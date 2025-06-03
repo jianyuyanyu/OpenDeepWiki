@@ -12,7 +12,8 @@ namespace KoalaWiki.KoalaWarehouse.GenerateThinkCatalogue;
 
 public class GenerateThinkCatalogueService
 {
-    public static async Task<(DocumentResultCatalogue catalogue, Exception? exception)> GenerateThinkCatalogue(string path,
+    public static async Task<(DocumentResultCatalogue catalogue, Exception? exception)> GenerateThinkCatalogue(
+        string path,
         string catalogue, string gitRepository,
         Warehouse warehouse, ClassifyType? classify)
     {
@@ -71,7 +72,7 @@ public class GenerateThinkCatalogueService
                 }
 
                 result =
-                    await GenerateCatalogue(str.ToString(), path, gitRepository, catalogue, warehouse,classify);
+                    await GenerateCatalogue(str.ToString(), path, gitRepository, catalogue, warehouse, classify);
 
                 break;
             }
@@ -100,7 +101,6 @@ public class GenerateThinkCatalogueService
         string path, string gitRepository, string catalogue,
         Warehouse warehouse, ClassifyType? classify)
     {
-        
         string prompt = string.Empty;
         if (classify.HasValue)
         {
@@ -125,7 +125,7 @@ public class GenerateThinkCatalogueService
                 });
         }
 
-        
+
         DocumentResultCatalogue? result = null;
 
         var retryCount = 0;
@@ -168,21 +168,39 @@ public class GenerateThinkCatalogueService
                     str.Clear();
                     str.Append(extractedContent);
                 }
-
-                // 尝试使用```json
-                var jsonRegex = new Regex(@"```json(.*?)```", RegexOptions.Singleline);
-                var jsonMatch = jsonRegex.Match(str.ToString());
-                if (jsonMatch.Success)
+                else
                 {
-                    // 提取到的内容
-                    var extractedContent = jsonMatch.Groups[1].Value;
-                    str.Clear();
-                    str.Append(extractedContent);
+                    // 尝试使用```json
+                    var jsonRegex = new Regex(@"```json(.*?)```", RegexOptions.Singleline);
+                    var jsonMatch = jsonRegex.Match(str.ToString());
+                    if (jsonMatch.Success)
+                    {
+                        // 提取到的内容
+                        var extractedContent = jsonMatch.Groups[1].Value;
+                        str.Clear();
+                        str.Append(extractedContent);
+                    }
+                    else
+                    {
+                        var jsonContentRegex = new Regex(@"\{(?:[^{}]|(?<open>{)|(?<-open>}))*(?(open)(?!))\}",
+                            RegexOptions.Singleline);
+                        var jsonContentMatch = jsonContentRegex.Match(str.ToString());
+
+                        if (jsonContentMatch.Success)
+                        {
+                            // 提取到的内容
+                            var extractedContent = jsonMatch.Groups[1].Value;
+                            str.Clear();
+                            str.Append(extractedContent);
+                        }
+                    }
                 }
+
 
                 try
                 {
-                    result = JsonConvert.DeserializeObject<DocumentResultCatalogue>(str.ToString().Trim());
+                    result = JsonConvert.DeserializeObject<DocumentResultCatalogue>(str.ToString().Trim()
+                        .TrimStart("json"));
                 }
                 catch (Exception ex)
                 {

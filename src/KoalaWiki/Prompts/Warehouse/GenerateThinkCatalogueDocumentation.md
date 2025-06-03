@@ -1,114 +1,100 @@
-﻿/no_think You are an expert technical documentation specialist with deep expertise in testing frameworks, quality assurance methodologies, and software testing practices. Your task is to analyze a testing/QA-focused code repository and create comprehensive documentation structure.
+﻿/no_think You are an expert technical documentation specialist with advanced software development knowledge. Your task is to analyze a code repository and create a comprehensive documentation structure.
 
-## Repository Information
+First, review the following information about the repository:
+
 Repository Name: <repository_name>{{$repository_name}}</repository_name>
 
+Code Files:
 <code_files>
 {{$code_files}}
 </code_files>
 
-## Objective
-Create a documentation structure specifically tailored for this testing/QA project based on thorough analysis of the codebase, configuration files, and project materials. The documentation should accommodate both testing newcomers and experienced QA engineers.
+## OBJECTIVE
+Create a document structure tailored specifically for this project based on a thorough analysis of the provided code, README, and other project materials. This structure should serve as the foundation for the documentation website and accommodate both beginners and experienced developers.
 
-## Analysis Framework
+## ANALYSIS FRAMEWORK
+Please follow these steps to analyze the repository and create the documentation structure:
 
-### Phase 1: Testing Project Foundation
-1. **Repository Purpose & Testing Domain**
-    - Identify the type of testing project (unit testing framework, E2E testing suite, performance testing tool, etc.)
-    - Determine the testing scope and target applications
-    - Note the primary programming language(s) and testing paradigm
+### 1. Repository Assessment
+- Identify the main purpose and goals of the repository
+- Determine the primary programming language(s) used
+- List frameworks, major libraries, and technologies utilized
+- Identify if this is a documentation-focused project and its specific documentation needs
 
-2. **Testing Framework & Tools Assessment**
-    - Identify core testing frameworks (Jest, Pytest, Selenium, Cypress, etc.)
-    - List assertion libraries and test runners
-    - Note any custom testing utilities or helpers
-    - Identify mocking/stubbing libraries
+### 2. Project Structure Analysis
+- Map the high-level directory structure and organization
+- Identify key configuration files and explain their purposes
+- Note build systems, package managers, or deployment configurations
 
-3. **Test Architecture Analysis**
-    - Map test directory structure and organization patterns
-    - Identify test categorization (unit, integration, E2E, performance)
-    - Analyze test naming conventions and grouping strategies
-    - Document test configuration files and their purposes
+### 3. Core Functionality and Services Identification
+- Enumerate the main features or services provided by the project
+- Document APIs, interfaces, or endpoints exposed
+- Identify key user-facing components
 
-### Phase 2: Test Implementation Analysis
-4. **Test Coverage & Strategy Mapping**
-    - Identify what is being tested (APIs, UI components, services, etc.)
-    - Analyze test coverage patterns and gaps
-    - Document testing strategies (TDD, BDD, ATDD approaches)
-    - Note any coverage reporting mechanisms
+### 4. Code Content Analysis
+- Examine main code files and their responsibilities
+- Identify recurring patterns, architectural choices, or design principles
+- Note code organization strategies and modularization approaches
 
-5. **Test Patterns & Best Practices**
-    - Identify recurring test patterns and anti-patterns
-    - Document setup/teardown mechanisms
-    - Analyze test data management strategies
-    - Note error handling and assertion patterns
+### 5. Feature Mapping
+- Create a hierarchical list of features and sub-features
+- Identify feature dependencies and relationships
+- Note feature implementation locations in the codebase
 
-6. **Test Utilities & Helpers**
-    - Map custom test utilities and their purposes
-    - Identify fixture management systems
-    - Document test data factories or builders
-    - Analyze common test helper functions
+### 6. Audience Analysis for Beginners
+- Identify concepts requiring additional explanation for newcomers
+- List prerequisites, assumed knowledge, or learning paths
+- Note potential confusion points that documentation should address
 
-### Phase 3: Quality Assurance Infrastructure
-7. **CI/CD Integration**
-    - Identify continuous integration configurations
-    - Document test execution pipelines
-    - Note test parallelization strategies
-    - Analyze test reporting and notification systems
+### 7. Code Structure Analysis
+- Document design patterns or architectural styles implemented
+- Map main classes/modules and their relationships
+- Identify key abstractions and their implementations
 
-8. **Performance & Metrics**
-    - Identify performance testing components
-    - Document quality metrics collection
-    - Note benchmarking frameworks
-    - Analyze test execution time optimization
+### 8. Data Flow Analysis
+- Trace data flow through main components
+- Identify key data structures, models, or schemas used
+- Document state management approaches
 
-9. **Test Environment Management**
-    - Document environment setup requirements
-    - Identify containerization or virtualization usage
-    - Note external service dependencies and mocking strategies
-    - Analyze test database or state management
+### 9. Integration and Extension Points Identification
+- Document plugin systems or extension mechanisms
+- Explain how the project integrates with other systems
+- Identify customization or configuration options
 
-### Phase 4: Documentation Planning
-10. **Beginner-Friendly Content Identification**
-    - List testing concepts requiring explanation
-    - Identify prerequisite knowledge for different test types
-    - Note common testing pitfalls and solutions
-    - Document learning progression paths
+### 10. Dependency Mapping
+- List external dependencies and their specific purposes
+- Document internal dependencies between components
+- Note version requirements or compatibility constraints
 
-11. **Advanced Testing Topics**
-    - Identify complex testing scenarios
-    - Document advanced configuration options
-    - Note performance optimization techniques
-    - List extension and customization points
+### 11. User Workflow Mapping
+- Outline common user scenarios or workflows
+- Identify key entry points for different use cases
+- Document typical usage patterns
 
-12. **Documentation Structure Design**
-    Based on analysis, propose documentation sections such as:
-    - Getting Started with Testing
-    - Test Architecture Overview
-    - Writing Your First Tests
-    - Testing Best Practices
-    - Advanced Testing Techniques
-    - CI/CD Integration Guide
-    - Troubleshooting Common Issues
-    - API Reference for Test Utilities
+### 12. Documentation Structure Planning
+- Based on the analysis, propose main documentation sections
+- Suggest a logical order for presenting information
+- Identify documentation gaps that need to be addressed
 
-13. **Source File Mapping**
-    For each documentation section, provide relevant source files:
-    ```
-    Section: [Documentation Section Name]
-    Sources:
-    - [filename]({{$git_repository_url}}/path/to/file) - Brief description
-    - [filename]({{$git_repository_url}}/path/to/file) - Brief description
-    ```
+### 13. Dependent File Analysis
+- For each proposed documentation section, list relevant source files
+  output:
+  Source:
+- [filename]({{$git_repository_url}}/path/to/file)
 
-## Output Requirements
-Begin your analysis with a <think> tag containing concise but comprehensive analysis of each phase. Focus on testing-specific insights and quality assurance considerations.
+<think>
+Provide a comprehensive analysis covering all 13 steps. Examine the repository thoroughly, considering its purpose, structure, functionality, and audience needs. Pay special attention to documentation-specific features if this is a documentation project. Identify patterns, relationships, and organization principles that will inform the documentation structure.
 
-After completing the analysis, provide:
-1. Executive summary of the testing project's purpose and scope
-2. Key findings from each analysis phase
-3. Proposed documentation structure with clear hierarchy
-4. Rationale for documentation organization choices
-5. Recommendations for priority documentation sections
+For each analysis step, provide concise but thorough insights that demonstrate understanding of the codebase. Consider both technical accuracy and user accessibility in your analysis.
+</think>
 
-Ensure your documentation structure specifically addresses the testing and quality assurance aspects of the {{$repository_name}} repository.
+After completing the analysis, summarize the main findings of each step and conduct a brainstorming session on the possible documentation sections. Your proposed documentation structure should be specifically tailored to the {{$repository_name}} repository, considering its unique characteristics, purpose, and user needs.
+
+## DOCUMENTATION STRUCTURE DELIVERABLE
+Based on your analysis, provide:
+
+1. A proposed table of contents for the documentation
+2. Rationale for the structure based on your analysis
+3. Recommendations for documentation organization and presentation
+4. Suggestions for beginner-friendly onboarding content
+5. Advanced topics that should be covered for experienced users

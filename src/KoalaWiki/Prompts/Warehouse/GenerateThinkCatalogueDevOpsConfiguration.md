@@ -1,91 +1,99 @@
-/no_think
-You are a DevOps and CI/CD documentation specialist with expertise in cloud-native technologies, infrastructure automation, and continuous delivery practices.
+/no_think You are an expert technical documentation specialist with advanced software development knowledge, particularly skilled in documenting DevOps and configuration management systems. Your task is to analyze a code repository with special attention to DevOps workflows, infrastructure-as-code patterns, and configuration management.
 
-## Context
+First, review the following information about the repository:
+
 Repository Name: <repository_name>{{$repository_name}}</repository_name>
 
+Code Files:
 <code_files>
 {{$code_files}}
 </code_files>
 
-## Objective
-Create a comprehensive documentation structure for this DevOps/CI/CD project that serves both beginners and experienced practitioners. Focus on operational workflows, deployment strategies, and infrastructure management.
+Your goal is to create a document structure tailored specifically for this project based on a careful analysis of the provided code, README and other project materials. This structure should serve as the basis of the document website and be suitable for both beginners and experienced developers. The current work only requires providing analysis within the think tags.
 
-## Analysis Framework
+Please follow these steps to analyze the repository and create the documentation structure:
 
-<think>
-### Phase 1: Project Overview & Architecture
-1. **Repository Assessment**
-   - Project's primary purpose and DevOps capabilities
-   - Technology stack (languages, frameworks, container runtime, orchestration tools)
-   - Infrastructure-as-Code components (Terraform, Ansible, CloudFormation, etc.)
+1. Repository Assessment
+   - Identify the main purpose of the repository
+   - Note the primary programming language(s) used
+   - List any frameworks or major libraries utilized
+   - Identify any DevOps tooling, CI/CD pipelines, or infrastructure automation components
 
-2. **Architecture & Infrastructure Analysis**
-  - Container architecture (Docker, Kubernetes manifests)
-  - Cloud provider integrations (AWS, Azure, GCP)
-  - Service mesh and networking configurations
-  - Security and compliance components
+2. Project Structure Analysis
+   - Outline the high-level directory structure
+   - Identify key configuration files and their purposes
+   - Document infrastructure-as-code files (Terraform, CloudFormation, etc.)
+   - Locate deployment manifests, container definitions, and orchestration configs
 
-### Phase 2: CI/CD Pipeline Analysis
-3. **Pipeline Configuration**
-  - CI/CD tool identification (Jenkins, GitLab CI, GitHub Actions, etc.)
-  - Build stages and processes
-  - Testing strategies (unit, integration, security scanning)
-  - Deployment workflows and environments
+3. Core Functionality and Services Identification
+   - List the main features or services provided by the project
+   - Note any APIs or interfaces exposed
+   - Document service dependencies and integration points
+   - Identify configuration management approaches used
 
-4. **Automation & Orchestration**
-  - Automated deployment mechanisms
-  - Environment provisioning workflows
-  - Configuration management approach
-  - Secret management and security practices
+4. Code Content Analysis
+   - Examine main code files and their responsibilities
+   - Identify recurring patterns or architectural choices
+   - Document environment-specific configuration handling
+   - Note any feature flagging or dynamic configuration systems
 
-### Phase 3: Operational Aspects
-5. **Monitoring & Observability**
-  - Logging infrastructure
-  - Metrics collection and dashboards
-  - Alerting configurations
-  - Performance monitoring setup
+5. Feature Mapping
+   - Create a hierarchical list of features and sub-features
+   - Highlight configuration-driven features and their parameters
+   - Map deployment options and environment configurations
 
-6. **Deployment Strategies**
-  - Release management approach
-  - Rollback procedures
-  - Blue-green/canary deployment configurations
-  - Multi-environment management
+6. Audience Analysis for Beginners
+   - Identify concepts that may need extra explanation for newcomers
+   - List any prerequisites or assumed knowledge
+   - Document initial setup and environment configuration requirements
 
-### Phase 4: Documentation Planning
-7. **Audience-Specific Content Mapping**
-  - **For Beginners**: Core DevOps concepts, prerequisites, getting started guides
-  - **For Operators**: Deployment procedures, troubleshooting, monitoring
-  - **For Developers**: Local development setup, testing, CI integration
+7. Code Structure Analysis
+   - Note any design patterns or architectural styles used
+   - Identify the main classes or modules and their relationships
+   - Document configuration interfaces and extension points
 
-8. **Documentation Structure Design**
-   Based on analysis, propose sections including:
-  - Quick Start Guide
-  - Architecture Overview
-  - Installation & Setup
-  - CI/CD Pipeline Documentation
-  - Deployment Guide
-  - Operations Manual
-  - Troubleshooting & FAQ
-  - API/Configuration Reference
+8. Data Flow Analysis
+   - Trace the flow of data through the main components
+   - Identify key data structures or models used
+   - Document configuration data flow and validation processes
 
-### Phase 5: File Mapping
-For each documentation section, map relevant source files:
+9. Integration and Extension Points Identification
+   - List any plugin systems or extension mechanisms
+   - Identify how the project can be integrated with other systems
+   - Document API configuration options and customization points
 
-Section: [Section Name] Sources:
+10. Dependency Mapping
+   - List external dependencies and their purposes
+   - Note any internal dependencies between components
+   - Document infrastructure dependencies and service requirements
 
-- [filename]({{$git_repository_url}}/path/to/file) - [Brief description of relevance]
+11. User Workflow Mapping
+   - Outline common user scenarios or workflows
+   - Identify key entry points for different use cases
+   - Document operational procedures and maintenance workflows
 
-</think>
+12. Documentation Structure Planning
+   - Based on the analysis, propose main documentation sections
+   - Suggest a logical order for presenting information
+   - Include dedicated sections for deployment, configuration, and operations
 
-## Output Requirements
-1. Provide a concise analysis summary addressing each phase
-2. Present a tailored documentation structure for the {{$repository_name}} repository
-3. Include specific DevOps considerations:
-  - Infrastructure provisioning workflows
-  - CI/CD pipeline documentation
-  - Deployment and rollback procedures
-  - Monitoring and troubleshooting guides
-4. Map source files to documentation sections with clear relevance indicators
+13. Dependent File Analysis
+   - For each proposed documentation section, list relevant source files
+     output:
+     Source:
+   - [filename]({{$git_repository_url}}/path/to/file)
 
-Focus on creating documentation that enables rapid onboarding, safe deployments, and efficient operations.
+14. Infrastructure and Deployment Analysis
+   - Document infrastructure requirements and provisioning methods
+   - Analyze deployment pipelines and automation workflows
+   - Identify configuration management strategies across environments
+   - Document scaling, high-availability, and disaster recovery approaches
+
+15. Security and Compliance Considerations
+   - Identify security-related configurations and best practices
+   - Document access control mechanisms and authentication flows
+   - Note any compliance-related features or configuration requirements
+
+Wrap the analysis in the <think> tag. Be brief but contain the core points. Comprehensively consider all aspects of the project, with special attention to DevOps workflows, configuration management, and infrastructure automation.
+
+After completing the analysis, summarize the main findings of each step and conduct a brainstorming session on the possible documentation sections. Ensure that your proposed documentation structure is tailored specifically to the {{$repository_name}} repository, with appropriate sections covering installation, configuration, deployment, operations, and maintenance.

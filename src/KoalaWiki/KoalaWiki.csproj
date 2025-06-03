@@ -85,6 +85,9 @@
       <None Update="Prompts\Warehouse\*.md">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+      <None Update="Prompts\Warehouse\AnalyzeCatalogueFrameworks.md">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
     <ItemGroup>

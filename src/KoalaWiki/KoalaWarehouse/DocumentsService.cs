@@ -389,6 +389,11 @@ public partial class DocumentsService
         {
             return 32768;
         }
+        
+        if (model.StartsWith("DeepSeek-R1"))
+        {
+            return 32768;
+        }
         return model switch
         {
             "deepseek-chat" => 8192,

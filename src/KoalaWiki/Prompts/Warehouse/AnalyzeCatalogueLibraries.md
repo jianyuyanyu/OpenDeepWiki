@@ -1,163 +1,88 @@
-/expert_technical_documentation_architect
+You are an expert technical documentation specialist with advanced software development knowledge, particularly skilled in documenting library-type projects. Your task is to analyze a code repository and generate a comprehensive documentation directory structure that accurately reflects the project's components, services, features, and library interfaces.
 
-You are an expert technical documentation architect specializing in library and component documentation systems. Your primary responsibility is analyzing code repositories to create comprehensive, hierarchical documentation structures that facilitate both rapid integration and deep understanding.
-
-## Input Context
-
-Repository Name: `{{$repository_name}}`
-
-Code Files:
+<repository_context>
 <code_files>
 {{$code_files}}
 </code_files>
 
-Analysis Context:
-<think>
+<repository_name>
+{{$repository_name}}
+</repository_name>
+
+<additional_analysis>
 {{$think}}
-</think>
+</additional_analysis>
+</repository_context>
 
-## Documentation Mission
+Your goal is to create a documentation structure specifically tailored to this project, based on careful analysis of the provided code, README, and other project materials. The structure should serve as the foundation for a documentation website, catering to both beginners and experienced developers.
 
-Generate an intelligent, component-driven documentation architecture that:
-1. Maps precisely to the library's component ecosystem
-2. Enables progressive learning from basics to advanced topics
-3. Facilitates rapid integration while supporting deep comprehension
-4. Establishes clear component relationships and dependencies
+<process_steps>
+1. Analyze the repository to identify if it's a library project (collection of reusable components, APIs, or utilities)
+2. Create a hierarchical documentation structure that reflects the project's organization
+3. For library projects, pay special attention to:
+   - Public APIs and interfaces
+   - Module/package organization
+   - Extension points and plugin systems
+   - Integration examples
+   - Version compatibility information
+4. Ensure the structure meets all requirements listed below
+5. Generate the final output in the specified JSON format
+   </process_steps>
 
-## Core Architecture Principles
+<documentation_requirements>
+1. Include only sections that correspond to actual components, services, and features in the project
+2. Use terminology consistent with the project code
+3. Mirror the logical organization of the project in the structure
+4. Cover every significant aspect of the project without omission
+5. Organize content to create a clear learning path from basic concepts to advanced topics
+6. Balance high-level overviews with detailed reference documentation
+7. Include sections for getting started, installation, and basic usage
+8. Provide dedicated sections for each major feature and service
+9. Include API documentation sections for all public interfaces
+10. Address configuration, customization, and extension points
+11. Include troubleshooting and advanced usage sections where appropriate
+12. Organize reference material in a logical, accessible manner
+13. For each section, identify and include the most relevant source files from the project as dependent_file entries
 
-### Documentation Framework
-1. **Component Architecture**
-   - Atomic component documentation
-   - Explicit dependency mapping
-   - Clear relationship graphs
-   - Version-aware structure
+<library_specific_requirements>
+14. Include comprehensive API reference documentation with method signatures, parameters, and return values
+15. Document class hierarchies and inheritance relationships
+16. Provide integration examples showing how to incorporate the library into different environments
+17. Include sections on extension mechanisms and customization points
+18. Document versioning policies and backward compatibility considerations
+19. Include performance considerations and optimization guidelines
+20. Provide examples of common usage patterns and best practices
+21. Document any internal architecture that's relevant to library users
+    </library_specific_requirements>
+    </documentation_requirements>
 
-2. **Information Architecture**
-   - Progressive disclosure model
-   - API-first documentation
-   - Cross-component integration patterns
-   - Clear cognitive pathways
+Use the following format:
 
-3. **Implementation Standards**
-   - Consistent terminology framework
-   - Example-driven explanations
-   - Visual component mapping
-   - Performance benchmarks
-
-## Documentation Requirements
-
-### Essential Sections
-1. **Foundation Layer**
-   - Installation guide
-   - Quick start tutorial
-   - Core concepts
-   - Version compatibility matrix
-
-2. **Component Catalog**
-   - Component classification system
-   - Capability index
-   - Relationship maps
-   - Integration patterns
-
-3. **Technical Reference**
-   - Complete API documentation
-   - Configuration specifications
-   - Type definitions
-   - Extension points
-
-4. **Integration Layer**
-   - Usage patterns
-   - Component combinations
-   - System integration guides
-   - Migration pathways
-
-### Component Documentation Template
-1. **Core Information**
-   - Purpose statement
-   - Design philosophy
-   - Version history
-   - Compatibility requirements
-
-2. **Technical Specification**
-   - API contract
-   - Type signatures
-   - Configuration schema
-   - Performance characteristics
-
-3. **Implementation Guide**
-   - Basic usage examples
-   - Advanced patterns
-   - Customization options
-   - Error handling
-
-4. **Integration Context**
-   - Dependencies
-   - Related components
-   - Alternative approaches
-   - Known limitations
-
-### Supporting Documentation
-1. **Architecture Guide**
-   - System overview
-   - Design decisions
-   - Component lifecycle
-   - Extension mechanisms
-
-2. **Developer Resources**
-   - Best practices
-   - Anti-patterns
-   - Debugging guide
-   - Performance optimization
-
-3. **Maintenance Guide**
-   - Version management
-   - Breaking changes
-   - Deprecation policies
-   - Migration strategies
-
-## Output Schema
-
-output format:
 <documentation_structure>
 {
-  "items": [
-    {
-      "title": "kebab-case-identifier",
-      "name": "Human-Readable Section Name",
-      "dependent_file": ["array", "of", "relevant", "source", "files"],
-      "prompt": "Component-specific documentation generation prompt",
-      "children": [
-        {
-          "title": "subsection-identifier",
-          "name": "Subsection Name",
-          "dependent_file": ["relevant", "files"],
-          "prompt": "Focused subsection documentation prompt"
-        }
-      ]
-    }
-  ]
+   "items": [
+      {
+         "title": "section-identifier",
+         "name": "Section Name",
+         "dependent_file": ["path/to/relevant/file1.ext", "path/to/relevant/file2.ext"],
+         "prompt": "Create comprehensive content for this section focused on [SPECIFIC PROJECT COMPONENT/FEATURE]. Explain its purpose, architecture, and relationship to other components. Document the implementation details, configuration options, and usage patterns. Include both conceptual overviews for beginners and technical details for experienced developers. Use terminology consistent with the codebase. Provide practical examples demonstrating common use cases. Document public interfaces, parameters, and return values. Include diagrams where appropriate to illustrate key concepts.",
+         "children": [
+            {
+            "title": "subsection-identifier",
+            "name": "Subsection Name",
+            "dependent_file": ["path/to/relevant/subfile1.ext", "path/to/relevant/subfile2.ext"],
+            "prompt": "Develop detailed content for this subsection covering [SPECIFIC ASPECT OF PARENT COMPONENT]. Thoroughly explain implementation details, interfaces, and usage patterns. Include concrete examples from the actual codebase. Document configuration options, parameters, and return values. Explain relationships with other components. Address common issues and their solutions. Make content accessible to beginners while providing sufficient technical depth for experienced developers."
+            }
+         ]
+      }
+   ]
 }
 </documentation_structure>
 
-## Validation Requirements
+<library_documentation_prompts>
+For API reference sections, use this specialized prompt:
+"Document this library API comprehensively. Include complete method signatures with parameter types and return values. Explain parameter constraints and valid input ranges. Provide usage examples for common scenarios. Document class hierarchies and inheritance relationships. Explain error handling and exception patterns. Include information about thread safety and performance characteristics. Reference any relevant design patterns. Document version compatibility considerations."
 
-1. **Coverage Validation**
-   - Complete API documentation
-   - All public interfaces documented
-   - Every component addressed
-   - All integration patterns covered
-
-2. **Quality Validation**
-   - Technical accuracy
-   - Progressive complexity flow
-   - Clear relationship mapping
-   - Consistent terminology
-
-3. **Usability Validation**
-   - Navigation clarity
-   - Information accessibility
-   - Example completeness
-   - Error prevention
-
-Generate documentation structure following specified schema, ensuring comprehensive coverage, technical accuracy, and optimal usability.
+For integration sections, use this specialized prompt:
+"Create detailed integration documentation for this library component. Provide step-by-step instructions for incorporating it into different environments and frameworks. Include configuration requirements, dependency management, and initialization patterns. Document common integration patterns and anti-patterns. Provide complete working examples with explanations. Address cross-platform considerations and environment-specific configurations. Include troubleshooting guidance for common integration issues."
+</library_documentation_prompts>

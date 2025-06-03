@@ -15,5 +15,34 @@ namespace KoalaWiki.Extensions
         {
             return !string.IsNullOrWhiteSpace(value) ? value.Trim() : value ?? string.Empty;
         }
+
+        public static string Trim(this string value)
+        {
+            return !string.IsNullOrWhiteSpace(value) ? value.Trim() : string.Empty;
+        }
+
+        public static string TrimStart(this string value, string trimChar)
+        {
+            if (value.StartsWith(trimChar))
+            {
+                return value.Substring(trimChar.Length);
+            }
+            else
+            {
+                return value;
+            }
+        }
+
+        public static string TrimEnd(this string value, string trimChar)
+        {
+            if (value.EndsWith(trimChar))
+            {
+                return value.Substring(0, value.Length - trimChar.Length);
+            }
+            else
+            {
+                return value;
+            }
+        }
     }
 }

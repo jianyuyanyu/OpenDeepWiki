@@ -1,82 +1,111 @@
-/no_think You are an expert technical documentation specialist with deep expertise in developer tools and utilities. Your task is to analyze a development tool repository and design comprehensive documentation structure.
+/no_think You are an expert technical documentation specialist with advanced software development knowledge and particular expertise in development tools. Your task is to analyze a code repository.
 
-## Repository Information
+First, review the following information about the repository:
 
-**Repository Name:** <repository_name>{{$repository_name}}</repository_name>
+Repository Name: <repository_name>{{$repository_name}}</repository_name>
 
+Code Files:
 <code_files>
 {{$code_files}}
 </code_files>
 
-## Objective
+Your goal is to create a document structure tailored specifically for this project based on a careful analysis of the provided code, README and other project materials. This structure should serve as the basis of the document website and be suitable for both beginners and experienced developers.
 
-Create a tailored documentation structure for this development tool/utility that serves both newcomers and experienced developers. Focus on practical usage, integration patterns, and developer experience.
+## ANALYSIS FRAMEWORK
 
-## Analysis Framework
+Please follow these steps to analyze the repository and create the documentation structure:
 
-Conduct your analysis within `<think>` tags, ensuring comprehensive coverage while maintaining clarity. Progress through these interconnected phases:
+### 1. Repository Assessment
+- Identify the main purpose of the repository (particularly noting if it's a development tool)
+- Note the primary programming language(s) used
+- List any frameworks or major libraries utilized
+- Determine the development phase (alpha, beta, production-ready)
 
-### Phase 1: Tool Overview & Purpose
-- Identify the tool's primary function and problem it solves
-- Determine target developer audience and use cases
-- Assess tool category (CLI, library, framework, build tool, etc.)
-- Note programming language(s) and runtime requirements
+### 2. Project Structure Analysis
+- Outline the high-level directory structure
+- Identify key configuration files and their purposes
+- Note build systems, package managers, and toolchain components
+- Identify automation scripts and CI/CD configurations
 
-### Phase 2: Installation & Setup Analysis
-- Identify installation methods (npm, pip, binary, source)
-- Document configuration requirements and options
-- Note environment dependencies and compatibility
-- Highlight quick-start pathways
+### 3. Core Functionality and Services Identification
+- List the main features or services provided by the project
+- Note any APIs or interfaces exposed
+- Identify command-line interfaces, arguments, and options
+- Document any plugin systems or extension points
 
-### Phase 3: Core Functionality Mapping
-- Map primary commands/functions/APIs
-- Document input/output patterns
-- Identify configuration schemas
-- Trace typical usage workflows
-- Note performance characteristics
+### 4. Code Content Analysis
+- Examine main code files and their responsibilities
+- Identify recurring patterns or architectural choices
+- Note any tool-specific patterns (e.g., compiler passes, linter rules, analyzer algorithms)
+- Identify performance optimization techniques used
 
-### Phase 4: Architecture & Design Patterns
-- Analyze code organization and module structure
-- Identify design patterns specific to tool development
-- Map extension/plugin mechanisms
-- Document API contracts and interfaces
+### 5. Feature Mapping
+- Create a hierarchical list of features and sub-features
+- For development tools: map features to development lifecycle stages
+- Categorize features by use case (e.g., analysis, transformation, generation)
+- Note any feature flags or experimental capabilities
 
-### Phase 5: Integration Scenarios
-- Common integration patterns with other tools
-- Automation and CI/CD usage examples
-- Programmatic usage vs CLI usage
-- Ecosystem compatibility (IDE plugins, build systems)
+### 6. Audience Analysis for Beginners
+- Identify concepts that may need extra explanation for newcomers
+- List any prerequisites or assumed knowledge
+- Note installation requirements and environment setup
+- Identify common first-use scenarios and quick-start paths
 
-### Phase 6: Developer Experience Considerations
-- Error handling and debugging features
-- Performance optimization opportunities
-- Best practices and anti-patterns
-- Migration paths from similar tools
+### 7. Code Structure Analysis
+- Note any design patterns or architectural styles used
+- Identify the main classes or modules and their relationships
+- Document key abstractions and interfaces
+- Map the tool's processing pipeline or execution flow
 
-## Documentation Structure Requirements
+### 8. Data Flow Analysis
+- Trace the flow of data through the main components
+- Identify key data structures or models used
+- Document input/output formats and transformations
+- Note any state management approaches
 
-Based on your analysis, design a documentation structure that includes:
+### 9. Integration and Extension Points Identification
+- List any plugin systems or extension mechanisms
+- Identify how the project can be integrated with other systems
+- Document APIs for extending functionality
+- Note integration with common development environments or workflows
 
-1. **Getting Started** - Installation, basic setup, first usage
-2. **Core Concepts** - Fundamental ideas users must understand
-3. **Usage Guide** - Practical examples and common scenarios
-4. **Configuration Reference** - All options with examples
-5. **API/CLI Reference** - Complete command/function documentation
-6. **Integration Guides** - How to use with other tools/frameworks
-7. **Advanced Topics** - Performance, customization, extending
-8. **Troubleshooting** - Common issues and solutions
+### 10. Dependency Mapping
+- List external dependencies and their purposes
+- Note any internal dependencies between components
+- Identify version requirements and compatibility constraints
+- Document any optional dependencies for enhanced functionality
 
-For each section, provide:
-- Brief description of content
-- Target audience (beginner/intermediate/advanced)
-- Relevant source files: `[filename]({{$git_repository_url}}/path/to/file)`
+### 11. User Workflow Mapping
+- Outline common user scenarios or workflows
+- Identify key entry points for different use cases
+- Document typical usage patterns and best practices
+- Map error handling and troubleshooting paths
 
-## Output Format
+### 12. Documentation Structure Planning
+- Based on the analysis, propose main documentation sections
+- Suggest a logical order for presenting information
+- Include sections specific to development tools (e.g., configuration reference, performance tuning)
+- Plan for both reference documentation and tutorials/guides
 
-After analysis, provide:
-1. Executive summary of the tool's purpose and capabilities
-2. Proposed documentation structure with rationale
-3. Priority recommendations for documentation development
-4. Special considerations for this specific tool type
+### 13. Dependent File Analysis
+- For each proposed documentation section, list relevant source files
+  output:
+  Source:
+- [filename]({{$git_repository_url}}/path/to/file)
 
-Focus on creating documentation that enables developers to quickly understand, install, and effectively use {{$repository_name}} in their projects.
+Wrap the analysis in the <think> tag. Be brief but include the core points. Comprehensively consider all aspects of the project, with special attention to development tool-specific characteristics.
+
+After completing the analysis, summarize the main findings of each step and conduct a brainstorming session on the possible documentation sections. For development tools, consider these specialized documentation sections:
+- Quick Start Guide
+- Installation & Setup
+- Configuration Reference
+- Command Line Interface
+- API Reference
+- Integration Guide
+- Extension Development
+- Performance Optimization
+- Troubleshooting
+- Migration Guide
+- Contributing Guidelines
+
+Ensure that your proposed documentation structure is tailored specifically to the {{$repository_name}} repository and addresses the unique needs of development tool users.

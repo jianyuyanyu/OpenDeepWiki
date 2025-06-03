@@ -11,8 +11,29 @@ export const extractHeadings = (markdown: string): {key: string, title: string, 
     const level = match[1].length;
     const title = match[2];
     const key = `heading-${index}`;
-    // 生成ID，用于锚点定位
-    const id = title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u4e00-\u9fa5-]/g, '');
+    
+    // 生成有效的CSS ID，移除或转换特殊字符
+    let id = title
+      .toLowerCase()
+      .trim()
+      // 移除Markdown标记
+      .replace(/[*_`~]/g, '')
+      // 将空格和特殊字符替换为连字符
+      .replace(/[\s\-\.\,\!\?\:\;\(\)\[\]\{\}\/\\]+/g, '-')
+      // 移除中文字符和其他非ASCII字符，替换为拼音或移除
+      .replace(/[\u4e00-\u9fa5]/g, '')
+      // 移除其他特殊字符
+      .replace(/[^\w\-]/g, '')
+      // 移除开头和结尾的连字符
+      .replace(/^-+|-+$/g, '')
+      // 确保不为空，如果为空则使用索引
+      || `heading-${index}`;
+    
+    // 确保ID以字母开头（CSS要求）
+    if (!/^[a-zA-Z]/.test(id)) {
+      id = `heading-${id}`;
+    }
+    
     
     return { key, title, level, id };
   });
