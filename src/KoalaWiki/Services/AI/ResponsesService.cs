@@ -6,15 +6,8 @@ using System.Text.Json.Nodes;
 using System.Web;
 using FastService;
 using KoalaWiki.Dto;
-using KoalaWiki.Functions;
-using KoalaWiki.Prompts;
 using KoalaWiki.Tools;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.OpenAI;
-using OpenAI.Chat;
-using ChatMessageContent = Microsoft.SemanticKernel.ChatMessageContent;
 
 #pragma warning disable SKEXP0001
 
@@ -91,7 +84,7 @@ public class ResponsesService(IKoalaWikiContext koala) : FastApi
         kernelCreateActivity?.SetTag("kernel.path", path);
         kernelCreateActivity?.SetTag("kernel.model", OpenAIOptions.ChatModel);
 
-        var kernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+        var kernel =await  KernelFactory.GetKernel(OpenAIOptions.Endpoint,
             OpenAIOptions.ChatApiKey, path, OpenAIOptions.ChatModel, false);
 
         kernelCreateActivity?.SetStatus(ActivityStatusCode.Ok);
@@ -118,12 +111,13 @@ public class ResponsesService(IKoalaWikiContext koala) : FastApi
         var chat = kernel.GetRequiredService<IChatCompletionService>();
 
         var history = new ChatHistory();
+        history.AddSystemEnhance();
 
         string tree = document.GetCatalogueSmartFilterOptimized();
 
         if (input.DeepResearch)
         {
-            history.AddSystemMessage(await PromptContext.Chat(nameof(PromptConstant.Chat.ResponsesDeepResearch),
+            history.AddUserMessage(await PromptContext.Chat(nameof(PromptConstant.Chat.ResponsesDeepResearch),
                 new KernelArguments()
                 {
                     ["catalogue"] = tree,
@@ -134,7 +128,7 @@ public class ResponsesService(IKoalaWikiContext koala) : FastApi
         }
         else
         {
-            history.AddSystemMessage(await PromptContext.Chat(nameof(PromptConstant.Chat.Responses),
+            history.AddUserMessage(await PromptContext.Chat(nameof(PromptConstant.Chat.Responses),
                 new KernelArguments()
                 {
                     ["catalogue"] = tree,
@@ -182,17 +176,13 @@ public class ResponsesService(IKoalaWikiContext koala) : FastApi
                     {
                         contents.Add(new TextContent(messageContentInput.Content));
                     }
-                    else if (messageContentInput.Type == ResponsesMessageContentType.Image &&
-                             messageContentInput.ImageContents != null)
+                    else if (messageContentInput is { Type: ResponsesMessageContentType.Image, ImageContents: not null })
                     {
                         foreach (var imageContent in messageContentInput.ImageContents)
                         {
                             contents.Add(new BinaryContent(
                                 $"data:{imageContent.MimeType};base64,{imageContent.Data}"));
                         }
-                    }
-                    else
-                    {
                     }
                 }
             }

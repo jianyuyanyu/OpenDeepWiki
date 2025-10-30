@@ -1,5 +1,4 @@
 set URLS=http://localhost:5085
-set KOALAWIKI_REPOSITORIES=/repositories
 REM 每个用户AI处理文档生成的最大并行数量
 SET TASK_MAX_SIZE_PER_USER=5
 REM 必须要支持function的模型

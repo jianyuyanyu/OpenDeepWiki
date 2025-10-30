@@ -1,19 +1,11 @@
 ﻿using System.ComponentModel;
-using System.Text.Encodings.Web;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
-using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using OpenDeepWiki.CodeFoundation;
-using OpenDeepWiki.CodeFoundation.Utils;
+using System.Text.Json.Serialization;
 
 namespace KoalaWiki.Tools;
 
 public class FileTool(string gitPath, List<string>? files)
 {
-    private readonly CodeCompressionService _codeCompressionService = new();
-    private static readonly ConcurrentDictionary<string, Regex> _regexCache = new();
     private int _readTokens = 0;
 
     /// <summary>
@@ -62,12 +54,6 @@ public class FileTool(string gitPath, List<string>? files)
 
             // 读取整个文件内容
             string content = await File.ReadAllTextAsync(filePath);
-
-            // 如果启用代码压缩且是代码文件，则应用压缩
-            if (DocumentOptions.EnableCodeCompression && CodeFileDetector.IsCodeFile(filePath))
-            {
-                content = _codeCompressionService.CompressCode(content, filePath);
-            }
 
             _readTokens += TokenHelper.GetTokens(content);
 
@@ -527,12 +513,6 @@ public class FileTool(string gitPath, List<string>? files)
                        The current file contains empty text content.
                        </system-warning>
                        """;
-            }
-
-            // 如果启用代码压缩且是代码文件，先对整个文件内容进行压缩
-            if (DocumentOptions.EnableCodeCompression && CodeFileDetector.IsCodeFile(filePath))
-            {
-                fileContent = _codeCompressionService.CompressCode(fileContent, filePath);
             }
 
             // 将压缩后的内容按行分割

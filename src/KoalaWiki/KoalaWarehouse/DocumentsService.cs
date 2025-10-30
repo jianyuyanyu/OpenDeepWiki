@@ -91,7 +91,7 @@ public class DocumentsService(IDocumentProcessingOrchestrator orchestrator)
 
         Log.Logger.Information("开始优化目录结构");
 
-        var analysisModel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+        var analysisModel = await KernelFactory.GetKernel(OpenAIOptions.Endpoint,
             OpenAIOptions.ChatApiKey, path, OpenAIOptions.AnalysisModel);
 
         var codeDirSimplifier = analysisModel.Plugins["CodeAnalysis"]["CodeDirSimplifier"];
@@ -187,11 +187,11 @@ public class DocumentsService(IDocumentProcessingOrchestrator orchestrator)
             var catalogue = DocumentsHelper.GetCatalogue(path);
             activity?.SetTag("catalogue.length", catalogue?.Length ?? 0);
 
-            var kernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+            var kernel = await KernelFactory.GetKernel(OpenAIOptions.Endpoint,
                 OpenAIOptions.ChatApiKey,
                 path, OpenAIOptions.ChatModel);
 
-            var fileKernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+            var fileKernel = await KernelFactory.GetKernel(OpenAIOptions.Endpoint,
                 OpenAIOptions.ChatApiKey, path, OpenAIOptions.ChatModel, false);
 
             // 生成README

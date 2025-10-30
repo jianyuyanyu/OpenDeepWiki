@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Net;
+using KoalaWiki.MCP.ModelContextProtocol;
 using KoalaWiki.plugins;
 using KoalaWiki.Tools;
 
@@ -17,7 +18,7 @@ namespace KoalaWiki;
 /// </summary>
 public static class KernelFactory
 {
-    public static Kernel GetKernel(string chatEndpoint,
+    public static async Task<Kernel> GetKernel(string chatEndpoint,
         string apiKey,
         string gitPath,
         string model, bool isCodeAnalysis = true,
@@ -66,7 +67,7 @@ public static class KernelFactory
         else
         {
             activity?.SetStatus(ActivityStatusCode.Error, "不支持的模型提供者");
-            throw new Exception("暂不支持：" + OpenAIOptions.ModelProvider + "，请使用OpenAI、AzureOpenAI或Anthropic");
+            throw new Exception("暂不支持：" + OpenAIOptions.ModelProvider + "，请使用OpenAI、AzureOpenAI");
         }
 
         if (isCodeAnalysis)
@@ -80,16 +81,26 @@ public static class KernelFactory
         var fileFunction = new FileTool(gitPath, files);
         kernelBuilder.Plugins.AddFromObject(fileFunction, "file");
 
-        kernelBuilder.Plugins.AddFromType<AgentTool>();
+        kernelBuilder.Plugins.AddFromType<AgentTool>("agent");
         activity?.SetTag("plugins.agent_tool", "loaded");
 
         activity?.SetTag("plugins.file_function", "loaded");
 
-        if (DocumentOptions.EnableCodeDependencyAnalysis)
+        if (DocumentOptions.McpStreamable.Count > 0)
         {
-            var codeAnalyzeFunction = new CodeAnalyzeTool(gitPath);
-            kernelBuilder.Plugins.AddFromObject(codeAnalyzeFunction, "git");
-            activity?.SetTag("plugins.code_analyze_function", "loaded");
+            foreach (var mcpStreamable in DocumentOptions.McpStreamable)
+            {
+                try
+                {
+                    await kernelBuilder.Plugins.AddMcpFunctionsFromSseServerAsync(mcpStreamable.Value,
+                        mcpStreamable.Key);
+                }
+                catch (Exception e)
+                {
+                    Log.Logger.Error(e, "从MCP服务器加载工具失败: {ServerUrl}", mcpStreamable.Value);
+                    activity?.SetStatus(ActivityStatusCode.Error, "从MCP服务器加载工具失败");
+                }
+            }
         }
 
         kernelBuilderAction?.Invoke(kernelBuilder);

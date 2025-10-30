@@ -16,9 +16,11 @@
       - UPDATE_INTERVAL=5 # 仓库增量更新间隔，单位天
       - EnableSmartFilter=true # 是否启用智能过滤，这可能影响AI得到仓库的文件目录
       - ENABLE_INCREMENTAL_UPDATE=true # 是否启用增量更新
-      - ENABLE_CODED_DEPENDENCY_ANALYSIS=false # 是否启用代码依赖分析？这可能会对代码的质量产生影响。
+      - ENABLE_CODED_DEPENDENCY_ANALYSIS=false # 是否启用代码依赖分析?这可能会对代码的质量产生影响。
       - ENABLE_WAREHOUSE_FUNCTION_PROMPT_TASK=false # 是否启用MCP Prompt生成
       - ENABLE_WAREHOUSE_DESCRIPTION_TASK=false # 是否启用仓库Description生成
+      - CUSTOM_BODY_PARAMS= # 自定义请求body参数,格式: key1=value1,key2=value2 例如: stop=<|im_end|>,max_tokens=4096
+      - MCP_STREAMABLE= # MCP服务streamable配置,格式: 服务名=streamableUrl 例如: claude=http://localhost:8080/api/mcp,windsurf=http://localhost:8080/api/mcp
       - OTEL_SERVICE_NAME=koalawiki
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889

@@ -353,6 +353,7 @@ public class DynamicConfigService
             { "TopP", new[] { "TOP_P", "TopP" } },
             { "FrequencyPenalty", new[] { "FREQUENCY_PENALTY", "FrequencyPenalty" } },
             { "PresencePenalty", new[] { "PRESENCE_PENALTY", "PresencePenalty" } },
+            { "CustomBodyParams", new[] { "CUSTOM_BODY_PARAMS", "CustomBodyParams" } },
             
             // Document 配置映射
             { "EnableIncrementalUpdate", new[] { "ENABLE_INCREMENTAL_UPDATE", "EnableIncrementalUpdate" } },
@@ -409,38 +410,39 @@ public class DynamicConfigService
             new() { Key = "TopP", Group = "OpenAI", ValueType = "string", Description = "Top P 采样 (0.0-1.0)", IsSensitive = false, RequiresRestart = false, DefaultValue = "1.0", Order = 13 },
             new() { Key = "FrequencyPenalty", Group = "OpenAI", ValueType = "string", Description = "频率惩罚 (-2.0-2.0)", IsSensitive = false, RequiresRestart = false, DefaultValue = "0.0", Order = 14 },
             new() { Key = "PresencePenalty", Group = "OpenAI", ValueType = "string", Description = "存在惩罚 (-2.0-2.0)", IsSensitive = false, RequiresRestart = false, DefaultValue = "0.0", Order = 15 },
+            new() { Key = "CustomBodyParams", Group = "OpenAI", ValueType = "string", Description = "自定义请求body参数，格式: key1=value1,key2=value2", IsSensitive = false, RequiresRestart = true, DefaultValue = "", Order = 16 },
 
             // Document配置
-            new() { Key = "EnableIncrementalUpdate", Group = "Document", ValueType = "bool", Description = "启用增量更新", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 16 },
-            new() { Key = "ExcludedFiles", Group = "Document", ValueType = "array", Description = "排除的文件", IsSensitive = false, RequiresRestart = false, DefaultValue = GetDefaultExcludedFilesJson(), Order = 17 },
-            new() { Key = "ExcludedFolders", Group = "Document", ValueType = "array", Description = "排除的文件夹", IsSensitive = false, RequiresRestart = false, DefaultValue = GetDefaultExcludedFoldersJson(), Order = 18 },
-            new() { Key = "EnableSmartFilter", Group = "Document", ValueType = "bool", Description = "启用智能过滤", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 19 },
-            new() { Key = "CatalogueFormat", Group = "Document", ValueType = "string", Description = "目录结构格式", IsSensitive = false, RequiresRestart = false, DefaultValue = "compact", Order = 20 },
-            new() { Key = "EnableCodeDependencyAnalysis", Group = "Document", ValueType = "bool", Description = "启用代码依赖分析", IsSensitive = false, RequiresRestart = false, DefaultValue = "false", Order = 21 },
-            new() { Key = "EnableWarehouseFunctionPromptTask", Group = "Document", ValueType = "bool", Description = "启用仓库功能提示任务", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 22 },
-            new() { Key = "EnableWarehouseDescriptionTask", Group = "Document", ValueType = "bool", Description = "启用仓库描述任务", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 23 },
-            new() { Key = "EnableFileCommit", Group = "Document", ValueType = "bool", Description = "启用文件提交", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 24 },
-            new() { Key = "RefineAndEnhanceQuality", Group = "Document", ValueType = "bool", Description = "精炼并提高质量", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 25 },
-            new() { Key = "EnableWarehouseCommit", Group = "Document", ValueType = "bool", Description = "启用仓库提交", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 26 },
-            new() { Key = "EnableCodeCompression", Group = "Document", ValueType = "bool", Description = "启用代码压缩", IsSensitive = false, RequiresRestart = false, DefaultValue = "false", Order = 27 },
-            new() { Key = "MaxFileReadCount", Group = "Document", ValueType = "int", Description = "最大文件读取数量", IsSensitive = false, RequiresRestart = false, DefaultValue = "15", Order = 28 },
+            new() { Key = "EnableIncrementalUpdate", Group = "Document", ValueType = "bool", Description = "启用增量更新", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 17 },
+            new() { Key = "ExcludedFiles", Group = "Document", ValueType = "array", Description = "排除的文件", IsSensitive = false, RequiresRestart = false, DefaultValue = GetDefaultExcludedFilesJson(), Order = 18 },
+            new() { Key = "ExcludedFolders", Group = "Document", ValueType = "array", Description = "排除的文件夹", IsSensitive = false, RequiresRestart = false, DefaultValue = GetDefaultExcludedFoldersJson(), Order = 19 },
+            new() { Key = "EnableSmartFilter", Group = "Document", ValueType = "bool", Description = "启用智能过滤", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 20 },
+            new() { Key = "CatalogueFormat", Group = "Document", ValueType = "string", Description = "目录结构格式", IsSensitive = false, RequiresRestart = false, DefaultValue = "compact", Order = 21 },
+            new() { Key = "EnableCodeDependencyAnalysis", Group = "Document", ValueType = "bool", Description = "启用代码依赖分析", IsSensitive = false, RequiresRestart = false, DefaultValue = "false", Order = 22 },
+            new() { Key = "EnableWarehouseFunctionPromptTask", Group = "Document", ValueType = "bool", Description = "启用仓库功能提示任务", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 23 },
+            new() { Key = "EnableWarehouseDescriptionTask", Group = "Document", ValueType = "bool", Description = "启用仓库描述任务", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 24 },
+            new() { Key = "EnableFileCommit", Group = "Document", ValueType = "bool", Description = "启用文件提交", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 25 },
+            new() { Key = "RefineAndEnhanceQuality", Group = "Document", ValueType = "bool", Description = "精炼并提高质量", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 26 },
+            new() { Key = "EnableWarehouseCommit", Group = "Document", ValueType = "bool", Description = "启用仓库提交", IsSensitive = false, RequiresRestart = false, DefaultValue = "true", Order = 27 },
+            new() { Key = "EnableCodeCompression", Group = "Document", ValueType = "bool", Description = "启用代码压缩", IsSensitive = false, RequiresRestart = false, DefaultValue = "false", Order = 28 },
+            new() { Key = "MaxFileReadCount", Group = "Document", ValueType = "int", Description = "最大文件读取数量", IsSensitive = false, RequiresRestart = false, DefaultValue = "15", Order = 29 },
 
             // JWT配置
-            new() { Key = "Secret", Group = "JWT", ValueType = "string", Description = "JWT密钥", IsSensitive = true, RequiresRestart = true, DefaultValue = "", Order = 29 },
-            new() { Key = "Issuer", Group = "JWT", ValueType = "string", Description = "颁发者", IsSensitive = false, RequiresRestart = true, DefaultValue = "KoalaWiki", Order = 30 },
-            new() { Key = "Audience", Group = "JWT", ValueType = "string", Description = "接收者", IsSensitive = false, RequiresRestart = true, DefaultValue = "KoalaWiki", Order = 31 },
-            new() { Key = "ExpireMinutes", Group = "JWT", ValueType = "int", Description = "过期时间（分钟）", IsSensitive = false, RequiresRestart = false, DefaultValue = "1440", Order = 32 },
-            new() { Key = "RefreshExpireMinutes", Group = "JWT", ValueType = "int", Description = "刷新令牌过期时间（分钟）", IsSensitive = false, RequiresRestart = false, DefaultValue = "10080", Order = 33 },
+            new() { Key = "Secret", Group = "JWT", ValueType = "string", Description = "JWT密钥", IsSensitive = true, RequiresRestart = true, DefaultValue = "", Order = 30 },
+            new() { Key = "Issuer", Group = "JWT", ValueType = "string", Description = "颁发者", IsSensitive = false, RequiresRestart = true, DefaultValue = "KoalaWiki", Order = 31 },
+            new() { Key = "Audience", Group = "JWT", ValueType = "string", Description = "接收者", IsSensitive = false, RequiresRestart = true, DefaultValue = "KoalaWiki", Order = 32 },
+            new() { Key = "ExpireMinutes", Group = "JWT", ValueType = "int", Description = "过期时间（分钟）", IsSensitive = false, RequiresRestart = false, DefaultValue = "1440", Order = 33 },
+            new() { Key = "RefreshExpireMinutes", Group = "JWT", ValueType = "int", Description = "刷新令牌过期时间（分钟）", IsSensitive = false, RequiresRestart = false, DefaultValue = "10080", Order = 34 },
 
             // GitHub配置
-            new() { Key = "GitHub.ClientId", Group = "GitHub", ValueType = "string", Description = "GitHub客户端ID", IsSensitive = false, RequiresRestart = true, DefaultValue = "", Order = 34 },
-            new() { Key = "GitHub.ClientSecret", Group = "GitHub", ValueType = "string", Description = "GitHub客户端密钥", IsSensitive = true, RequiresRestart = true, DefaultValue = "", Order = 35 },
-            new() { Key = "GitHub.Token", Group = "GitHub", ValueType = "string", Description = "GitHub访问令牌", IsSensitive = true, RequiresRestart = true, DefaultValue = "", Order = 36 },
+            new() { Key = "GitHub.ClientId", Group = "GitHub", ValueType = "string", Description = "GitHub客户端ID", IsSensitive = false, RequiresRestart = true, DefaultValue = "", Order = 35 },
+            new() { Key = "GitHub.ClientSecret", Group = "GitHub", ValueType = "string", Description = "GitHub客户端密钥", IsSensitive = true, RequiresRestart = true, DefaultValue = "", Order = 36 },
+            new() { Key = "GitHub.Token", Group = "GitHub", ValueType = "string", Description = "GitHub访问令牌", IsSensitive = true, RequiresRestart = true, DefaultValue = "", Order = 37 },
 
             // Gitee配置
-            new() { Key = "Gitee.ClientId", Group = "Gitee", ValueType = "string", Description = "Gitee客户端ID", IsSensitive = false, RequiresRestart = true, DefaultValue = "", Order = 37 },
-            new() { Key = "Gitee.ClientSecret", Group = "Gitee", ValueType = "string", Description = "Gitee客户端密钥", IsSensitive = true, RequiresRestart = true, DefaultValue = "", Order = 38 },
-            new() { Key = "Gitee.Token", Group = "Gitee", ValueType = "string", Description = "Gitee访问令牌", IsSensitive = true, RequiresRestart = true, DefaultValue = "", Order = 39 }
+            new() { Key = "Gitee.ClientId", Group = "Gitee", ValueType = "string", Description = "Gitee客户端ID", IsSensitive = false, RequiresRestart = true, DefaultValue = "", Order = 38 },
+            new() { Key = "Gitee.ClientSecret", Group = "Gitee", ValueType = "string", Description = "Gitee客户端密钥", IsSensitive = true, RequiresRestart = true, DefaultValue = "", Order = 39 },
+            new() { Key = "Gitee.Token", Group = "Gitee", ValueType = "string", Description = "Gitee访问令牌", IsSensitive = true, RequiresRestart = true, DefaultValue = "", Order = 40 }
         };
     }
 

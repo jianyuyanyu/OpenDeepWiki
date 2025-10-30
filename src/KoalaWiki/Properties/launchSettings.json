@@ -12,10 +12,12 @@
         "ENABLE_WAREHOUSE_DESCRIPTION_TASK": "false",
         "EnableWarehouseFunctionPromptTask": "false",
         "ENABLE_INCREMENTAL_UPDATE": "false",
-        "REFINE_AND_ENHANCE_QUALITY": "false",
+        "REFINE_AND_ENHANCE_QUALITY": "true",
         "FeishuBotName":"OpenDeepWiki",
         "FeishuAppSecret":"GV1EW5RNQGri1TCZl4Lc2cQlo4kaSRiA",
-        "FeishuAppId":"cli_a806079600bdd00d"
+        "FeishuAppId":"cli_a806079600bdd00d",
+        "ENABLE_WIKI": "true",
+        "CUSTOM_BODY_PARAMS": "tool_stream=true"
       }
     },
     "https": {

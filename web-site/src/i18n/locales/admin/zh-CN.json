@@ -1,0 +1,325 @@
+{
+  "admin": {
+    "dashboard": {
+      "fetchFailed": "获取仪表板数据失败",
+      "lastUpdated": "最后更新",
+      "autoRefresh": "自动刷新",
+      "refresh": "刷新",
+      "monthlyNew": "本月新增",
+      "comparedToLastMonth": "相比上月",
+      "todayActive": "今日活跃",
+      "weekActive": "本周活跃",
+      "monthlyActiveUsers": "本月活跃用户",
+      "userActivityStats": "用户活跃度统计",
+      "recentUsers": "最近注册的用户",
+      "recentRepositories": "最近创建的仓库",
+      "recentErrorLogs": "最近错误日志",
+      "documentCount": "文档数",
+      "quickActions": "快速操作",
+      "quickActionsDescription": "常用的管理操作",
+      "stats": {
+        "total_repos": "仓库总数",
+        "total_documents": "文档总数",
+        "online_users": "在线用户"
+      },
+      "noDescription": "暂无描述",
+      "unknown": "未知",
+      "increaseRate": "增长率"
+    },
+    "users": {
+      "userList": "用户列表",
+      "totalUsers": "共 {{total}} 个用户",
+      "filterByRole": "按角色筛选",
+      "allRoles": "所有角色",
+      "cancelSelection": "取消选择",
+      "selectAll": "全选",
+      "selectUser": "选择用户 {{name}}",
+      "openMenu": "打开菜单",
+      "actionsMenu": "操作",
+      "resetPassword": "重置密码",
+      "batchDeleteSelected": "删除选中 ({{count}})",
+      "previous": "上一页",
+      "next": "下一页",
+      "pageInfo": "第 {{current}} 页 / 共 {{total}} 页",
+      "errors": {
+        "loadFailed": "加载失败",
+        "loadFailedDescription": "无法加载用户列表",
+        "unknown": "未知"
+      },
+      "messages": {
+        "confirmDelete": "确定要删除该用户吗？",
+        "deleteSuccess": "删除成功",
+        "deleteSuccessDescription": "用户已被删除",
+        "deleteFailed": "删除失败",
+        "deleteFailedDescription": "无法删除用户",
+        "pleaseSelectUsers": "请选择要删除的用户"
+      }
+    },
+    "repositories": {
+      "batchActions": "批量操作",
+      "repositoryList": "仓库列表",
+      "totalRepositories": "共 {{total}} 个仓库",
+      "filterStatus": "筛选状态",
+      "allStatus": "全部状态",
+      "statisticsInfo": "统计信息",
+      "tokenIn": "输入Token",
+      "tokenOut": "输出Token",
+      "totalToken": "总Token",
+      "openMenu": "打开菜单",
+      "viewRepository": "查看仓库",
+      "editInfo": "编辑信息",
+      "manageContent": "管理内容",
+      "reprocessRepository": "重新处理仓库",
+      "exportMarkdown": "导出Markdown",
+      "deleteRepository": "删除仓库",
+      "previous": "上一页",
+      "next": "下一页",
+      "pageInfo": "第 {{current}} 页 / 共 {{total}} 页",
+      "stats": {
+        "totalRepositories": "总仓库数",
+        "totalRepositoriesDescription": "所有仓库",
+        "completedRepositories": "已完成",
+        "completedRepositoriesDescription": "分析完成",
+        "processingRepositories": "处理中",
+        "processingRepositoriesDescription": "正在分析",
+        "pendingRepositories": "待处理",
+        "pendingRepositoriesDescription": "等待分析"
+      },
+      "statusLabels": {
+        "pending": "待处理",
+        "processing": "处理中",
+        "completed": "已完成",
+        "failed": "失败"
+      },
+      "errors": {
+        "loadFailed": "加载失败",
+        "loadFailedDescription": "无法加载仓库列表"
+      },
+      "messages": {
+        "deleteSuccess": "删除成功",
+        "deleteSuccessDescription": "仓库 \"{{name}}\" 已被删除",
+        "deleteFailed": "删除失败",
+        "deleteFailedDescription": "无法删除仓库",
+        "refreshSuccess": "刷新成功",
+        "refreshSuccessDescription": "仓库 \"{{name}}\" 已开始重新处理",
+        "refreshFailed": "刷新失败",
+        "refreshFailedDescription": "无法刷新仓库",
+        "updateSuccess": "仓库信息更新成功",
+        "updateFailed": "更新失败",
+        "updateFailedDescription": "更新仓库信息时发生错误"
+      },
+      "deleteDialog": {
+        "title": "确认删除仓库",
+        "description": "您确定要删除仓库 \"{{name}}\" 吗？",
+        "warning": "此操作不可逆转，将删除仓库及其所有文档数据。",
+        "cancel": "取消",
+        "confirmDelete": "确认删除"
+      },
+      "editDialog": {
+        "title": "编辑仓库信息",
+        "description": "编辑 {{organizationName}}/{{name}} 的信息",
+        "repositoryDescription": "仓库描述",
+        "descriptionPlaceholder": "请输入仓库描述...",
+        "isRecommended": "推荐仓库",
+        "customPrompt": "自定义提示词（可选）",
+        "promptPlaceholder": "请输入自定义提示词...",
+        "cancel": "取消",
+        "saving": "保存中...",
+        "saveChanges": "保存更改"
+      },
+      "detail": {
+        "loadRepositoryDataFailed": "加载仓库数据失败",
+        "fileSaveSuccess": "文件保存成功",
+        "fileSaveFailed": "文件保存失败",
+        "repositoryRefreshSuccess": "仓库刷新成功",
+        "repositoryRefreshFailed": "仓库刷新失败",
+        "repositoryDeleteSuccess": "仓库删除成功",
+        "repositoryDeleteFailed": "仓库删除失败",
+        "syncTaskStarted": "同步任务已启动",
+        "syncStartFailed": "同步启动失败",
+        "exportSuccess": "导出成功",
+        "exportFailed": "导出失败",
+        "repositoryNotFound": "仓库不存在",
+        "returnToRepositoryList": "返回仓库列表",
+        "refreshing": "刷新中...",
+        "refresh": "刷新",
+        "export": "导出",
+        "edit": "编辑",
+        "delete": "删除",
+        "confirmDeleteRepository": "确认删除仓库",
+        "deleteRepositoryWarning": "此操作将永久删除仓库及其所有数据，此操作不可撤销。",
+        "cancel": "取消",
+        "confirmDelete": "确认删除",
+        "documents": "文档管理",
+        "sync": "同步管理",
+        "quality": "质量评估",
+        "searchDocuments": "搜索文档...",
+        "noDocuments": "暂无文档目录",
+        "selectDocument": "选择一个文档",
+        "selectDocumentDescription": "从左侧目录中选择一个文档来查看或编辑其内容",
+        "completed": "已完成",
+        "aiGenerate": "AI生成",
+        "save": "保存",
+        "saving": "保存中...",
+        "lastModified": "最后修改",
+        "loadingEditor": "加载编辑器...",
+        "fileContent": "文件内容...",
+        "documentContent": "文档内容...",
+        "documentSaveSuccess": "文档保存成功",
+        "syncManagement": "同步管理",
+        "syncManagementDescription": "管理仓库的同步设置和历史",
+        "manualSync": "手动同步",
+        "manualSyncRepository": "手动同步仓库",
+        "syncDescription": "这将从源仓库拉取最新的文件并重新生成文档。",
+        "startSync": "开始同步",
+        "lastSyncTime": "最后同步时间",
+        "neverSynced": "从未同步",
+        "syncStatus": "同步状态",
+        "autoSync": "自动同步",
+        "updating": "更新中...",
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "syncHistory": "同步历史",
+        "syncSuccess": "同步成功",
+        "syncFailed": "同步失败",
+        "syncing": "同步中",
+        "manual": "手动",
+        "auto": "自动",
+        "startTime": "开始",
+        "endTime": "结束",
+        "filesChanged": "个文件",
+        "filesAdded": "新增",
+        "filesUpdated": "更新",
+        "filesDeleted": "删除",
+        "noSyncHistory": "暂无同步历史",
+        "permissionManagement": "权限管理",
+        "permissionManagementDescription": "管理用户和角色对此仓库的访问权限",
+        "permissionDevelopment": "权限管理功能开发中...",
+        "configManagement": "配置管理",
+        "configManagementDescription": "管理仓库的各种配置选项",
+        "configDevelopment": "配置管理功能开发中...",
+        "taskManagement": "任务管理",
+        "taskManagementDescription": "查看和管理仓库相关的处理任务",
+        "taskDevelopment": "任务管理功能开发中...",
+        "editRepositoryInfo": "编辑仓库信息",
+        "editRepositoryDescription": "修改仓库的基本信息和同步设置",
+        "repositoryName": "仓库名称",
+        "repositoryNamePlaceholder": "输入仓库名称",
+        "repositoryDescription": "仓库描述",
+        "repositoryDescriptionPlaceholder": "输入仓库描述",
+        "enableAutoSync": "自动同步",
+        "enableAutoSyncDescription": "启用后系统将自动同步仓库更新",
+        "aiGenerateDialog": {
+          "title": "AI智能生成文档内容",
+          "description": "为当前选中的文档目录生成内容。您可以输入自定义提示词来引导AI生成，留空则使用默认提示词。",
+          "promptLabel": "提示词（可选）",
+          "promptPlaceholder": "例如：请生成详细的技术文档，包含代码示例和架构说明...",
+          "promptHint": "提示：留空将使用系统默认提示词或之前保存的提示词",
+          "targetDocument": "目标文档：",
+          "currentPrompt": "当前提示词：",
+          "cancel": "取消",
+          "generating": "生成中...",
+          "startGenerate": "开始生成"
+        },
+        "wikiGeneration": "Wiki生成"
+      }
+    },
+    "roles": {
+      "errors": {
+        "loadFailed": "加载失败",
+        "loadFailedDescription": "无法加载角色列表"
+      },
+      "status": {
+        "enabled": "启用",
+        "disabled": "禁用"
+      },
+      "type": {
+        "system": "系统角色",
+        "custom": "自定义角色"
+      },
+      "messages": {
+        "confirmDelete": "确定要删除角色 \"{{name}}\" 吗？",
+        "deleteSuccess": "删除成功",
+        "deleteSuccessDescription": "角色已被删除",
+        "deleteFailed": "删除失败",
+        "deleteFailedDescription": "无法删除角色",
+        "statusUpdateSuccess": "状态更新成功",
+        "statusUpdateDescription": "角色已{{status}}",
+        "statusEnabled": "启用",
+        "statusDisabled": "禁用",
+        "statusUpdateFailed": "状态更新失败",
+        "statusUpdateFailedDescription": "无法更新角色状态"
+      },
+      "stats": {
+        "totalRoles": "总角色数",
+        "totalRolesDescription": "包含系统和自定义角色",
+        "activeRoles": "活跃角色",
+        "activeRolesDescription": "当前启用的角色",
+        "assignedUsers": "分配用户数",
+        "assignedUsersDescription": "已分配角色的用户总数"
+      },
+      "list": {
+        "title": "角色列表",
+        "totalCount": "共 {{total}} 个角色"
+      },
+      "filters": {
+        "allStatus": "全部状态"
+      },
+      "table": {
+        "noDescription": "暂无描述",
+        "openMenu": "打开菜单",
+        "actionsMenu": "操作"
+      },
+      "actions": {
+        "viewMembers": "查看成员",
+        "copyRole": "复制角色",
+        "disable": "禁用",
+        "enable": "启用"
+      },
+      "pagination": {
+        "previous": "上一页",
+        "pageInfo": "第 {{current}} 页 / 共 {{total}} 页",
+        "next": "下一页"
+      }
+    },
+    "tokens": {
+      "labels": {
+        "inputTokens": "输入Token",
+        "outputTokens": "输出Token",
+        "totalTokens": "总Token"
+      },
+      "stats": {
+        "percentageOfTotal": "占总量 {{percentage}}%",
+        "comparedToYesterday": "{{sign}}{{value}}% 较昨日"
+      },
+      "chart": {
+        "title": "Token 使用趋势",
+        "description": "查看不同时间段的Token使用情况",
+        "timeRange": {
+          "7d": "最近7天",
+          "30d": "最近30天",
+          "90d": "最近90天"
+        },
+        "chartType": {
+          "area": "面积图",
+          "line": "折线图",
+          "bar": "柱状图"
+        },
+        "export": "导出",
+        "noData": "暂无数据",
+        "noDataDescription": "Token使用数据将在有活动后显示"
+      },
+      "operationDistribution": {
+        "title": "操作类型分布",
+        "description": "不同操作类型的Token使用情况",
+        "noData": "暂无操作数据",
+        "unknown": "未知"
+      },
+      "topRepositories": {
+        "title": "热门仓库",
+        "description": "Token使用量最高的仓库",
+        "noData": "暂无仓库数据"
+      }
+    }
+  }
+}

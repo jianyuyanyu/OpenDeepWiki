@@ -29,10 +29,6 @@ public partial class DocumentPendingService
         {
             return """
                    ## Enterprise Application Documentation Protocol
-                   <thinking>
-                   Generate comprehensive enterprise application documentation that enables successful adoption, deployment, and maintenance through systematic coverage of user workflows, technical architecture, and operational procedures.
-                   </thinking>
-
                    **DOCUMENTATION GENERATION METHODOLOGY:**
                    Create exhaustive application documentation through structured understanding-focused protocols:
 
@@ -53,7 +49,6 @@ public partial class DocumentPendingService
                    - **Monitoring Philosophy**: Understanding of observability concepts, logging strategies, and performance measurement approaches
                    - **Maintenance Methodology**: Analysis of operational procedures, troubleshooting approaches, and maintenance strategies
                    - **Integration Ecosystem**: Comprehensive explanation of external dependencies, API design philosophy, and integration patterns
-
                    """;
         }
 
@@ -61,10 +56,6 @@ public partial class DocumentPendingService
         {
             return """
                    ## Development Framework Documentation Protocol
-                   <thinking>
-                   Create comprehensive framework documentation that facilitates developer adoption, mastery, and ecosystem integration through systematic coverage of concepts, APIs, and practical implementation guidance.
-                   </thinking>
-
                    **FRAMEWORK DOCUMENTATION METHODOLOGY:**
                    Generate complete framework documentation through structured development-focused protocols:
 
@@ -93,10 +84,6 @@ public partial class DocumentPendingService
         {
             return """
                    ## Reusable Library Documentation Protocol
-                   <thinking>
-                   Create comprehensive library documentation that enables seamless integration, effective usage, and optimal performance through systematic coverage of APIs, implementation patterns, and best practices.
-                   </thinking>
-
                    **LIBRARY DOCUMENTATION METHODOLOGY:**
                    Generate complete library documentation through structured integration-focused protocols:
 
@@ -125,9 +112,6 @@ public partial class DocumentPendingService
         {
             return """
                    ## Development Tool Documentation Protocol
-                   <thinking>
-                   Create comprehensive development tool documentation that maximizes developer productivity through detailed setup procedures, feature exploration, and workflow integration guidance.
-                   </thinking>
 
                    **DEVELOPMENT TOOL DOCUMENTATION METHODOLOGY:**
                    Generate complete tool documentation through structured productivity-focused protocols:
@@ -157,10 +141,6 @@ public partial class DocumentPendingService
         {
             return """
                    ## CLI Tool Documentation Protocol
-                   <thinking>
-                   Create comprehensive command-line tool documentation that enables mastery through detailed command references, practical examples, and automation integration guidance.
-                   </thinking>
-
                    **CLI TOOL DOCUMENTATION METHODOLOGY:**
                    Generate complete CLI documentation through structured command-line focused protocols:
 
@@ -189,10 +169,6 @@ public partial class DocumentPendingService
         {
             return """
                    ## DevOps Infrastructure Documentation Protocol
-                   <thinking>
-                   Create comprehensive infrastructure documentation that enables successful deployment, operation, and maintenance through detailed procedures, configuration guidance, and operational excellence practices.
-                   </thinking>
-
                    **DEVOPS DOCUMENTATION METHODOLOGY:**
                    Generate complete infrastructure documentation through structured operational protocols:
 
@@ -221,10 +197,6 @@ public partial class DocumentPendingService
         {
             return """
                    ## Documentation Project Documentation Protocol
-                   <thinking>
-                   Create comprehensive meta-documentation that enables effective contribution, maintenance, and improvement of documentation projects through detailed processes, quality standards, and workflow guidance.
-                   </thinking>
-
                    **DOCUMENTATION PROJECT METHODOLOGY:**
                    Generate complete documentation project documentation through structured knowledge management protocols:
 
@@ -251,10 +223,7 @@ public partial class DocumentPendingService
 
         return """
                ## General Project Documentation Protocol
-               <thinking>
-               Create comprehensive software project documentation that enables understanding, adoption, and contribution through systematic coverage of project purpose, implementation guidance, and development procedures.
-               </thinking>
-
+               
                **COMPREHENSIVE PROJECT DOCUMENTATION METHODOLOGY:**
                Generate complete project documentation through structured multi-purpose protocols:
 

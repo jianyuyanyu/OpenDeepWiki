@@ -4,10 +4,9 @@ using KoalaWiki.Options;
 
 namespace KoalaWiki.KoalaWarehouse.Pipeline.Steps;
 
-public class DocumentContentGenerationStep : DocumentProcessingStepBase<DocumentProcessingContext, DocumentProcessingContext>
+public class DocumentContentGenerationStep(ILogger<DocumentContentGenerationStep> logger)
+    : DocumentProcessingStepBase<DocumentProcessingContext, DocumentProcessingContext>(logger)
 {
-    public DocumentContentGenerationStep(ILogger<DocumentContentGenerationStep> logger) : base(logger) { }
-
     public override string StepName => "生成目录结构中的文档";
 
     public override async Task<DocumentProcessingContext> ExecuteAsync(DocumentProcessingContext context,
@@ -29,7 +28,7 @@ public class DocumentContentGenerationStep : DocumentProcessingStepBase<Document
             // 确保有文件内核实例
             if (context.FileKernelInstance == null)
             {
-                context.FileKernelInstance = KernelFactory.GetKernel(
+                context.FileKernelInstance = await KernelFactory.GetKernel(
                     OpenAIOptions.Endpoint,
                     OpenAIOptions.ChatApiKey, 
                     context.Document.GitPath, 

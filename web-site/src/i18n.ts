@@ -1,6 +1,12 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
+// 动态导入 admin 翻译文件
+import zhCNAdmin from './locales/admin/zh-CN.json'
+import enUSAdmin from './locales/admin/en-US.json'
+import jaJPAdmin from './locales/admin/ja-JP.json'
+import koKRAdmin from './locales/admin/ko-KR.json'
+
 // 翻译资源
 const resources = {
   'zh-CN': {
@@ -89,7 +95,8 @@ const resources = {
         title: '关于 OpenDeepWiki',
         description: 'AI 驱动的代码知识库系统'
       }
-    }
+    },
+    admin: zhCNAdmin.admin
   },
   en: {
     translation: {
@@ -177,8 +184,20 @@ const resources = {
         title: 'About OpenDeepWiki',
         description: 'AI-Driven Code Knowledge Base System'
       }
-    }
+    },
+    admin: enUSAdmin.admin
   }
+}
+
+// 为其他语言添加 admin 命名空间
+resources['ja-JP'] = {
+  ...resources['ja-JP'] || {},
+  admin: jaJPAdmin.admin
+}
+
+resources['ko-KR'] = {
+  ...resources['ko-KR'] || {},
+  admin: koKRAdmin.admin
 }
 
 // 初始化 i18n
@@ -188,6 +207,8 @@ i18n
     resources,
     lng: localStorage.getItem('language') || 'zh-CN', // 默认语言
     fallbackLng: 'en',
+    ns: ['translation', 'admin'],
+    defaultNS: 'translation',
     interpolation: {
       escapeValue: false // React 已经做了转义
     },

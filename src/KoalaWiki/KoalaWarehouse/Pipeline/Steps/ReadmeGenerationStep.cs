@@ -6,12 +6,9 @@ using Microsoft.SemanticKernel.Connectors.OpenAI;
 
 namespace KoalaWiki.KoalaWarehouse.Pipeline.Steps;
 
-public class ReadmeGenerationStep : DocumentProcessingStepBase<DocumentProcessingContext, DocumentProcessingContext>
+public class ReadmeGenerationStep(ILogger<ReadmeGenerationStep> logger)
+    : DocumentProcessingStepBase<DocumentProcessingContext, DocumentProcessingContext>(logger)
 {
-    public ReadmeGenerationStep(ILogger<ReadmeGenerationStep> logger) : base(logger)
-    {
-    }
-
     public override string StepName => "读取生成README";
 
     public override StepExecutionConfig Configuration => new()
@@ -137,11 +134,11 @@ public class ReadmeGenerationStep : DocumentProcessingStepBase<DocumentProcessin
             var catalogue = DocumentsHelper.GetCatalogue(path);
             activity?.SetTag("catalogue.length", catalogue?.Length ?? 0);
 
-            var kernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+            var kernel = await KernelFactory.GetKernel(OpenAIOptions.Endpoint,
                 OpenAIOptions.ChatApiKey,
                 path, OpenAIOptions.ChatModel);
 
-            var fileKernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+            var fileKernel = await KernelFactory.GetKernel(OpenAIOptions.Endpoint,
                 OpenAIOptions.ChatApiKey, path, OpenAIOptions.ChatModel, false);
 
             var generateReadmePlugin = kernel.Plugins["CodeAnalysis"]["GenerateReadme"];

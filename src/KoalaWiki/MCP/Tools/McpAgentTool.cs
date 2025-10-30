@@ -1,17 +1,12 @@
 ﻿using System.Diagnostics;
 using System.Text;
 using KoalaWiki.Domains.MCP;
-using KoalaWiki.Functions;
-using KoalaWiki.Prompts;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.OpenAI;
+using KoalaWiki.Tools;
 using ModelContextProtocol.Server;
-using OpenAI.Chat;
 
 namespace KoalaWiki.MCP.Tools;
 
-public sealed class WarehouseTool(IKoalaWikiContext koala)
+public class McpAgentTool
 {
     /// <summary>
     /// 生成仓库文档
@@ -20,10 +15,15 @@ public sealed class WarehouseTool(IKoalaWikiContext koala)
     /// <param name="question"></param>
     /// <returns></returns>
     /// <exception cref="Exception"></exception>
-    public async Task<string> GenerateDocumentAsync(
-        IMcpServer server,
+    [McpServerTool(Name = "GenerateWiki")]
+    public static async Task<string> GenerateDocumentAsync(
+        McpServer server,
         string question)
     {
+        await using var scope = server.Services.CreateAsyncScope();
+
+        var koala = scope.ServiceProvider.GetRequiredService<IKoalaWikiContext>();
+
         var name = server.ServerOptions.Capabilities!.Experimental["name"].ToString();
         var owner = server.ServerOptions.Capabilities!.Experimental["owner"].ToString();
 
@@ -49,7 +49,7 @@ public sealed class WarehouseTool(IKoalaWikiContext koala)
         // 找到是否有相似的提问
         var similarQuestion = await koala.MCPHistories
             .AsNoTracking()
-            .Where(x => x.WarehouseId == warehouse.Id && x.Question == question)
+            .Where(x => x.WarehouseId == warehouse.Id && x.Question.ToLower() == question.ToLower())
             .OrderByDescending(x => x.CreatedAt)
             .FirstOrDefaultAsync();
 
@@ -60,7 +60,7 @@ public sealed class WarehouseTool(IKoalaWikiContext koala)
         }
 
 
-        var kernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+        var kernel =await  KernelFactory.GetKernel(OpenAIOptions.Endpoint,
             OpenAIOptions.ChatApiKey, document.GitPath, OpenAIOptions.DeepResearchModel, false);
 
         var chat = kernel.GetRequiredService<IChatCompletionService>();
@@ -68,12 +68,26 @@ public sealed class WarehouseTool(IKoalaWikiContext koala)
         // 解析仓库的目录结构
         var path = document.GitPath;
 
-        var fileKernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
-            OpenAIOptions.ChatApiKey, path, OpenAIOptions.DeepResearchModel, false);
+        var complete = string.Empty;
+
+        var token = new CancellationTokenSource();
+
+        var fileKernel = await KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+            OpenAIOptions.ChatApiKey, path, OpenAIOptions.DeepResearchModel, false, kernelBuilderAction: (builder =>
+            {
+                builder.Plugins.AddFromObject(new CompleteTool((async value =>
+                {
+                    if (!string.IsNullOrEmpty(value))
+                    {
+                        complete = value;
+
+                        await token.CancelAsync().ConfigureAwait(false);
+                    }
+                })));
+            }));
 
         var history = new ChatHistory();
-
-        var readme = await DocumentsService.GenerateReadMe(warehouse, document.GitPath, koala);
+        history.AddSystemEnhance();
 
         var catalogue = document.GetCatalogueSmartFilterOptimized();
 
@@ -82,8 +96,18 @@ public sealed class WarehouseTool(IKoalaWikiContext koala)
             {
                 ["catalogue"] = catalogue,
                 ["repository_url"] = warehouse.Address,
-                ["question"] = question,
             }, OpenAIOptions.ChatModel));
+
+        history.AddUserMessage([
+            new TextContent(question),
+            new TextContent("""
+                            <system-reminder>
+                            Note:
+                            - What the user needs is a detailed and professional response based on the contents of the aforementioned warehouse.
+                            - Answer the user's questions as detailedly and promptly as possible.
+                            </system-reminder>
+                            """)
+        ]);
 
         var first = true;
 
@@ -98,10 +122,11 @@ public sealed class WarehouseTool(IKoalaWikiContext koala)
                                new OpenAIPromptExecutionSettings()
                                {
                                    ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions,
-                                   MaxTokens = DocumentsHelper.GetMaxTokens(OpenAIOptions.ChatModel),
-                                   Temperature = 0.5
-                               }, fileKernel))
+                                   MaxTokens = DocumentsHelper.GetMaxTokens(OpenAIOptions.ChatModel)
+                               }, fileKernel, token.Token))
             {
+                token.Token.ThrowIfCancellationRequested();
+
                 // 发送数据
                 if (chatItem.InnerContent is StreamingChatCompletionUpdate message)
                 {
@@ -118,6 +143,12 @@ public sealed class WarehouseTool(IKoalaWikiContext koala)
             }
 
             sw.Stop();
+
+            if (!string.IsNullOrEmpty(complete))
+            {
+                sb.Clear();
+                sb.Append(complete);
+            }
 
             var mcpHistory = new MCPHistory()
             {
@@ -136,6 +167,11 @@ public sealed class WarehouseTool(IKoalaWikiContext koala)
             await koala.SaveChangesAsync();
 
             return sb.ToString();
+        }
+        // 如果是取消异常
+        catch (OperationCanceledException)
+        {
+            return complete;
         }
         catch (Exception e)
         {

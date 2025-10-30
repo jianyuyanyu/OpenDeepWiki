@@ -3,9 +3,6 @@
 public partial class DocumentPendingService
 {
     private static int TaskMaxSizePerUser = 3;
-    private static int MinContentLength = 1000;
-    private static double MinQualityScore = 60.0;
-    private static double MinChineseRatio = 0.3;
 
     static DocumentPendingService()
     {
@@ -14,19 +11,6 @@ public partial class DocumentPendingService
         if (!string.IsNullOrEmpty(maxSize) && int.TryParse(maxSize, out var maxSizeInt))
         {
             TaskMaxSizePerUser = maxSizeInt;
-        }
-
-        // 文档质量相关配置
-        var minLength = Environment.GetEnvironmentVariable("DOC_MIN_CONTENT_LENGTH").GetTrimmedValueOrEmpty();
-        if (!string.IsNullOrEmpty(minLength) && int.TryParse(minLength, out var lengthInt))
-        {
-            MinContentLength = lengthInt;
-        }
-
-        var minScore = Environment.GetEnvironmentVariable("DOC_MIN_QUALITY_SCORE").GetTrimmedValueOrEmpty();
-        if (!string.IsNullOrEmpty(minScore) && double.TryParse(minScore, out var scoreDouble))
-        {
-            MinQualityScore = scoreDouble;
         }
     }
 
@@ -148,7 +132,7 @@ public partial class DocumentPendingService
 
                 var docs = new DocsFunction();
                 // 为每个文档处理创建独立的Kernel实例，避免状态管理冲突
-                var documentKernel = KernelFactory.GetKernel(
+                var documentKernel = await KernelFactory.GetKernel(
                     OpenAIOptions.Endpoint,
                     OpenAIOptions.ChatApiKey,
                     path,
@@ -529,32 +513,6 @@ public partial class DocumentPendingService
 
 
         throw new Exception("处理失败，重试多次仍未成功: " + catalog.Name);
-    }
-
-
-    /// <summary>
-    /// 计算文档质量评分
-    /// </summary>
-    private static double CalculateQualityScore(DocumentQualityMetrics metrics, int issueCount)
-    {
-        double score = 100.0;
-
-        // 基于各项指标扣分
-        if (metrics.ContentLength < MinContentLength) score -= 20;
-        else if (metrics.ContentLength < MinContentLength * 1.5) score -= 10;
-
-        score -= issueCount * 5;
-
-        return Math.Max(score, 0);
-    }
-
-    /// <summary>
-    /// 文档质量指标
-    /// </summary>
-    public class DocumentQualityMetrics
-    {
-        public int ContentLength { get; set; }
-        public double QualityScore { get; set; }
     }
 
     /// <summary>

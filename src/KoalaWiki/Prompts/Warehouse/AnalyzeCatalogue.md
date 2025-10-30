@@ -10,69 +10,53 @@ Here is the repository code and structure you need to analyze:
 {{$code_files}}
 </code_files>
 
-## Your Task
+If the content referenced by <code_files> is very large (e.g., >200 files or >200k characters):
+- First summarize top-level directories and purposes.
+- Then sample representative files from each major area, prioritizing:
+  - src/KoalaWiki, src/KoalaWiki.AppHost
+  - Provider/*/Migrations
+  - plugins/CodeAnalysis/* and Prompts/*
+  - web-site/
+- Prefer citations to concrete files with file_path:line_number in all summaries.
+## Task
+Generate a dynamic, hierarchical JSON documentation catalog from the repository.
 
-You must analyze the provided repository and generate a dynamic, hierarchical JSON documentation catalog that adapts to the project's specific complexity and features.
+## Inputs
+- <project_type>: {{$projectType}}
+- If <code_files> is large (>200 files or >200k chars): summarize top-level dirs, sample representative files, prefer citations (file_path:line_number).
 
-## Required Process
-
-Before generating the final JSON structure, conduct your analysis in <repository_analysis> tags. It's OK for this section to be quite long. Follow this detailed process:
-
-1. **File Structure Mapping**: List the key files and directories you can identify from the repository, noting their apparent purposes
-
-2. **Technology Stack Identification**: Examine the code files and identify specific technologies, frameworks, languages, and tools being used (look for package.json, requirements.txt, imports, etc.)
-
-3. **Component Discovery**: Analyze the code structure to identify distinct components, modules, or major functional areas. List each component and its apparent responsibility.
-
-4. **Architecture Pattern Recognition**: Based on the code organization and component relationships, identify the architectural patterns being used (MVC, microservices, layered, etc.)
-
-5. **Feature and Functionality Analysis**: Examine the code to identify the main features and capabilities this project provides. List specific features you can identify.
-
-6. **Complexity Assessment**: Based on your analysis above, assess the project's complexity level and determine appropriate documentation depth and nesting levels
-
-7. **Documentation Structure Planning**: Plan which sections will be most valuable for this specific project, determining what should be included in Getting Started vs Deep Dive, and what level of nesting is appropriate
-
-## Documentation Architecture Requirements
-
-### Module 1: Getting Started Guide
-Help users quickly understand and start using the project:
-- **Project Overview** - Core purpose, technology stack, target users
-- **Environment Setup** - Installation, dependencies, configuration (if complex setup required)
-- **Core Concepts** - Essential terminology and abstractions (if project has complex concepts)
-- **Basic Usage** - Practical examples and common operations
-- **Quick Reference** - Commands and configurations (if many operational procedures)
-
-### Module 2: Deep Dive Analysis
-Provide comprehensive technical analysis for advanced users:
-- **Architecture Analysis** - System design, patterns, component relationships
-- **Core Components** - Detailed module analysis (if project has multiple distinct components)
-- **Feature Implementation** - Business logic and functionality breakdown (if project has identifiable features)
-- **Technical Implementation** - Algorithms, data structures, performance analysis
-- **Integration & APIs** - External interfaces and extension points (if project has APIs/integrations)
-
-## Structure Generation Rules
-
-**Dynamic Adaptation:**
-- Only include sections relevant to the actual project
-- Adapt nesting depth (2-3 levels typically) based on real component complexity
-- Create sub-sections only when parent contains multiple distinct, separable aspects
-- Scale technical depth to match actual implementation sophistication
-
-**Nesting Levels:**
-- **Level 1**: Main sections (overview, setup, analysis, etc.)
-- **Level 2**: Sub-topics within main sections (components, features, etc.)
-- **Level 3**: Detailed aspects for complex features (algorithms, patterns, etc.)
-
-**Section Requirements:**
-Each section must include:
-- `title`: Unique identifier (kebab-case)
-- `name`: Display name
-- `prompt`: Specific, actionable generation instruction based on actual project analysis
-- `children`: Optional array for complex topics requiring breakdown
+## Rules & Constraints
+- JSON-only final output (no prose) using the required format below.
+- Cite real files (file_path:line_number) wherever applicable.
+- Derive section titles and names dynamically from detected components/dirs/tech.
+- **Max nesting depth: 4 (to support component-level granularity)**; ≤8 children per section for architectural modules.
+- Getting Started: overview, environment setup, basic usage, quick reference (include "Core Concepts" only if non-trivial).
+- **Deep Dive: Create hierarchical structures that drill down to individual components:**
+  - **Layer 1**: Major functional areas (architecture overview, data layer, business logic layer, integrations, frontend)
+  - **Layer 2**: Subsystems within each area (e.g., MySQL/PostgreSQL/SqlServer providers, plugin categories, service modules, middleware)
+  - **Layer 3**: Individual components (e.g., specific controllers, services, repositories, utilities, React components)
+  - **Layer 4**: Key methods, interfaces, or configuration details within components (when architecturally significant)
+- **Component-level analysis requirements:**
+  - Identify concrete classes, services, controllers, repositories, utilities, hooks, and components
+  - Map dependencies and relationships between components with file citations
+  - Document component responsibilities, interfaces, and public APIs
+  - Include initialization patterns, lifecycle management, and dependency injection
+  - Highlight design patterns used (e.g., Repository, Factory, Strategy, Observer)
+- **Deep Dive structure guidelines:**
+  - For **Architecture**: Include layers (Presentation/API, Application/Business Logic, Domain, Data Access, Infrastructure)
+  - For **Data Layer**: Break down by provider type → migrations → specific DbContext/repositories → entities
+  - For **Business Logic**: Organize by feature area → services → handlers/processors → domain logic
+  - For **Plugins/Extensions**: Categorize by type → individual plugins → configuration → hooks/events
+  - For **Integrations**: Group by system (AI/LLM, Git, GitHub, MCP) → connectors → adapters → specific implementations
+  - For **Frontend**: Structure by routing → pages → components hierarchy → hooks → utilities → state management
+- Large inputs: follow summarize→sample→prioritize key areas, but ensure representative components from each major subsystem are analyzed with sufficient depth.
+- Small repo mode: if the repo is very small/simple (e.g., ≤10 files or no clear modules), emit only a minimal "getting-started" with 1–2 children and omit "deep-dive" entirely; for single-file repos, return a single child summarizing the analysis with citations.
+- If context is insufficient: reduce scope and state concrete needs in prompts.
+- Token guidance (approximate): Getting Started ~600-900 words; Deep Dive ~1800-2500 words (expanded for component detail); per-section prompt 1-3 sentences for leaves, 2-4 for branches with children.
 
 ## Required JSON Output Format
 
-Generate a JSON structure following this exact format:
+Follow this schema. The deep-dive module is optional—omit it for small/simple repos. Reduce or collapse children lists as needed.
 
 ```json
 {
@@ -80,29 +64,167 @@ Generate a JSON structure following this exact format:
     {
       "title": "getting-started",
       "name": "[Project-Specific Getting Started Name]",
-      "prompt": "Help users quickly understand and start using the project", 
+      "prompt": "Help users quickly understand and start using the project",
       "children": [
         {
-          "title": "section-id",
-          "name": "Section Name",
-          "prompt": "Detailed, specific instruction for content generation based on actual project analysis",
-          "children": [
-            // Optional sub-sections for complex topics
-          ]
+          "title": "[auto-derived-overview-title]",
+          "name": "[Overview Name]",
+          "prompt": "Summarize purpose and stack using repo files (e.g., README, build files). Include citations.",
+          "children": []
+        },
+        {
+          "title": "[auto-derived-setup-title]",
+          "name": "[Setup Name]",
+          "prompt": "List setup commands dynamically detected from repo (dotnet/docker/npm as applicable) with citations.",
+          "children": []
+        },
+        {
+          "title": "[auto-derived-usage-title]",
+          "name": "[Usage Name]",
+          "prompt": "Describe common operations based on detected entry points and scripts with file citations.",
+          "children": []
+        },
+        {
+          "title": "[auto-derived-quickref-title]",
+          "name": "[Quick Reference Name]",
+          "prompt": "Provide a concise list of frequent commands/configs discovered in the repo with file_path:line_number references.",
+          "children": []
         }
       ]
     },
     {
-      "title": "deep-dive", 
+      "title": "deep-dive",
       "name": "[Project-Specific Deep Dive Name]",
       "prompt": "In-depth analysis of core components and functionality",
       "children": [
         {
-          "title": "section-id", 
-          "name": "Section Name",
-          "prompt": "Detailed, specific instruction for technical analysis based on actual code",
+          "title": "[auto-derived-architecture-title]",
+          "name": "[Architecture Name]",
+          "prompt": "Map the actual layered structure discovered in the repo with citations to specific files.",
           "children": [
-            // Optional sub-sections for comprehensive coverage
+            {
+              "title": "[layer-name-api]",
+              "name": "[API/Presentation Layer Name]",
+              "prompt": "Analyze controllers, endpoints, middleware, and routing with file citations.",
+              "children": [
+                {
+                  "title": "[controller-group]",
+                  "name": "[Specific Controller/Endpoint Group]",
+                  "prompt": "Detail methods, request/response models, and authorization with citations.",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "title": "[layer-name-business]",
+              "name": "[Business Logic Layer Name]",
+              "prompt": "Document services, handlers, and business logic processors with citations.",
+              "children": []
+            },
+            {
+              "title": "[layer-name-data]",
+              "name": "[Data Access Layer Name]",
+              "prompt": "Examine repositories, DbContext, query patterns with citations.",
+              "children": []
+            }
+          ]
+        },
+        {
+          "title": "[auto-derived-providers-title]",
+          "name": "[Providers Name]",
+          "prompt": "Analyze data providers and migrations discovered under provider projects with citations.",
+          "children": [
+            {
+              "title": "[provider-type]",
+              "name": "[Specific Provider Name (e.g., MySQL, PostgreSQL)]",
+              "prompt": "Detail provider implementation, connection handling, and configurations with citations.",
+              "children": [
+                {
+                  "title": "[migrations-subsection]",
+                  "name": "[Migrations]",
+                  "prompt": "Document migration files, schema changes, and versioning with citations.",
+                  "children": []
+                },
+                {
+                  "title": "[repositories-subsection]",
+                  "name": "[Repositories]",
+                  "prompt": "Analyze repository implementations, query methods, and data access patterns with citations.",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "[auto-derived-plugins-title]",
+          "name": "[Plugins/Prompts Name]",
+          "prompt": "Detail detected plugins and prompts folders and their configuration with citations.",
+          "children": [
+            {
+              "title": "[plugin-category]",
+              "name": "[Plugin Category Name]",
+              "prompt": "Analyze plugins in this category, their registration, and lifecycle with citations.",
+              "children": [
+                {
+                  "title": "[specific-plugin]",
+                  "name": "[Individual Plugin Name]",
+                  "prompt": "Document plugin implementation, configuration options, and integration points with citations.",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "[auto-derived-integrations-title]",
+          "name": "[Integrations Name]",
+          "prompt": "Explain detected integrations (e.g., AI connectors, MCP server, Git ops, GitHub API) with file citations.",
+          "children": [
+            {
+              "title": "[integration-system]",
+              "name": "[Specific Integration System Name]",
+              "prompt": "Analyze integration architecture, connectors, and adapters with citations.",
+              "children": [
+                {
+                  "title": "[connector-implementation]",
+                  "name": "[Specific Connector/Service]",
+                  "prompt": "Detail connector implementation, API clients, authentication, and data transformation with citations.",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "title": "[auto-derived-frontend-title]",
+          "name": "[Frontend Name]",
+          "prompt": "Summarize frontend structure and scripts from detected package files with citations.",
+          "children": [
+            {
+              "title": "[frontend-routing]",
+              "name": "[Routing/Pages]",
+              "prompt": "Document route definitions and page components with citations.",
+              "children": []
+            },
+            {
+              "title": "[frontend-components]",
+              "name": "[Component Library]",
+              "prompt": "Analyze component hierarchy, shared components, and composition patterns with citations.",
+              "children": [
+                {
+                  "title": "[component-category]",
+                  "name": "[Component Category Name]",
+                  "prompt": "Detail specific components, props, state management, and interactions with citations.",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "title": "[frontend-state]",
+              "name": "[State Management]",
+              "prompt": "Examine state management patterns, stores, contexts, and data flow with citations.",
+              "children": []
+            }
           ]
         }
       ]
@@ -111,58 +233,4 @@ Generate a JSON structure following this exact format:
 }
 ```
 
-## Success Criteria
-
-**Documentation Quality Standards:**
-- Comprehensive, in-depth content that users can immediately apply with detailed understanding
-- Appropriate technical depth for each module's target audience with exhaustive coverage
-- Detailed practical examples, code analysis, and real-world implementation scenarios
-- Logical flow from basic understanding to advanced implementation with thorough technical exploration
-- Multi-layered analysis covering both conceptual understanding and implementation specifics
-  **Documentation Quality:**
-- Deep technical analysis of actual project components and implementations
-- Comprehensive coverage of system modules, services, data models, and APIs
-- Detailed feature decomposition with sub-component analysis and functional module breakdown
-- Thorough examination of core functionality, business logic, workflows, and algorithms
-- Complete use case implementation analysis and feature interaction mapping
-- Clear progression from basic understanding to advanced implementation details
-- Practical examples and real code analysis with architectural insights
-
-**Two-Module Balance:**
-- Getting Started Guide enables comprehensive project comprehension with detailed foundational knowledge
-- Deep Dive Analysis provides exhaustive technical understanding with implementation-level details
-- Clear boundaries between foundational and advanced content with appropriate depth progression
-- Natural progression paths between modules with detailed coverage at each level
-  **Structure Balance:**
-- Getting Started Guide provides solid foundation with core concepts and basic usage
-- Deep Dive Analysis delivers exhaustive technical understanding of all major components
-- Core Components section thoroughly covers system modules, services, and data architecture
-- Feature Implementation section provides detailed analysis of business logic and workflows
-- Core Functionality Breakdown delivers comprehensive feature decomposition and module analysis
-- Clear boundaries between foundational knowledge and advanced technical implementation
-
-**Content Validation:**
-- All sections address comprehensive user needs with detailed, specific questions and thorough answers
-- Technical accuracy with deep implementation feasibility analysis
-- Complete, exhaustive coverage of core project functionality with detailed feature analysis
-- Scalable structure that provides thorough detail appropriate to project complexity
-- Each section delivers substantial, educationally rich content that thoroughly explores its domain
-  **Technical Coverage:**
-- Complete analysis of project's core technology stack and architectural decisions
-- Detailed breakdown of system components and their responsibilities
-- Comprehensive feature analysis with implementation patterns, business logic, and workflow mapping
-- Detailed functional module breakdown with use case implementations and interaction analysis
-- Technical implementation details including algorithms, patterns, and optimizations
-- Integration analysis covering APIs, external systems, and extension mechanisms
-
-## Quality Requirements
-
-- Base all sections on actual code analysis, not generic templates
-- Create specific, actionable prompts that reference real project components
-- Ensure logical progression from basic understanding to advanced implementation
-- Generate comprehensive coverage appropriate to project's actual complexity
-- Include only sections that add value based on the specific repository
-- Make each prompt detailed enough to generate substantial, educational content
-
-Generate comprehensive, detailed documentation catalogs that serve both newcomers seeking thorough understanding and experienced users requiring exhaustive technical analysis. Ensure each generated section provides in-depth, substantial content that thoroughly educates users about all aspects of the project.
-Your final output must be valid JSON that can be immediately used to generate comprehensive documentation for this specific project.
+(Internal validation—do not output): citations included; ≤8 children/section for architectural modules; depth ≤4; sections non-duplicative; omit undetected modules; component-level granularity achieved where applicable.

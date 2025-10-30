@@ -666,7 +666,7 @@ public class RepositoryService(
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.WarehouseId == input.WarehouseId);
 
-        var fileKernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+        var fileKernel = await KernelFactory.GetKernel(OpenAIOptions.Endpoint,
             OpenAIOptions.ChatApiKey, document.GitPath, OpenAIOptions.ChatModel, false);
         // 对当前单目录进行分析
         var (catalogs, fileItem, files)
@@ -760,7 +760,7 @@ public class RepositoryService(
                     throw new Exception("文档不存在");
                 }
 
-                var fileKernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+                var fileKernel = await KernelFactory.GetKernel(OpenAIOptions.Endpoint,
                     OpenAIOptions.ChatApiKey, document.GitPath, OpenAIOptions.ChatModel, false);
 
                 // 对当前单目录进行分析

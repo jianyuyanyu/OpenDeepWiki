@@ -2,10 +2,9 @@ using System.Diagnostics;
 
 namespace KoalaWiki.KoalaWarehouse.Pipeline.Steps;
 
-public class ProjectClassificationStep : DocumentProcessingStepBase<DocumentProcessingContext, DocumentProcessingContext>
+public class ProjectClassificationStep(ILogger<ProjectClassificationStep> logger)
+    : DocumentProcessingStepBase<DocumentProcessingContext, DocumentProcessingContext>(logger)
 {
-    public ProjectClassificationStep(ILogger<ProjectClassificationStep> logger) : base(logger) { }
-
     public override string StepName => "读取或生成项目类别";
 
     public override async Task<DocumentProcessingContext> ExecuteAsync(DocumentProcessingContext context,
@@ -32,7 +31,7 @@ public class ProjectClassificationStep : DocumentProcessingStepBase<DocumentProc
                 // 确保有文件内核实例
                 if (context.FileKernelInstance == null)
                 {
-                    context.FileKernelInstance = KernelFactory.GetKernel(
+                    context.FileKernelInstance = await KernelFactory.GetKernel(
                         OpenAIOptions.Endpoint,
                         OpenAIOptions.ChatApiKey, 
                         context.Document.GitPath, 

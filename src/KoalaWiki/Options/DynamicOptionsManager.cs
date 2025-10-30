@@ -1,5 +1,3 @@
-using KoalaWiki.Services;
-
 namespace KoalaWiki.Options;
 
 /// <summary>
@@ -87,8 +85,6 @@ public class DynamicOptionsManager
             await _configService.GetValueAsync<string[]>("ExcludedFolders") ?? Array.Empty<string>();
         DocumentOptions.EnableSmartFilter = await _configService.GetValueAsync<bool>("EnableSmartFilter", true);
         DocumentOptions.CatalogueFormat = await _configService.GetValueAsync<string>("CatalogueFormat") ?? "compact";
-        DocumentOptions.EnableCodeDependencyAnalysis =
-            await _configService.GetValueAsync<bool>("EnableCodeDependencyAnalysis", false);
         DocumentOptions.EnableWarehouseFunctionPromptTask =
             await _configService.GetValueAsync<bool>("EnableWarehouseFunctionPromptTask", true);
         DocumentOptions.EnableWarehouseDescriptionTask =
@@ -97,8 +93,6 @@ public class DynamicOptionsManager
         DocumentOptions.RefineAndEnhanceQuality =
             await _configService.GetValueAsync<bool>("RefineAndEnhanceQuality", true);
         DocumentOptions.EnableWarehouseCommit = await _configService.GetValueAsync<bool>("EnableWarehouseCommit", true);
-        DocumentOptions.EnableCodeCompression =
-            await _configService.GetValueAsync<bool>("EnableCodeCompression", false);
         DocumentOptions.ReadMaxTokens = await _configService.GetValueAsync<int>("ReadMaxTokens", 90000);
 
         _logger.LogDebug("Document配置已加载");

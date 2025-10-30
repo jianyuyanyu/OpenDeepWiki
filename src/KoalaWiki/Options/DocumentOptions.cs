@@ -35,12 +35,6 @@ public class DocumentOptions
     public static string CatalogueFormat { get; set; } = "compact";
 
     /// <summary>
-    /// 是否启用代码依赖分析
-    /// </summary>
-    /// <returns></returns>
-    public static bool EnableCodeDependencyAnalysis { get; set; } = false;
-
-    /// <summary>
     /// 是否启用仓库功能提示任务
     /// </summary>
     public static bool EnableWarehouseFunctionPromptTask { get; set; } = true;
@@ -69,14 +63,6 @@ public class DocumentOptions
     public static bool EnableWarehouseCommit { get; set; } = true;
 
     /// <summary>
-    /// 是否启用代码压缩
-    /// 当启用时，FileFunction读取代码文件时会应用压缩算法
-    /// 压缩会保留注释、方法名等关键信息，但会移除多余的空白和格式
-    /// </summary>
-    /// <returns></returns>
-    public static bool EnableCodeCompression { get; set; } = false;
-
-    /// <summary>
     /// 限制单个AI读取的最大token上下文比例是当前模型的多少，范围0.1-1.0
     /// </summary>
     /// <returns></returns>
@@ -101,8 +87,25 @@ public class DocumentOptions
     /// </summary>
     public static bool EnableWiki { get; set; } = true;
 
+    public static Dictionary<string, string> McpStreamable = new Dictionary<string, string>();
+
     public static void InitConfig(IConfiguration configuration)
     {
+        var mcpStreamable = Environment.GetEnvironmentVariable("MCP_STREAMABLE");
+        if (!string.IsNullOrEmpty(mcpStreamable))
+        {
+            var pairs = mcpStreamable.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var pair in pairs)
+            {
+                var keyValue = pair.Split('=', 2, StringSplitOptions.RemoveEmptyEntries);
+                if (keyValue.Length == 2)
+                {
+                    McpStreamable[keyValue[0].Trim()] = keyValue[1].Trim();
+                }
+            }
+        }
+        
+        
         configuration.GetSection(Name).Get<DocumentOptions>();
 
         var enableWarehouseCommit = configuration.GetValue<bool?>($"ENABLE_WAREHOUSE_COMMIT") ?? true;
@@ -130,16 +133,6 @@ public class DocumentOptions
             RefineAndEnhanceQuality = bool.TryParse(refineAndEnhanceQuality, out var enable) && enable;
         }
 
-        var enableCodeDependencyAnalysis = configuration.GetValue<string>($"ENABLE_CODED_DEPENDENCY_ANALYSIS");
-
-        if (!string.IsNullOrEmpty(enableCodeDependencyAnalysis))
-        {
-            if (bool.TryParse(enableCodeDependencyAnalysis, out var enable))
-            {
-                EnableCodeDependencyAnalysis = enable;
-            }
-        }
-
         var enableWarehouseFunctionPromptTask =
             configuration.GetValue<string>($"ENABLE_WAREHOUSE_FUNCTION_PROMPT_TASK");
 
@@ -164,15 +157,6 @@ public class DocumentOptions
         if (!string.IsNullOrEmpty(catalogueFormat))
         {
             CatalogueFormat = catalogueFormat.ToLower();
-        }
-
-        var enableCodeCompression = configuration.GetValue<string>($"ENABLE_CODE_COMPRESSION");
-        if (!string.IsNullOrEmpty(enableCodeCompression))
-        {
-            if (bool.TryParse(enableCodeCompression, out var enable))
-            {
-                EnableCodeCompression = enable;
-            }
         }
 
         var maxFileReadCount = configuration.GetValue<string>($"READ_MAX_TOKENS");

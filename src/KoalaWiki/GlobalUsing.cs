@@ -1,5 +1,4 @@
-﻿global using KoalaWiki.CodeMap;
-global using KoalaWiki.Core.DataAccess;
+﻿global using KoalaWiki.Core.DataAccess;
 global using KoalaWiki.DataMigration;
 global using KoalaWiki.Extensions;
 global using KoalaWiki.Git;

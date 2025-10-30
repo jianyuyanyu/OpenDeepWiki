@@ -31,6 +31,8 @@
         <PackageReference Include="Microsoft.SemanticKernel.Connectors.AzureOpenAI" />
         <PackageReference Include="Microsoft.SemanticKernel.Connectors.OpenAI" />
         <PackageReference Include="ModelContextProtocol.AspNetCore" />
+        <PackageReference Include="ModelContextProtocol.Core" />
+        <PackageReference Include="ModelContextProtocolServer.Sse" />
         <PackageReference Include="Newtonsoft.Json" />
         <PackageReference Include="Octokit" />
         <PackageReference Include="Polly" />
@@ -95,7 +97,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\framework\src\OpenDeepWiki.CodeFoundation\OpenDeepWiki.CodeFoundation.csproj" />
       <ProjectReference Include="..\..\KoalaWiki.Domains\KoalaWiki.Domains.csproj" />
       <ProjectReference Include="..\..\Provider\KoalaWiki.Provider.PostgreSQL\KoalaWiki.Provider.PostgreSQL.csproj" />
       <ProjectReference Include="..\..\Provider\KoalaWiki.Provider.Sqlite\KoalaWiki.Provider.Sqlite.csproj" />

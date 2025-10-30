@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "build:analyze": "tsc -b && vite build --mode analyze",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "merge-i18n": "node --loader ts-node/esm src/i18n/mergeBundles.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

@@ -121,8 +121,6 @@ const AISettingsTab: React.FC<AISettingsTabProps> = ({
   const modelProviders = [
     { value: 'OpenAI', label: 'OpenAI' },
     { value: 'Azure', label: 'Azure OpenAI' },
-    { value: 'Anthropic', label: 'Anthropic' },
-    { value: 'Google', label: 'Google AI' },
     { value: 'Custom', label: t('settings.ai.customProvider') }
   ]
 
@@ -499,6 +497,50 @@ const AISettingsTab: React.FC<AISettingsTabProps> = ({
                     </div>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* 自定义Body参数配置 */}
+          <div className="md:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  {t('settings.ai.customBodyParams')}
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{t('settings.ai.customBodyParamsHelp')}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="customBodyParams">{t('settings.ai.customBodyParamsLabel')}</Label>
+                  <Input
+                    id="customBodyParams"
+                    value={getSettingValue('CustomBodyParams')}
+                    onChange={(e) => onUpdate('CustomBodyParams', e.target.value)}
+                    placeholder="stop=<|im_end|>,max_tokens=4096"
+                    disabled={loading}
+                    className={validationErrors.CustomBodyParams ? 'border-destructive' : ''}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.ai.customBodyParamsDescription')}
+                  </p>
+                  {validationErrors.CustomBodyParams && (
+                    <p className="text-sm text-destructive">{validationErrors.CustomBodyParams}</p>
+                  )}
+                </div>
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    {t('settings.ai.customBodyParamsNote')}
+                  </AlertDescription>
+                </Alert>
               </CardContent>
             </Card>
           </div>

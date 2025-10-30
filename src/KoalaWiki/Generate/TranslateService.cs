@@ -219,7 +219,7 @@ public class TranslateService
         var document = await _dbContext.Documents.Where(x => x.WarehouseId == warehouseId)
             .FirstOrDefaultAsync(cancellationToken: cancellationToken);
 
-        var kernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint, OpenAIOptions.ChatApiKey, document.GitPath,
+        var kernel = await KernelFactory.GetKernel(OpenAIOptions.Endpoint, OpenAIOptions.ChatApiKey, document.GitPath,
             OpenAIOptions.ChatModel, false);
 
         try
@@ -341,7 +341,7 @@ public class TranslateService
         var document = await _dbContext.Documents.Where(x => x.WarehouseId == warehouseId)
             .FirstOrDefaultAsync(cancellationToken: cancellationToken);
 
-        var kernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint, OpenAIOptions.ChatApiKey, document.GitPath,
+        var kernel =await  KernelFactory.GetKernel(OpenAIOptions.Endpoint, OpenAIOptions.ChatApiKey, document.GitPath,
             OpenAIOptions.ChatModel, false);
 
 
@@ -698,7 +698,7 @@ public class TranslateService
                 throw new ArgumentException($"目录 {catalogId} 对应的仓库不存在");
             }
 
-            var kernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint, OpenAIOptions.ChatApiKey, document.GitPath,
+            var kernel =await  KernelFactory.GetKernel(OpenAIOptions.Endpoint, OpenAIOptions.ChatApiKey, document.GitPath,
                 OpenAIOptions.ChatModel, false);
 
             // 翻译目录本身

@@ -1,6 +1,8 @@
 ﻿using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Serilog;
 
 namespace KoalaWiki;
@@ -15,6 +17,7 @@ public sealed class KoalaHttpClientHandler : HttpClientHandler
     {
         Log.Logger.Information("HTTP {Method} {Uri}", request.Method, request.RequestUri);
 
+        request.Headers.UserAgent.Clear();
         request.Headers.UserAgent.ParseAdd("KoalaWiki/" + Version);
 
         var json = JsonConvert.DeserializeObject<dynamic>(await request.Content.ReadAsStringAsync(cancellationToken));
@@ -22,7 +25,7 @@ public sealed class KoalaHttpClientHandler : HttpClientHandler
         var model = $"{json.model}";
 
         // 兼容旧模型 ( max_completion_tokens => max_tokens )
-        if (json != null && json.max_completion_tokens != null && !model.StartsWith("o") &&
+        if (json != null && json?.max_completion_tokens != null && !model.StartsWith('o') &&
             !model.StartsWith("gpt"))
         {
             json.max_tokens = json.max_completion_tokens;
@@ -57,6 +60,9 @@ public sealed class KoalaHttpClientHandler : HttpClientHandler
                 json.chat_template_kwargs.enable_thinking = false;
             }
         }
+
+        // 添加自定义body参数支持
+        ApplyCustomBodyParams(json);
 
         // 重写请求体
         request.Content = new StringContent(JsonConvert.SerializeObject(json),
@@ -146,6 +152,79 @@ public sealed class KoalaHttpClientHandler : HttpClientHandler
                 stopwatch.ElapsedMilliseconds
             );
             return response;
+        }
+    }
+
+    /// <summary>
+    /// 应用自定义body参数
+    /// 从环境变量 CUSTOM_BODY_PARAMS 中读取参数，格式: key1=value1,key2=value2
+    /// </summary>
+    private void ApplyCustomBodyParams(JObject json)
+    {
+        var customParams = Environment.GetEnvironmentVariable("CUSTOM_BODY_PARAMS");
+
+        if (string.IsNullOrWhiteSpace(customParams))
+        {
+            return;
+        }
+
+        try
+        {
+            // 解析参数格式: key1=value1,key2=value2
+            var paramPairs = customParams.Split(',', StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var pair in paramPairs)
+            {
+                var parts = pair.Split('=', 2, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 2)
+                {
+                    var key = parts[0].Trim();
+                    var value = parts[1].Trim();
+
+                    if (!string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(value))
+                    {
+                        if (json.ContainsKey(key))
+                        {
+                            json.Remove(key);
+                        }
+
+                        // 判断是否为数字
+                        if (int.TryParse(value, out var intValue))
+                        {
+                            json.Add(key, intValue);
+                        }
+                        else if (double.TryParse(value, out var doubleValue))
+                        {
+                            json.Add(key, doubleValue);
+                        }
+                        else if (bool.TryParse(value, out var boolValue))
+                        {
+                            json.Add(key, boolValue);
+                        }
+                        else if (DateTime.TryParse(value, out var dateTimeValue))
+                        {
+                            json.Add(key, dateTimeValue);
+                        }
+                        else
+                        {
+                            try
+                            {
+                                var jToken = JToken.Parse(value);
+                                json.Add(key, jToken);
+                            }
+                            catch
+                            {
+                                // 作为字符串处理
+                                json.Add(key, value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Warning(ex, "Failed to parse custom body parameters: {CustomParams}", customParams);
         }
     }
 }

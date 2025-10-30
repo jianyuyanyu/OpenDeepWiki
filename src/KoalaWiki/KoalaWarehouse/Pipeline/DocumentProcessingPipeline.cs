@@ -18,11 +18,11 @@ public class DocumentProcessingPipeline : IDocumentProcessingPipeline
     }
 
     public async Task<DocumentProcessingResult> ExecuteAsync(
-        DocumentProcessingCommand command, 
+        DocumentProcessingCommand command,
         CancellationToken cancellationToken = default)
     {
         using var activity = _activitySource.StartActivity("DocumentProcessingPipeline.Execute");
-        
+
         try
         {
             var context = new DocumentProcessingContext
@@ -34,38 +34,38 @@ public class DocumentProcessingPipeline : IDocumentProcessingPipeline
             };
 
             // 初始化内核实例
-            InitializeKernels(context);
-            
+            await InitializeKernels(context);
+
             SetPipelineActivityTags(activity, context);
-            
-            _logger.LogInformation("开始执行文档处理管道，仓库: {WarehouseId}, 文档: {DocumentId}", 
+
+            _logger.LogInformation("开始执行文档处理管道，仓库: {WarehouseId}, 文档: {DocumentId}",
                 context.Warehouse.Id, context.Document.Id);
 
             var executedSteps = new List<string>();
-            
+
             foreach (var step in _steps)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                
+
                 try
                 {
                     if (await step.CanExecuteAsync(context))
                     {
                         _logger.LogInformation("执行步骤: {StepName}", step.StepName);
-                        
+
                         using var stepActivity = _activitySource.StartActivity($"Step.{step.StepName}");
                         stepActivity?.SetTag("step.name", step.StepName);
-                        
+
                         var stepStartTime = DateTime.UtcNow;
                         context = await step.ExecuteAsync(context, cancellationToken);
                         var stepDuration = DateTime.UtcNow - stepStartTime;
-                        
+
                         stepActivity?.SetTag("step.duration_ms", stepDuration.TotalMilliseconds);
                         stepActivity?.SetTag("step.completed", true);
-                        
+
                         executedSteps.Add(step.StepName);
-                        
-                        _logger.LogInformation("完成步骤: {StepName}，耗时: {Duration}ms", 
+
+                        _logger.LogInformation("完成步骤: {StepName}，耗时: {Duration}ms",
                             step.StepName, stepDuration.TotalMilliseconds);
                     }
                     else
@@ -78,17 +78,17 @@ public class DocumentProcessingPipeline : IDocumentProcessingPipeline
                     _logger.LogError(stepEx, "步骤 {StepName} 执行失败", step.StepName);
                     activity?.SetTag("failed_step", step.StepName);
                     activity?.SetTag("error", stepEx.Message);
-                    
+
                     return DocumentProcessingResult.CreateFailure(
-                        $"步骤 '{step.StepName}' 执行失败: {stepEx.Message}", 
+                        $"步骤 '{step.StepName}' 执行失败: {stepEx.Message}",
                         stepEx);
                 }
             }
 
             activity?.SetTag("pipeline.completed", true);
             activity?.SetTag("executed_steps", string.Join(",", executedSteps));
-            
-            _logger.LogInformation("文档处理管道执行完成，执行的步骤: {Steps}", 
+
+            _logger.LogInformation("文档处理管道执行完成，执行的步骤: {Steps}",
                 string.Join(", ", executedSteps));
 
             return DocumentProcessingResult.CreateSuccess(context);
@@ -104,32 +104,32 @@ public class DocumentProcessingPipeline : IDocumentProcessingPipeline
             _logger.LogError(ex, "文档处理管道执行失败");
             activity?.SetTag("pipeline.failed", true);
             activity?.SetTag("error", ex.Message);
-            
+
             return DocumentProcessingResult.CreateFailure(
-                $"文档处理管道执行失败: {ex.Message}", 
+                $"文档处理管道执行失败: {ex.Message}",
                 ex);
         }
     }
 
-    private void InitializeKernels(DocumentProcessingContext context)
+    private async Task InitializeKernels(DocumentProcessingContext context)
     {
         try
         {
             // 初始化主内核（带插件）
-            context.KernelInstance = KernelFactory.GetKernel(
+            context.KernelInstance = await KernelFactory.GetKernel(
                 OpenAIOptions.Endpoint,
                 OpenAIOptions.ChatApiKey,
-                context.Document.GitPath, 
+                context.Document.GitPath,
                 OpenAIOptions.ChatModel);
 
             // 初始化文件内核（不带插件）
-            context.FileKernelInstance = KernelFactory.GetKernel(
+            context.FileKernelInstance = await KernelFactory.GetKernel(
                 OpenAIOptions.Endpoint,
-                OpenAIOptions.ChatApiKey, 
-                context.Document.GitPath, 
-                OpenAIOptions.ChatModel, 
+                OpenAIOptions.ChatApiKey,
+                context.Document.GitPath,
+                OpenAIOptions.ChatModel,
                 false);
-            
+
             _logger.LogDebug("内核实例初始化完成");
         }
         catch (Exception ex)

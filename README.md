@@ -91,6 +91,18 @@ If mcp streamable http is not supported, use the following format:
 }
 ```
 
+**MCP Streamable Configuration**
+
+You can configure MCP streamable support for specific services using the `MCP_STREAMABLE` environment variable:
+
+```yaml
+environment:
+  # Format: serviceName1=streamableUrl1,serviceName2=streamableUrl2
+  - MCP_STREAMABLE=claude=http://localhost:8080/api/mcp,windsurf=http://localhost:8080/api/mcp
+```
+
+This allows you to specify which services should use streamable HTTP endpoints and their corresponding URLs.
+
 - owner: Repository organization or owner name
 - name: Repository name
 
@@ -119,18 +131,17 @@ cd OpenDeepWiki
 services:
   koalawiki:
     environment:
-      - KOALAWIKI_REPOSITORIES=/repositories
-      - TASK_MAX_SIZE_PER_USER=5 # Maximum parallel document generation tasks per user for AI
+      - TASK_MAX_SIZE_PER_USER=2 # Maximum parallel document generation tasks per user for AI
       - CHAT_MODEL=DeepSeek-V3 # Model must support function calling
       - ANALYSIS_MODEL= # Analysis model for generating repository directory structure
       - CHAT_API_KEY= # Your API Key
       - LANGUAGE= # Default generation language, e.g., "Chinese"
       - ENDPOINT=https://api.token-ai.cn/v1
       - DB_TYPE=sqlite
-      - MODEL_PROVIDER=OpenAI # Model provider, supports OpenAI, AzureOpenAI, Anthropic
+      - MODEL_PROVIDER=OpenAI # Model provider, supports OpenAI, AzureOpenAI
       - DB_CONNECTION_STRING=Data Source=/data/KoalaWiki.db
       - EnableSmartFilter=true # Whether to enable smart filtering, affects AI's ability to get repository file directories
-      - UPDATE_INTERVAL # Repository incremental update interval in days
+      - UPDATE_INTERVAL=5 # Repository incremental update interval in days
       - MAX_FILE_LIMIT=100 # Maximum upload file limit in MB
       - DEEP_RESEARCH_MODEL= # Deep research model, if empty uses CHAT_MODEL
       - ENABLE_INCREMENTAL_UPDATE=true # Whether to enable incremental updates
@@ -138,11 +149,10 @@ services:
       - ENABLE_WAREHOUSE_COMMIT=true # Whether to enable warehouse commit
       - ENABLE_FILE_COMMIT=true # Whether to enable file commit
       - REFINE_AND_ENHANCE_QUALITY=false # Whether to refine and enhance quality
-      - ENABLE_WAREHOUSE_FUNCTION_PROMPT_TASK=true # Whether to enable warehouse function prompt task
-      - ENABLE_WAREHOUSE_DESCRIPTION_TASK=true # Whether to enable warehouse description task
       - CATALOGUE_FORMAT=compact # Directory structure format (compact, json, pathlist, unix)
-      - ENABLE_CODE_COMPRESSION=false # Whether to enable code compression
+      - CUSTOM_BODY_PARAMS= # Custom request body parameters, format: key1=value1,key2=value2 (e.g., stop=<|im_end|>,max_tokens=4096)
       - READ_MAX_TOKENS=100000 # The maximum token limit for reading files in AI is set to prevent unlimited file reading. It is recommended to fill in 70% of the model's maximum token.
+      - MCP_STREAMABLE= # MCP service streamable configuration, format: serviceName=streamableUrl (e.g., claude=http://localhost:8080/api/mcp,windsurf=http://localhost:8080/api/mcp)
       # Feishu Bot configuration (optional)
       - FeishuAppId=
       - FeishuAppSecret=
@@ -306,6 +316,8 @@ graph TD
 - `ENABLE_WAREHOUSE_DESCRIPTION_TASK`: Whether to enable warehouse description task
 - `CATALOGUE_FORMAT`: Directory structure format (compact, json, pathlist, unix)
 - `ENABLE_CODE_COMPRESSION`: Whether to enable code compression
+- `CUSTOM_BODY_PARAMS`: Custom request body parameters, format: `key1=value1,key2=value2` (e.g., `stop=<|im_end|>,max_tokens=4096`). These parameters will be added to all AI model API requests
+- `READ_MAX_TOKENS`: Maximum token limit for reading files in AI, prevents unlimited file reading. It is recommended to fill in 70% of the model's maximum token (default: 100000)
 - `MAX_FILE_READ_COUNT`: Maximum file read count limit for AI, prevents unlimited file reading and improves processing efficiency (default: 10, 0 = no limit)
 - `FeishuAppId`: Feishu App ID (required if enabling Feishu Bot)
 - `FeishuAppSecret`: Feishu App Secret (required if enabling Feishu Bot)

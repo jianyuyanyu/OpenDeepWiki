@@ -113,6 +113,7 @@ export interface AISettings {
   topP?: string
   frequencyPenalty?: string
   presencePenalty?: string
+  customBodyParams?: string
 }
 
 // 存储设置

@@ -234,7 +234,7 @@ public class FeishuBotService(
             // 解析仓库的目录结构
             var path = document.GitPath;
 
-            var kernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+            var kernel = await KernelFactory.GetKernel(OpenAIOptions.Endpoint,
                 OpenAIOptions.ChatApiKey, path, OpenAIOptions.ChatModel, false);
 
             if (OpenAIOptions.EnableMem0)

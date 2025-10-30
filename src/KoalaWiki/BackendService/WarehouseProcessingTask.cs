@@ -8,8 +8,6 @@ public partial class WarehouseProcessingTask(IServiceProvider service, ILogger<W
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        
-        return;
         await Task.Delay(1000, stoppingToken);
 
         if (!DocumentOptions.EnableIncrementalUpdate)

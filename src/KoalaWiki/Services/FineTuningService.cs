@@ -276,7 +276,7 @@ public class FineTuningService(IKoalaWikiContext koala, IUserContext userContext
         try
         {
             // 配置OpenAI客户端
-            var kernel = KernelFactory.GetKernel(dataset.Endpoint,
+            var kernel = await KernelFactory.GetKernel(dataset.Endpoint,
                 dataset.ApiKey, document.GitPath, dataset.Model, false);
 
             var chat = kernel.GetRequiredService<IChatCompletionService>();

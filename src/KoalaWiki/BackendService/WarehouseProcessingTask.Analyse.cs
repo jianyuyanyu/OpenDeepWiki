@@ -77,7 +77,7 @@ public partial class WarehouseProcessingTask
             logger.LogInformation("步骤3: 创建内核并准备分析");
 
             // 先得到树形结构
-            var kernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+            var kernel = await KernelFactory.GetKernel(OpenAIOptions.Endpoint,
                 OpenAIOptions.ChatApiKey, document.GitPath, OpenAIOptions.ChatModel, false);
 
             var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
@@ -182,7 +182,7 @@ public partial class WarehouseProcessingTask
                 }
             }
 
-            var fileKernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint, OpenAIOptions.ChatApiKey, document.GitPath,
+            var fileKernel =await  KernelFactory.GetKernel(OpenAIOptions.Endpoint, OpenAIOptions.ChatApiKey, document.GitPath,
                 OpenAIOptions.ChatModel, false);
 
             foreach (var valueTuple in documents)

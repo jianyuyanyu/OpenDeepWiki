@@ -4,12 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace KoalaWiki.KoalaWarehouse.Pipeline.Steps;
 
-public class CatalogueGenerationStep : DocumentProcessingStepBase<DocumentProcessingContext, DocumentProcessingContext>
+public class CatalogueGenerationStep(ILogger<CatalogueGenerationStep> logger)
+    : DocumentProcessingStepBase<DocumentProcessingContext, DocumentProcessingContext>(logger)
 {
-    public CatalogueGenerationStep(ILogger<CatalogueGenerationStep> logger) : base(logger)
-    {
-    }
-
     public override string StepName => "读取并生成目录结构";
 
     public override StepExecutionConfig Configuration => new()
@@ -18,7 +15,7 @@ public class CatalogueGenerationStep : DocumentProcessingStepBase<DocumentProces
         RetryStrategy = StepRetryStrategy.Smart,
         MaxRetryAttempts = 3,
         RetryDelay = TimeSpan.FromSeconds(5),
-        StepTimeout = TimeSpan.FromMinutes(20), // 目录分析可能需要更长时间
+        StepTimeout = TimeSpan.FromMinutes(60), // 目录分析可能需要更长时间
         ContinueOnFailure = true,
         RetriableExceptions =
         [
@@ -27,11 +24,11 @@ public class CatalogueGenerationStep : DocumentProcessingStepBase<DocumentProces
             typeof(InvalidOperationException),
             typeof(TimeoutException)
         ],
-        NonRetriableExceptions = new List<Type>
-        {
+        NonRetriableExceptions =
+        [
             typeof(DirectoryNotFoundException),
             typeof(UnauthorizedAccessException)
-        }
+        ]
     };
 
     public override async Task<DocumentProcessingContext> ExecuteAsync(

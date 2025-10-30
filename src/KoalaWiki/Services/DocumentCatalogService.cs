@@ -132,7 +132,7 @@ public class DocumentCatalogService(IKoalaWikiContext dbAccess) : FastApi
 
         if (item == null)
         {
-            throw new NotFoundException("文件不存在");
+            throw new NotFoundException("文档内容为空，可能是生成失败或者还没生成成功");
         }
 
         // 找到所有引用文件

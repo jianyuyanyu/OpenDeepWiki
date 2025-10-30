@@ -23,7 +23,7 @@ import {
 import {
   Search,
   GitBranch,
-  Code,
+  Github,
   PanelLeftClose,
   PanelLeftOpen,
   Hash,
@@ -278,66 +278,52 @@ export const FumadocsSidebar: React.FC<FumadocsSidebarProps> = React.memo(({
         className
       )}
       style={{
-        transform: 'translateZ(0)', // 启用硬件加速
+        transform: 'translateZ(0)', // 
         backfaceVisibility: 'hidden'
       }}
     >
-      {/* 品牌头部 */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 flex items-center justify-center shadow-sm">
-              <Hash className="w-3.5 h-3.5 text-white" />
-            </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-background"></div>
-          </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-sm text-foreground">{name}</span>
-            <span className="text-xs text-muted-foreground">{owner}</span>
-          </div>
-        </div>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 hover:bg-accent/50"
-                onClick={onSidebarToggle}
-                disabled={!onSidebarToggle}
-              >
-                {sidebarOpen ? (
-                  <PanelLeftClose className="h-3.5 w-3.5" />
-                ) : (
-                  <PanelLeftOpen className="h-3.5 w-3.5" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p className="text-xs">
-                {sidebarOpen
-                  ? t('repository.layout.collapseSidebar')
-                  : t('repository.layout.expandSidebar')}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
-
       {/* 搜索框 */}
-      <div className="px-3 py-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="搜索文档..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 pr-14 h-8 text-sm bg-accent/30 border-0 focus:bg-accent/50 transition-colors placeholder:text-muted-foreground/60"
-          />
-          <kbd className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none inline-flex h-4 select-none items-center gap-0.5 rounded border border-border/50 bg-background px-1 font-mono text-[10px] font-medium text-muted-foreground">
-            <span className="text-[10px]">⌘</span>K
-          </kbd>
+      <div className="px-3 py-2 border-b border-border/50">
+        <div className="relative flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="搜索文档..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-14 h-8 text-sm bg-accent/30 border-0 focus:bg-accent/50 transition-colors placeholder:text-muted-foreground/60"
+            />
+            <kbd className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none inline-flex h-4 select-none items-center gap-0.5 rounded border border-border/50 bg-background px-1 font-mono text-[10px] font-medium text-muted-foreground">
+              <span className="text-[10px]">⌘</span>K
+            </kbd>
+          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 hover:bg-accent/50 flex-shrink-0"
+                  onClick={onSidebarToggle}
+                  disabled={!onSidebarToggle}
+                >
+                  {sidebarOpen ? (
+                    <PanelLeftClose className="h-3.5 w-3.5" />
+                  ) : (
+                    <PanelLeftOpen className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p className="text-xs">
+                  {sidebarOpen
+                    ? t('repository.layout.collapseSidebar')
+                    : t('repository.layout.expandSidebar')}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </div>
 
@@ -408,7 +394,7 @@ export const FumadocsSidebar: React.FC<FumadocsSidebarProps> = React.memo(({
                   className="h-6 w-6 hover:bg-accent/50"
                   onClick={() => window.open(`https://github.com/${owner}/${name}`, '_blank')}
                 >
-                  <Code className="h-3 w-3" />
+                  <Github className="h-3 w-3" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="right">

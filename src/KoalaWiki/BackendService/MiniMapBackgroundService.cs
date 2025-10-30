@@ -1,9 +1,6 @@
 ﻿using System.Text.Json;
-using KoalaWiki.Domains;
-using KoalaWiki.Domains.Warehouse;
-using Microsoft.EntityFrameworkCore;
 
-namespace KoalaWiki.KoalaWarehouse;
+namespace KoalaWiki.BackendService;
 
 /// <summary>
 /// 思维导图服务生成

@@ -91,6 +91,18 @@ OpenDeepWiki支持MCP协议：
 }
 ```
 
+**MCP Streamable 配置**
+
+您可以使用 `MCP_STREAMABLE` 环境变量为特定服务配置 MCP streamable 支持：
+
+```yaml
+environment:
+  # 格式: 服务名称1=streamableUrl1,服务名称2=streamableUrl2
+  - MCP_STREAMABLE=claude=http://localhost:8080/api/mcp,windsurf=http://localhost:8080/api/mcp
+```
+
+这允许您指定哪些服务应该使用 streamable HTTP 端点及其对应的 URL。
+
 - owner：仓库所属组织或拥有者名称
 - name：仓库名称
 
@@ -119,18 +131,17 @@ cd OpenDeepWiki
 services:
   koalawiki:
     environment:
-      - KOALAWIKI_REPOSITORIES=/repositories
-      - TASK_MAX_SIZE_PER_USER=5 # AI每用户最大并行文档生成任务数
+      - TASK_MAX_SIZE_PER_USER=2 # AI每用户最大并行文档生成任务数
       - CHAT_MODEL=DeepSeek-V3 # 模型需支持函数调用
       - ANALYSIS_MODEL= # 用于生成仓库目录结构的分析模型
       - CHAT_API_KEY= # 你的API Key
       - LANGUAGE= # 默认生成语言，如“Chinese”
       - ENDPOINT=https://api.token-ai.cn/v1
       - DB_TYPE=sqlite
-      - MODEL_PROVIDER=OpenAI # 模型提供商，支持OpenAI、AzureOpenAI、Anthropic
+      - MODEL_PROVIDER=OpenAI # 模型提供商，支持OpenAI、AzureOpenAI
       - DB_CONNECTION_STRING=Data Source=/data/KoalaWiki.db
       - EnableSmartFilter=true # 是否启用智能过滤，影响AI获取仓库文件目录能力
-      - UPDATE_INTERVAL # 仓库增量更新间隔，单位天
+      - UPDATE_INTERVAL=5 # 仓库增量更新间隔，单位天
       - MAX_FILE_LIMIT=100 # 上传文件最大限制，单位MB
       - DEEP_RESEARCH_MODEL= # 深度研究模型，空则使用CHAT_MODEL
       - ENABLE_INCREMENTAL_UPDATE=true # 是否启用增量更新
@@ -138,11 +149,10 @@ services:
       - ENABLE_WAREHOUSE_COMMIT=true # 是否启用仓库提交
       - ENABLE_FILE_COMMIT=true # 是否启用文件提交
       - REFINE_AND_ENHANCE_QUALITY=false # 是否精炼并提高质量
-      - ENABLE_WAREHOUSE_FUNCTION_PROMPT_TASK=true # 是否启用仓库功能提示任务
-      - ENABLE_WAREHOUSE_DESCRIPTION_TASK=true # 是否启用仓库描述任务
       - CATALOGUE_FORMAT=compact # 目录结构格式 (compact, json, pathlist, unix)
-      - ENABLE_CODE_COMPRESSION=false # 是否启用代码压缩
+      - CUSTOM_BODY_PARAMS= # 自定义请求body参数，格式: key1=value1,key2=value2 (例如: stop=<|im_end|>,max_tokens=4096)
       - READ_MAX_TOKENS=100000 # AI最大文件读取token数量限制，防止无限制读取文件，建议填写模型最大token的百分之七十
+      - MCP_STREAMABLE= # MCP服务streamable配置，格式: 服务名=streamableUrl (例如: claude=http://localhost:8080/api/mcp,windsurf=http://localhost:8080/api/mcp)
       # 飞书 Bot 配置（可选，如需接入飞书）
       - FeishuAppId=
       - FeishuAppSecret=
@@ -306,6 +316,8 @@ graph TD
 - `ENABLE_WAREHOUSE_DESCRIPTION_TASK`：是否启用仓库描述任务
 - `CATALOGUE_FORMAT`：目录结构格式 (compact, json, pathlist, unix)
 - `ENABLE_CODE_COMPRESSION`：是否启用代码压缩
+- `CUSTOM_BODY_PARAMS`：自定义请求body参数，格式：`key1=value1,key2=value2`(例如：`stop=<|im_end|>,max_tokens=4096`)。这些参数将被添加到所有AI模型API请求中
+- `READ_MAX_TOKENS`：AI最大文件读取token数量限制，防止无限制读取文件，建议填写模型最大token的百分之七十（默认：100000）
 - `MAX_FILE_READ_COUNT`：AI最大文件读取数量限制，防止无限制读取文件，提高处理效率（默认：10，0表示不限制）
 - `FeishuAppId`：飞书应用 App ID（启用飞书 Bot 必填）
 - `FeishuAppSecret`：飞书应用 App Secret（启用飞书 Bot 必填）

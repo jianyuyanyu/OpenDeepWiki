@@ -36,7 +36,7 @@ public static class MiniMapService
 
         history.AddUserMessage(prompt);
 
-        var kernel = KernelFactory.GetKernel(OpenAIOptions.Endpoint, OpenAIOptions.ChatApiKey, path,
+        var kernel =await  KernelFactory.GetKernel(OpenAIOptions.Endpoint, OpenAIOptions.ChatApiKey, path,
             OpenAIOptions.ChatModel, false);
 
         int retry = 1;

@@ -161,9 +161,12 @@ public static partial class GenerateThinkCatalogueService
         history.AddUserMessage(contents);
 
         var catalogueTool = new CatalogueFunction();
-        var analysisModel = KernelFactory.GetKernel(OpenAIOptions.Endpoint,
+        var analysisModel =await  KernelFactory.GetKernel(OpenAIOptions.Endpoint,
             OpenAIOptions.ChatApiKey, path, OpenAIOptions.AnalysisModel, false, null,
-            builder => { builder.Plugins.AddFromObject(catalogueTool, "catalog"); });
+            builder =>
+            {
+                builder.Plugins.AddFromObject(catalogueTool, "catalog");
+            });
 
         var chat = analysisModel.Services.GetService<IChatCompletionService>();
         if (chat == null)

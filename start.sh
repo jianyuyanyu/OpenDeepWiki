@@ -1,7 +1,6 @@
 #!/bin/bash
 
 export URLS=http://localhost:5085
-export KOALAWIKI_REPOSITORIES=/repositories
 # 每个用户AI处理文档生成的最大并行数量
 export TASK_MAX_SIZE_PER_USER=5
 # 必须要支持function的模型

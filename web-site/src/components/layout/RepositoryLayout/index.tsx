@@ -1,5 +1,3 @@
-// 仓库详情页专用布局
-
 import { useEffect, useState } from 'react'
 import { Outlet, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -166,6 +164,20 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
     setHasNavigatedToFirstDoc(false)
   }, [owner, name, selectedBranch])
 
+  // 设置页面标题
+  useEffect(() => {
+    if (owner && name) {
+      const baseTitle = `${owner}/${name}`
+      const branchInfo = selectedBranch && selectedBranch !== 'main' ? ` (${selectedBranch})` : ''
+      document.title = `${baseTitle}${branchInfo} | KoalaWiki`
+    }
+    
+    return () => {
+      // 恢复默认标题
+      document.title = 'KoalaWiki'
+    }
+  }, [owner, name, selectedBranch])
+
   // 移动端关闭菜单
   useEffect(() => {
     const handleResize = () => {
@@ -193,36 +205,8 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
               {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </Button>
 
-            {/* 品牌/Logo */}
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/')}
-                className="flex items-center gap-2 px-2 h-8"
-              >
-                <div className="w-5 h-5 rounded-sm bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                  <Hash className="w-3 h-3 text-white" />
-                </div>
-                <span className="font-semibold text-sm hidden sm:inline">OpenDeepWiki</span>
-              </Button>
 
-              {/* 分隔符 */}
-              <div className="h-4 w-px bg-border hidden sm:block" />
-            </div>
-
-            {/* 面包屑导航 */}
             <nav className="flex items-center gap-1 min-w-0 flex-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/')}
-                className="text-muted-foreground hover:text-foreground h-7 px-2 text-sm"
-              >
-                {t('nav.repositories')}
-              </Button>
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
-
               {error ? (
                 <div className="flex items-center gap-2 text-destructive">
                   <AlertCircle className="h-4 w-4" />
@@ -280,11 +264,10 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
       </header>
 
       <div className="flex relative">
-        {/* 侧边栏 - 桌面端 - 优化性能 */}
         <aside
           className={cn(
             "hidden lg:block min-h-[calc(100vh-4rem)] fixed left-0 z-10",
-            "w-72 bg-background border-r border-border", // 固定宽度，避免布局重排
+            "w-72 bg-background border-r border-border",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
           style={{

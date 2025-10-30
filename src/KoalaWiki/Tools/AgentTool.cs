@@ -31,7 +31,10 @@ public class AgentTool
         [Description("A thought to think about")]
         string thought)
     {
-        Console.WriteLine("深入思考：\n" + thought);
+        var originalColor = System.Console.ForegroundColor;
+        System.Console.ForegroundColor = ConsoleColor.Yellow;
+        System.Console.WriteLine("深入思考>"+thought);
+        System.Console.ForegroundColor = originalColor;
         return thought;
     }
 }
