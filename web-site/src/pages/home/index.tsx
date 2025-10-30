@@ -81,7 +81,7 @@ export const HomePage = () => {
         })
       }
 
-      if (response && response.success) {
+      if (response && response.code === 200) {
         toast.success(t('repository.form.submitSuccess'))
         refresh()
         setShowAddModal(false)

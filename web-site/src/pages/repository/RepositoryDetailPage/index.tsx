@@ -9,7 +9,11 @@ import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useRepositoryDetailStore } from '@/stores/repositoryDetail.store'
+import { warehouseService } from '@/services/warehouse.service'
+import { request } from '@/utils/request'
 import { WarehouseStatus } from '@/types/repository'
+import { DocumentQualityEvaluation } from '@/components/DocumentQuality'
+import WikiGenerationManagement from '@/components/WikiGeneration/WikiGenerationManagement'
 import {
   GitBranch,
   AlertCircle,
@@ -34,6 +38,9 @@ const RepositoryDetailPage = () => {
   } = useRepositoryDetailStore()
 
   const [loading, setLoading] = useState(true)
+  const [tokenStats, setTokenStats] = useState<{ inputToken: number; outputToken: number; totalToken: number }>({ inputToken: 0, outputToken: 0, totalToken: 0 })
+  const [tokenRecords, setTokenRecords] = useState<Array<{ id: string; operation: string; inputToken: number; outputToken: number; totalToken: number; model?: string; createdAt: string }>>([])
+  const [tokenDaily, setTokenDaily] = useState<Array<{date: string; operations: Array<{ operation: string; inputToken: number; outputToken: number; totalToken: number }>; totals: { inputToken: number; outputToken: number; totalToken: number }}>>([])
 
   // 初始化数据
   const initializeData = async () => {
@@ -47,6 +54,23 @@ const RepositoryDetailPage = () => {
 
       // 获取文档目录（这会同时获取分支列表）
       await fetchDocumentCatalog()
+
+      // 获取仓库 Token 统计
+      try {
+        const res = await warehouseService.getTokenStatsByOwnerAndName(owner, name)
+        if (res) {
+          const { inputToken = 0, outputToken = 0, totalToken = 0 } = res || {}
+          setTokenStats({ inputToken, outputToken, totalToken })
+        }
+        // 最近消费记录
+        const rec = await request.get<any>(`/api/Repository/TokenConsumptionRecordsByOwnerAndName`, { params: { owner, name, page: 1, pageSize: 5 }})
+        if (rec && rec.items) {
+          setTokenRecords(rec.items || [])
+        }
+        // 按天×操作类型
+        const daily = await request.get<any>(`/api/Repository/TokenDailyByOperationByOwnerAndName`, { params: { owner, name, days: 30 }})
+        if (Array.isArray(daily)) setTokenDaily(daily)
+      } catch {}
     } finally {
       setLoading(false)
     }
@@ -308,8 +332,119 @@ const RepositoryDetailPage = () => {
               <p className="text-sm text-muted-foreground">{t('repository.detail.stars')}</p>
             </div>
           </div>
+          <div className="grid grid-cols-3 gap-4 mt-4">
+            <div className="text-center p-4 rounded-lg bg-muted/50">
+              <p className="text-2xl font-bold">{tokenStats.inputToken}</p>
+              <p className="text-sm text-muted-foreground">{t('repository.detail.inputToken')}</p>
+            </div>
+            <div className="text-center p-4 rounded-lg bg-muted/50">
+              <p className="text-2xl font-bold">{tokenStats.outputToken}</p>
+              <p className="text-sm text-muted-foreground">{t('repository.detail.outputToken')}</p>
+            </div>
+            <div className="text-center p-4 rounded-lg bg-muted/50">
+              <p className="text-2xl font-bold">{tokenStats.totalToken}</p>
+              <p className="text-sm text-muted-foreground">{t('repository.detail.totalToken')}</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      {/* Token消费记录 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t('repository.detail.tokenConsumption')}</CardTitle>
+          <CardDescription>{t('repository.detail.tokenConsumptionDescription')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {tokenRecords.length === 0 ? (
+            <div className="text-sm text-muted-foreground">{t('repository.detail.noRecords')}</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="py-2 pr-2">{t('repository.detail.time')}</th>
+                    <th className="py-2 pr-2">{t('repository.detail.operation')}</th>
+                    <th className="py-2 pr-2">{t('repository.detail.model')}</th>
+                    <th className="py-2 pr-2">{t('repository.detail.inputToken')}</th>
+                    <th className="py-2 pr-2">{t('repository.detail.outputToken')}</th>
+                    <th className="py-2 pr-2">{t('repository.detail.totalToken')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tokenRecords.map(r => (
+                    <tr key={r.id} className="border-t">
+                      <td className="py-2 pr-2">{new Date(r.createdAt).toLocaleString()}</td>
+                      <td className="py-2 pr-2">{r.operation}</td>
+                      <td className="py-2 pr-2">{r.model || '-'}</td>
+                      <td className="py-2 pr-2">{r.inputToken}</td>
+                      <td className="py-2 pr-2">{r.outputToken}</td>
+                      <td className="py-2 pr-2 font-medium">{r.totalToken}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Token 按天 × 操作类型 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t('repository.detail.tokenDailyByOperation')}</CardTitle>
+          <CardDescription>{t('repository.detail.tokenDailyDescription')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {tokenDaily.length === 0 ? (
+            <div className="text-sm text-muted-foreground">{t('repository.detail.noData')}</div>
+          ) : (
+            <div className="space-y-2">
+              {/* 简易堆叠条形图：使用 div 宽度比例模拟 */}
+              {(() => {
+                const max = Math.max(...tokenDaily.map(d => d.totals.totalToken || 0), 1)
+                const opSet = Array.from(new Set(tokenDaily.flatMap(d => d.operations.map(o => o.operation))))
+                const opColors: Record<string, string> = {}
+                const palette = ['#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#9333ea', '#0891b2']
+                opSet.forEach((op, idx) => opColors[op] = palette[idx % palette.length])
+                return (
+                  <div className="space-y-1">
+                    {tokenDaily.map(d => (
+                      <div key={d.date} className="flex items-center gap-2">
+                        <div className="w-24 text-xs text-muted-foreground">{d.date.slice(5)}</div>
+                        <div className="flex-1 h-3 bg-muted rounded overflow-hidden flex">
+                          {d.operations.map(op => (
+                            <div key={op.operation}
+                              title={`${op.operation}: ${op.totalToken}`}
+                              style={{ width: `${(op.totalToken / max) * 100}%`, backgroundColor: opColors[op.operation] }}
+                              className="h-full"></div>
+                          ))}
+                        </div>
+                        <div className="w-16 text-right text-xs">{d.totals.totalToken}</div>
+                      </div>
+                    ))}
+                    {/* 图例 */}
+                    <div className="flex flex-wrap gap-3 pt-2">
+                      {opSet.map(op => (
+                        <div key={op} className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: opColors[op] }} />
+                          <span>{op}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Wiki生成管理 */}
+      {repository?.id && <WikiGenerationManagement warehouseId={repository.id} />}
+
+      {/* 文档质量评估 */}
+      {repository?.id && <DocumentQualityEvaluation warehouseId={repository.id} />}
     </div>
   )
 }

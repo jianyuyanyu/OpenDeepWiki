@@ -8,9 +8,12 @@ import { Button } from '@/components/ui/button'
 import { FumadocsSidebar } from '@/components/layout/FumadocsSidebar'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useRepositoryDetailStore } from '@/stores/repositoryDetail.store'
+import { useChatStore } from '@/stores/chat.store'
 import { warehouseService } from '@/services/warehouse.service'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
+import { FloatingChatButton } from '@/components/chat/FloatingChatButton'
+import { ChatPanel } from '@/components/chat/ChatPanel'
 import {
   Github,
   Home,
@@ -61,6 +64,9 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
 
   const { isAuthenticated } = useAuth()
   const [isDownloading, setIsDownloading] = useState(false)
+
+  // Chat state
+  const { isOpen: isChatOpen, setOpen: setChatOpen, reset: resetChat } = useChatStore()
 
   // 处理节点选择
   const handleNodeSelect = (node: any) => {
@@ -128,6 +134,8 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
     return () => {
       // 组件卸载时重置store
       reset()
+      // 重置聊天
+      resetChat()
     }
   }, [owner, name])
 
@@ -387,6 +395,23 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
             )}
           </div>
         </main>
+
+        {/* Chat Components */}
+        {owner && name && !error && (
+          <>
+            <FloatingChatButton
+              onClick={() => setChatOpen(true)}
+              className={cn(isChatOpen && 'pointer-events-none opacity-0')}
+            />
+
+            <ChatPanel
+              isOpen={isChatOpen}
+              onClose={() => setChatOpen(false)}
+              organizationName={owner}
+              repositoryName={name}
+            />
+          </>
+        )}
       </div>
     </div>
   )

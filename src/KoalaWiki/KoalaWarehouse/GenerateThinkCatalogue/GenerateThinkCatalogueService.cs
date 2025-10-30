@@ -182,10 +182,10 @@ public static partial class GenerateThinkCatalogueService
         var inputTokenCount = 0;
         var outputTokenCount = 0;
 
+        retry:
         // 添加超时控制
         var cts = new CancellationTokenSource(TimeSpan.FromMinutes(20));
 
-        retry:
         try
         {
             // 流式获取响应 - 添加取消令牌和异常处理

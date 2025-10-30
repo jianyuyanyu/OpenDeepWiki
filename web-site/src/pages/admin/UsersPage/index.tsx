@@ -69,8 +69,8 @@ const UsersPage: React.FC = () => {
       setTotal(data.total || 0)
     } catch (error) {
       console.error('Failed to load users:', error)
-      toast.error('加载失败', {
-        description: '无法加载用户列表'
+      toast.error(t('admin.users.load_failed'), {
+        description: t('admin.users.load_error')
       })
     } finally {
       setLoading(false)
@@ -129,23 +129,23 @@ const UsersPage: React.FC = () => {
   }
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return '未知'
-    return new Date(dateString).toLocaleDateString('zh-CN')
+    if (!dateString) return t('common.unknown')
+    return new Date(dateString).toLocaleDateString()
   }
 
   const handleDeleteUser = async (id: string) => {
-    if (!confirm('确定要删除该用户吗？')) return
+    if (!confirm(t('admin.users.confirm_delete'))) return
 
     try {
       await userService.deleteUser(id)
-      toast.success('删除成功', {
-        description: '用户已被删除'
+      toast.success(t('admin.users.delete_success'), {
+        description: t('admin.users.user_deleted')
       })
       loadUsers()
       setSelectedUserIds(prev => prev.filter(userId => userId !== id))
     } catch (error) {
-      toast.error('删除失败', {
-        description: '无法删除用户'
+      toast.error(t('admin.users.delete_failed'), {
+        description: t('admin.users.delete_error')
       })
     }
   }
@@ -197,7 +197,7 @@ const UsersPage: React.FC = () => {
   // 处理批量删除
   const handleBatchDelete = () => {
     if (selectedUserIds.length === 0) {
-      toast.error('请选择要删除的用户')
+      toast.error(t('admin.users.select_users_to_delete'))
       return
     }
     setBatchDeleteDialogOpen(true)
@@ -242,7 +242,7 @@ const UsersPage: React.FC = () => {
               onClick={handleBatchDelete}
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              删除选中 ({selectedUserIds.length})
+              {t('admin.users.delete_selected', { count: selectedUserIds.length })}
             </Button>
           )}
           <Button onClick={handleCreateUser}>
@@ -255,8 +255,8 @@ const UsersPage: React.FC = () => {
       {/* 搜索和筛选 */}
       <Card>
         <CardHeader>
-          <CardTitle>用户列表</CardTitle>
-          <CardDescription>共 {total} 个用户</CardDescription>
+          <CardTitle>{t('admin.users.list_title')}</CardTitle>
+          <CardDescription>{t('admin.users.total_users', { count: total })}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center space-x-4 mb-4">
@@ -272,10 +272,10 @@ const UsersPage: React.FC = () => {
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-48">
                 <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="按角色筛选" />
+                <SelectValue placeholder={t('admin.users.filters.filter_by_role')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">所有角色</SelectItem>
+                <SelectItem value="all">{t('admin.users.filters.all_roles')}</SelectItem>
                 {Array.isArray(roles) && roles.map((role) => (
                   <SelectItem key={role.id} value={role.name}>
                     {role.name}
@@ -288,7 +288,7 @@ const UsersPage: React.FC = () => {
                 variant="outline"
                 onClick={resetSelection}
               >
-                取消选择
+                {t('admin.users.actions.cancel_selection')}
               </Button>
             )}
           </div>
@@ -302,7 +302,7 @@ const UsersPage: React.FC = () => {
                     <Checkbox
                       checked={users.length > 0 && selectedUserIds.length === users.length}
                       onCheckedChange={handleSelectAll}
-                      aria-label="全选"
+                      aria-label={t('admin.users.actions.select_all')}
                     />
                   </TableHead>
                   <TableHead>{t('admin.users.table.username')}</TableHead>
@@ -336,7 +336,7 @@ const UsersPage: React.FC = () => {
                         <Checkbox
                           checked={selectedUserIds.includes(user.id)}
                           onCheckedChange={(checked) => handleSelectUser(user.id, checked as boolean)}
-                          aria-label={`选择用户 ${user.name}`}
+                          aria-label={t('admin.users.select_user', { name: user.name })}
                         />
                       </TableCell>
                       <TableCell>
@@ -356,12 +356,12 @@ const UsersPage: React.FC = () => {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">打开菜单</span>
+                              <span className="sr-only">{t('admin.users.open_menu')}</span>
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>操作</DropdownMenuLabel>
+                            <DropdownMenuLabel>{t('admin.users.actions_menu')}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleEditUser(user)}>
                               <Edit className="mr-2 h-4 w-4" />
@@ -373,7 +373,7 @@ const UsersPage: React.FC = () => {
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleResetPassword(user)}>
                               <Key className="mr-2 h-4 w-4" />
-                              重置密码
+                              {t('admin.users.actions.reset_password')}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -402,10 +402,13 @@ const UsersPage: React.FC = () => {
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
               >
-                上一页
+                {t('admin.users.pagination.previous')}
               </Button>
               <div className="text-sm text-muted-foreground">
-                第 {currentPage} 页 / 共 {Math.ceil(total / pageSize)} 页
+                {t('admin.users.pagination.page_info', {
+                  current: currentPage,
+                  total: Math.ceil(total / pageSize)
+                })}
               </div>
               <Button
                 variant="outline"
@@ -413,7 +416,7 @@ const UsersPage: React.FC = () => {
                 onClick={() => setCurrentPage(prev => prev + 1)}
                 disabled={currentPage >= Math.ceil(total / pageSize)}
               >
-                下一页
+                {t('admin.users.pagination.next')}
               </Button>
             </div>
           )}

@@ -46,6 +46,8 @@ import {
 import { cn } from '@/lib/utils'
 import { type WarehouseInfo, type RepositoryLogDto, type WarehouseSyncRecord, repositoryService } from '@/services/admin.service'
 import { toast } from 'sonner'
+import { DocumentQualityEvaluation } from '@/components/DocumentQuality'
+import WikiGenerationManagement from '@/components/WikiGeneration/WikiGenerationManagement'
 
 // 延迟加载 MarkdownEditor 组件
 const MarkdownEditor = lazy(() => import('@/components/MarkdownEditor'))
@@ -561,7 +563,7 @@ const RepositoryDetailPage: React.FC = () => {
               <span className="truncate flex-1 text-left font-normal">{nodeName}</span>
               {node.catalog?.isCompleted && (
                 <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
-                  完成
+                  {t('admin.repositories.detail.completed')}
                 </span>
               )}
             </button>
@@ -575,7 +577,7 @@ const RepositoryDetailPage: React.FC = () => {
                 </span>
               </div>
               {isDisabled && (
-                <span className="text-[10px] text-muted-foreground">处理中...</span>
+                <span className="text-[10px] text-muted-foreground">{t('admin.repositories.detail.processing')}</span>
               )}
             </div>
           )}
@@ -611,7 +613,7 @@ const RepositoryDetailPage: React.FC = () => {
           <span className="truncate flex-1 text-left font-normal">{nodeName}</span>
           {node.catalog?.isCompleted && (
             <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
-              完成
+              {t('admin.repositories.detail.completed')}
             </span>
           )}
         </button>
@@ -624,7 +626,7 @@ const RepositoryDetailPage: React.FC = () => {
               </span>
             </div>
             {isDisabled && (
-              <span className="text-[10px] text-muted-foreground">处理中...</span>
+              <span className="text-[10px] text-muted-foreground">{t('admin.repositories.detail.processing')}</span>
             )}
           </div>
         )}
@@ -699,7 +701,7 @@ const RepositoryDetailPage: React.FC = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                     <Input
                       type="text"
-                      placeholder="搜索文档..."
+                      placeholder={t('admin.repositories.detail.search_documents')}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9 pr-14 h-8 text-sm bg-accent/30 border-0 focus:bg-accent/50 transition-colors placeholder:text-muted-foreground/60"
@@ -730,7 +732,7 @@ const RepositoryDetailPage: React.FC = () => {
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground/60 text-center py-4 px-6">
-                      暂无文档目录
+                      {t('admin.repositories.detail.no_documents')}
                     </p>
                   )}
                 </div>
@@ -758,7 +760,7 @@ const RepositoryDetailPage: React.FC = () => {
                         {selectedNode.catalog?.isCompleted && (
                           <Badge variant="default" className="text-xs">
                             <CheckCircle className="w-3 h-3 mr-1" />
-                            已完成
+                            {t('admin.repositories.detail.completed_badge')}
                           </Badge>
                         )}
                         <Button
@@ -769,7 +771,7 @@ const RepositoryDetailPage: React.FC = () => {
                           className="flex items-center gap-2"
                         >
                           <Sparkles className="h-4 w-4" />
-                          AI生成
+                          {t('admin.repositories.detail.ai_generate')}
                         </Button>
                         <Button
                           size="sm"
@@ -778,13 +780,13 @@ const RepositoryDetailPage: React.FC = () => {
                           className="flex items-center gap-2"
                         >
                           <Save className="h-4 w-4" />
-                          {saving ? '保存中...' : '保存'}
+                          {saving ? t('admin.repositories.detail.saving') : t('admin.repositories.detail.save')}
                         </Button>
                       </div>
                         {selectedNode.lastModified && (
                           <>
                             <Separator orientation="vertical" className="h-4" />
-                            <span>最后修改: {new Date(selectedNode.lastModified).toLocaleString('zh-CN')}</span>
+                            <span>{t('admin.repositories.detail.last_modified')}: {new Date(selectedNode.lastModified).toLocaleString()}</span>
                           </>
                         )}
                       </div>
@@ -808,20 +810,20 @@ const RepositoryDetailPage: React.FC = () => {
                       <div className="flex items-center justify-center h-full">
                         <div className="text-center">
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                          <p>加载编辑器...</p>
+                          <p>{t('admin.repositories.detail.loading_editor')}</p>
                         </div>
                       </div>
                     }>
                       <MarkdownEditor
                         value={selectedNode.content || ''}
                         onChange={handleContentChange}
-                        placeholder={selectedNode.isLeaf ? "文件内容..." : "文档内容..."}
+                        placeholder={selectedNode.isLeaf ? t('admin.repositories.detail.file_placeholder') : t('admin.repositories.detail.document_placeholder')}
                         height="100%"
                         theme="light"
                         language="zh-CN"
                         onSave={(value, html) => {
                           handleSave()
-                          toast.success('文档保存成功')
+                          toast.success(t('admin.repositories.detail.document_save_success'))
                         }}
                         onError={(error) => {
                           console.error('Editor error:', error)
@@ -839,9 +841,9 @@ const RepositoryDetailPage: React.FC = () => {
                   <FileText className="h-8 w-8 text-muted-foreground" />
                 </div>
                 <div>
-                  <h3 className="font-medium text-foreground">选择一个文档</h3>
+                  <h3 className="font-medium text-foreground">{t('admin.repositories.detail.select_document')}</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    从左侧目录中选择一个文档来查看或编辑其内容
+                    {t('admin.repositories.detail.select_document_description')}
                   </p>
                 </div>
               </div>
@@ -859,30 +861,30 @@ const RepositoryDetailPage: React.FC = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>同步管理</CardTitle>
-              <CardDescription>管理仓库的同步设置和历史</CardDescription>
+              <CardTitle>{t('admin.repositories.detail.sync_management')}</CardTitle>
+              <CardDescription>{t('admin.repositories.detail.manage_sync_settings_history')}</CardDescription>
             </div>
             <div className="flex items-center space-x-2">
               <Dialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
                 <DialogTrigger asChild>
                   <Button>
                     <RefreshCw className="mr-2 h-4 w-4" />
-                    手动同步
+                    {t('admin.repositories.detail.manual_sync')}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>手动同步仓库</DialogTitle>
+                    <DialogTitle>{t('admin.repositories.detail.manual_sync_repository')}</DialogTitle>
                     <DialogDescription>
-                      这将从源仓库拉取最新的文件并重新生成文档。
+                      {t('admin.repositories.detail.sync_description')}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="flex justify-end space-x-2">
                     <Button variant="outline" onClick={() => setSyncDialogOpen(false)}>
-                      取消
+                      {t('admin.repositories.detail.cancel')}
                     </Button>
                     <Button onClick={handleSync}>
-                      开始同步
+                      {t('admin.repositories.detail.start_sync')}
                     </Button>
                   </div>
                 </DialogContent>
@@ -893,20 +895,20 @@ const RepositoryDetailPage: React.FC = () => {
         <CardContent>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>最后同步时间</Label>
+              <Label>{t('admin.repositories.detail.last_sync_label')}</Label>
               <p className="text-sm text-muted-foreground">
                 {stats?.lastSyncTime
-                  ? new Date(stats.lastSyncTime).toLocaleString('zh-CN')
-                  : '从未同步'
+                  ? new Date(stats.lastSyncTime).toLocaleString()
+                  : t('admin.repositories.detail.never_synced_label')
                 }
               </p>
             </div>
             <div className="space-y-2">
-              <Label>同步状态</Label>
+              <Label>{t('admin.repositories.detail.sync_status_label')}</Label>
               {getStatusBadge(stats?.processingStatus || 'Pending')}
             </div>
             <div className="space-y-2">
-              <Label>自动同步</Label>
+              <Label>{t('admin.repositories.detail.auto_sync_label')}</Label>
               <div className="flex items-center space-x-2">
                 <Switch
                   checked={repository?.enableSync || false}
@@ -914,7 +916,7 @@ const RepositoryDetailPage: React.FC = () => {
                   disabled={updatingSyncSetting}
                 />
                 <span className="text-sm text-muted-foreground">
-                  {updatingSyncSetting ? '更新中...' : (repository?.enableSync ? '已启用' : '已禁用')}
+                  {updatingSyncSetting ? t('admin.repositories.detail.sync_updating') : (repository?.enableSync ? t('admin.repositories.detail.enabled') : t('admin.repositories.detail.disabled'))}
                 </span>
               </div>
             </div>
@@ -925,7 +927,7 @@ const RepositoryDetailPage: React.FC = () => {
       {/* 同步历史 */}
       <Card>
         <CardHeader>
-          <CardTitle>同步历史</CardTitle>
+          <CardTitle>{t('admin.repositories.detail.sync_history')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -941,16 +943,16 @@ const RepositoryDetailPage: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium">
-                          {sync.status === 'Success' ? '同步成功' :
-                            sync.status === 'Failed' ? '同步失败' : '同步中'}
+                          {sync.status === 'Success' ? t('admin.repositories.detail.sync_success') :
+                            sync.status === 'Failed' ? t('admin.repositories.detail.sync_failed') : t('admin.repositories.detail.syncing')}
                         </p>
                         <Badge variant={sync.trigger === 'Manual' ? 'default' : 'outline'} className="text-xs">
-                          {sync.trigger === 'Manual' ? '手动' : '自动'}
+                          {sync.trigger === 'Manual' ? t('admin.repositories.detail.manual_trigger') : t('admin.repositories.detail.auto_trigger')}
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        开始: {new Date(sync.startTime).toLocaleString('zh-CN')}
-                        {sync.endTime && ` • 结束: ${new Date(sync.endTime).toLocaleString('zh-CN')}`}
+                        {t('admin.repositories.detail.start_time')}: {new Date(sync.startTime).toLocaleString()}
+                        {sync.endTime && ` • ${t('admin.repositories.detail.end_time')}: ${new Date(sync.endTime).toLocaleString()}`}
                       </p>
                       {sync.errorMessage && (
                         <p className="text-xs text-red-500 mt-1">{sync.errorMessage}</p>
@@ -964,13 +966,13 @@ const RepositoryDetailPage: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <Badge variant="outline" className="mb-1">
-                      {sync.fileCount} 个文件
+                      {sync.fileCount} {t('admin.repositories.detail.files')}
                     </Badge>
                     {sync.status === 'Success' && (
                       <div className="text-xs text-muted-foreground">
-                        <div>新增: {sync.addedFileCount}</div>
-                        <div>更新: {sync.updatedFileCount}</div>
-                        <div>删除: {sync.deletedFileCount}</div>
+                        <div>{t('admin.repositories.detail.added_files')}: {sync.addedFileCount}</div>
+                        <div>{t('admin.repositories.detail.updated_files')}: {sync.updatedFileCount}</div>
+                        <div>{t('admin.repositories.detail.deleted_files')}: {sync.deletedFileCount}</div>
                       </div>
                     )}
                   </div>
@@ -978,7 +980,7 @@ const RepositoryDetailPage: React.FC = () => {
               ))
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">
-                暂无同步历史
+                {t('admin.repositories.detail.no_sync_history')}
               </p>
             )}
           </div>
@@ -1116,14 +1118,11 @@ const RepositoryDetailPage: React.FC = () => {
 
       {/* 主要内容区域 */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-5">
-        <TabsList
-
-          className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="documents">{t('admin.repositories.detail.documents')}</TabsTrigger>
           <TabsTrigger value="sync">{t('admin.repositories.detail.sync')}</TabsTrigger>
-          <TabsTrigger value="permissions">{t('admin.repositories.detail.permissions')}</TabsTrigger>
-          <TabsTrigger value="config">{t('admin.repositories.detail.config')}</TabsTrigger>
-          <TabsTrigger value="tasks">{t('admin.repositories.detail.tasks')}</TabsTrigger>
+          <TabsTrigger value="generation">Wiki生成</TabsTrigger>
+          <TabsTrigger value="quality">{t('admin.repositories.detail.quality') || '质量评估'}</TabsTrigger>
         </TabsList>
 
         {/* 文档管理标签页 */}
@@ -1136,19 +1135,14 @@ const RepositoryDetailPage: React.FC = () => {
           {renderSyncTab()}
         </TabsContent>
 
-        {/* 权限管理标签页 */}
-        <TabsContent value="permissions" className="space-y-6">
-          {renderPermissionsTab()}
+        {/* Wiki生成管理标签页 */}
+        <TabsContent value="generation" className="space-y-6">
+          {id && <WikiGenerationManagement warehouseId={id} />}
         </TabsContent>
 
-        {/* 配置管理标签页 */}
-        <TabsContent value="config" className="space-y-6">
-          {renderConfigTab()}
-        </TabsContent>
-
-        {/* 任务管理标签页 */}
-        <TabsContent value="tasks" className="space-y-6">
-          {renderTasksTab()}
+        {/* 文档质量评估标签页 */}
+        <TabsContent value="quality" className="space-y-6">
+          {id && <DocumentQualityEvaluation warehouseId={id} />}
         </TabsContent>
 
       </Tabs>

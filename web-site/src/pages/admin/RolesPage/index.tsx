@@ -63,8 +63,8 @@ const RolesPage: React.FC = () => {
       setTotal(data.total || 0)
     } catch (error) {
       console.error('Failed to load roles:', error)
-      toast.error('加载失败', {
-        description: '无法加载角色列表'
+      toast.error(t('admin.roles.load_failed'), {
+        description: t('admin.roles.load_error')
       })
     } finally {
       setLoading(false)
@@ -90,7 +90,7 @@ const RolesPage: React.FC = () => {
   const getStatusBadge = (isActive: boolean) => {
     return (
       <Badge variant={isActive ? 'default' : 'secondary'}>
-        {isActive ? '启用' : '禁用'}
+        {isActive ? t('admin.roles.status.active') : t('admin.roles.status.inactive')}
       </Badge>
     )
   }
@@ -98,32 +98,32 @@ const RolesPage: React.FC = () => {
   const getRoleTypeBadge = (isSystemRole: boolean) => {
     return isSystemRole ? (
       <Badge variant="outline" className="text-blue-600 border-blue-600">
-        系统角色
+        {t('admin.roles.type.system')}
       </Badge>
     ) : (
       <Badge variant="outline">
-        自定义角色
+        {t('admin.roles.type.custom')}
       </Badge>
     )
   }
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return '未知'
-    return new Date(dateString).toLocaleDateString('zh-CN')
+    if (!dateString) return t('common.unknown')
+    return new Date(dateString).toLocaleDateString()
   }
 
   const handleDeleteRole = async (id: string, name: string) => {
-    if (!confirm(`确定要删除角色 "${name}" 吗？`)) return
+    if (!confirm(t('admin.roles.confirm_delete', { name }))) return
 
     try {
       await roleService.deleteRole(id)
-      toast.success('删除成功', {
-        description: '角色已被删除'
+      toast.success(t('admin.roles.delete_success'), {
+        description: t('admin.roles.role_deleted')
       })
       loadRoles()
     } catch (error: any) {
-      toast.error('删除失败', {
-        description: error?.message || '无法删除角色'
+      toast.error(t('admin.roles.delete_failed'), {
+        description: error?.message || t('admin.roles.delete_error')
       })
     }
   }
@@ -161,13 +161,15 @@ const RolesPage: React.FC = () => {
   const handleToggleStatus = async (role: RoleInfo) => {
     try {
       await roleService.batchUpdateRoleStatus([role.id], !role.isActive)
-      toast.success('状态更新成功', {
-        description: `角色已${role.isActive ? '禁用' : '启用'}`
+      toast.success(t('admin.roles.status_update_success'), {
+        description: t('admin.roles.status_updated', {
+          status: role.isActive ? t('admin.roles.status.inactive') : t('admin.roles.status.active')
+        })
       })
       loadRoles()
     } catch (error: any) {
-      toast.error('状态更新失败', {
-        description: error?.message || '无法更新角色状态'
+      toast.error(t('admin.roles.status_update_failed'), {
+        description: error?.message || t('admin.roles.status_update_error')
       })
     }
   }
@@ -197,34 +199,34 @@ const RolesPage: React.FC = () => {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">总角色数</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('admin.roles.stats.total_roles')}</CardTitle>
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">包含系统和自定义角色</p>
+            <p className="text-xs text-muted-foreground">{t('admin.roles.stats.total_roles_desc')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">活跃角色</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('admin.roles.stats.active_roles')}</CardTitle>
             <Shield className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.active}</div>
-            <p className="text-xs text-muted-foreground">当前启用的角色</p>
+            <p className="text-xs text-muted-foreground">{t('admin.roles.stats.active_roles_desc')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">分配用户数</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('admin.roles.stats.assigned_users')}</CardTitle>
             <Shield className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalUsers}</div>
-            <p className="text-xs text-muted-foreground">已分配角色的用户总数</p>
+            <p className="text-xs text-muted-foreground">{t('admin.roles.stats.assigned_users_desc')}</p>
           </CardContent>
         </Card>
       </div>
@@ -232,8 +234,8 @@ const RolesPage: React.FC = () => {
       {/* 搜索和筛选 */}
       <Card>
         <CardHeader>
-          <CardTitle>角色列表</CardTitle>
-          <CardDescription>共 {total} 个角色</CardDescription>
+          <CardTitle>{t('admin.roles.list_title')}</CardTitle>
+          <CardDescription>{t('admin.roles.total_roles', { count: total })}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center space-x-4 mb-4">
@@ -259,9 +261,9 @@ const RolesPage: React.FC = () => {
                 }}
                 className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="all">全部状态</option>
-                <option value="active">启用</option>
-                <option value="inactive">禁用</option>
+                <option value="all">{t('admin.roles.filters.all_status')}</option>
+                <option value="active">{t('admin.roles.filters.active')}</option>
+                <option value="inactive">{t('admin.roles.filters.inactive')}</option>
               </select>
             </div>
           </div>
@@ -306,7 +308,7 @@ const RolesPage: React.FC = () => {
                       </TableCell>
                       <TableCell className="max-w-xs">
                         <span className="text-sm text-muted-foreground">
-                          {role.description || '暂无描述'}
+                          {role.description || t('admin.roles.no_description')}
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
@@ -321,12 +323,12 @@ const RolesPage: React.FC = () => {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">打开菜单</span>
+                              <span className="sr-only">{t('admin.roles.open_menu')}</span>
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>操作</DropdownMenuLabel>
+                            <DropdownMenuLabel>{t('admin.roles.actions_menu')}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleEditRole(role)}>
                               <Edit className="mr-2 h-4 w-4" />
@@ -338,15 +340,15 @@ const RolesPage: React.FC = () => {
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleViewMembers(role)}>
                               <Users className="mr-2 h-4 w-4" />
-                              查看成员
+                              {t('admin.roles.view_members')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleCopyRole(role)}>
                               <Copy className="mr-2 h-4 w-4" />
-                              复制角色
+                              {t('admin.roles.copy_role')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleToggleStatus(role)}>
                               <Shield className="mr-2 h-4 w-4" />
-                              {role.isActive ? '禁用' : '启用'}
+                              {role.isActive ? t('admin.roles.disable') : t('admin.roles.enable')}
                             </DropdownMenuItem>
                             {!role.isSystemRole && (
                               <>
@@ -379,10 +381,13 @@ const RolesPage: React.FC = () => {
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
               >
-                上一页
+                {t('admin.roles.pagination.previous')}
               </Button>
               <div className="text-sm text-muted-foreground">
-                第 {currentPage} 页 / 共 {Math.ceil(total / pageSize)} 页
+                {t('admin.roles.pagination.page_info', {
+                  current: currentPage,
+                  total: Math.ceil(total / pageSize)
+                })}
               </div>
               <Button
                 variant="outline"
@@ -390,7 +395,7 @@ const RolesPage: React.FC = () => {
                 onClick={() => setCurrentPage(prev => prev + 1)}
                 disabled={currentPage >= Math.ceil(total / pageSize)}
               >
-                下一页
+                {t('admin.roles.pagination.next')}
               </Button>
             </div>
           )}
