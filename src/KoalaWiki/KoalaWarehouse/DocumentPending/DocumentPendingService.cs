@@ -67,7 +67,7 @@ public partial class DocumentPendingService
             {
                 var (catalog, fileItem, files) = await completedTask.ConfigureAwait(false);
 
-                if (fileItem == null)
+                if (fileItem == null || string.IsNullOrEmpty(fileItem.Content))
                 {
                     // 构建失败
                     Log.Logger.Error("处理仓库；{path} ,处理标题：{name} 失败:文件内容为空", path, catalog.Name);
