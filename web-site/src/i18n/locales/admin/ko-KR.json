@@ -23,14 +23,44 @@
     "quickActions": "빠른 작업",
     "quickActionsDescription": "자주 사용하는 관리 작업",
     "overview": "관리 개요",
+    "title": "대시보드",
     "stats": {
       "total_repos": "총 저장소 수",
       "total_documents": "총 문서 수",
-      "online_users": "온라인 사용자"
+      "online_users": "온라인 사용자",
+      "total_users": "총 사용자 수",
+      "total_repositories": "총 저장소 수",
+      "repository_growth_rate": "저장소 증가율",
+      "monthly_new_repositories": "이번 달 신규 저장소"
     },
     "noDescription": "설명 없음",
     "unknown": "알 수 없음",
-    "increaseRate": "증가율"
+    "increaseRate": "증가율",
+    "totalRepositories": "총 저장소 수",
+    "totalDocuments": "총 문서 수",
+    "totalViews": "총 조회수",
+    "userGrowthRate": "사용자 증가율",
+    "documentGrowthRate": "문서 증가율",
+    "repositoryGrowthRate": "저장소 증가율",
+    "dailyActiveUsers": "오늘 활성",
+    "weeklyActiveUsers": "이번 주 활성",
+    "onlineUsers": "온라인 사용자",
+    "activeUserGrowthRate": "증가율",
+    "retryButton": "재시도",
+    "online": "온라인",
+    "offline": "오프라인",
+    "documentation": "문서",
+    "addUser": "사용자 추가",
+    "addRepository": "저장소 추가",
+    "manageRoles": "역할 관리",
+    "systemSettings": "시스템 설정",
+    "viewReports": "보고서 보기",
+    "viewLogs": "로그 보기",
+    "status": "상태",
+    "completed": "완료",
+    "processing": "처리 중",
+    "pending": "대기 중",
+    "failed": "실패"
   },
   "users": {
     "userList": "사용자 목록",
@@ -83,7 +113,49 @@
     "edit": "사용자 편집",
     "delete": "사용자 삭제",
     "assign_roles": "역할 할당",
-    "select_users_to_delete": "삭제할 사용자를 선택하세요"
+    "select_users_to_delete": "삭제할 사용자를 선택하세요",
+    "errors": {
+      "loadFailed": "로드 실패",
+      "loadFailedDescription": "사용자 목록을 로드할 수 없습니다",
+      "unknown": "알 수 없음"
+    },
+    "messages": {
+      "confirmDelete": "이 사용자를 삭제하시겠습니까?",
+      "deleteSuccess": "삭제 성공",
+      "deleteSuccessDescription": "사용자가 삭제되었습니다",
+      "deleteFailed": "삭제 실패",
+      "deleteFailedDescription": "사용자를 삭제할 수 없습니다",
+      "pleaseSelectUsers": "삭제할 사용자를 선택하세요"
+    },
+    "createDialog": {
+      "title": "사용자 생성",
+      "description": "새로운 시스템 사용자 생성",
+      "username": "사용자 이름",
+      "usernamePlaceholder": "사용자 이름 입력",
+      "email": "이메일",
+      "emailPlaceholder": "이메일 주소 입력",
+      "password": "비밀번호",
+      "passwordPlaceholder": "비밀번호 입력",
+      "confirmPassword": "비밀번호 확인",
+      "confirmPasswordPlaceholder": "비밀번호 확인",
+      "role": "역할",
+      "selectRole": "역할 선택",
+      "cancel": "취소",
+      "saving": "생성 중...",
+      "create": "사용자 생성"
+    },
+    "editDialog": {
+      "title": "사용자 편집",
+      "description": "사용자 정보 및 권한 편집",
+      "username": "사용자 이름",
+      "email": "이메일",
+      "emailPlaceholder": "이메일 주소 입력",
+      "role": "역할",
+      "selectRole": "역할 선택",
+      "cancel": "취소",
+      "saving": "저장 중...",
+      "saveChanges": "변경사항 저장"
+    }
   },
   "repositories": {
     "batchActions": "일괄 작업",
@@ -265,11 +337,40 @@
     }
   },
   "roles": {
+    "title": "역할 관리",
+    "subtitle": "시스템의 역할 및 권한 관리",
+    "listTitle": "역할 목록",
+    "create": "역할 생성",
+    "edit": "역할 편집",
+    "delete": "역할 삭제",
+    "permissions": "권한 관리",
+    "view_members": "멤버 보기",
+    "copy_role": "역할 복사",
+    "disable": "비활성화",
+    "enable": "활성화",
+    "load_failed": "로드 실패",
+    "load_error": "역할 목록을 로드할 수 없습니다",
+    "confirm_delete": "역할 \"{{name}}\"을(를) 삭제하시겠습니까?",
+    "delete_success": "삭제 성공",
+    "role_deleted": "역할이 삭제되었습니다",
+    "delete_failed": "삭제 실패",
+    "delete_error": "역할을 삭제할 수 없습니다",
+    "status_update_success": "상태 업데이트 성공",
+    "status_updated": "역할이 {{status}}되었습니다",
+    "status_update_failed": "상태 업데이트 실패",
+    "status_update_error": "역할 상태를 업데이트할 수 없습니다",
+    "total_roles": "총 {{count}}개의 역할",
+    "search_placeholder": "역할 이름 검색...",
+    "no_description": "설명 없음",
+    "open_menu": "메뉴 열기",
+    "actions_menu": "작업",
     "errors": {
       "loadFailed": "로드 실패",
       "loadFailedDescription": "역할 목록을 로드할 수 없습니다"
     },
     "status": {
+      "active": "활성화됨",
+      "inactive": "비활성화됨",
       "enabled": "활성화됨",
       "disabled": "비활성화됨"
     },
@@ -303,9 +404,19 @@
       "totalCount": "총 {{total}}개의 역할"
     },
     "filters": {
-      "allStatus": "모든 상태"
+      "allStatus": "모든 상태",
+      "all_status": "모든 상태",
+      "active": "활성화됨",
+      "inactive": "비활성화됨"
     },
     "table": {
+      "name": "역할 이름",
+      "description": "설명",
+      "users_count": "사용자 수",
+      "permissions_count": "권한 수",
+      "status": "상태",
+      "created_at": "생성 시간",
+      "actions": "작업",
       "noDescription": "설명 없음",
       "openMenu": "메뉴 열기",
       "actionsMenu": "작업"
@@ -318,6 +429,7 @@
     },
     "pagination": {
       "previous": "이전",
+      "page_info": "{{current}}페이지 / 총 {{total}}페이지",
       "pageInfo": "{{current}}페이지 / 총 {{total}}페이지",
       "next": "다음"
     }
@@ -366,6 +478,8 @@
     "users": "사용자 관리",
     "repositories": "저장소 관리",
     "settings": "시스템 설정",
-    "roles": "역할 관리"
+    "roles": "역할 관리",
+    "back_to_website": "웹사이트로 돌아가기",
+    "back_to_home": "홈으로 돌아가기"
   }
 }

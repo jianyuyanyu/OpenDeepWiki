@@ -418,6 +418,43 @@
       "previous": "Previous Page",
       "next": "Next Page",
       "pageInfo": "Page {{current}} / {{total}}",
+      "title": "User Management",
+      "subtitle": "Manage system user accounts and permissions",
+      "searchPlaceholder": "Search username or email...",
+      "table": {
+        "username": "Username",
+        "email": "Email",
+        "role": "Role",
+        "created_at": "Created At",
+        "updated_at": "Updated At",
+        "actions": "Actions"
+      },
+      "actions": {
+        "cancel_selection": "Cancel Selection",
+        "select_all": "Select All",
+        "reset_password": "Reset Password"
+      },
+      "filters": {
+        "filter_by_role": "Filter by Role",
+        "all_roles": "All Roles"
+      },
+      "pagination": {
+        "previous": "Previous Page",
+        "page_info": "Page {{current}} / {{total}}",
+        "next": "Next Page"
+      },
+      "load_failed": "Load Failed",
+      "load_error": "Unable to load user list",
+      "confirm_delete": "Are you sure you want to delete this user?",
+      "delete_success": "Delete Successful",
+      "user_deleted": "User has been deleted",
+      "delete_failed": "Delete Failed",
+      "delete_error": "Unable to delete user",
+      "create": "Create User",
+      "edit": "Edit User",
+      "delete": "Delete User",
+      "assign_roles": "Assign Roles",
+      "select_users_to_delete": "Please select users to delete",
       "errors": {
         "loadFailed": "Loading failed",
         "loadFailedDescription": "Failed to load user list",

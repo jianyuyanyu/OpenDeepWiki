@@ -140,8 +140,8 @@ const DashboardPage: React.FC = () => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('admin.dashboard.title')}</h1>
-          <p className="text-muted-foreground">{t('admin.dashboard.overview')}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('dashboard.title')}</h1>
+          <p className="text-muted-foreground">{t('dashboard.overview')}</p>
         </div>
         <Alert className="border-red-200 bg-red-50">
           <AlertTriangle className="h-4 w-4 text-red-600" />
@@ -197,14 +197,14 @@ const DashboardPage: React.FC = () => {
       {/* 页面标题和操作栏 */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('admin.dashboard.title')}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('dashboard.title')}</h1>
           <div className="flex items-center space-x-2 mt-1">
-            <p className="text-muted-foreground">{t('admin.dashboard.overview')}</p>
+            <p className="text-muted-foreground">{t('dashboard.overview')}</p>
             {lastUpdated && (
               <>
                 <Separator orientation="vertical" className="h-4" />
                 <p className="text-xs text-muted-foreground">
-                  最后更新: {lastUpdated.toLocaleTimeString()}
+                  {t('dashboard.lastUpdated')}: {lastUpdated.toLocaleTimeString()}
                 </p>
               </>
             )}
@@ -213,7 +213,7 @@ const DashboardPage: React.FC = () => {
         <div className="flex items-center space-x-2">
           <Badge variant="outline" className="text-green-600">
             <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse"></div>
-            自动刷新
+            {t('dashboard.autoRefresh')}
           </Badge>
           <Button
             variant="outline"
@@ -222,7 +222,7 @@ const DashboardPage: React.FC = () => {
             disabled={refreshing}
           >
             <RefreshCw className={cn("h-4 w-4 mr-2", refreshing && "animate-spin")} />
-            刷新
+            {t('dashboard.refresh')}
           </Button>
         </div>
       </div>
@@ -232,7 +232,7 @@ const DashboardPage: React.FC = () => {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('admin.dashboard.stats.total_users')}</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('dashboard.stats.total_users')}</CardTitle>
             <Users className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
@@ -240,18 +240,18 @@ const DashboardPage: React.FC = () => {
             <div className="flex items-center space-x-1 mt-1">
               {getTrendIcon(safeData.systemStats.userGrowthRate)}
               <p className="text-xs text-muted-foreground">
-                {formatPercentage(safeData.systemStats.userGrowthRate)} 相比上月
+                {formatPercentage(safeData.systemStats.userGrowthRate)} {t('dashboard.comparedToLastMonth')}
               </p>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              本月新增: {safeData.systemStats.monthlyNewUsers}
+              {t('dashboard.monthlyNew')}: {safeData.systemStats.monthlyNewUsers}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">仓库总数</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('dashboard.stats.total_repositories')}</CardTitle>
             <Database className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
@@ -259,18 +259,18 @@ const DashboardPage: React.FC = () => {
             <div className="flex items-center space-x-1 mt-1">
               {getTrendIcon(safeData.systemStats.repositoryGrowthRate)}
               <p className="text-xs text-muted-foreground">
-                {formatPercentage(safeData.systemStats.repositoryGrowthRate)} 相比上月
+                {formatPercentage(safeData.systemStats.repositoryGrowthRate)} {t('dashboard.comparedToLastMonth')}
               </p>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              本月新增: {safeData.systemStats.monthlyNewRepositories}
+              {t('dashboard.monthlyNew')}: {safeData.systemStats.monthlyNewRepositories}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">文档总数</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('dashboard.stats.total_documents')}</CardTitle>
             <FileText className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
@@ -278,27 +278,27 @@ const DashboardPage: React.FC = () => {
             <div className="flex items-center space-x-1 mt-1">
               {getTrendIcon(safeData.systemStats.documentGrowthRate)}
               <p className="text-xs text-muted-foreground">
-                {formatPercentage(safeData.systemStats.documentGrowthRate)} 相比上月
+                {formatPercentage(safeData.systemStats.documentGrowthRate)} {t('dashboard.comparedToLastMonth')}
               </p>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              本月新增: {formatNumber(safeData.systemStats.monthlyNewDocuments)}
+              {t('dashboard.monthlyNew')}: {formatNumber(safeData.systemStats.monthlyNewDocuments)}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">在线用户</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('dashboard.stats.online_users')}</CardTitle>
             <Globe className="h-4 w-4 text-orange-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{safeData.userActivity.onlineUsers}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              今日活跃: {safeData.userActivity.dailyActiveUsers}
+              {t('dashboard.todayActive')}: {safeData.userActivity.dailyActiveUsers}
             </p>
             <p className="text-xs text-muted-foreground">
-              总访问量: {formatNumber(safeData.systemStats.totalViews)}
+              {t('dashboard.totalViews')}: {formatNumber(safeData.systemStats.totalViews)}
             </p>
           </CardContent>
         </Card>
@@ -311,24 +311,24 @@ const DashboardPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Users className="h-5 w-5 text-blue-600" />
-              <span>用户活跃度统计</span>
+              <span>{t('dashboard.userActivityStats')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <p className="text-sm text-muted-foreground">今日活跃</p>
+                <p className="text-sm text-muted-foreground">{t('dashboard.todayActive')}</p>
                 <p className="text-2xl font-bold text-blue-600">{safeData.userActivity.dailyActiveUsers}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">本周活跃</p>
+                <p className="text-sm text-muted-foreground">{t('dashboard.weekActive')}</p>
                 <p className="text-2xl font-bold text-green-600">{safeData.userActivity.weeklyActiveUsers}</p>
               </div>
             </div>
             <div className="space-y-1 text-sm text-muted-foreground">
-              <p>本月活跃用户: {safeData.userActivity.monthlyActiveUsers}</p>
+              <p>{t('dashboard.monthlyActiveUsers')}: {safeData.userActivity.monthlyActiveUsers}</p>
               <div className="flex items-center space-x-1">
-                <span>增长率:</span>
+                <span>{t('dashboard.increaseRate')}:</span>
                 {getTrendIcon(safeData.userActivity.activeUserGrowthRate)}
                 <span>{formatPercentage(safeData.userActivity.activeUserGrowthRate)}</span>
               </div>
@@ -340,7 +340,7 @@ const DashboardPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Eye className="h-5 w-5 text-purple-600" />
-              <span>最近注册的用户</span>
+              <span>{t('dashboard.recentUsers')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -359,7 +359,7 @@ const DashboardPage: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <Badge variant={user.isOnline ? "default" : "secondary"} className="text-xs">
-                      {user.isOnline ? '在线' : '离线'}
+                      {user.isOnline ? t('dashboard.online') : t('dashboard.offline')}
                     </Badge>
                     <p className="text-xs text-muted-foreground mt-1">
                       {new Date(user.createdAt).toLocaleDateString()}
@@ -377,7 +377,7 @@ const DashboardPage: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Database className="h-5 w-5 text-green-600" />
-            <span>最近创建的仓库</span>
+            <span>{t('dashboard.recentRepositories')}</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -393,14 +393,14 @@ const DashboardPage: React.FC = () => {
                     repo.status === 'Pending' ? 'text-yellow-600 border-yellow-200' :
                     'text-red-600 border-red-200'
                   )}>
-                    {repo.status}
+                    {t(`dashboard.${repo.status.toLowerCase()}`)}
                   </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground line-clamp-2">
-                  {repo.description || '暂无描述'}
+                  {repo.description || t('dashboard.noDescription')}
                 </p>
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>文档: {repo.documentCount}</span>
+                  <span>{t('dashboard.documentation')}: {repo.documentCount}</span>
                   <span>{new Date(repo.createdAt).toLocaleDateString()}</span>
                 </div>
               </div>
@@ -415,7 +415,7 @@ const DashboardPage: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <AlertTriangle className="h-5 w-5 text-red-600" />
-              <span>最近错误日志</span>
+              <span>{t('dashboard.recentErrorLogs')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -441,34 +441,34 @@ const DashboardPage: React.FC = () => {
       {/* 快速操作 */}
       <Card>
         <CardHeader>
-          <CardTitle>快速操作</CardTitle>
-          <CardDescription>常用的管理操作</CardDescription>
+          <CardTitle>{t('dashboard.quickActions')}</CardTitle>
+          <CardDescription>{t('dashboard.quickActionsDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm">
               <UserPlus className="h-4 w-4 mr-2" />
-              添加用户
+              {t('dashboard.addUser')}
             </Button>
             <Button variant="outline" size="sm">
               <FolderPlus className="h-4 w-4 mr-2" />
-              添加仓库
+              {t('dashboard.addRepository')}
             </Button>
             <Button variant="outline" size="sm">
               <Shield className="h-4 w-4 mr-2" />
-              管理角色
+              {t('dashboard.manageRoles')}
             </Button>
             <Button variant="outline" size="sm">
               <Settings className="h-4 w-4 mr-2" />
-              系统设置
+              {t('dashboard.systemSettings')}
             </Button>
             <Button variant="outline" size="sm">
               <BarChart3 className="h-4 w-4 mr-2" />
-              查看报表
+              {t('dashboard.viewReports')}
             </Button>
             <Button variant="outline" size="sm">
               <AlertTriangle className="h-4 w-4 mr-2" />
-              查看日志
+              {t('dashboard.viewLogs')}
             </Button>
           </div>
         </CardContent>

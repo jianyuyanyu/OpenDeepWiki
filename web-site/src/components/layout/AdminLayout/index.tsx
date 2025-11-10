@@ -9,6 +9,7 @@ import { usePermissions } from '@/hooks/usePermissions'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import {
   BarChart3,
   Users,
@@ -46,7 +47,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           <Button asChild>
             <Link to="/">
               <Home className="mr-2 h-4 w-4" />
-              返回首页
+              {t('nav.back_to_home')}
             </Link>
           </Button>
         </div>
@@ -114,11 +115,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
           {/* 右侧操作区 */}
           <div className="flex items-center gap-2">
+            <LanguageSwitcher variant="ghost" size="sm" />
             <ThemeToggle />
             <Button variant="ghost" size="sm" asChild>
               <Link to="/">
                 <ChevronLeft className="mr-2 h-4 w-4" />
-                返回网站
+                {t('nav.back_to_website')}
               </Link>
             </Button>
           </div>

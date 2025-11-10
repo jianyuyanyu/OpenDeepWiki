@@ -10,7 +10,9 @@
     "users": "用户管理",
     "repositories": "仓库管理",
     "settings": "系统设置",
-    "roles": "角色管理"
+    "roles": "角色管理",
+    "back_to_website": "返回网站",
+    "back_to_home": "返回首页"
   },
   "dashboard": {
     "fetchFailed": "获取仪表板数据失败",
@@ -29,15 +31,45 @@
     "documentCount": "文档数",
     "quickActions": "快速操作",
     "quickActionsDescription": "常用的管理操作",
+    "title": "仪表板",
     "overview": "管理概览",
     "stats": {
       "total_repos": "仓库总数",
       "total_documents": "文档总数",
-      "online_users": "在线用户"
+      "online_users": "在线用户",
+      "total_users": "用户总数",
+      "total_repositories": "仓库总数",
+      "repository_growth_rate": "仓库增长率",
+      "monthly_new_repositories": "本月新增仓库"
     },
     "noDescription": "暂无描述",
     "unknown": "未知",
-    "increaseRate": "增长率"
+    "increaseRate": "增长率",
+    "totalRepositories": "仓库总数",
+    "totalDocuments": "文档总数",
+    "totalViews": "总访问量",
+    "userGrowthRate": "用户增长率",
+    "documentGrowthRate": "文档增长率",
+    "repositoryGrowthRate": "仓库增长率",
+    "dailyActiveUsers": "今日活跃",
+    "weeklyActiveUsers": "本周活跃",
+    "onlineUsers": "在线用户",
+    "activeUserGrowthRate": "增长率",
+    "retryButton": "重试",
+    "online": "在线",
+    "offline": "离线",
+    "documentation": "文档",
+    "addUser": "添加用户",
+    "addRepository": "添加仓库",
+    "manageRoles": "管理角色",
+    "systemSettings": "系统设置",
+    "viewReports": "查看报表",
+    "viewLogs": "查看日志",
+    "status": "状态",
+    "completed": "已完成",
+    "processing": "处理中",
+    "pending": "待处理",
+    "failed": "失败"
   },
   "users": {
     "userList": "用户列表",
@@ -103,6 +135,35 @@
       "deleteFailed": "删除失败",
       "deleteFailedDescription": "无法删除用户",
       "pleaseSelectUsers": "请选择要删除的用户"
+    },
+    "createDialog": {
+      "title": "创建用户",
+      "description": "创建新系统用户",
+      "username": "用户名",
+      "usernamePlaceholder": "输入用户名",
+      "email": "邮箱",
+      "emailPlaceholder": "输入邮箱地址",
+      "password": "密码",
+      "passwordPlaceholder": "输入密码",
+      "confirmPassword": "确认密码",
+      "confirmPasswordPlaceholder": "确认密码",
+      "role": "角色",
+      "selectRole": "选择角色",
+      "cancel": "取消",
+      "saving": "创建中...",
+      "create": "创建用户"
+    },
+    "editDialog": {
+      "title": "编辑用户",
+      "description": "编辑用户信息和权限",
+      "username": "用户名",
+      "email": "邮箱",
+      "emailPlaceholder": "输入邮箱地址",
+      "role": "角色",
+      "selectRole": "选择角色",
+      "cancel": "取消",
+      "saving": "保存中...",
+      "saveChanges": "保存更改"
     }
   },
   "repositories": {
@@ -285,11 +346,40 @@
     }
   },
   "roles": {
+    "title": "角色管理",
+    "subtitle": "管理系统中的角色和权限",
+    "listTitle": "角色列表",
+    "create": "创建角色",
+    "edit": "编辑角色",
+    "delete": "删除角色",
+    "permissions": "管理权限",
+    "view_members": "查看成员",
+    "copy_role": "复制角色",
+    "disable": "禁用",
+    "enable": "启用",
+    "load_failed": "加载失败",
+    "load_error": "无法加载角色列表",
+    "confirm_delete": "确定要删除角色 \"{{name}}\" 吗？",
+    "delete_success": "删除成功",
+    "role_deleted": "角色已被删除",
+    "delete_failed": "删除失败",
+    "delete_error": "无法删除角色",
+    "status_update_success": "状态更新成功",
+    "status_updated": "角色已{{status}}",
+    "status_update_failed": "状态更新失败",
+    "status_update_error": "无法更新角色状态",
+    "total_roles": "共 {{count}} 个角色",
+    "search_placeholder": "搜索角色名称...",
+    "no_description": "暂无描述",
+    "open_menu": "打开菜单",
+    "actions_menu": "操作",
     "errors": {
       "loadFailed": "加载失败",
       "loadFailedDescription": "无法加载角色列表"
     },
     "status": {
+      "active": "启用",
+      "inactive": "禁用",
       "enabled": "启用",
       "disabled": "禁用"
     },
@@ -323,9 +413,19 @@
       "totalCount": "共 {{total}} 个角色"
     },
     "filters": {
-      "allStatus": "全部状态"
+      "allStatus": "全部状态",
+      "all_status": "全部状态",
+      "active": "启用",
+      "inactive": "禁用"
     },
     "table": {
+      "name": "角色名称",
+      "description": "描述",
+      "users_count": "用户数",
+      "permissions_count": "权限数",
+      "status": "状态",
+      "created_at": "创建时间",
+      "actions": "操作",
       "noDescription": "暂无描述",
       "openMenu": "打开菜单",
       "actionsMenu": "操作"
@@ -338,6 +438,7 @@
     },
     "pagination": {
       "previous": "上一页",
+      "page_info": "第 {{current}} 页 / 共 {{total}} 页",
       "pageInfo": "第 {{current}} 页 / 共 {{total}} 页",
       "next": "下一页"
     }
@@ -379,6 +480,105 @@
       "title": "热门仓库",
       "description": "Token使用量最高的仓库",
       "noData": "暂无仓库数据"
+    }
+  },
+  "settings": {
+    "title": "系统设置",
+    "subtitle": "管理系统配置和偏好设置",
+    "general": {
+      "title": "常规设置",
+      "siteName": "网站名称",
+      "siteNamePlaceholder": "输入网站名称",
+      "siteDescription": "网站描述",
+      "siteDescriptionPlaceholder": "输入网站描述",
+      "siteUrl": "网站URL",
+      "siteUrlPlaceholder": "输入网站URL",
+      "language": "默认语言",
+      "selectLanguage": "选择语言",
+      "timezone": "时区",
+      "selectTimezone": "选择时区"
+    },
+    "security": {
+      "title": "安全设置",
+      "passwordPolicy": "密码策略",
+      "minimumLength": "最小长度",
+      "requireNumbers": "需要数字",
+      "requireSpecialCharacters": "需要特殊字符",
+      "requireUppercase": "需要大写字母",
+      "sessionTimeout": "会话超时（分钟）",
+      "twoFactorAuthentication": "双因素认证",
+      "enableTwoFactor": "启用双因素认证"
+    },
+    "email": {
+      "title": "邮箱设置",
+      "smtpServer": "SMTP服务器",
+      "smtpServerPlaceholder": "输入SMTP服务器",
+      "smtpPort": "SMTP端口",
+      "smtpPortPlaceholder": "输入端口号",
+      "senderEmail": "发件人邮箱",
+      "senderEmailPlaceholder": "输入发件人邮箱地址",
+      "senderName": "发件人名称",
+      "senderNamePlaceholder": "输入发件人名称",
+      "username": "用户名",
+      "usernamePlaceholder": "输入用户名",
+      "password": "密码",
+      "passwordPlaceholder": "输入密码",
+      "useSSL": "使用SSL/TLS",
+      "testConnection": "测试连接"
+    },
+    "storage": {
+      "title": "存储设置",
+      "storageType": "存储类型",
+      "selectStorageType": "选择存储类型",
+      "localPath": "本地路径",
+      "localPathPlaceholder": "输入本地存储路径",
+      "maxUploadSize": "最大上传大小（MB）",
+      "maxUploadSizePlaceholder": "输入最大文件大小（MB）",
+      "allowedFileTypes": "允许的文件类型",
+      "allowedFileTypesPlaceholder": "输入文件类型，用逗号分隔"
+    },
+    "api": {
+      "title": "API设置",
+      "apiKey": "API密钥",
+      "apiKeyPlaceholder": "输入API密钥",
+      "generateNewKey": "生成新密钥",
+      "regenerateKey": "重新生成密钥",
+      "rateLimit": "速率限制（请求/分钟）",
+      "rateLimitPlaceholder": "输入速率限制",
+      "enableAPI": "启用API",
+      "apiDocumentation": "API文档"
+    },
+    "backup": {
+      "title": "备份设置",
+      "autoBackup": "自动备份",
+      "backupFrequency": "备份频率",
+      "daily": "每日",
+      "weekly": "每周",
+      "monthly": "每月",
+      "backupLocation": "备份位置",
+      "backupLocationPlaceholder": "输入备份位置",
+      "retentionDays": "保留天数",
+      "retentionDaysPlaceholder": "备份保留天数",
+      "lastBackupTime": "最后备份时间",
+      "manualBackup": "手动备份",
+      "restoreBackup": "恢复备份"
+    },
+    "buttons": {
+      "save": "保存设置",
+      "saving": "保存中...",
+      "cancel": "取消",
+      "reset": "恢复默认值"
+    },
+    "messages": {
+      "saveSuccess": "设置保存成功",
+      "saveFailed": "设置保存失败",
+      "loadFailed": "设置加载失败",
+      "confirmReset": "确定要将所有设置恢复为默认值吗？",
+      "resetSuccess": "设置已恢复为默认值",
+      "testConnectionSuccess": "连接测试成功",
+      "testConnectionFailed": "连接测试失败",
+      "generateKeySuccess": "新API密钥生成成功",
+      "generateKeyFailed": "API密钥生成失败"
     }
   }
 }

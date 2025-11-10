@@ -23,14 +23,44 @@
     "quickActions": "クイックアクション",
     "quickActionsDescription": "よく使う管理操作",
     "overview": "管理概要",
+    "title": "ダッシュボード",
     "stats": {
       "total_repos": "総リポジトリ数",
       "total_documents": "総ドキュメント数",
-      "online_users": "オンラインユーザー"
+      "online_users": "オンラインユーザー",
+      "total_users": "総ユーザー数",
+      "total_repositories": "総リポジトリ数",
+      "repository_growth_rate": "リポジトリ増加率",
+      "monthly_new_repositories": "今月の新規リポジトリ"
     },
     "noDescription": "説明なし",
     "unknown": "不明",
-    "increaseRate": "増加率"
+    "increaseRate": "増加率",
+    "totalRepositories": "総リポジトリ数",
+    "totalDocuments": "総ドキュメント数",
+    "totalViews": "総ビュー数",
+    "userGrowthRate": "ユーザー増加率",
+    "documentGrowthRate": "ドキュメント増加率",
+    "repositoryGrowthRate": "リポジトリ増加率",
+    "dailyActiveUsers": "今日のアクティブ",
+    "weeklyActiveUsers": "今週のアクティブ",
+    "onlineUsers": "オンラインユーザー",
+    "activeUserGrowthRate": "増加率",
+    "retryButton": "再試行",
+    "online": "オンライン",
+    "offline": "オフライン",
+    "documentation": "ドキュメント",
+    "addUser": "ユーザー追加",
+    "addRepository": "リポジトリ追加",
+    "manageRoles": "ロール管理",
+    "systemSettings": "システム設定",
+    "viewReports": "レポート表示",
+    "viewLogs": "ログ表示",
+    "status": "ステータス",
+    "completed": "完了",
+    "processing": "処理中",
+    "pending": "保留中",
+    "failed": "失敗"
   },
   "users": {
     "userList": "ユーザーリスト",
@@ -83,7 +113,49 @@
     "edit": "ユーザー編集",
     "delete": "ユーザー削除",
     "assign_roles": "ロール割り当て",
-    "select_users_to_delete": "削除するユーザーを選択してください"
+    "select_users_to_delete": "削除するユーザーを選択してください",
+    "errors": {
+      "loadFailed": "読み込み失敗",
+      "loadFailedDescription": "ユーザーリストを読み込めません",
+      "unknown": "未知"
+    },
+    "messages": {
+      "confirmDelete": "このユーザーを削除してもよろしいですか？",
+      "deleteSuccess": "削除成功",
+      "deleteSuccessDescription": "ユーザーが削除されました",
+      "deleteFailed": "削除失敗",
+      "deleteFailedDescription": "ユーザーを削除できません",
+      "pleaseSelectUsers": "削除するユーザーを選択してください"
+    },
+    "createDialog": {
+      "title": "ユーザー作成",
+      "description": "新しいシステムユーザーを作成",
+      "username": "ユーザー名",
+      "usernamePlaceholder": "ユーザー名を入力",
+      "email": "メール",
+      "emailPlaceholder": "メールアドレスを入力",
+      "password": "パスワード",
+      "passwordPlaceholder": "パスワードを入力",
+      "confirmPassword": "パスワード確認",
+      "confirmPasswordPlaceholder": "パスワードを確認",
+      "role": "ロール",
+      "selectRole": "ロールを選択",
+      "cancel": "キャンセル",
+      "saving": "作成中...",
+      "create": "ユーザー作成"
+    },
+    "editDialog": {
+      "title": "ユーザー編集",
+      "description": "ユーザー情報と権限を編集",
+      "username": "ユーザー名",
+      "email": "メール",
+      "emailPlaceholder": "メールアドレスを入力",
+      "role": "ロール",
+      "selectRole": "ロールを選択",
+      "cancel": "キャンセル",
+      "saving": "保存中...",
+      "saveChanges": "変更を保存"
+    }
   },
   "repositories": {
     "batchActions": "一括操作",
@@ -265,11 +337,40 @@
     }
   },
   "roles": {
+    "title": "ロール管理",
+    "subtitle": "システムのロールと権限を管理",
+    "listTitle": "ロールリスト",
+    "create": "ロール作成",
+    "edit": "ロール編集",
+    "delete": "ロール削除",
+    "permissions": "権限管理",
+    "view_members": "メンバーを表示",
+    "copy_role": "ロールをコピー",
+    "disable": "無効化",
+    "enable": "有効化",
+    "load_failed": "読み込み失敗",
+    "load_error": "ロールリストを読み込めません",
+    "confirm_delete": "ロール \"{{name}}\" を削除してもよろしいですか？",
+    "delete_success": "削除成功",
+    "role_deleted": "ロールが削除されました",
+    "delete_failed": "削除失敗",
+    "delete_error": "ロールを削除できません",
+    "status_update_success": "ステータス更新成功",
+    "status_updated": "ロールが{{status}}されました",
+    "status_update_failed": "ステータス更新失敗",
+    "status_update_error": "ロールのステータスを更新できません",
+    "total_roles": "合計 {{count}} ロール",
+    "search_placeholder": "ロール名を検索...",
+    "no_description": "説明なし",
+    "open_menu": "メニューを開く",
+    "actions_menu": "操作",
     "errors": {
       "loadFailed": "読み込み失敗",
       "loadFailedDescription": "ロールリストを読み込めません"
     },
     "status": {
+      "active": "有効",
+      "inactive": "無効",
       "enabled": "有効",
       "disabled": "無効"
     },
@@ -303,9 +404,19 @@
       "totalCount": "合計 {{total}} ロール"
     },
     "filters": {
-      "allStatus": "すべてのステータス"
+      "allStatus": "すべてのステータス",
+      "all_status": "すべてのステータス",
+      "active": "有効",
+      "inactive": "無効"
     },
     "table": {
+      "name": "ロール名",
+      "description": "説明",
+      "users_count": "ユーザー数",
+      "permissions_count": "権限数",
+      "status": "ステータス",
+      "created_at": "作成日時",
+      "actions": "操作",
       "noDescription": "説明なし",
       "openMenu": "メニューを開く",
       "actionsMenu": "操作"
@@ -318,6 +429,7 @@
     },
     "pagination": {
       "previous": "前へ",
+      "page_info": "{{current}}ページ / 全{{total}}ページ",
       "pageInfo": "{{current}}ページ / 全{{total}}ページ",
       "next": "次へ"
     }
@@ -366,6 +478,8 @@
     "users": "ユーザー管理",
     "repositories": "リポジトリ管理",
     "settings": "システム設定",
-    "roles": "ロール管理"
+    "roles": "ロール管理",
+    "back_to_website": "ウェブサイトに戻る",
+    "back_to_home": "ホームに戻る"
   }
 }

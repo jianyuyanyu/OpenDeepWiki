@@ -418,6 +418,43 @@
       "previous": "前へ",
       "next": "次へ",
       "pageInfo": "ページ {{current}} / 合計 {{total}} ページ",
+      "title": "ユーザー管理",
+      "subtitle": "システムユーザーアカウントとアクセス権限を管理",
+      "searchPlaceholder": "ユーザー名またはメールアドレスで検索...",
+      "table": {
+        "username": "ユーザー名",
+        "email": "メールアドレス",
+        "role": "ロール",
+        "created_at": "作成日時",
+        "updated_at": "更新日時",
+        "actions": "操作"
+      },
+      "actions": {
+        "cancel_selection": "選択をキャンセル",
+        "select_all": "すべて選択",
+        "reset_password": "パスワードをリセット"
+      },
+      "filters": {
+        "filter_by_role": "ロールで絞り込み",
+        "all_roles": "すべてのロール"
+      },
+      "pagination": {
+        "previous": "前へ",
+        "page_info": "ページ {{current}} / 合計 {{total}} ページ",
+        "next": "次へ"
+      },
+      "load_failed": "読み込み失敗",
+      "load_error": "ユーザーリストを読み込めません",
+      "confirm_delete": "このユーザーを削除してもよろしいですか？",
+      "delete_success": "削除成功",
+      "user_deleted": "ユーザーが削除されました",
+      "delete_failed": "削除失敗",
+      "delete_error": "ユーザーを削除できません",
+      "create": "ユーザーを作成",
+      "edit": "ユーザーを編集",
+      "delete": "ユーザーを削除",
+      "assign_roles": "ロールを割り当て",
+      "select_users_to_delete": "削除するユーザーを選択してください",
       "errors": {
         "loadFailed": "読み込み失敗",
         "loadFailedDescription": "ユーザーリストを読み込めません",

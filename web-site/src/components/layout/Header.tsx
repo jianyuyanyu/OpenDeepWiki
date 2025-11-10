@@ -167,10 +167,12 @@ export const Header: React.FC<HeaderProps> = ({ className }) => {
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <Link to="/admin">
+                        <div onClick={()=>{
+                          window.location.href = '/admin'
+                        }}>
                           <Shield className="mr-2 h-4 w-4" />
                           <span>{t('nav.admin_console')}</span>
-                        </Link>
+                        </div>
                       </DropdownMenuItem>
                     </>
                   )}

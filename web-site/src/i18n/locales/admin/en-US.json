@@ -23,14 +23,44 @@
     "quickActions": "Quick Actions",
     "quickActionsDescription": "Frequently used management operations",
     "overview": "Management Overview",
+    "title": "Dashboard",
     "stats": {
       "total_repos": "Total Repositories",
       "total_documents": "Total Documents",
-      "online_users": "Online Users"
+      "online_users": "Online Users",
+      "total_users": "Total Users",
+      "total_repositories": "Total Repositories",
+      "repository_growth_rate": "Repository Growth Rate",
+      "monthly_new_repositories": "Monthly New Repositories"
     },
     "noDescription": "No description",
     "unknown": "Unknown",
-    "increaseRate": "Growth Rate"
+    "increaseRate": "Growth Rate",
+    "totalRepositories": "Total Repositories",
+    "totalDocuments": "Total Documents",
+    "totalViews": "Total Views",
+    "userGrowthRate": "User Growth Rate",
+    "documentGrowthRate": "Document Growth Rate",
+    "repositoryGrowthRate": "Repository Growth Rate",
+    "dailyActiveUsers": "Today Active",
+    "weeklyActiveUsers": "Week Active",
+    "onlineUsers": "Online Users",
+    "activeUserGrowthRate": "Growth Rate",
+    "retryButton": "Retry",
+    "online": "Online",
+    "offline": "Offline",
+    "documentation": "Documentation",
+    "addUser": "Add User",
+    "addRepository": "Add Repository",
+    "manageRoles": "Manage Roles",
+    "systemSettings": "System Settings",
+    "viewReports": "View Reports",
+    "viewLogs": "View Logs",
+    "status": "Status",
+    "completed": "Completed",
+    "processing": "Processing",
+    "pending": "Pending",
+    "failed": "Failed"
   },
   "users": {
     "userList": "User List",
@@ -96,6 +126,35 @@
       "deleteFailed": "Delete Failed",
       "deleteFailedDescription": "Unable to delete user",
       "pleaseSelectUsers": "Please select users to delete"
+    },
+    "createDialog": {
+      "title": "Create User",
+      "description": "Create a new system user",
+      "username": "Username",
+      "usernamePlaceholder": "Enter username",
+      "email": "Email",
+      "emailPlaceholder": "Enter email address",
+      "password": "Password",
+      "passwordPlaceholder": "Enter password",
+      "confirmPassword": "Confirm Password",
+      "confirmPasswordPlaceholder": "Confirm password",
+      "role": "Role",
+      "selectRole": "Select a role",
+      "cancel": "Cancel",
+      "saving": "Creating...",
+      "create": "Create User"
+    },
+    "editDialog": {
+      "title": "Edit User",
+      "description": "Edit user information and permissions",
+      "username": "Username",
+      "email": "Email",
+      "emailPlaceholder": "Enter email address",
+      "role": "Role",
+      "selectRole": "Select a role",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "saveChanges": "Save Changes"
     }
   },
   "repositories": {
@@ -278,11 +337,40 @@
     }
   },
   "roles": {
+    "title": "Role Management",
+    "subtitle": "Manage roles and permissions in the system",
+    "listTitle": "Role List",
+    "create": "Create Role",
+    "edit": "Edit Role",
+    "delete": "Delete Role",
+    "permissions": "Manage Permissions",
+    "view_members": "View Members",
+    "copy_role": "Copy Role",
+    "disable": "Disable",
+    "enable": "Enable",
+    "load_failed": "Load Failed",
+    "load_error": "Unable to load role list",
+    "confirm_delete": "Are you sure you want to delete role \"{{name}}\"?",
+    "delete_success": "Delete Successful",
+    "role_deleted": "Role has been deleted",
+    "delete_failed": "Delete Failed",
+    "delete_error": "Unable to delete role",
+    "status_update_success": "Status Update Successful",
+    "status_updated": "Role has been {{status}}",
+    "status_update_failed": "Status Update Failed",
+    "status_update_error": "Unable to update role status",
+    "total_roles": "Total {{count}} roles",
+    "search_placeholder": "Search role name...",
+    "no_description": "No description",
+    "open_menu": "Open Menu",
+    "actions_menu": "Actions",
     "errors": {
       "loadFailed": "Load Failed",
       "loadFailedDescription": "Unable to load role list"
     },
     "status": {
+      "active": "Enabled",
+      "inactive": "Disabled",
       "enabled": "Enabled",
       "disabled": "Disabled"
     },
@@ -316,9 +404,19 @@
       "totalCount": "Total {{total}} roles"
     },
     "filters": {
-      "allStatus": "All Status"
+      "allStatus": "All Status",
+      "all_status": "All Status",
+      "active": "Enabled",
+      "inactive": "Disabled"
     },
     "table": {
+      "name": "Role Name",
+      "description": "Description",
+      "users_count": "Users Count",
+      "permissions_count": "Permissions Count",
+      "status": "Status",
+      "created_at": "Created At",
+      "actions": "Actions",
       "noDescription": "No description",
       "openMenu": "Open Menu",
       "actionsMenu": "Actions"
@@ -331,6 +429,7 @@
     },
     "pagination": {
       "previous": "Previous",
+      "page_info": "Page {{current}} of {{total}}",
       "pageInfo": "Page {{current}} of {{total}}",
       "next": "Next"
     }
@@ -374,11 +473,112 @@
       "noData": "No repository data"
     }
   },
+  "settings": {
+    "title": "System Settings",
+    "subtitle": "Manage system configuration and preferences",
+    "general": {
+      "title": "General Settings",
+      "siteName": "Site Name",
+      "siteNamePlaceholder": "Enter site name",
+      "siteDescription": "Site Description",
+      "siteDescriptionPlaceholder": "Enter site description",
+      "siteUrl": "Site URL",
+      "siteUrlPlaceholder": "Enter site URL",
+      "language": "Default Language",
+      "selectLanguage": "Select language",
+      "timezone": "Timezone",
+      "selectTimezone": "Select timezone"
+    },
+    "security": {
+      "title": "Security Settings",
+      "passwordPolicy": "Password Policy",
+      "minimumLength": "Minimum Length",
+      "requireNumbers": "Require Numbers",
+      "requireSpecialCharacters": "Require Special Characters",
+      "requireUppercase": "Require Uppercase",
+      "sessionTimeout": "Session Timeout (minutes)",
+      "twoFactorAuthentication": "Two Factor Authentication",
+      "enableTwoFactor": "Enable Two Factor Authentication"
+    },
+    "email": {
+      "title": "Email Settings",
+      "smtpServer": "SMTP Server",
+      "smtpServerPlaceholder": "Enter SMTP server",
+      "smtpPort": "SMTP Port",
+      "smtpPortPlaceholder": "Enter port number",
+      "senderEmail": "Sender Email",
+      "senderEmailPlaceholder": "Enter sender email address",
+      "senderName": "Sender Name",
+      "senderNamePlaceholder": "Enter sender name",
+      "username": "Username",
+      "usernamePlaceholder": "Enter username",
+      "password": "Password",
+      "passwordPlaceholder": "Enter password",
+      "useSSL": "Use SSL/TLS",
+      "testConnection": "Test Connection"
+    },
+    "storage": {
+      "title": "Storage Settings",
+      "storageType": "Storage Type",
+      "selectStorageType": "Select storage type",
+      "localPath": "Local Path",
+      "localPathPlaceholder": "Enter local storage path",
+      "maxUploadSize": "Max Upload Size (MB)",
+      "maxUploadSizePlaceholder": "Enter maximum file size in MB",
+      "allowedFileTypes": "Allowed File Types",
+      "allowedFileTypesPlaceholder": "Enter file types separated by comma"
+    },
+    "api": {
+      "title": "API Settings",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "Enter API key",
+      "generateNewKey": "Generate New Key",
+      "regenerateKey": "Regenerate Key",
+      "rateLimit": "Rate Limit (requests/minute)",
+      "rateLimitPlaceholder": "Enter rate limit",
+      "enableAPI": "Enable API",
+      "apiDocumentation": "API Documentation"
+    },
+    "backup": {
+      "title": "Backup Settings",
+      "autoBackup": "Automatic Backup",
+      "backupFrequency": "Backup Frequency",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "backupLocation": "Backup Location",
+      "backupLocationPlaceholder": "Enter backup location",
+      "retentionDays": "Retention Days",
+      "retentionDaysPlaceholder": "Number of days to keep backups",
+      "lastBackupTime": "Last Backup Time",
+      "manualBackup": "Manual Backup",
+      "restoreBackup": "Restore Backup"
+    },
+    "buttons": {
+      "save": "Save Settings",
+      "saving": "Saving...",
+      "cancel": "Cancel",
+      "reset": "Reset to Default"
+    },
+    "messages": {
+      "saveSuccess": "Settings saved successfully",
+      "saveFailed": "Failed to save settings",
+      "loadFailed": "Failed to load settings",
+      "confirmReset": "Are you sure you want to reset all settings to default values?",
+      "resetSuccess": "Settings reset to default successfully",
+      "testConnectionSuccess": "Connection test successful",
+      "testConnectionFailed": "Connection test failed",
+      "generateKeySuccess": "New API key generated successfully",
+      "generateKeyFailed": "Failed to generate API key"
+    }
+  },
   "nav": {
     "dashboard": "Management Dashboard",
     "users": "User Management",
     "repositories": "Repository Management",
     "settings": "System Settings",
-    "roles": "Role Management"
+    "roles": "Role Management",
+    "back_to_website": "Back to Website",
+    "back_to_home": "Back to Home"
   }
 }
