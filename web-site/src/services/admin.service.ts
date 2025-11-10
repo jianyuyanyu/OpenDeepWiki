@@ -200,10 +200,7 @@ export const roleService = {
 
   // 批量更新角色状态
   batchUpdateRoleStatus: async (ids: string[], isActive: boolean) => {
-    return request.post<boolean>('/api/Role/BatchUpdateRoleStatus', {
-      ids,
-      isActive
-    })
+    return request.post<boolean>(`/api/Role/BatchUpdateRoleStatus?isActive=${isActive}`,ids)
   }
 }
 

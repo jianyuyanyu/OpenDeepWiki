@@ -72,6 +72,7 @@ const SystemSettingsPage: React.FC<SystemSettingsPageProps> = () => {
       // 确保 response 是数组
       const groups = Array.isArray(response) ? response : []
       setSettingGroups(groups)
+      setActiveTab(groups[0]?.group || '')
 
       const settingsMap: Record<string, SystemSetting[]> = {}
       groups.forEach(group => {

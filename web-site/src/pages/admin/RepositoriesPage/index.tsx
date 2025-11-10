@@ -114,8 +114,8 @@ const RepositoriesPage: React.FC = () => {
       setSelectedRepositories([])
     } catch (error) {
       console.error('Failed to load repositories:', error)
-      toast.error('加载失败', {
-        description: '无法加载仓库列表'
+      toast.error(t('admin.repositories.errors.loadFailed'), {
+        description: t('admin.repositories.errors.loadFailedDescription')
       })
     } finally {
       setLoading(false)
@@ -219,13 +219,13 @@ const RepositoriesPage: React.FC = () => {
 
     try {
       await repositoryService.deleteRepository(repositoryToDelete.id)
-      toast.success('删除成功', {
-        description: `仓库 "${repositoryToDelete.name}" 已被删除`
+      toast.success(t('admin.repositories.messages.deleteSuccess'), {
+        description: t('admin.repositories.messages.deleteSuccessDescription', { name: repositoryToDelete.name })
       })
       loadRepositories()
     } catch (error) {
-      toast.error('删除失败', {
-        description: '无法删除仓库'
+      toast.error(t('admin.repositories.messages.deleteFailed'), {
+        description: t('admin.repositories.messages.deleteFailedDescription')
       })
     } finally {
       setShowDeleteAlert(false)
@@ -237,13 +237,13 @@ const RepositoriesPage: React.FC = () => {
   const handleRefreshRepository = async (id: string, name: string) => {
     try {
       await repositoryService.refreshRepository(id)
-      toast.success('刷新成功', {
-        description: `仓库 "${name}" 已开始重新处理`
+      toast.success(t('admin.repositories.messages.refreshSuccess'), {
+        description: t('admin.repositories.messages.refreshSuccessDescription', { name })
       })
       loadRepositories()
     } catch (error) {
-      toast.error('刷新失败', {
-        description: '无法刷新仓库'
+      toast.error(t('admin.repositories.messages.refreshFailed'), {
+        description: t('admin.repositories.messages.refreshFailedDescription')
       })
     }
   }
@@ -279,8 +279,8 @@ const RepositoriesPage: React.FC = () => {
       {/* 页面标题和操作 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('admin.repositories.title')}</h1>
-          <p className="text-muted-foreground">{t('admin.repositories.subtitle')}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('repositories.title')}</h1>
+          <p className="text-muted-foreground">{t('repositories.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           {selectedRepositories.length > 0 && (
@@ -288,7 +288,7 @@ const RepositoriesPage: React.FC = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" disabled={batchLoading}>
                   {batchLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  批量操作 ({selectedRepositories.length})
+                  {t('admin.repositories.batchActionsCount', { count: selectedRepositories.length })}
                 </Button>
               </DropdownMenuTrigger>
             </DropdownMenu>
@@ -354,7 +354,7 @@ const RepositoriesPage: React.FC = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder={t('admin.repositories.search_placeholder')}
+                placeholder={t('repositories.search_placeholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -386,25 +386,25 @@ const RepositoriesPage: React.FC = () => {
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
-                  <TableHead>{t('admin.repositories.table.name')}</TableHead>
-                  <TableHead>{t('admin.repositories.table.organization')}</TableHead>
-                  <TableHead>{t('admin.repositories.table.status')}</TableHead>
-                  <TableHead className="text-center">统计信息</TableHead>
-                  <TableHead>{t('admin.repositories.table.created_at')}</TableHead>
-                  <TableHead className="text-right">{t('admin.repositories.table.actions')}</TableHead>
+                  <TableHead>{t('repositories.table.name')}</TableHead>
+                  <TableHead>{t('repositories.table.organization')}</TableHead>
+                  <TableHead>{t('repositories.table.status')}</TableHead>
+                  <TableHead className="text-center">{t('admin.repositories.table.statistics')}</TableHead>
+                  <TableHead>{t('repositories.table.created_at')}</TableHead>
+                  <TableHead className="text-right">{t('repositories.table.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
-                      {t('admin.messages.loading')}
+                      {t('messages.loading')}
                     </TableCell>
                   </TableRow>
                 ) : repositories.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
-                      {t('admin.messages.no_data')}
+                      {t('messages.no_data')}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -494,36 +494,36 @@ const RepositoriesPage: React.FC = () => {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">打开菜单</span>
+                              <span className="sr-only">{t('admin.repositories.actions.openMenu')}</span>
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>操作</DropdownMenuLabel>
+                            <DropdownMenuLabel>{t('admin.repositories.actions.actionMenu')}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem asChild>
                               <Link to={`/${repo.organizationName}/${repo.name}`}>
                                 <Eye className="mr-2 h-4 w-4" />
-                                查看仓库
+                                {t('admin.repositories.actions.viewRepository')}
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEditRepository(repo)}>
                               <Edit className="mr-2 h-4 w-4" />
-                              编辑信息
+                              {t('admin.repositories.actions.editInfo')}
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
                               <Link to={`/admin/repositories/${repo.id}`}>
                                 <Settings className="mr-2 h-4 w-4" />
-                                管理内容
+                                {t('admin.repositories.actions.manageContent')}
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleRefreshRepository(repo.id, repo.name)}>
                               <RefreshCw className="mr-2 h-4 w-4" />
-                              重新处理仓库
+                              {t('admin.repositories.actions.reprocessRepository')}
                             </DropdownMenuItem>
                             <DropdownMenuItem>
                               <Download className="mr-2 h-4 w-4" />
-                              导出Markdown
+                              {t('admin.repositories.actions.exportMarkdown')}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -531,7 +531,7 @@ const RepositoriesPage: React.FC = () => {
                               onClick={() => handleDeleteRepository(repo)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
-                              删除仓库
+                              {t('admin.repositories.actions.deleteRepository')}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -552,10 +552,10 @@ const RepositoriesPage: React.FC = () => {
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
               >
-                上一页
+                {t('admin.repositories.previous')}
               </Button>
               <div className="text-sm text-muted-foreground">
-                第 {currentPage} 页 / 共 {Math.ceil(total / pageSize)} 页
+                {t('admin.repositories.pageInfo', { current: currentPage, total: Math.ceil(total / pageSize) })}
               </div>
               <Button
                 variant="outline"
@@ -563,7 +563,7 @@ const RepositoriesPage: React.FC = () => {
                 onClick={() => setCurrentPage(prev => prev + 1)}
                 disabled={currentPage >= Math.ceil(total / pageSize)}
               >
-                下一页
+                {t('admin.repositories.next')}
               </Button>
             </div>
           )}
@@ -592,19 +592,19 @@ const RepositoriesPage: React.FC = () => {
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除仓库</AlertDialogTitle>
+            <AlertDialogTitle>{t('admin.repositories.deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              您确定要删除仓库 "{repositoryToDelete?.name}" 吗？
+              {t('admin.repositories.deleteDialog.description', { name: repositoryToDelete?.name })}
               <br />
               <span className="text-red-600 font-medium">
-                此操作不可逆转，将删除仓库及其所有文档数据。
+                {t('admin.repositories.deleteDialog.warning')}
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{t('admin.repositories.deleteDialog.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteRepository} className="bg-red-600 hover:bg-red-700">
-              确认删除
+              {t('admin.repositories.deleteDialog.confirmDelete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -621,6 +621,7 @@ const EditRepositoryDialog: React.FC<{
   onSuccess: () => void
   onCancel: () => void
 }> = ({ repository, onSuccess, onCancel }) => {
+  const { t } = useTranslation('admin')
   const [formData, setFormData] = useState<UpdateRepositoryDto>({
     description: '',
     isRecommended: false,
@@ -645,11 +646,11 @@ const EditRepositoryDialog: React.FC<{
     setLoading(true)
     try {
       await repositoryService.updateRepository(repository.id, formData)
-      toast.success('仓库信息更新成功')
+      toast.success(t('admin.repositories.messages.updateSuccess'))
       onSuccess()
     } catch (error: any) {
-      toast.error('更新失败', {
-        description: error.message || '更新仓库信息时发生错误'
+      toast.error(t('admin.repositories.messages.updateFailed'), {
+        description: error.message || t('admin.repositories.messages.updateFailedDescription')
       })
     } finally {
       setLoading(false)
@@ -661,17 +662,20 @@ const EditRepositoryDialog: React.FC<{
   return (
     <>
       <DialogHeader>
-        <DialogTitle>编辑仓库信息</DialogTitle>
+        <DialogTitle>{t('admin.repositories.editDialog.title')}</DialogTitle>
         <DialogDescription>
-          编辑 {repository.organizationName}/{repository.name} 的信息
+          {t('admin.repositories.editDialog.description', {
+            organizationName: repository.organizationName,
+            name: repository.name
+          })}
         </DialogDescription>
       </DialogHeader>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <Label htmlFor="description">仓库描述</Label>
+          <Label htmlFor="description">{t('admin.repositories.editDialog.repositoryDescription')}</Label>
           <Textarea
             id="description"
-            placeholder="请输入仓库描述..."
+            placeholder={t('admin.repositories.editDialog.descriptionPlaceholder')}
             value={formData.description}
             onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
             rows={3}
@@ -683,13 +687,13 @@ const EditRepositoryDialog: React.FC<{
             checked={formData.isRecommended}
             onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isRecommended: checked }))}
           />
-          <Label htmlFor="isRecommended">推荐仓库</Label>
+          <Label htmlFor="isRecommended">{t('admin.repositories.editDialog.isRecommended')}</Label>
         </div>
         <div>
-          <Label htmlFor="prompt">自定义提示词（可选）</Label>
+          <Label htmlFor="prompt">{t('admin.repositories.editDialog.customPrompt')}</Label>
           <Textarea
             id="prompt"
-            placeholder="请输入自定义提示词..."
+            placeholder={t('admin.repositories.editDialog.promptPlaceholder')}
             value={formData.prompt}
             onChange={(e) => setFormData(prev => ({ ...prev, prompt: e.target.value }))}
             rows={3}
@@ -697,11 +701,11 @@ const EditRepositoryDialog: React.FC<{
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onCancel}>
-            取消
+            {t('admin.repositories.editDialog.cancel')}
           </Button>
           <Button type="submit" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            保存更改
+            {t('admin.repositories.editDialog.saveChanges')}
           </Button>
         </DialogFooter>
       </form>

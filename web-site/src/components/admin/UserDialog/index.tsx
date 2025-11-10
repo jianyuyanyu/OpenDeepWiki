@@ -204,10 +204,10 @@ const UserDialog: React.FC<UserDialogProps> = ({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>
-            {isEdit ? t('admin.users.dialogs.edit_title') : t('admin.users.dialogs.create_title')}
+            {isEdit ? t('users.dialogs.edit_title') : t('users.dialogs.create_title')}
           </DialogTitle>
           <DialogDescription>
-            {isEdit ? t('admin.users.dialogs.edit_description') : t('admin.users.dialogs.create_description')}
+            {isEdit ? t('users.dialogs.edit_description') : t('users.dialogs.create_description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -259,7 +259,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
 
           {/* 用户名 */}
           <div className="space-y-2">
-            <Label htmlFor="name">{t('admin.users.form.username')}</Label>
+            <Label htmlFor="name">{t('users.form.username')}</Label>
             <Input
               id="name"
               value={form.name}
@@ -274,7 +274,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
 
           {/* 邮箱 */}
           <div className="space-y-2">
-            <Label htmlFor="email">{t('admin.users.form.email')}</Label>
+            <Label htmlFor="email">{t('users.form.email')}</Label>
             <Input
               id="email"
               type="email"
@@ -291,7 +291,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
           {/* 密码 */}
           <div className="space-y-2">
             <Label htmlFor="password">
-              {t('admin.users.form.password')}
+              {t('users.form.password')}
               {isEdit && <span className="text-sm text-gray-500 ml-1">(留空表示不修改)</span>}
             </Label>
             <Input
@@ -311,7 +311,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
           {(!isEdit || form.password) && (
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">
-                {t('admin.users.form.confirm_password')}
+                {t('users.form.confirm_password')}
               </Label>
               <Input
                 id="confirmPassword"

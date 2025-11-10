@@ -1,6 +1,7 @@
 // 角色成员查看对话框组件
 
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -46,6 +47,7 @@ const RoleMembersDialog: React.FC<RoleMembersDialogProps> = ({
   onOpenChange,
   role
 }) => {
+  const { t } = useTranslation('admin')
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [members, setMembers] = useState<UserInfo[]>([])
@@ -62,8 +64,8 @@ const RoleMembersDialog: React.FC<RoleMembersDialogProps> = ({
       setMembers(memberList)
       setFilteredMembers(memberList)
     } catch (error: any) {
-      toast.error('加载失败', {
-        description: error?.message || '无法加载角色成员'
+      toast.error(t('roles.messages.loadMembersError'), {
+        description: error?.message || t('roles.messages.loadMembersError')
       })
     } finally {
       setLoading(false)
@@ -95,7 +97,7 @@ const RoleMembersDialog: React.FC<RoleMembersDialogProps> = ({
 
   // 格式化日期
   const formatDate = (dateString: string) => {
-    if (!dateString) return '未知'
+    if (!dateString) return t('common.unknown')
     return new Date(dateString).toLocaleDateString('zh-CN')
   }
 
@@ -113,21 +115,21 @@ const RoleMembersDialog: React.FC<RoleMembersDialogProps> = ({
   const handleRemoveUser = async (user: UserInfo) => {
     if (!role?.id) return
 
-    const confirmed = confirm(`确定要将用户 "${user.name}" 从角色 "${role.name}" 中移除吗？`)
+    const confirmed = confirm(t('roles.dialog.roleMembers.confirmRemove', { name: user.name, role: role.name }))
     if (!confirmed) return
 
     try {
       // 这里需要调用移除用户角色的API
       // 暂时使用toast提示，实际需要后端API支持
-      toast.success('移除成功', {
-        description: `用户 ${user.name} 已从角色中移除`
+      toast.success(t('roles.messages.removeSuccess'), {
+        description: t('roles.messages.removeSuccessDescription')
       })
 
       // 重新加载成员列表
       loadRoleMembers()
     } catch (error: any) {
-      toast.error('移除失败', {
-        description: error?.message || '无法移除用户'
+      toast.error(t('roles.messages.removeFailed'), {
+        description: error?.message || t('roles.messages.removeFailedDescription')
       })
     }
   }
@@ -140,10 +142,10 @@ const RoleMembersDialog: React.FC<RoleMembersDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
-            角色成员管理
+            {t('roles.dialog.roleMembers.title')}
           </DialogTitle>
           <DialogDescription>
-            查看和管理角色 "{role.name}" 的成员列表
+            {t('roles.dialog.roleMembers.description', { name: role?.name })}
           </DialogDescription>
         </DialogHeader>
 
@@ -152,27 +154,27 @@ const RoleMembersDialog: React.FC<RoleMembersDialogProps> = ({
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Shield className="h-4 w-4" />
-              角色信息
+              {t('roles.dialog.roleMembers.title')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div>
-                <div className="text-muted-foreground">角色名称</div>
-                <div className="font-medium">{role.name}</div>
+                <div className="text-muted-foreground">{t('roles.table.name')}</div>
+                <div className="font-medium">{role?.name}</div>
               </div>
               <div>
-                <div className="text-muted-foreground">成员数量</div>
+                <div className="text-muted-foreground">{t('roles.dialog.roleMembers.memberCount', { count: members.length })}</div>
                 <div className="font-medium">{members.length}</div>
               </div>
               <div>
-                <div className="text-muted-foreground">权限数量</div>
-                <div className="font-medium">{role.warehousePermissionCount || 0}</div>
+                <div className="text-muted-foreground">{t('roles.table.permissions_count')}</div>
+                <div className="font-medium">{role?.warehousePermissionCount || 0}</div>
               </div>
               <div>
-                <div className="text-muted-foreground">状态</div>
-                <Badge variant={role.isActive ? 'default' : 'secondary'}>
-                  {role.isActive ? '启用' : '禁用'}
+                <div className="text-muted-foreground">{t('roles.table.status')}</div>
+                <Badge variant={role?.isActive ? 'default' : 'secondary'}>
+                  {role?.isActive ? t('roles.status.enabled') : t('roles.status.disabled')}
                 </Badge>
               </div>
             </div>
@@ -184,7 +186,7 @@ const RoleMembersDialog: React.FC<RoleMembersDialogProps> = ({
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="搜索成员..."
+              placeholder={t('roles.dialog.roleMembers.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -193,7 +195,7 @@ const RoleMembersDialog: React.FC<RoleMembersDialogProps> = ({
           <div className="flex items-center gap-2">
             <Button size="sm" className="gap-2">
               <UserPlus className="h-4 w-4" />
-              添加成员
+              {t('common.add')}
             </Button>
           </div>
         </div>
@@ -203,34 +205,34 @@ const RoleMembersDialog: React.FC<RoleMembersDialogProps> = ({
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
-                成员列表 ({filteredMembers.length})
+                {t('roles.dialog.roleMembers.title')} ({filteredMembers.length})
               </CardTitle>
               <CardDescription>
-                显示拥有此角色的所有用户
+                {t('roles.dialog.roleMembers.description', { name: role?.name })}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <ScrollArea className="h-[400px]">
                 {loading ? (
                   <div className="flex items-center justify-center py-8">
-                    <div className="text-muted-foreground">加载成员列表中...</div>
+                    <div className="text-muted-foreground">{t('common.loading')}</div>
                   </div>
                 ) : filteredMembers.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                     <Users className="h-12 w-12 mb-2 opacity-50" />
                     <div>
-                      {searchQuery ? '没有找到匹配的成员' : '暂无成员'}
+                      {searchQuery ? t('common.no_data') : t('roles.dialog.roleMembers.noMembers')}
                     </div>
                   </div>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>用户</TableHead>
-                        <TableHead>邮箱</TableHead>
-                        <TableHead>加入时间</TableHead>
-                        <TableHead>状态</TableHead>
-                        <TableHead className="text-right">操作</TableHead>
+                        <TableHead>{t('roles.table.name')}</TableHead>
+                        <TableHead>{t('roles.table.email')}</TableHead>
+                        <TableHead>{t('roles.dialog.roleMembers.memberTable.joined')}</TableHead>
+                        <TableHead>{t('roles.table.status')}</TableHead>
+                        <TableHead className="text-right">{t('roles.table.actions')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -266,11 +268,11 @@ const RoleMembersDialog: React.FC<RoleMembersDialogProps> = ({
                           </TableCell>
                           <TableCell>
                             <Badge variant="secondary">
-                              活跃
+                              {t('roles.status.active')}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            {!role.isSystemRole && (
+                            {!role?.isSystemRole && (
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -278,7 +280,7 @@ const RoleMembersDialog: React.FC<RoleMembersDialogProps> = ({
                                 onClick={() => handleRemoveUser(member)}
                               >
                                 <UserMinus className="h-4 w-4 mr-1" />
-                                移除
+                                {t('roles.dialog.roleMembers.removeUser')}
                               </Button>
                             )}
                           </TableCell>
@@ -298,14 +300,14 @@ const RoleMembersDialog: React.FC<RoleMembersDialogProps> = ({
             <Separator />
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <div>
-                共 {members.length} 个成员
+                {t('roles.table.users_count')}: {members.length}
                 {searchQuery && filteredMembers.length !== members.length && (
-                  <span>，显示 {filteredMembers.length} 个匹配结果</span>
+                  <span>，{t('common.no_data')} {filteredMembers.length}</span>
                 )}
               </div>
               <div>
-                {role.isSystemRole && (
-                  <span className="text-yellow-600">系统角色成员不可移除</span>
+                {role?.isSystemRole && (
+                  <span className="text-yellow-600">{t('roles.type.system')}{t('common.notSet')}</span>
                 )}
               </div>
             </div>

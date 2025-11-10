@@ -1,6 +1,7 @@
 // 角色权限配置对话框组件
 
 import React, { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Dialog,
   DialogContent,
@@ -70,6 +71,7 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
   role,
   onSuccess
 }) => {
+  const { t } = useTranslation('admin')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [permissionTree, setPermissionTree] = useState<WarehousePermissionTreeNode[]>([])
@@ -81,18 +83,18 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
 
     setLoading(true)
     try {
-      const tree = await request.get<WarehousePermissionTreeNode[]>(
+      const {data} = await request.get<WarehousePermissionTreeNode[]>(
         `/api/Permission/WarehousePermissionTree?roleId=${role.id}`
       )
 
-      setPermissionTree(tree || [])
+      setPermissionTree(data || [])
 
       // 默认展开所有组织节点
-      const orgNodes = tree?.filter(node => node.type === 'organization').map(node => node.id) || []
+      const orgNodes = data?.filter(node => node.type === 'organization').map(node => node.id) || []
       setExpandedNodes(new Set(orgNodes))
     } catch (error: any) {
-      toast.error('加载失败', {
-        description: error?.message || '无法加载权限配置'
+      toast.error(t('roles.dialog.permissions.loadError'), {
+        description: error?.message || t('roles.dialog.permissions.loadErrorDescription')
       })
     } finally {
       setLoading(false)
@@ -258,15 +260,15 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
 
       await request.post('/api/Permission/SetRolePermissions', config)
 
-      toast.success('保存成功', {
-        description: '角色权限配置已更新'
+      toast.success(t('roles.dialog.permissions.saveSuccess'), {
+        description: t('roles.dialog.permissions.saveSuccessDescription')
       })
 
       onSuccess?.()
       onOpenChange(false)
     } catch (error: any) {
-      toast.error('保存失败', {
-        description: error?.message || '无法保存权限配置'
+      toast.error(t('roles.dialog.permissions.saveError'), {
+        description: error?.message || t('roles.dialog.permissions.saveErrorDescription')
       })
     } finally {
       setSaving(false)
@@ -286,7 +288,7 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
           />
           <Label className="text-xs flex items-center gap-1">
             <Eye className="h-3 w-3" />
-            查看
+            {t('roles.dialog.permissions.permissionType.readOnly')}
           </Label>
         </div>
 
@@ -297,7 +299,7 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
           />
           <Label className="text-xs flex items-center gap-1">
             <Edit className="h-3 w-3" />
-            编辑
+            {t('roles.dialog.permissions.permissionType.write')}
           </Label>
         </div>
 
@@ -308,11 +310,11 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
           />
           <Label className="text-xs flex items-center gap-1">
             <Trash2 className="h-3 w-3" />
-            删除
+            {t('roles.dialog.permissions.permissionType.delete')}
           </Label>
           <Label className="text-xs flex items-center gap-1">
             <Edit className="h-3 w-3" />
-            编辑
+            {t('roles.dialog.permissions.permissionType.write')}
           </Label>
         </div>
 
@@ -323,7 +325,7 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
           />
           <Label className="text-xs flex items-center gap-1">
             <Trash2 className="h-3 w-3" />
-            删除
+            {t('roles.dialog.permissions.permissionType.delete')}
           </Label>
         </div>
       </div>
@@ -373,7 +375,7 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
               )}
               <span className="text-sm font-medium">{node.name}</span>
               <Badge variant={node.type === 'organization' ? 'default' : 'secondary'}>
-                {node.type === 'organization' ? '组织' : '仓库'}
+                {node.type === 'organization' ? t('roles.dialog.permissions.organization') : t('roles.dialog.permissions.warehouse')}
               </Badge>
             </div>
 
@@ -398,7 +400,7 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
     let selectedWarehouses = 0
 
     const count = (nodes: WarehousePermissionTreeNode[]) => {
-      nodes.forEach(node => {
+      nodes?.forEach(node => {
         if (node.type === 'warehouse') {
           totalWarehouses++
           if (node.isSelected) selectedWarehouses++
@@ -422,17 +424,17 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            配置角色权限
+            {t('roles.dialog.permissions.title')}
           </DialogTitle>
           <DialogDescription>
-            为角色 "{role?.name}" 配置仓库访问权限。选择仓库并设置相应的操作权限。
+            {t('roles.dialog.permissions.description', { name: role?.name })}
           </DialogDescription>
         </DialogHeader>
 
         {role?.isSystemRole && (
           <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
             <div className="text-sm text-yellow-800">
-              <strong>注意：</strong> 系统角色的权限配置是只读的，不能修改。
+              <strong>{t('roles.dialog.permissions.systemRoleNotice')}：</strong> {t('roles.dialog.permissions.systemRoleNoticeMessage')}
             </div>
           </div>
         )}
@@ -440,13 +442,13 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
         {/* 权限统计 */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">权限概览</CardTitle>
+            <CardTitle className="text-base">{t('roles.dialog.permissions.overviewTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <Badge variant="outline">
-                  已选择 {stats.selectedWarehouses} / {stats.totalWarehouses} 个仓库
+                  {t('roles.dialog.permissions.selectedRepositories', { selected: stats.selectedWarehouses, total: stats.totalWarehouses })}
                 </Badge>
               </div>
             </div>
@@ -458,11 +460,11 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
           <ScrollArea className="h-full border rounded-md p-4">
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-muted-foreground">加载权限配置中...</div>
+                <div className="text-muted-foreground">{t('roles.dialog.permissions.loadingMessage')}</div>
               </div>
             ) : permissionTree.length === 0 ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-muted-foreground">暂无可配置的权限</div>
+                <div className="text-muted-foreground">{t('roles.dialog.permissions.noPermissions')}</div>
               </div>
             ) : (
               <div className="space-y-2">
@@ -481,14 +483,14 @@ const RolePermissionDialog: React.FC<RolePermissionDialogProps> = ({
             onClick={() => onOpenChange(false)}
             disabled={saving}
           >
-            取消
+            {t('roles.dialog.permissions.cancelButton')}
           </Button>
           <Button
             type="button"
             onClick={handleSave}
             disabled={saving || loading || role?.isSystemRole}
           >
-            {saving ? '保存中...' : '保存配置'}
+            {saving ? t('roles.dialog.permissions.savingButton') : t('roles.dialog.permissions.saveButton')}
           </Button>
         </DialogFooter>
       </DialogContent>

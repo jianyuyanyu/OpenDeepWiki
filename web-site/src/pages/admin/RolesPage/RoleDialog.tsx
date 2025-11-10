@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
-import { toast } from 'sonner'
+import { toast } from "sonner"
 import { roleService, type RoleInfo, type CreateRoleDto, type UpdateRoleDto } from '@/services/admin.service'
 
 interface RoleDialogProps {
@@ -44,7 +44,7 @@ const RoleDialog: React.FC<RoleDialogProps> = ({
   })
 
   const isEditMode = Boolean(role)
-  const dialogTitle = isEditMode ? t('admin.roles.edit') : t('admin.roles.create')
+  const dialogTitle = isEditMode ? t('roles.dialog.form.title.edit') : t('roles.dialog.form.title.create')
 
   // 当对话框打开或角色数据变化时，初始化表单
   useEffect(() => {
@@ -76,29 +76,29 @@ const RoleDialog: React.FC<RoleDialogProps> = ({
   // 表单验证
   const validateForm = () => {
     if (!formData.name.trim()) {
-      toast.error('验证失败', {
-        description: '角色名称不能为空'
+      toast.error(t('roles.validation.validationFailed'), {
+        description: t('roles.validation.nameRequired')
       })
       return false
     }
 
     if (formData.name.trim().length < 2) {
-      toast.error('验证失败', {
-        description: '角色名称至少需要2个字符'
+      toast.error(t('roles.validation.validationFailed'), {
+        description: t('roles.validation.nameMinLength')
       })
       return false
     }
 
     if (formData.name.trim().length > 50) {
-      toast.error('验证失败', {
-        description: '角色名称不能超过50个字符'
+      toast.error(t('roles.validation.validationFailed'), {
+        description: t('roles.validation.nameMaxLength')
       })
       return false
     }
 
     if (formData.description.length > 200) {
-      toast.error('验证失败', {
-        description: '角色描述不能超过200个字符'
+      toast.error(t('roles.validation.validationFailed'), {
+        description: t('roles.validation.descriptionMaxLength')
       })
       return false
     }
@@ -124,8 +124,8 @@ const RoleDialog: React.FC<RoleDialogProps> = ({
           isActive: formData.isActive
         }
         result = await roleService.updateRole(role.id, updateData)
-        toast.success('更新成功', {
-          description: '角色信息已更新'
+        toast.success(t('roles.messages.updateSuccess'), {
+          description: t('roles.messages.updateSuccessDescription')
         })
       } else {
         // 创建模式
@@ -135,17 +135,20 @@ const RoleDialog: React.FC<RoleDialogProps> = ({
           isActive: formData.isActive
         }
         result = await roleService.createRole(createData)
-        toast.success('创建成功', {
-          description: '新角色已创建'
+        toast.success(t('roles.messages.createSuccess'), {
+          description: t('roles.messages.createSuccessDescription')
         })
       }
 
       onSuccess?.(result)
       onOpenChange(false)
     } catch (error: any) {
-      toast.error(isEditMode ? '更新失败' : '创建失败', {
-        description: error?.message || '操作失败，请稍后重试'
-      })
+      toast.error(
+        isEditMode ? t('roles.messages.updateFailed') : t('roles.messages.createFailed'),
+        {
+          description: error?.message || t('roles.messages.operationFailed')
+        }
+      )
     } finally {
       setLoading(false)
     }
@@ -158,8 +161,8 @@ const RoleDialog: React.FC<RoleDialogProps> = ({
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>
             {isEditMode
-              ? '修改角色信息。系统角色不能编辑名称和状态。'
-              : '创建新的角色。角色创建后可以为其分配权限。'
+              ? t('roles.dialog.form.description.edit')
+              : t('roles.dialog.form.description.create')
             }
           </DialogDescription>
         </DialogHeader>
@@ -168,14 +171,14 @@ const RoleDialog: React.FC<RoleDialogProps> = ({
           {/* 角色名称 */}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
-              角色名称 *
+              {t('roles.dialog.form.roleNameRequired')}
             </Label>
             <div className="col-span-3">
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleFieldChange('name', e.target.value)}
-                placeholder="请输入角色名称"
+                placeholder={t('roles.dialog.form.roleNamePlaceholder')}
                 disabled={loading || (isEditMode && role?.isSystemRole)}
                 maxLength={50}
               />
@@ -188,14 +191,14 @@ const RoleDialog: React.FC<RoleDialogProps> = ({
           {/* 角色描述 */}
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="description" className="text-right mt-2">
-              角色描述
+              {t('roles.dialog.form.roleDescription')}
             </Label>
             <div className="col-span-3">
               <Textarea
                 id="description"
                 value={formData.description}
                 onChange={(e) => handleFieldChange('description', e.target.value)}
-                placeholder="请输入角色描述（可选）"
+                placeholder={t('roles.dialog.form.roleDescriptionPlaceholder')}
                 disabled={loading}
                 maxLength={200}
                 rows={3}
@@ -209,7 +212,7 @@ const RoleDialog: React.FC<RoleDialogProps> = ({
           {/* 启用状态 */}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="isActive" className="text-right">
-              启用状态
+              {t('roles.dialog.form.enableStatus')}
             </Label>
             <div className="col-span-3 flex items-center space-x-2">
               <Switch
@@ -219,7 +222,7 @@ const RoleDialog: React.FC<RoleDialogProps> = ({
                 disabled={loading || (isEditMode && role?.isSystemRole)}
               />
               <span className="text-sm text-muted-foreground">
-                {formData.isActive ? '启用' : '禁用'}
+                {formData.isActive ? t('roles.dialog.form.enabled') : t('roles.dialog.form.disabled')}
               </span>
             </div>
           </div>
@@ -228,7 +231,7 @@ const RoleDialog: React.FC<RoleDialogProps> = ({
           {isEditMode && role?.isSystemRole && (
             <div className="col-span-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="text-sm text-yellow-800">
-                <strong>注意：</strong> 系统角色不能修改名称和状态，只能修改描述。
+                <strong>{t('roles.dialog.form.systemRoleWarning')}：</strong> {t('roles.dialog.form.systemRoleWarningMessage')}
               </div>
             </div>
           )}
@@ -241,14 +244,16 @@ const RoleDialog: React.FC<RoleDialogProps> = ({
             onClick={() => onOpenChange(false)}
             disabled={loading}
           >
-            取消
+            {t('roles.dialog.form.cancel')}
           </Button>
           <Button
             type="button"
             onClick={handleSubmit}
             disabled={loading}
           >
-            {loading ? (isEditMode ? '更新中...' : '创建中...') : (isEditMode ? '更新' : '创建')}
+            {loading 
+              ? (isEditMode ? t('roles.dialog.form.submit.updateLoading') : t('roles.dialog.form.submit.createLoading')) 
+              : (isEditMode ? t('roles.dialog.form.submit.update') : t('roles.dialog.form.submit.create'))}
           </Button>
         </DialogFooter>
       </DialogContent>

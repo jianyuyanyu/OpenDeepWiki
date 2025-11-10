@@ -127,10 +127,7 @@ class RoleService {
    * 批量更新角色状态
    */
   async batchUpdateRoleStatus(ids: string[], isActive: boolean): Promise<boolean> {
-    return fetchService.post<boolean>(`${this.basePath}/BatchUpdateRoleStatus`, {
-      ids,
-      isActive
-    })
+    return fetchService.post<boolean>(`${this.basePath}/BatchUpdateRoleStatus?isActive=${isActive}`, ids)
   }
 }
 
