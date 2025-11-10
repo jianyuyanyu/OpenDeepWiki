@@ -7,6 +7,8 @@ import LanguageDetector from 'i18next-browser-languagedetector'
 // 导入语言资源
 import enUS from './locales/en-US.json'
 import zhCN from './locales/zh-CN.json'
+import jaJP from './locales/ja-JP.json'
+import koKR from './locales/ko-KR.json'
 
 const resources = {
   'en-US': {
@@ -14,6 +16,12 @@ const resources = {
   },
   'zh-CN': {
     translation: zhCN,
+  },
+  'ja-JP': {
+    translation: jaJP,
+  },
+  'ko-KR': {
+    translation: koKR,
   },
 }
 
@@ -39,7 +47,7 @@ i18n
     },
 
     // 支持的语言
-    supportedLngs: ['en-US', 'zh-CN'],
+    supportedLngs: ['en-US', 'zh-CN', 'ja-JP', 'ko-KR'],
 
     // 命名空间
     ns: ['translation'],
@@ -59,6 +67,16 @@ export const languages = [
     code: 'en-US',
     name: 'English',
     flag: '🇺🇸',
+  },
+  {
+    code: 'ja-JP',
+    name: '日本語',
+    flag: '🇯🇵',
+  },
+  {
+    code: 'ko-KR',
+    name: '한국어',
+    flag: '🇰🇷',
   },
 ]
 

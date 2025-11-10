@@ -148,12 +148,12 @@ export default function SettingsPage() {
           profileForm.setValue('name', user.name || '')
           profileForm.setValue('email', user.email || '')
         } else {
-          toast.error('获取用户信息失败，请重新登录')
+          toast.error(t('settings.profile.loadUserInfoFailed'))
           navigate('/login')
         }
       } catch (error) {
         console.error('加载用户信息失败:', error)
-        toast.error('加载用户信息失败')
+        toast.error(t('settings.profile.loadUserInfoError'))
       }
     }
 
@@ -187,15 +187,15 @@ export default function SettingsPage() {
 
       const response = await updateCurrentUserProfile(updateData)
       if (response.code === 200) {
-        toast.success('个人信息更新成功')
+        toast.success(t('settings.profile.updateSuccess'))
         const updatedUser = { ...userInfo, ...updateData }
         setUserInfo(updatedUser)
       } else {
-        toast.error(response.message || '更新失败')
+        toast.error(response.message || t('settings.profile.updateFailed'))
       }
     } catch (error) {
       console.error('更新个人信息失败:', error)
-      toast.error('更新失败，请重试')
+      toast.error(t('settings.profile.updateError'))
     } finally {
       setLoading(false)
     }
@@ -210,7 +210,7 @@ export default function SettingsPage() {
 
       const verifyResponse = await verifyPassword(values.currentPassword)
       if (verifyResponse.code !== 200 || !verifyResponse.data) {
-        toast.error('当前密码不正确')
+        toast.error(t('settings.security.currentPasswordIncorrect'))
         return
       }
 
@@ -221,14 +221,14 @@ export default function SettingsPage() {
 
       const response = await changePassword(changePasswordData)
       if (response.code === 200) {
-        toast.success('密码修改成功')
+        toast.success(t('settings.security.changeSuccess'))
         passwordForm.reset()
       } else {
-        toast.error(response.message || '密码修改失败')
+        toast.error(response.message || t('settings.security.changeFailed'))
       }
     } catch (error) {
       console.error('修改密码失败:', error)
-      toast.error('修改密码失败，请重试')
+      toast.error(t('settings.security.changeError'))
     } finally {
       setLoading(false)
     }
@@ -238,12 +238,12 @@ export default function SettingsPage() {
   const handleAvatarUpload = async (file: File) => {
     const isJpgOrPng = file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/gif'
     if (!isJpgOrPng) {
-      toast.error('只能上传 JPG/PNG/GIF 格式的图片!')
+      toast.error(t('settings.avatar.uploadFormatError'))
       return false
     }
     const isLt2M = file.size / 1024 / 1024 < 2
     if (!isLt2M) {
-      toast.error('图片大小不能超过 2MB!')
+      toast.error(t('settings.avatar.uploadSizeError'))
       return false
     }
 
@@ -255,7 +255,7 @@ export default function SettingsPage() {
         const timestamp = new Date().getTime()
         const avatarUrl = `${response.data}?t=${timestamp}`
         setAvatarUrl(avatarUrl)
-        toast.success('头像上传成功')
+        toast.success(t('settings.avatar.uploadSuccess'))
 
         if (userInfo) {
           const updateData: UpdateProfileRequest = {
@@ -271,11 +271,11 @@ export default function SettingsPage() {
           }
         }
       } else {
-        toast.error(response.message || '头像上传失败')
+        toast.error(response.message || t('settings.avatar.uploadFailed'))
       }
     } catch (error) {
       console.error('头像上传失败:', error)
-      toast.error('头像上传失败，请重试')
+      toast.error(t('settings.avatar.uploadError'))
     } finally {
       setAvatarUploading(false)
     }
@@ -290,18 +290,18 @@ export default function SettingsPage() {
       const response = await removeAvatar()
       if (response.code === 200) {
         setAvatarUrl('')
-        toast.success('头像删除成功')
+        toast.success(t('settings.avatar.removeSuccess'))
         
         if (userInfo) {
           const updatedUser = { ...userInfo, avatar: '' }
           setUserInfo(updatedUser)
         }
       } else {
-        toast.error(response.message || '删除头像失败')
+        toast.error(response.message || t('settings.avatar.removeFailed'))
       }
     } catch (error) {
       console.error('删除头像失败:', error)
-      toast.error('删除头像失败，请重试')
+      toast.error(t('settings.avatar.removeError'))
     } finally {
       setAvatarUploading(false)
     }
@@ -336,17 +336,17 @@ export default function SettingsPage() {
     {
       key: 'profile',
       icon: <User className="w-4 h-4" />,
-      title: '账户信息',
+      title: t('settings.ui.menu.profile'),
     },
     {
       key: 'security',
       icon: <Shield className="w-4 h-4" />,
-      title: '安全设置',
+      title: t('settings.ui.menu.security'),
     },
     {
       key: 'preferences',
       icon: <Settings className="w-4 h-4" />,
-      title: '偏好设置',
+      title: t('settings.ui.menu.preferences'),
     }
   ]
 
@@ -357,8 +357,8 @@ export default function SettingsPage() {
         return (
           <div className="space-y-6">
             <div className="pb-6 border-b">
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent mb-3">账户信息</h2>
-              <p className="text-lg text-muted-foreground">管理您的个人资料和基本信息</p>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent mb-3">{t('settings.profile.title')}</h2>
+              <p className="text-lg text-muted-foreground">{t('settings.profile.description')}</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -419,15 +419,15 @@ export default function SettingsPage() {
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
-                                <AlertDialogTitle>确认删除头像</AlertDialogTitle>
+                                <AlertDialogTitle>{t('settings.avatar.confirmDelete.title')}</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  确定要删除当前头像吗？此操作不可撤销。
+                                  {t('settings.avatar.confirmDelete.description')}
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>取消</AlertDialogCancel>
+                                <AlertDialogCancel>{t('settings.avatar.confirmDelete.cancel')}</AlertDialogCancel>
                                 <AlertDialogAction onClick={handleRemoveAvatar}>
-                                  确认删除
+                                  {t('settings.avatar.confirmDelete.confirm')}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -442,10 +442,10 @@ export default function SettingsPage() {
                       </div>
                       <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200 hover:bg-green-100">
                         <CheckCircle className="w-3 h-3 mr-1" />
-                        已验证
+                        {t('settings.profile.verified')}
                       </Badge>
                       <p className="text-xs text-muted-foreground px-4">
-                        支持 JPG、PNG、GIF 格式，文件大小不超过 2MB
+                        {t('settings.avatar.uploadHint')}
                       </p>
                     </div>
                   </div>
@@ -457,10 +457,10 @@ export default function SettingsPage() {
                 <CardHeader className="pb-6">
                   <CardTitle className="text-xl font-semibold flex items-center gap-2">
                     <User className="w-5 h-5 text-primary" />
-                    基本信息
+                    {t('settings.profile.basicInfo.title')}
                   </CardTitle>
                   <CardDescription className="text-base">
-                    管理您的个人资料信息
+                    {t('settings.profile.basicInfo.description')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -472,10 +472,10 @@ export default function SettingsPage() {
                           name="name"
                           render={({ field }) => (
                             <FormItem className="space-y-3">
-                              <FormLabel className="text-sm font-medium text-foreground">用户名</FormLabel>
+                              <FormLabel className="text-sm font-medium text-foreground">{t('settings.profile.fields.username')}</FormLabel>
                               <FormControl>
                                 <Input 
-                                  placeholder="请输入用户名" 
+                                  placeholder={t('settings.profile.placeholders.username')} 
                                   className="h-11 border-2 focus:border-primary transition-colors" 
                                   {...field} 
                                 />
@@ -489,10 +489,10 @@ export default function SettingsPage() {
                           name="email"
                           render={({ field }) => (
                             <FormItem className="space-y-3">
-                              <FormLabel className="text-sm font-medium text-foreground">邮箱地址</FormLabel>
+                              <FormLabel className="text-sm font-medium text-foreground">{t('settings.profile.fields.email')}</FormLabel>
                               <FormControl>
                                 <Input 
-                                  placeholder="请输入邮箱地址" 
+                                  placeholder={t('settings.profile.placeholders.email')} 
                                   className="h-11 border-2 focus:border-primary transition-colors" 
                                   {...field} 
                                 />
@@ -511,12 +511,12 @@ export default function SettingsPage() {
                           {loading ? (
                             <>
                               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              保存中...
+                              {t('settings.profile.saving')}
                             </>
                           ) : (
                             <>
                               <Save className="w-4 h-4 mr-2" />
-                              保存更改
+                              {t('settings.profile.saveChanges')}
                             </>
                           )}
                         </Button>
@@ -533,8 +533,8 @@ export default function SettingsPage() {
         return (
           <div className="space-y-6">
             <div className="pb-6 border-b">
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent mb-3">安全设置</h2>
-              <p className="text-lg text-muted-foreground">管理您的账户安全和密码设置</p>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent mb-3">{t('settings.security.title')}</h2>
+              <p className="text-lg text-muted-foreground">{t('settings.security.description')}</p>
             </div>
 
             <div className="max-w-3xl">
@@ -542,10 +542,10 @@ export default function SettingsPage() {
                 <CardHeader className="pb-6">
                   <CardTitle className="text-xl font-semibold flex items-center gap-2">
                     <Shield className="w-5 h-5 text-primary" />
-                    修改密码
+                    {t('settings.security.changePassword.title')}
                   </CardTitle>
                   <CardDescription className="text-base mt-2">
-                    定期更改密码有助于保护您的账户安全。请确保使用强密码。
+                    {t('settings.security.changePassword.description')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -557,11 +557,11 @@ export default function SettingsPage() {
                           name="currentPassword"
                           render={({ field }) => (
                             <FormItem className="space-y-3">
-                              <FormLabel className="text-sm font-medium text-foreground">当前密码</FormLabel>
+                              <FormLabel className="text-sm font-medium text-foreground">{t('settings.security.fields.currentPassword')}</FormLabel>
                               <FormControl>
                                 <Input 
                                   type="password" 
-                                  placeholder="请输入当前密码" 
+                                  placeholder={t('settings.security.placeholders.currentPassword')} 
                                   className="h-11 border-2 focus:border-primary transition-colors" 
                                   {...field} 
                                 />
@@ -577,17 +577,17 @@ export default function SettingsPage() {
                             name="newPassword"
                             render={({ field }) => (
                               <FormItem className="space-y-3">
-                                <FormLabel className="text-sm font-medium text-foreground">新密码</FormLabel>
+                                <FormLabel className="text-sm font-medium text-foreground">{t('settings.security.fields.newPassword')}</FormLabel>
                                 <FormControl>
                                   <Input 
                                     type="password" 
-                                    placeholder="请输入新密码" 
+                                    placeholder={t('settings.security.placeholders.newPassword')} 
                                     className="h-11 border-2 focus:border-primary transition-colors" 
                                     {...field} 
                                   />
                                 </FormControl>
                                 <FormDescription className="text-xs text-muted-foreground">
-                                  密码必须至少8个字符，包含大小写字母和数字
+                                  {t('settings.security.passwordRequirements')}
                                 </FormDescription>
                                 <FormMessage />
                               </FormItem>
@@ -598,11 +598,11 @@ export default function SettingsPage() {
                             name="confirmPassword"
                             render={({ field }) => (
                               <FormItem className="space-y-3">
-                                <FormLabel className="text-sm font-medium text-foreground">确认新密码</FormLabel>
+                                <FormLabel className="text-sm font-medium text-foreground">{t('settings.security.fields.confirmPassword')}</FormLabel>
                                 <FormControl>
                                   <Input 
                                     type="password" 
-                                    placeholder="请再次输入新密码" 
+                                    placeholder={t('settings.security.placeholders.confirmPassword')} 
                                     className="h-11 border-2 focus:border-primary transition-colors" 
                                     {...field} 
                                   />
@@ -623,12 +623,12 @@ export default function SettingsPage() {
                           {loading ? (
                             <>
                               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              更新中...
+                              {t('settings.security.updating')}
                             </>
                           ) : (
                             <>
                               <Save className="w-4 h-4 mr-2" />
-                              更新密码
+                              {t('settings.security.updatePassword')}
                             </>
                           )}
                         </Button>
@@ -645,18 +645,18 @@ export default function SettingsPage() {
         return (
           <div className="space-y-6">
             <div className="pb-6 border-b">
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent mb-3">偏好设置</h2>
-              <p className="text-lg text-muted-foreground">自定义您的应用体验和通知偏好</p>
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent mb-3">{t('settings.preferences.title')}</h2>
+              <p className="text-lg text-muted-foreground">{t('settings.preferences.description')}</p>
             </div>
             <div className="max-w-3xl">
               <Card className="border-0 shadow-lg">
                 <CardHeader className="pb-6">
                   <CardTitle className="text-xl font-semibold flex items-center gap-2">
                     <Settings className="w-5 h-5 text-primary" />
-                    应用设置
+                    {t('settings.preferences.appSettings.title')}
                   </CardTitle>
                   <CardDescription className="text-base mt-2">
-                    管理您的应用偏好设置和通知选项
+                    {t('settings.preferences.appSettings.description')}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -665,10 +665,10 @@ export default function SettingsPage() {
                       <div className="space-y-1">
                         <Label className="text-base font-medium cursor-pointer flex items-center gap-2">
                           <Mail className="w-4 h-4" />
-                          邮件通知
+                          {t('settings.preferences.notifications.email.title')}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          接收重要更新和通知邮件
+                          {t('settings.preferences.notifications.email.description')}
                         </p>
                       </div>
                       <Switch 
@@ -682,10 +682,10 @@ export default function SettingsPage() {
                       <div className="space-y-1">
                         <Label className="text-base font-medium cursor-pointer flex items-center gap-2">
                           <Bell className="w-4 h-4" />
-                          桌面通知
+                          {t('settings.preferences.notifications.desktop.title')}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          在桌面显示实时通知
+                          {t('settings.preferences.notifications.desktop.description')}
                         </p>
                       </div>
                       <Switch 
@@ -699,10 +699,10 @@ export default function SettingsPage() {
                       <div className="space-y-1">
                         <Label className="text-base font-medium cursor-pointer flex items-center gap-2">
                           <Save className="w-4 h-4" />
-                          自动保存
+                          {t('settings.preferences.autoSave.title')}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          自动保存您的工作进度
+                          {t('settings.preferences.autoSave.description')}
                         </p>
                       </div>
                       <Switch 
@@ -717,10 +717,10 @@ export default function SettingsPage() {
                       <div className="space-y-1">
                         <Label className="text-base font-medium cursor-pointer flex items-center gap-2">
                           <Globe className="w-4 h-4" />
-                          界面语言
+                          {t('settings.preferences.language.title')}
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          选择您的首选界面语言
+                          {t('settings.preferences.language.description')}
                         </p>
                       </div>
                       <Select
@@ -728,7 +728,7 @@ export default function SettingsPage() {
                         onValueChange={(value) => handleSettingChange('language', value)}
                       >
                         <SelectTrigger className="w-40">
-                          <SelectValue placeholder="选择语言" />
+                          <SelectValue placeholder={t('settings.preferences.language.placeholder')} />
                         </SelectTrigger>
                         <SelectContent>
                           {languages.map((lang) => (
@@ -747,7 +747,7 @@ export default function SettingsPage() {
                   <div className="pt-4 border-t">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Settings className="w-4 h-4" />
-                      <span>设置将自动保存</span>
+                      <span>{t('settings.preferences.autoSaveHint')}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -776,8 +776,8 @@ export default function SettingsPage() {
         <div className="w-64 border-r bg-background/95 backdrop-blur-sm min-h-screen">
           <div className="p-6">
             <div className="space-y-2">
-              <h2 className="text-lg font-semibold">设置</h2>
-              <p className="text-sm text-muted-foreground">管理您的账户和偏好</p>
+              <h2 className="text-lg font-semibold">{t('settings.ui.sidebar.title')}</h2>
+              <p className="text-sm text-muted-foreground">{t('settings.ui.sidebar.description')}</p>
             </div>
           </div>
           <nav className="space-y-2 px-4">
@@ -810,11 +810,11 @@ export default function SettingsPage() {
                 className="gap-2 hover:bg-muted/50 transition-all duration-200"
               >
                 <ArrowLeft className="w-4 h-4" />
-                返回
+                {t('settings.ui.back')}
               </Button>
               <Separator orientation="vertical" className="h-6" />
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">设置</h1>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">{t('settings.ui.title')}</h1>
               </div>
             </div>
           </div>
@@ -825,7 +825,7 @@ export default function SettingsPage() {
               <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                  <p className="text-sm text-muted-foreground">更新中...</p>
+                  <p className="text-sm text-muted-foreground">{t('settings.ui.loading')}</p>
                 </div>
               </div>
             )}

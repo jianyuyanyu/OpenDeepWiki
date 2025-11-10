@@ -126,7 +126,7 @@ export const HomePage = () => {
               {t('home.repository_card.recommended')}
             </Badge>
             <Badge variant="outline" className="cursor-pointer hover:bg-secondary/80">
-              最近更新
+              {t('home.repository_card.recently_updated')}
             </Badge>
             <Badge variant="outline" className="cursor-pointer hover:bg-secondary/80">
               {t('home.repository_card.status.processing')}

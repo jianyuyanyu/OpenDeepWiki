@@ -1,6 +1,7 @@
 // 搜索栏组件
 
 import { useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Search, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -22,6 +23,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   className,
   size = 'default'
 }) => {
+  const { t } = useTranslation()
   const [internalValue, setInternalValue] = useState(propValue)
   const value = propValue || internalValue
 
@@ -97,7 +99,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         size={size}
         className="ml-2"
       >
-        搜索
+        {t('common.search')}
       </Button>
     </div>
   )

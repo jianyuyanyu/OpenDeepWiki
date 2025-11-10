@@ -1,5 +1,7 @@
 // 日期处理工具函数
 
+import i18n from '@/i18n'
+
 export function formatDistanceToNow(date: string | Date): string {
   const now = new Date()
   const past = new Date(date)
@@ -12,18 +14,20 @@ export function formatDistanceToNow(date: string | Date): string {
   const months = Math.floor(days / 30)
   const years = Math.floor(days / 365)
   
+  const t = i18n.t.bind(i18n)
+  
   if (years > 0) {
-    return `${years}年前`
+    return t('common.time.yearsAgo', { count: years })
   } else if (months > 0) {
-    return `${months}个月前`
+    return t('common.time.monthsAgo', { count: months })
   } else if (days > 0) {
-    return `${days}天前`
+    return t('common.time.daysAgo', { count: days })
   } else if (hours > 0) {
-    return `${hours}小时前`
+    return t('common.time.hoursAgo', { count: hours })
   } else if (minutes > 0) {
-    return `${minutes}分钟前`
+    return t('common.time.minutesAgo', { count: minutes })
   } else {
-    return '刚刚'
+    return t('common.time.justNow')
   }
 }
 

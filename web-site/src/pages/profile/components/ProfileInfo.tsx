@@ -1,6 +1,7 @@
 // 用户个人资料信息组件
 import { useState, useRef } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,7 +28,8 @@ import {
 import { userService } from '@/services/userService'
 
 export const ProfileInfo: React.FC = () => {
-  const { user, } = useAuth()
+  const { user } = useAuth()
+  const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [isEditing, setIsEditing] = useState(false)
@@ -58,11 +60,10 @@ export const ProfileInfo: React.FC = () => {
     setLoading(true)
     try {
       await userService.updateProfile(formData)
-      // await refreshUser()
       setIsEditing(false)
-      sonnerToast.success('保存成功', { description: '您的个人资料已更新' })
+      sonnerToast.success(t('profile.info.saveSuccess'), { description: t('profile.info.saveProfileInfo') })
     } catch (error: any) {
-      sonnerToast.error('保存失败', { description: error.message || '更新个人资料时出错' })
+      sonnerToast.error(t('profile.info.saveFailed'), { description: error.message || '' })
     } finally {
       setLoading(false)
     }
@@ -89,13 +90,13 @@ export const ProfileInfo: React.FC = () => {
     // 验证文件类型
     const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
     if (!validTypes.includes(file.type)) {
-      sonnerToast.error('文件类型错误', { description: '请上传 JPG、PNG、GIF 或 WebP 格式的图片' })
+      sonnerToast.error(t('profile.info.uploadFileTypeError'), { description: t('profile.info.uploadFileTypeErrorDesc') })
       return
     }
 
     // 验证文件大小（5MB）
     if (file.size > 5 * 1024 * 1024) {
-      sonnerToast.error('文件太大', { description: '图片大小不能超过 5MB' })
+      sonnerToast.error(t('profile.info.uploadFileSizeError'), { description: t('profile.info.uploadFileSizeErrorDesc') })
       return
     }
 
@@ -106,9 +107,9 @@ export const ProfileInfo: React.FC = () => {
 
       await userService.uploadAvatar(formData)
 
-      sonnerToast.success('上传成功', { description: '头像已更新' })
+      sonnerToast.success(t('profile.info.uploadSuccess'), { description: '' })
     } catch (error: any) {
-      sonnerToast.error('上传失败', { description: error.message || '上传头像时出错' })
+      sonnerToast.error(t('profile.info.uploadFailed'), { description: error.message || '' })
     } finally {
       setUploadingAvatar(false)
       if (fileInputRef.current) {
@@ -122,9 +123,9 @@ export const ProfileInfo: React.FC = () => {
     try {
       await userService.deleteAvatar()
       setShowDeleteDialog(false)
-      sonnerToast.success('删除成功', { description: '头像已删除' })
+      sonnerToast.success(t('profile.info.deleteSuccess'), { description: '' })
     } catch (error: any) {
-      sonnerToast.error('删除失败', { description: error.message || '删除头像时出错' })
+      sonnerToast.error(t('profile.info.deleteFailed'), { description: error.message || '' })
     }
   }
 
@@ -185,7 +186,7 @@ export const ProfileInfo: React.FC = () => {
         {!isEditing && (
           <Button onClick={() => setIsEditing(true)} variant="outline">
             <Edit className="h-4 w-4 mr-2" />
-            编辑资料
+            {t('profile.info.editProfile')}
           </Button>
         )}
       </div>
@@ -194,70 +195,70 @@ export const ProfileInfo: React.FC = () => {
       <div className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="username">用户名</Label>
+            <Label htmlFor="username">{t('profile.info.username')}</Label>
             <Input
               id="username"
               value={formData.username}
               onChange={(e) => handleInputChange('username', e.target.value)}
               disabled={!isEditing}
-              placeholder="请输入用户名"
+              placeholder={t('profile.info.username')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">邮箱</Label>
+            <Label htmlFor="email">{t('profile.info.email')}</Label>
             <Input
               id="email"
               type="email"
               value={formData.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
               disabled={!isEditing}
-              placeholder="请输入邮箱"
+              placeholder={t('profile.info.email')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="location">位置</Label>
+            <Label htmlFor="location">{t('profile.info.location')}</Label>
             <Input
               id="location"
               value={formData.location}
               onChange={(e) => handleInputChange('location', e.target.value)}
               disabled={!isEditing}
-              placeholder="例如: 北京, 中国"
+              placeholder={t('profile.info.locationPlaceholder')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="company">公司</Label>
+            <Label htmlFor="company">{t('profile.info.company')}</Label>
             <Input
               id="company"
               value={formData.company}
               onChange={(e) => handleInputChange('company', e.target.value)}
               disabled={!isEditing}
-              placeholder="您所在的公司"
+              placeholder={t('profile.info.companyPlaceholder')}
             />
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="website">个人网站</Label>
+            <Label htmlFor="website">{t('profile.info.website')}</Label>
             <Input
               id="website"
               type="url"
               value={formData.website}
               onChange={(e) => handleInputChange('website', e.target.value)}
               disabled={!isEditing}
-              placeholder="https://example.com"
+              placeholder={t('profile.info.websitePlaceholder')}
             />
           </div>
 
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="bio">个人简介</Label>
+            <Label htmlFor="bio">{t('profile.info.bio')}</Label>
             <Textarea
               id="bio"
               value={formData.bio}
               onChange={(e) => handleInputChange('bio', e.target.value)}
               disabled={!isEditing}
-              placeholder="介绍一下您自己..."
+              placeholder={t('profile.info.bioPlaceholder')}
               rows={4}
               className="resize-none"
             />
@@ -273,7 +274,7 @@ export const ProfileInfo: React.FC = () => {
               disabled={loading}
             >
               <X className="h-4 w-4 mr-2" />
-              取消
+              {t('profile.info.cancel')}
             </Button>
             <Button
               onClick={handleSave}
@@ -282,12 +283,12 @@ export const ProfileInfo: React.FC = () => {
               {loading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  保存中...
+                  {t('profile.info.saving')}
                 </>
               ) : (
                 <>
                   <Save className="h-4 w-4 mr-2" />
-                  保存更改
+                  {t('profile.info.saveChanges')}
                 </>
               )}
             </Button>
@@ -299,15 +300,15 @@ export const ProfileInfo: React.FC = () => {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除头像</AlertDialogTitle>
+            <AlertDialogTitle>{t('profile.info.confirmDeleteAvatar')}</AlertDialogTitle>
             <AlertDialogDescription>
-              您确定要删除当前头像吗？删除后将使用默认头像。
+              {t('profile.info.deleteAvatarDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{t('profile.info.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteAvatar}>
-              确认删除
+              {t('common.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -315,3 +316,5 @@ export const ProfileInfo: React.FC = () => {
     </div>
   )
 }
+
+export default ProfileInfo

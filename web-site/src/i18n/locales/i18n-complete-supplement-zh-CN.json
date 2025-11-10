@@ -55,6 +55,126 @@
         "pleaseSelectUsers": "请选择要删除的用户"
       }
     },
+    "settings": {
+      "profile": {
+        "title": "个人信息",
+        "description": "管理您的个人资料信息，包括用户名、邮箱和头像。",
+        "loadUserInfoFailed": "加载用户信息失败，请重新登录。",
+        "loadUserInfoError": "加载用户信息时发生错误。",
+        "updateSuccess": "个人信息更新成功！",
+        "updateFailed": "个人信息更新失败。",
+        "updateError": "更新个人信息时发生错误。",
+        "saving": "保存中...",
+        "saveChanges": "保存更改",
+        "verified": "已验证邮箱",
+        "fields": {
+          "username": "用户名",
+          "email": "邮箱"
+        },
+        "placeholders": {
+          "username": "请输入用户名",
+          "email": "请输入邮箱地址"
+        },
+        "basicInfo": {
+          "title": "基本信息",
+          "description": "请填写您的用户名和邮箱。"
+        },
+        "validation": {
+          "username_min": "用户名至少2个字符",
+          "email_invalid": "邮箱格式不正确"
+        }
+      },
+      "security": {
+        "title": "安全设置",
+        "description": "修改您的账户密码，保障账户安全。",
+        "changePassword": {
+          "title": "修改密码",
+          "description": "请填写当前密码和新密码以完成修改。"
+        },
+        "fields": {
+          "currentPassword": "当前密码",
+          "newPassword": "新密码",
+          "confirmPassword": "确认新密码"
+        },
+        "placeholders": {
+          "currentPassword": "请输入当前密码",
+          "newPassword": "请输入新密码",
+          "confirmPassword": "请再次输入新密码"
+        },
+        "passwordRequirements": "密码需至少8位，包含大写字母、小写字母和数字。",
+        "validation": {
+          "current_password_required": "请输入当前密码",
+          "new_password_min": "新密码至少8位",
+          "new_password_pattern": "新密码需包含大写字母、小写字母和数字",
+          "passwords_not_match": "两次输入的新密码不一致"
+        },
+        "currentPasswordIncorrect": "当前密码不正确",
+        "changeSuccess": "密码修改成功！",
+        "changeFailed": "密码修改失败。",
+        "changeError": "修改密码时发生错误。",
+        "updating": "更新中...",
+        "updatePassword": "更新密码"
+      },
+      "preferences": {
+        "title": "偏好设置",
+        "description": "自定义您的通知、自动保存和语言等应用偏好。",
+        "appSettings": {
+          "title": "应用设置",
+          "description": "调整通知、自动保存和语言等设置。"
+        },
+        "notifications": {
+          "email": {
+            "title": "邮件通知",
+            "description": "开启后将通过邮箱接收通知。"
+          },
+          "desktop": {
+            "title": "桌面通知",
+            "description": "开启后将在桌面弹窗显示通知。"
+          }
+        },
+        "autoSave": {
+          "title": "自动保存",
+          "description": "编辑内容时自动保存，无需手动操作。"
+        },
+        "autoSaveHint": "自动保存功能已启用，编辑内容将自动保存。",
+        "language": {
+          "title": "界面语言",
+          "description": "选择您习惯的界面语言。",
+          "placeholder": "请选择语言"
+        }
+      },
+      "ui": {
+        "sidebar": {
+          "title": "设置菜单",
+          "description": "选择左侧菜单进行相关设置。"
+        },
+        "menu": {
+          "profile": "个人信息",
+          "security": "安全设置",
+          "preferences": "偏好设置"
+        },
+        "back": "返回首页",
+        "title": "用户设置",
+        "loading": "正在加载..."
+      },
+      "avatar": {
+        "uploadHint": "支持 JPG/PNG/GIF 格式，大小不超过2MB。",
+        "uploadFormatError": "仅支持 JPG/PNG/GIF 格式图片。",
+        "uploadSizeError": "图片大小不能超过2MB。",
+        "uploadSuccess": "头像上传成功！",
+        "uploadFailed": "头像上传失败。",
+        "uploadError": "上传头像时发生错误。",
+        "removeSuccess": "头像已移除。",
+        "removeFailed": "移除头像失败。",
+        "removeError": "移除头像时发生错误。",
+        "confirmDelete": {
+          "title": "确认移除头像",
+          "description": "确定要移除当前头像吗？",
+          "cancel": "取消",
+          "confirm": "确认移除"
+        }
+      }
+    },
     "repositories": {
       "batchActions": "批量操作",
       "repositoryList": "仓库列表",

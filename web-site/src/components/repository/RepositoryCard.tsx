@@ -7,24 +7,38 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Star, GitBranch, Calendar, AlertCircle } from 'lucide-react'
 import { WarehouseStatus, type RepositoryInfo } from '@/types/repository'
 import { formatDistanceToNow } from '@/utils/date'
+import { useTranslation } from 'react-i18next'
+
+const getStatusVariant = (status: WarehouseStatus): 'default' | 'secondary' | 'success' | 'destructive' => {
+  switch (status) {
+    case WarehouseStatus.Pending:
+      return 'secondary'
+    case WarehouseStatus.Processing:
+      return 'default'
+    case WarehouseStatus.Completed:
+      return 'success'
+    case WarehouseStatus.Failed:
+    case WarehouseStatus.Canceled:
+    case WarehouseStatus.Unauthorized:
+      return 'destructive'
+    default:
+      return 'secondary'
+  }
+}
 
 interface RepositoryCardProps {
   repository: RepositoryInfo
   onClick?: (repository: RepositoryInfo) => void
 }
 
-const statusConfig: Record<WarehouseStatus, { label: string; variant: 'default' | 'secondary' | 'success' | 'destructive' }> = {
-  [WarehouseStatus.Pending]: { label: '待处理', variant: 'secondary' },
-  [WarehouseStatus.Processing]: { label: '处理中', variant: 'default' },
-  [WarehouseStatus.Completed]: { label: '已完成', variant: 'success' },
-  [WarehouseStatus.Failed]: { label: '失败', variant: 'destructive' },
-  [WarehouseStatus.Canceled]: { label: '已取消', variant: 'destructive' },
-  [WarehouseStatus.Unauthorized]: { label: '未授权', variant: 'destructive' },
-}
-
 export const RepositoryCard: React.FC<RepositoryCardProps> = React.memo(({ repository, onClick }) => {
+  const { t } = useTranslation()
+
   // 缓存状态信息
-  const statusInfo = useMemo(() => statusConfig[repository.status], [repository.status])
+  const statusInfo = useMemo(() => ({
+    label: t(`home.repository_card.status.${repository.status}`),
+    variant: getStatusVariant(repository.status)
+  }), [repository.status, t])
 
   // 缓存头像显示文本
   const avatarText = useMemo(() =>
@@ -65,7 +79,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = React.memo(({ repos
           </div>
           {repository.isRecommended && (
             <Badge variant="secondary" className="ml-2">
-              推荐
+              {t('home.repository_card.recommended')}
             </Badge>
           )}
         </div>
@@ -73,7 +87,7 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = React.memo(({ repos
       
       <CardContent className="flex-1 pb-3">
         <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-          {repository.description || '暂无描述'}
+          {repository.description || t('repository.layout.no_description')}
         </p>
         
         <div className="flex items-center gap-2 flex-wrap">

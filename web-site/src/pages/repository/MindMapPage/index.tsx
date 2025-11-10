@@ -416,7 +416,7 @@ export default function MindMapPage({ className }: { className?: string }) {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>刷新</p>
+                  <p>{t('repository.mindMap.refresh')}</p>
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -431,7 +431,7 @@ export default function MindMapPage({ className }: { className?: string }) {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>导出图片</p>
+                  <p>{t('repository.mindMap.exportImage')}</p>
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -446,7 +446,7 @@ export default function MindMapPage({ className }: { className?: string }) {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{isFullscreen ? "退出全屏" : "全屏"}</p>
+                  <p>{isFullscreen ? t('repository.mindMap.fullscreenExit') : t('repository.mindMap.fullscreenEnter')}</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -490,7 +490,7 @@ export default function MindMapPage({ className }: { className?: string }) {
           />
 
           <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-2 rounded text-xs z-[1000]">
-            鼠标左键拖动 • 滚轮缩放 • 双击节点查看详情 • 右键菜单编辑
+            {t('repository.mindMap.helpText')}
           </div>
         </CardContent>
       </Card>

@@ -1,5 +1,6 @@
 // 应用管理组件
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -54,6 +55,8 @@ import { appConfigService } from '@/services/appConfigService'
 import type { AppConfigOutput, AppConfigInput } from '@/types'
 
 export const AppManagement: React.FC = () => {
+  const { t } = useTranslation()
+
   const toast = (opts: { title: string; description?: string; variant?: 'destructive' | string }) => {
     if (opts.variant === 'destructive') {
       sonnerToast.error(opts.title, { description: opts.description })
@@ -61,6 +64,7 @@ export const AppManagement: React.FC = () => {
       sonnerToast.success(opts.title, { description: opts.description })
     }
   }
+
   const [apps, setApps] = useState<AppConfigOutput[]>([])
   const [loading, setLoading] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -87,19 +91,18 @@ export const AppManagement: React.FC = () => {
   const loadApps = async () => {
     setLoading(true)
     try {
-      const data = await appConfigService.getAppConfigs()
+      const {data} = await appConfigService.getAppConfigs()
       setApps(data)
     } catch (error: any) {
       toast({
-        title: '加载失败',
-        description: error.message || '无法加载应用列表',
+        title: t('profile.apps.loadFailed'),
+        description: error.message || t('profile.apps.loadFailedDesc'),
         variant: 'destructive',
       })
     } finally {
       setLoading(false)
     }
   }
-
 
   useEffect(() => {
     loadApps()
@@ -199,22 +202,22 @@ export const AppManagement: React.FC = () => {
       if (selectedApp) {
         await appConfigService.updateAppConfig(selectedApp.appId, formData)
         toast({
-          title: '更新成功',
-          description: '应用配置已更新',
+          title: t('profile.apps.updateSuccess'),
+          description: '',
         })
       } else {
         await appConfigService.createAppConfig(formData)
         toast({
-          title: '创建成功',
-          description: '应用已创建',
+          title: t('profile.apps.createSuccess'),
+          description: '',
         })
       }
       setDialogOpen(false)
       loadApps()
     } catch (error: any) {
       toast({
-        title: '操作失败',
-        description: error.message || '保存应用配置时出错',
+        title: t('profile.apps.operationFailed'),
+        description: error.message || '',
         variant: 'destructive',
       })
     }
@@ -227,15 +230,15 @@ export const AppManagement: React.FC = () => {
     try {
       await appConfigService.deleteAppConfig(selectedApp.appId)
       toast({
-        title: '删除成功',
-        description: '应用已删除',
+        title: t('profile.apps.deleteSuccess'),
+        description: '',
       })
       setDeleteDialogOpen(false)
       loadApps()
     } catch (error: any) {
       toast({
-        title: '删除失败',
-        description: error.message || '删除应用时出错',
+        title: t('profile.apps.deleteFailed'),
+        description: error.message || '',
         variant: 'destructive',
       })
     }
@@ -247,13 +250,13 @@ export const AppManagement: React.FC = () => {
       await appConfigService.toggleAppConfig(appId)
       loadApps()
       toast({
-        title: '状态已更新',
-        description: '应用状态已切换',
+        title: t('profile.apps.toggleStatusSuccess'),
+        description: '',
       })
     } catch (error: any) {
       toast({
-        title: '操作失败',
-        description: error.message || '切换状态时出错',
+        title: t('profile.apps.toggleStatusFailed'),
+        description: error.message || '',
         variant: 'destructive',
       })
     }
@@ -263,8 +266,8 @@ export const AppManagement: React.FC = () => {
   const copyAppId = (appId: string) => {
     navigator.clipboard.writeText(appId)
     toast({
-      title: '复制成功',
-      description: '应用ID已复制到剪贴板',
+      title: t('profile.apps.copySuccess'),
+      description: '',
     })
   }
 
@@ -281,14 +284,14 @@ export const AppManagement: React.FC = () => {
       {/* 头部 */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">我的应用</h3>
+          <h3 className="text-lg font-semibold">{t('profile.apps.title')}</h3>
           <p className="text-sm text-muted-foreground">
-            管理您创建的应用配置
+            {t('profile.apps.description')}
           </p>
         </div>
         <Button onClick={() => openDialog()}>
           <Plus className="h-4 w-4 mr-2" />
-          创建应用
+          {t('profile.apps.createApp')}
         </Button>
       </div>
 
@@ -298,9 +301,9 @@ export const AppManagement: React.FC = () => {
           <div className="flex flex-col items-center space-y-4">
             <Settings className="h-12 w-12 text-muted-foreground" />
             <div>
-              <h3 className="text-lg font-semibold">暂无应用</h3>
+              <h3 className="text-lg font-semibold">{t('profile.apps.noApps')}</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                点击"创建应用"按钮创建您的第一个应用
+                {t('profile.apps.noAppsDesc')}
               </p>
             </div>
           </div>
@@ -318,7 +321,7 @@ export const AppManagement: React.FC = () => {
                     </CardDescription>
                   </div>
                   <Badge variant={app.isEnabled ? 'default' : 'secondary'}>
-                    {app.isEnabled ? '启用' : '禁用'}
+                    {app.isEnabled ? t('profile.apps.enabled') : t('profile.apps.disabled')}
                   </Badge>
                 </div>
               </CardHeader>
@@ -341,7 +344,7 @@ export const AppManagement: React.FC = () => {
                   <div className="flex items-center space-x-2 text-sm">
                     <Globe className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">
-                      {app.allowedDomains.length} 个允许的域名
+                      {t('profile.apps.allowedDomainsCount', { count: app.allowedDomains.length })}
                     </span>
                   </div>
                 )}
@@ -354,7 +357,7 @@ export const AppManagement: React.FC = () => {
 
                 {app.lastUsedAt && (
                   <p className="text-xs text-muted-foreground">
-                    最后使用: {new Date(app.lastUsedAt).toLocaleDateString('zh-CN')}
+                    {t('profile.apps.lastUsed')}: {new Date(app.lastUsedAt).toLocaleDateString('zh-CN')}
                   </p>
                 )}
               </CardContent>
@@ -366,7 +369,7 @@ export const AppManagement: React.FC = () => {
                     onClick={() => openDialog(app)}
                   >
                     <Edit className="h-3 w-3 mr-1" />
-                    编辑
+                    {t('profile.apps.edit')}
                   </Button>
                   <Button
                     size="sm"
@@ -377,7 +380,7 @@ export const AppManagement: React.FC = () => {
                     }}
                   >
                     <Trash2 className="h-3 w-3 mr-1" />
-                    删除
+                    {t('profile.apps.delete')}
                   </Button>
                 </div>
                 <Switch
@@ -395,24 +398,24 @@ export const AppManagement: React.FC = () => {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {selectedApp ? '编辑应用' : '创建新应用'}
+              {selectedApp ? t('profile.apps.createApplicationDialog.editTitle') : t('profile.apps.createApplicationDialog.title')}
             </DialogTitle>
             <DialogDescription>
-              配置应用的基本信息和访问权限
+              {selectedApp ? t('profile.apps.createApplicationDialog.editTitle') : ''}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             {/* 基础信息 */}
             <div className="space-y-2">
-              <Label htmlFor="appId">应用ID</Label>
+              <Label htmlFor="appId">{t('profile.apps.appId')}</Label>
               <div className="flex space-x-2">
                 <Input
                   id="appId"
                   value={formData.appId}
                   onChange={(e) => handleInputChange('appId', e.target.value)}
                   disabled={!!selectedApp}
-                  placeholder="应用唯一标识"
+                  placeholder={t('profile.apps.appId')}
                 />
                 {!selectedApp && (
                   <Button
@@ -420,64 +423,64 @@ export const AppManagement: React.FC = () => {
                     variant="outline"
                     onClick={generateAppId}
                   >
-                    生成ID
+                    {t('profile.apps.generateId')}
                   </Button>
                 )}
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="name">应用名称</Label>
+              <Label htmlFor="name">{t('profile.apps.appName')}</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
-                placeholder="输入应用名称"
+                placeholder={t('profile.apps.appName')}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="organization">组织名称</Label>
+                <Label htmlFor="organization">{t('profile.apps.organization')}</Label>
                 <Input
                   id="organization"
                   value={formData.organizationName}
                   onChange={(e) => handleInputChange('organizationName', e.target.value)}
-                  placeholder="输入组织名称"
+                  placeholder={t('profile.apps.organization')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="repository">仓库名称</Label>
+                <Label htmlFor="repository">{t('profile.apps.repository')}</Label>
                 <Input
                   id="repository"
                   value={formData.repositoryName}
                   onChange={(e) => handleInputChange('repositoryName', e.target.value)}
-                  placeholder="输入仓库名称"
+                  placeholder={t('profile.apps.repository')}
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">应用描述</Label>
+              <Label htmlFor="description">{t('profile.apps.description')}</Label>
               <Textarea
                 id="description"
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
-                placeholder="描述应用的用途..."
+                placeholder={t('profile.apps.descriptionPlaceholder')}
                 rows={3}
               />
             </div>
 
             {/* AI配置 */}
             <div className="space-y-2">
-              <Label htmlFor="model">AI模型</Label>
+              <Label htmlFor="model">{t('profile.apps.model')}</Label>
               <Select
                 value={formData.model}
                 onValueChange={(value) => handleInputChange('model', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="选择AI模型" />
+                  <SelectValue placeholder={t('profile.apps.selectModel')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
@@ -489,39 +492,39 @@ export const AppManagement: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="prompt">系统提示词</Label>
+              <Label htmlFor="prompt">{t('profile.apps.prompt')}</Label>
               <Textarea
                 id="prompt"
                 value={formData.prompt}
                 onChange={(e) => handleInputChange('prompt', e.target.value)}
-                placeholder="设置AI助手的系统提示词..."
+                placeholder={t('profile.apps.promptPlaceholder')}
                 rows={4}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="introduction">开场白</Label>
+              <Label htmlFor="introduction">{t('profile.apps.introduction')}</Label>
               <Textarea
                 id="introduction"
                 value={formData.introduction}
                 onChange={(e) => handleInputChange('introduction', e.target.value)}
-                placeholder="AI助手的开场白..."
+                placeholder={t('profile.apps.introductionPlaceholder')}
                 rows={3}
               />
             </div>
 
             {/* 推荐问题 */}
             <div className="space-y-2">
-              <Label>推荐问题</Label>
+              <Label>{t('profile.apps.recommendedQuestions')}</Label>
               <div className="flex space-x-2">
                 <Input
                   value={newQuestion}
                   onChange={(e) => setNewQuestion(e.target.value)}
-                  placeholder="添加推荐问题"
+                  placeholder={t('profile.apps.addQuestionPlaceholder')}
                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addQuestion())}
                 />
                 <Button type="button" variant="outline" onClick={addQuestion}>
-                  添加
+                  {t('common.add')}
                 </Button>
               </div>
               <div className="flex flex-wrap gap-2 mt-2">
@@ -543,9 +546,9 @@ export const AppManagement: React.FC = () => {
             <div className="space-y-4 p-4 border rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>域名验证</Label>
+                  <Label>{t('profile.apps.domainValidation')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    启用后，只有指定域名可以使用此应用
+                    {t('profile.apps.domainValidationDesc')}
                   </p>
                 </div>
                 <Switch
@@ -560,11 +563,11 @@ export const AppManagement: React.FC = () => {
                     <Input
                       value={newDomain}
                       onChange={(e) => setNewDomain(e.target.value)}
-                      placeholder="example.com"
+                      placeholder={t('profile.apps.domainPlaceholder')}
                       onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addDomain())}
                     />
                     <Button type="button" variant="outline" onClick={addDomain}>
-                      添加域名
+                      {t('profile.apps.addDomain')}
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -587,10 +590,10 @@ export const AppManagement: React.FC = () => {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button onClick={handleSave}>
-              {selectedApp ? '保存更改' : '创建应用'}
+              {selectedApp ? t('common.save') : t('profile.apps.createApp')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -600,15 +603,15 @@ export const AppManagement: React.FC = () => {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogTitle>{t('profile.apps.deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              您确定要删除应用 "{selectedApp?.name}" 吗？此操作无法撤销。
+              {t('profile.apps.deleteDialog.desc', { name: selectedApp?.name || '' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>
-              确认删除
+              {t('common.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -616,3 +619,5 @@ export const AppManagement: React.FC = () => {
     </div>
   )
 }
+
+export default AppManagement
