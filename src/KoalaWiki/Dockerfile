@@ -27,13 +27,10 @@ FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "./KoalaWiki.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS frontend-build
-WORKDIR /src
-# Install Node.js
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs
-# Copy web-site and build frontend
-COPY web-site ./web-site
-WORKDIR "/src/web-site"
+FROM node:22-bullseye AS frontend-build
+WORKDIR /app
+COPY web-site/ .
+WORKDIR "/app"
 RUN npm install
 RUN npm run build
 
@@ -41,5 +38,5 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 # Copy built frontend files to wwwroot
-COPY --from=frontend-build /src/src/KoalaWiki/wwwroot ./wwwroot
+COPY --from=frontend-build /app/static ./wwwroot
 ENTRYPOINT ["dotnet", "KoalaWiki.dll"]
