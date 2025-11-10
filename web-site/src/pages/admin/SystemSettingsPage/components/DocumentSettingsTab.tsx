@@ -35,7 +35,7 @@ const DocumentSettingsTab: React.FC<DocumentSettingsTabProps> = ({
   validationErrors,
   loading = false
 }) => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
 
   // 获取设置值的辅助函数
   const getSettingValue = (key: string) => {

@@ -40,7 +40,7 @@ const ThirdPartySettingsTab: React.FC<ThirdPartySettingsTabProps> = ({
   loading = false,
   group
 }) => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
 
   // 获取设置值的辅助函数
   const getSettingValue = (key: string) => {

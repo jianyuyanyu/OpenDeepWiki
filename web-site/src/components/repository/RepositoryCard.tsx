@@ -4,7 +4,7 @@ import React, { useCallback, useMemo } from 'react'
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Star, GitBranch, Calendar, AlertCircle } from 'lucide-react'
+import { Star, GitBranch, Calendar, AlertCircle, ChevronRight } from 'lucide-react'
 import { WarehouseStatus, type RepositoryInfo } from '@/types/repository'
 import { formatDistanceToNow } from '@/utils/date'
 import { useTranslation } from 'react-i18next'
@@ -59,74 +59,53 @@ export const RepositoryCard: React.FC<RepositoryCardProps> = React.memo(({ repos
 
   return (
     <Card
-      className="hover:shadow-lg transition-shadow cursor-pointer h-full flex flex-col"
+      className="hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col p-2 gap-2"
       onClick={handleClick}
     >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-10 w-10">
-              <AvatarFallback>{avatarText}</AvatarFallback>
-            </Avatar>
-            <div>
-              <h3 className="font-semibold text-lg line-clamp-1">
-                {repository.name}
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                {repository.organizationName}
-              </p>
-            </div>
-          </div>
-          {repository.isRecommended && (
-            <Badge variant="secondary" className="ml-2">
-              {t('home.repository_card.recommended')}
-            </Badge>
-          )}
+      <CardHeader className="pb-1 pt-1 px-2">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-base line-clamp-1">
+            <span className="mr-1">{repository.name}</span>/
+            <span className="ml-1 text-muted-foreground">{repository.organizationName}</span>
+          </h3>
         </div>
       </CardHeader>
-      
-      <CardContent className="flex-1 pb-3">
-        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+
+      <CardContent className="flex-1 pb-2 pt-1 px-2">
+        <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
           {repository.description || t('repository.layout.no_description')}
         </p>
-        
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge >
-            {statusInfo.label}
-          </Badge>
-          
-          {repository.branch && (
-            <div className="flex items-center text-xs text-muted-foreground">
-              <GitBranch className="h-3 w-3 mr-1" />
-              {repository.branch}
-            </div>
-          )}
-        </div>
-        
         {repository.error && (
-          <div className="mt-2 flex items-start text-xs text-destructive">
+          <div className="mt-1 flex items-start text-xs text-destructive">
             <AlertCircle className="h-3 w-3 mr-1 mt-0.5 flex-shrink-0" />
             <span className="line-clamp-2">{repository.error}</span>
           </div>
         )}
       </CardContent>
-      
-      <CardFooter className="pt-3 border-t">
-        <div className="flex items-center justify-between w-full text-sm text-muted-foreground">
-          <div className="flex items-center gap-4">
+
+      <CardFooter className="pt-2 border-t px-2 pb-1">
+        <div className="flex items-center justify-between w-full text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            {repository.branch && (
+              <div className="flex items-center text-xs text-muted-foreground">
+                <GitBranch className="h-3 w-3 mr-1" />
+                {repository.branch}
+              </div>
+            )}
             <div className="flex items-center">
-              <Star className="h-4 w-4 mr-1" />
-              <span>0</span>
+              <Star className="h-3 w-3 mr-1" />
+              <span>{repository?.stars}</span>
             </div>
             <div className="flex items-center">
-              <GitBranch className="h-4 w-4 mr-1" />
-              <span>0</span>
+              <GitBranch className="h-3 w-3 mr-1" />
+              <span>{repository?.forks}</span>
+            </div>
+            <div className="flex items-center gap-1 flex-wrap">
+              <Badge className="px-1 py-0 text-xs h-5">{statusInfo.label}</Badge>
             </div>
           </div>
-          
           <div className="flex items-center">
-            <Calendar className="h-4 w-4 mr-1" />
-            <span>{formattedTime}</span>
+            <ChevronRight className="h-3 w-3 ml-1" />
           </div>
         </div>
       </CardFooter>

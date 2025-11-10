@@ -40,7 +40,7 @@ import UserPasswordDialog from '@/components/admin/UserPasswordDialog'
 import BatchDeleteDialog from '@/components/admin/BatchDeleteDialog'
 
 const UsersPage: React.FC = () => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const [searchQuery, setSearchQuery] = useState('')
   const [users, setUsers] = useState<UserInfo[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,8 +69,8 @@ const UsersPage: React.FC = () => {
       setTotal(data.total || 0)
     } catch (error) {
       console.error('Failed to load users:', error)
-      toast.error(t('admin.users.load_failed'), {
-        description: t('admin.users.load_error')
+      toast.error(t('users.load_failed'), {
+        description: t('users.load_error')
       })
     } finally {
       setLoading(false)
@@ -134,18 +134,18 @@ const UsersPage: React.FC = () => {
   }
 
   const handleDeleteUser = async (id: string) => {
-    if (!confirm(t('admin.users.confirm_delete'))) return
+    if (!confirm(t('users.confirm_delete'))) return
 
     try {
       await userService.deleteUser(id)
-      toast.success(t('admin.users.delete_success'), {
-        description: t('admin.users.user_deleted')
+      toast.success(t('users.delete_success'), {
+        description: t('users.user_deleted')
       })
       loadUsers()
       setSelectedUserIds(prev => prev.filter(userId => userId !== id))
     } catch (error) {
-      toast.error(t('admin.users.delete_failed'), {
-        description: t('admin.users.delete_error')
+      toast.error(t('users.delete_failed'), {
+        description: t('users.delete_error')
       })
     }
   }
@@ -197,7 +197,7 @@ const UsersPage: React.FC = () => {
   // 处理批量删除
   const handleBatchDelete = () => {
     if (selectedUserIds.length === 0) {
-      toast.error(t('admin.users.select_users_to_delete'))
+      toast.error(t('users.select_users_to_delete'))
       return
     }
     setBatchDeleteDialogOpen(true)
@@ -232,8 +232,8 @@ const UsersPage: React.FC = () => {
       {/* 页面标题和操作 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t('admin.users.title')}</h1>
-          <p className="text-muted-foreground">{t('admin.users.subtitle')}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('users.title')}</h1>
+          <p className="text-muted-foreground">{t('users.subtitle')}</p>
         </div>
         <div className="flex space-x-2">
           {selectedUserIds.length > 0 && (
@@ -242,12 +242,12 @@ const UsersPage: React.FC = () => {
               onClick={handleBatchDelete}
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              {t('admin.users.delete_selected', { count: selectedUserIds.length })}
+              {t('users.delete_selected', { count: selectedUserIds.length })}
             </Button>
           )}
           <Button onClick={handleCreateUser}>
             <Plus className="mr-2 h-4 w-4" />
-            {t('admin.users.create')}
+            {t('users.create')}
           </Button>
         </div>
       </div>
@@ -255,15 +255,15 @@ const UsersPage: React.FC = () => {
       {/* 搜索和筛选 */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('admin.users.list_title')}</CardTitle>
-          <CardDescription>{t('admin.users.total_users', { count: total })}</CardDescription>
+          <CardTitle>{t('users.userList')}</CardTitle>
+          <CardDescription>{t('users.totalUsers', { count: total })}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center space-x-4 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder={t('admin.users.search_placeholder')}
+                placeholder={t('users.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -272,10 +272,10 @@ const UsersPage: React.FC = () => {
             <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-48">
                 <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder={t('admin.users.filters.filter_by_role')} />
+                <SelectValue placeholder={t('users.filters.filter_by_role')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t('admin.users.filters.all_roles')}</SelectItem>
+                <SelectItem value="all">{t('users.filters.all_roles')}</SelectItem>
                 {Array.isArray(roles) && roles.map((role) => (
                   <SelectItem key={role.id} value={role.name}>
                     {role.name}
@@ -288,7 +288,7 @@ const UsersPage: React.FC = () => {
                 variant="outline"
                 onClick={resetSelection}
               >
-                {t('admin.users.actions.cancel_selection')}
+                {t('users.actions.cancel_selection')}
               </Button>
             )}
           </div>
@@ -302,28 +302,28 @@ const UsersPage: React.FC = () => {
                     <Checkbox
                       checked={users.length > 0 && selectedUserIds.length === users.length}
                       onCheckedChange={handleSelectAll}
-                      aria-label={t('admin.users.actions.select_all')}
+                      aria-label={t('users.actions.select_all')}
                     />
                   </TableHead>
-                  <TableHead>{t('admin.users.table.username')}</TableHead>
-                  <TableHead>{t('admin.users.table.email')}</TableHead>
-                  <TableHead>{t('admin.users.table.role')}</TableHead>
-                  <TableHead>{t('admin.users.table.created_at')}</TableHead>
-                  <TableHead>{t('admin.users.table.updated_at')}</TableHead>
-                  <TableHead className="text-right">{t('admin.users.table.actions')}</TableHead>
+                  <TableHead>{t('users.table.username')}</TableHead>
+                  <TableHead>{t('users.table.email')}</TableHead>
+                  <TableHead>{t('users.table.role')}</TableHead>
+                  <TableHead>{t('users.table.created_at')}</TableHead>
+                  <TableHead>{t('users.table.updated_at')}</TableHead>
+                  <TableHead className="text-right">{t('users.table.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
-                      {t('admin.messages.loading')}
+                      {t('messages.loading')}
                     </TableCell>
                   </TableRow>
                 ) : filteredUsers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8">
-                      {t('admin.messages.no_data')}
+                      {t('messages.no_data')}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -336,7 +336,7 @@ const UsersPage: React.FC = () => {
                         <Checkbox
                           checked={selectedUserIds.includes(user.id)}
                           onCheckedChange={(checked) => handleSelectUser(user.id, checked as boolean)}
-                          aria-label={t('admin.users.select_user', { name: user.name })}
+                          aria-label={t('users.select_user', { name: user.name })}
                         />
                       </TableCell>
                       <TableCell>
@@ -356,24 +356,24 @@ const UsersPage: React.FC = () => {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">{t('admin.users.open_menu')}</span>
+                              <span className="sr-only">{t('users.open_menu')}</span>
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>{t('admin.users.actions_menu')}</DropdownMenuLabel>
+                            <DropdownMenuLabel>{t('users.actions_menu')}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleEditUser(user)}>
                               <Edit className="mr-2 h-4 w-4" />
-                              {t('admin.users.edit')}
+                              {t('users.edit')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleAssignRoles(user)}>
                               <UserPlus className="mr-2 h-4 w-4" />
-                              {t('admin.users.assign_roles')}
+                              {t('users.assign_roles')}
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleResetPassword(user)}>
                               <Key className="mr-2 h-4 w-4" />
-                              {t('admin.users.actions.reset_password')}
+                              {t('users.actions.reset_password')}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -381,7 +381,7 @@ const UsersPage: React.FC = () => {
                               onClick={() => handleDeleteUser(user.id)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
-                              {t('admin.users.delete')}
+                              {t('users.delete')}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -402,10 +402,10 @@ const UsersPage: React.FC = () => {
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
               >
-                {t('admin.users.pagination.previous')}
+                {t('users.pagination.previous')}
               </Button>
               <div className="text-sm text-muted-foreground">
-                {t('admin.users.pagination.page_info', {
+                {t('users.pagination.page_info', {
                   current: currentPage,
                   total: Math.ceil(total / pageSize)
                 })}
@@ -416,7 +416,7 @@ const UsersPage: React.FC = () => {
                 onClick={() => setCurrentPage(prev => prev + 1)}
                 disabled={currentPage >= Math.ceil(total / pageSize)}
               >
-                {t('admin.users.pagination.next')}
+                {t('users.pagination.next')}
               </Button>
             </div>
           )}

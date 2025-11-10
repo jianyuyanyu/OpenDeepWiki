@@ -23,6 +23,8 @@ export interface RepositoryInfo {
   isEmbedded: boolean
   isRecommended: boolean
   createdAt: string
+  stars:number
+  forks:number
 }
 
 export interface CreateGitRepositoryDto {

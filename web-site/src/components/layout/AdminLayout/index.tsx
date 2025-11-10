@@ -26,7 +26,7 @@ interface AdminLayoutProps {
 }
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const location = useLocation()
   const { isAuthenticated } = useAuth()
   const { canAccessAdmin } = usePermissions()
@@ -42,7 +42,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center space-y-4">
           <Shield className="h-16 w-16 text-muted-foreground mx-auto" />
-          <h1 className="text-2xl font-bold">{t('admin.messages.no_permission')}</h1>
+          <h1 className="text-2xl font-bold">{t('messages.no_permission')}</h1>
           <Button asChild>
             <Link to="/">
               <Home className="mr-2 h-4 w-4" />
@@ -56,31 +56,31 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   const navigation = [
     {
-      name: t('admin.nav.dashboard'),
+      name: t('nav.dashboard'),
       href: '/admin',
       icon: BarChart3,
       current: location.pathname === '/admin' || location.pathname === '/admin/'
     },
     {
-      name: t('admin.nav.users'),
+      name: t('nav.users'),
       href: '/admin/users',
       icon: Users,
       current: location.pathname.startsWith('/admin/users')
     },
     {
-      name: t('admin.nav.roles'),
+      name: t('nav.roles'),
       href: '/admin/roles',
       icon: Shield,
       current: location.pathname.startsWith('/admin/roles')
     },
     {
-      name: t('admin.nav.repositories'),
+      name: t('nav.repositories'),
       href: '/admin/repositories',
       icon: Database,
       current: location.pathname.startsWith('/admin/repositories')
     },
     {
-      name: t('admin.nav.settings'),
+      name: t('nav.settings'),
       href: '/admin/settings',
       icon: Settings,
       current: location.pathname.startsWith('/admin/settings')
@@ -106,7 +106,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             {/* 标题 */}
             <div className="flex items-center gap-2">
               <Shield className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-semibold">{t('admin.title')}</h1>
+              <h1 className="text-xl font-semibold">{t('title')}</h1>
             </div>
           </div>
 

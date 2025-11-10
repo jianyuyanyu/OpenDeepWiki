@@ -129,10 +129,10 @@ export const HomePage = () => {
               {t('home.repository_card.recently_updated')}
             </Badge>
             <Badge variant="outline" className="cursor-pointer hover:bg-secondary/80">
-              {t('home.repository_card.status.processing')}
+              {t('home.repository_card.status.1')}
             </Badge>
             <Badge variant="outline" className="cursor-pointer hover:bg-secondary/80">
-              {t('home.repository_card.status.completed')}
+              {t('home.repository_card.status.2')}
             </Badge>
           </div>
         </div>
@@ -196,7 +196,7 @@ export const HomePage = () => {
           <>
             {/* Repository Grid */}
             {repositories.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mb-12">
                 {repositories.map((repo) => (
                   <RepositoryCard
                     key={repo.id}

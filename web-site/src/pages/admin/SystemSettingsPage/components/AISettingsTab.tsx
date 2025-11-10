@@ -41,7 +41,7 @@ const AISettingsTab: React.FC<AISettingsTabProps> = ({
   validationErrors,
   loading = false
 }) => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const { toast } = useToast()
   const [testModalVisible, setTestModalVisible] = useState(false)
   const [testing, setTesting] = useState(false)

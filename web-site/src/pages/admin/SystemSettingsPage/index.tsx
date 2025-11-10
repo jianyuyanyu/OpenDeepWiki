@@ -50,7 +50,7 @@ import SettingsImportExport from './components/SettingsImportExport'
 interface SystemSettingsPageProps {}
 
 const SystemSettingsPage: React.FC<SystemSettingsPageProps> = () => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const { toast } = useToast()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)

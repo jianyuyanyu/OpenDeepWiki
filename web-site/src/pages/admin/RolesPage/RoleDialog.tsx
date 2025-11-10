@@ -31,7 +31,7 @@ const RoleDialog: React.FC<RoleDialogProps> = ({
   role,
   onSuccess
 }) => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState<{
     name: string

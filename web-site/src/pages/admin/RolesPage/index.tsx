@@ -31,7 +31,7 @@ import RoleCopyDialog from './RoleCopyDialog'
 import RoleMembersDialog from './RoleMembersDialog'
 
 const RolesPage: React.FC = () => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const [searchQuery, setSearchQuery] = useState('')
   const [roles, setRoles] = useState<RoleInfo[]>([])
   const [loading, setLoading] = useState(true)

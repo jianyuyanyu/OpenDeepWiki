@@ -77,7 +77,7 @@ import { type WarehouseInfo, type UpdateRepositoryDto, repositoryService } from 
 import { toast } from 'sonner'
 
 const RepositoriesPage: React.FC = () => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const [searchQuery, setSearchQuery] = useState('')
   const [repositories, setRepositories] = useState<WarehouseInfo[]>([])
   const [loading, setLoading] = useState(true)

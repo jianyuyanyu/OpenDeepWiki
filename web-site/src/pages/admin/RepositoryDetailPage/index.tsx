@@ -102,7 +102,7 @@ interface SyncRecord {
 
 const RepositoryDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>()
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const navigate = useNavigate()
 
   // 状态管理

@@ -51,10 +51,15 @@
     "time": {
       "justNow": "刚刚",
       "minutesAgo": "{{count}}分钟前",
+      "minutesAgo_one": "{{count}}分钟前",
       "hoursAgo": "{{count}}小时前",
+      "hoursAgo_one": "{{count}}小时前",
       "daysAgo": "{{count}}天前",
+      "daysAgo_one": "{{count}}天前",
       "monthsAgo": "{{count}}个月前",
-      "yearsAgo": "{{count}}年前"
+      "monthsAgo_one": "{{count}}个月前",
+      "yearsAgo": "{{count}}年前",
+      "yearsAgo_one": "{{count}}年前"
     }
   },
   "nav": {
@@ -413,6 +418,43 @@
       "previous": "上一页",
       "next": "下一页",
       "pageInfo": "第 {{current}} 页 / 共 {{total}} 页",
+      "title": "用户管理",
+      "subtitle": "管理系统用户账户和权限",
+      "searchPlaceholder": "搜索用户名或邮箱...",
+      "table": {
+        "username": "用户名",
+        "email": "邮箱",
+        "role": "角色",
+        "created_at": "创建时间",
+        "updated_at": "更新时间",
+        "actions": "操作"
+      },
+      "actions": {
+        "cancel_selection": "取消选择",
+        "select_all": "全选",
+        "reset_password": "重置密码"
+      },
+      "filters": {
+        "filter_by_role": "按角色筛选",
+        "all_roles": "所有角色"
+      },
+      "pagination": {
+        "previous": "上一页",
+        "page_info": "第 {{current}} 页 / 共 {{total}} 页",
+        "next": "下一页"
+      },
+      "load_failed": "加载失败",
+      "load_error": "无法加载用户列表",
+      "confirm_delete": "确定要删除该用户吗？",
+      "delete_success": "删除成功",
+      "user_deleted": "用户已被删除",
+      "delete_failed": "删除失败",
+      "delete_error": "无法删除用户",
+      "create": "创建用户",
+      "edit": "编辑用户",
+      "delete": "删除用户",
+      "assign_roles": "分配角色",
+      "select_users_to_delete": "请选择要删除的用户",
       "errors": {
         "loadFailed": "加载失败",
         "loadFailedDescription": "无法加载用户列表",
@@ -719,14 +761,59 @@
     "validationFailed": "配置验证失败",
     "noSettingsAvailable": "暂无可用设置",
     "profile": {
+      "title": "账户信息",
+      "description": "管理您的个人资料和账户详情",
       "loadUserInfoFailed": "获取用户信息失败，请重新登录",
       "loadUserInfoError": "加载用户信息失败",
       "updateSuccess": "个人信息更新成功",
       "updateFailed": "更新失败",
       "updateError": "更新失败，请重试",
+      "saveChanges": "保存更改",
+      "saving": "保存中...",
+      "verified": "已验证",
+      "basicInfo": {
+        "title": "基本信息",
+        "description": "更新您的个人信息"
+      },
+      "fields": {
+        "username": "用户名",
+        "email": "邮箱地址"
+      },
+      "placeholders": {
+        "username": "请输入用户名",
+        "email": "请输入邮箱地址"
+      },
       "validation": {
         "username_min": "用户名至少需要2个字符",
         "email_invalid": "请输入有效的邮箱地址"
+      }
+    },
+    "preferences": {
+      "title": "偏好设置",
+      "description": "自定义您的应用体验和通知偏好",
+      "appSettings": {
+        "title": "应用设置",
+        "description": "管理您的应用偏好设置和通知选项"
+      },
+      "notifications": {
+        "email": {
+          "title": "邮件通知",
+          "description": "接收重要更新和通知邮件"
+        },
+        "desktop": {
+          "title": "桌面通知",
+          "description": "在桌面显示实时通知"
+        }
+      },
+      "autoSave": {
+        "title": "自动保存",
+        "description": "自动保存您的工作进度"
+      },
+      "autoSaveHint": "设置将自动保存",
+      "language": {
+        "title": "界面语言",
+        "description": "选择您的首选界面语言",
+        "placeholder": "选择语言"
       }
     },
     "securitySettings": {
@@ -749,9 +836,17 @@
       "uploadError": "头像上传失败，请重试",
       "removeSuccess": "头像删除成功",
       "removeFailed": "删除头像失败",
-      "removeError": "删除头像失败，请重试"
+      "removeError": "删除头像失败，请重试",
+      "uploadHint": "上传 JPG、PNG 或 GIF 格式的图片，最大 2MB",
+      "confirmDelete": {
+        "title": "确认删除头像",
+        "description": "确定要删除当前头像吗？此操作不可撤销。",
+        "cancel": "取消",
+        "confirm": "确认删除"
+      }
     },
     "ui": {
+      "title": "设置",
       "accountInfo": "账户信息",
       "accountInfoDesc": "管理您的个人资料和基本信息",
       "securitySettings": "安全设置",
@@ -1277,7 +1372,6 @@
       "appName": "应用名称",
       "organization": "组织名称",
       "repository": "仓库名称",
-      "description": "应用描述",
       "descriptionPlaceholder": "描述应用的用途...",
       "aiSettings": "AI设置",
       "model": "AI模型",

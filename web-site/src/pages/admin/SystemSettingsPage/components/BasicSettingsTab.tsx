@@ -27,7 +27,7 @@ const BasicSettingsTab: React.FC<BasicSettingsTabProps> = ({
   validationErrors,
   loading = false
 }) => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const { toast } = useToast()
 
   const getSettingValue = (key: string) => {

@@ -30,7 +30,8 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({
   const handleLanguageChange = async (languageCode: string) => {
     try {
       await changeLanguage(languageCode)
-      // 可以在这里添加成功提示或其他逻辑
+      // 语言切换成功后,i18next-browser-languagedetector 会自动将语言保存到 localStorage
+      console.log('语言已切换至:', languageCode)
     } catch (error) {
       console.error('切换语言失败:', error)
     }

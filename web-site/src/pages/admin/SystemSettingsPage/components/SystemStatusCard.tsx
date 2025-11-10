@@ -31,7 +31,7 @@ interface SystemStatusCardProps {
 }
 
 const SystemStatusCard: React.FC<SystemStatusCardProps> = ({ status, restartRequired, className }) => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
 
   // 如果没有状态数据，显示加载或错误状态
   if (!status) {

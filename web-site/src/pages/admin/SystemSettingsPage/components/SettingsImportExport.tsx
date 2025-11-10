@@ -41,7 +41,7 @@ interface SettingsImportExportProps {
 const SettingsImportExport: React.FC<SettingsImportExportProps> = ({
   onClose
 }) => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<'export' | 'import'>('export')
   const [exportLoading, setExportLoading] = useState(false)

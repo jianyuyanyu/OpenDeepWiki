@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils'
 import { statsService } from '@/services/admin.service'
 
 const DashboardPage: React.FC = () => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [dashboardData, setDashboardData] = useState<any>(null)
