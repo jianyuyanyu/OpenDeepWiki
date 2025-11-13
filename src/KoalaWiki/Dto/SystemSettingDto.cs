@@ -163,4 +163,46 @@ public class SystemSettingGroupOutput
     /// 分组设置项
     /// </summary>
     public List<SystemSettingOutput> Settings { get; set; } = new();
+}
+
+/// <summary>
+/// AI API测试请求参数
+/// </summary>
+public class TestAIApiRequest
+{
+    /// <summary>
+    /// API端点地址
+    /// </summary>
+    public string Endpoint { get; set; } = string.Empty;
+
+    /// <summary>
+    /// API密钥
+    /// </summary>
+    public string ApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 模型名称
+    /// </summary>
+    public string? Model { get; set; }
+}
+
+/// <summary>
+/// 测试结果响应
+/// </summary>
+public class TestResultResponse
+{
+    /// <summary>
+    /// 是否成功
+    /// </summary>
+    public bool Success { get; set; }
+
+    /// <summary>
+    /// 消息
+    /// </summary>
+    public string Message { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 详细信息
+    /// </summary>
+    public object? Details { get; set; }
 } 

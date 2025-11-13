@@ -4,6 +4,8 @@ using KoalaWiki.Dto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 
 namespace KoalaWiki.Services;
 
@@ -280,6 +282,120 @@ public class SystemSettingService(
         }
 
         return errors;
+    }
+
+    /// <summary>
+    /// 测试AI API连接
+    /// </summary>
+    [HttpPost("/test/ai")]
+    public async Task<TestResultResponse> TestAIConnectionAsync([FromBody] TestAIApiRequest request)
+    {
+        try
+        {
+            logger.LogInformation("开始测试AI API连接：Endpoint={Endpoint}, Model={Model}", 
+                request.Endpoint, request.Model ?? "default");
+
+            // 验证必填参数
+            if (string.IsNullOrWhiteSpace(request.Endpoint))
+            {
+                return new TestResultResponse
+                {
+                    Success = false,
+                    Message = "API端点不能为空"
+                };
+            }
+
+            if (string.IsNullOrWhiteSpace(request.ApiKey))
+            {
+                return new TestResultResponse
+                {
+                    Success = false,
+                    Message = "API密钥不能为空"
+                };
+            }
+
+            // 使用提供的模型或当前配置的模型
+            var model = string.IsNullOrWhiteSpace(request.Model) ? OpenAIOptions.ChatModel : request.Model;
+            
+            if (string.IsNullOrWhiteSpace(model))
+            {
+                return new TestResultResponse
+                {
+                    Success = false,
+                    Message = "未指定模型名称"
+                };
+            }
+
+            // 创建临时目录用于测试
+            var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            Directory.CreateDirectory(tempPath);
+
+            try
+            {
+                // 使用KernelFactory创建测试Kernel
+                var kernel = await KernelFactory.GetKernel(
+                    chatEndpoint: request.Endpoint,
+                    apiKey: request.ApiKey,
+                    gitPath: tempPath,
+                    model: model,
+                    isCodeAnalysis: false, // 测试时不需要加载代码分析插件
+                    files: null
+                );
+
+                // 发送测试消息
+                var chatService = kernel.GetRequiredService<IChatCompletionService>();
+                var chatHistory = new ChatHistory();
+                chatHistory.AddUserMessage("Hello");
+
+                var response = await chatService.GetChatMessageContentAsync(chatHistory);
+
+                logger.LogInformation("AI API连接测试成功");
+
+                return new TestResultResponse
+                {
+                    Success = true,
+                    Message = "AI API连接测试成功，模型响应正常",
+                    Details = new
+                    {
+                        Model = model,
+                        Endpoint = request.Endpoint,
+                        Response = response.Content
+                    }
+                };
+            }
+            finally
+            {
+                // 清理临时目录
+                try
+                {
+                    if (Directory.Exists(tempPath))
+                    {
+                        Directory.Delete(tempPath, true);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "清理临时目录失败：{TempPath}", tempPath);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "AI API连接测试失败");
+
+            var errorMessage = ex.InnerException?.Message ?? ex.Message;
+            
+            return new TestResultResponse
+            {
+                Success = false,
+                Message = $"AI API连接测试失败：{errorMessage}",
+                Details = new
+                {
+                    Error = errorMessage,
+                    Type = ex.GetType().Name
+                }
+            };
+        }
     }
 
     /// <summary>
