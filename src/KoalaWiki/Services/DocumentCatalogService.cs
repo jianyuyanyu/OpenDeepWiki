@@ -170,23 +170,26 @@ public class DocumentCatalogService(IKoalaWikiContext dbAccess) : FastApi
     {
         var url = string.Empty;
 
-        if (warehouse.Address.StartsWith("https://github.com") || warehouse.Address.StartsWith("https://gitee.com"))
+        if (warehouse != null && !string.IsNullOrEmpty(warehouse.Address))
         {
-            // 删除.git后缀
-            url = warehouse.Address
-                            .Replace(".git", string.Empty)
-                            .TrimEnd('/') + $"/tree/{warehouse.Branch}/" + fileItemSource.Address;
-        }
-        // TODO: 兼容其他提供商
-        else if(warehouse.Address.StartsWith("https://gitlab.com"))
-        {
-            url = warehouse.Address
-                            .Replace(".git", string.Empty)
-                            .TrimEnd('/') + $"/-/tree/{warehouse.Branch}/" + fileItemSource.Address;
-        }
-        else
-        {
-            url = warehouse.Address.TrimEnd('/') + "/" + fileItemSource.Address;
+            if (warehouse.Address.StartsWith("https://github.com") || warehouse.Address.StartsWith("https://gitee.com"))
+            {
+                // 删除.git后缀
+                url = warehouse.Address
+                                .Replace(".git", string.Empty)
+                                .TrimEnd('/') + $"/tree/{warehouse.Branch}/" + fileItemSource.Address;
+            }
+            // TODO: 兼容其他提供商
+            else if(warehouse.Address.StartsWith("https://gitlab.com"))
+            {
+                url = warehouse.Address
+                                .Replace(".git", string.Empty)
+                                .TrimEnd('/') + $"/-/tree/{warehouse.Branch}/" + fileItemSource.Address;
+            }
+            else
+            {
+                url = warehouse.Address.TrimEnd('/') + "/" + fileItemSource.Address;
+            }
         }
         
         var name = Path.GetFileName(fileItemSource.Address);
