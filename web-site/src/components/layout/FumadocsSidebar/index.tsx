@@ -90,7 +90,7 @@ export const FumadocsSidebar: React.FC<FumadocsSidebarProps> = React.memo(({
 
       return {
         id: node.id,
-        label: node.name,
+        label: node.name || 'Untitled',  // Fallback to 'Untitled' if name is null/undefined
         // 所有节点都可以点击，并包含分支信息
         path: pathWithBranch,
         disabled: node.disabled,  // 传递禁用状态
@@ -368,7 +368,7 @@ export const FumadocsSidebar: React.FC<FumadocsSidebarProps> = React.memo(({
             {menuItems.length > 0 ? (
               menuItems
                 .filter(item => !searchQuery ||
-                  item.label.toLowerCase().includes(searchQuery.toLowerCase()))
+                  (item.label && item.label.toLowerCase().includes(searchQuery.toLowerCase())))
                 .map(item => renderMenuItem(item))
             ) : (
               <p className="text-xs text-muted-foreground/60 text-center py-4 px-6">
