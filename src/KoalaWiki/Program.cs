@@ -2,6 +2,7 @@ using ImageAgent.Feishu;
 using KoalaWiki.BackendService;
 using KoalaWiki.Generate;
 using KoalaWiki.KoalaWarehouse.Extensions;
+using KoalaWiki.MCP;
 using KoalaWiki.Mem0;
 using KoalaWiki.Services.Feishu.Feishu;
 using Microsoft.AspNetCore.StaticFiles;
@@ -299,6 +300,10 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
+
+// Add SSE keep-alive middleware to prevent connection timeout after ~5 minutes of inactivity
+// This is especially important for MCP SSE endpoints used by Claude Code
+app.UseMiddleware<SseKeepAliveMiddleware>();
 
 app.MapMcp("/api/mcp");
 
