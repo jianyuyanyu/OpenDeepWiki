@@ -228,16 +228,10 @@ public partial class DocumentPendingService
                 int inputTokenCount = 0;
                 int outputTokenCount = 0;
                 int maxRetries = 3;
-                CancellationTokenSource token = null;
-
                 reset:
 
                 try
                 {
-                    // 创建新的取消令牌（每次重试都重新创建）
-                    token?.Dispose();
-                    token = new CancellationTokenSource(TimeSpan.FromMinutes(30)); // 20分钟超时
-
                     Console.WriteLine($"开始处理文档 (尝试 {count}/{maxRetries + 1})，超时设置: 30分钟");
 
                     try
@@ -248,14 +242,8 @@ public partial class DocumentPendingService
                         await foreach (var item in chat.GetStreamingChatMessageContentsAsync(
                                            history,
                                            settings,
-                                           documentKernel,
-                                           token.Token).ConfigureAwait(false))
+                                           documentKernel).ConfigureAwait(false))
                         {
-                            // 检查是否被取消
-                            token.Token.ThrowIfCancellationRequested();
-
-                            // 更新最后活动时间
-                            lastActivityTime = DateTime.UtcNow;
                             hasReceivedContent = true;
 
                             switch (item.InnerContent)
@@ -294,7 +282,7 @@ public partial class DocumentPendingService
                             Console.WriteLine("警告: 没有接收到任何流式内容");
                         }
                     }
-                    catch (OperationCanceledException) when (token.Token.IsCancellationRequested)
+                    catch (OperationCanceledException)
                     {
                         Console.WriteLine("操作被取消 (超时或手动取消)");
 
@@ -352,8 +340,6 @@ public partial class DocumentPendingService
                 }
                 finally
                 {
-                    // 确保资源被正确释放
-                    token?.Dispose();
                     Console.WriteLine("资源清理完成");
                 }
 

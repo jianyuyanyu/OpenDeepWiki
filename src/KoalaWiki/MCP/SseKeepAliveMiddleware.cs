@@ -1,4 +1,5 @@
 using System.Text;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace KoalaWiki.MCP;
 
