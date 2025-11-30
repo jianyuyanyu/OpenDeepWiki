@@ -1,10 +1,8 @@
-﻿using KoalaWiki.Core.Extensions;
-using KoalaWiki.Prompts;
-using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.OpenAI;
+﻿using KoalaWiki.Agents;
+using KoalaWiki.Tools;
+using Microsoft.Extensions.AI;
 using Newtonsoft.Json;
-using OpenAI.Chat;
-using JsonSerializer = System.Text.Json.JsonSerializer;
+using ChatMessage = Microsoft.Extensions.AI.ChatMessage;
 
 namespace KoalaWiki.KoalaWarehouse.GenerateThinkCatalogue;
 
@@ -39,7 +37,7 @@ public static partial class GenerateThinkCatalogueService
             try
             {
                 var result =
-                    await ExecuteSingleAttempt(path, catalogue, classify, retryCount).ConfigureAwait(false);
+                    await ExecuteSingleAttempt(path, catalogue, classify).ConfigureAwait(false);
 
                 if (result != null)
                 {
@@ -95,19 +93,17 @@ public static partial class GenerateThinkCatalogueService
     }
 
     private static async Task<DocumentResultCatalogue?> ExecuteSingleAttempt(
-        string path, string catalogue, ClassifyType? classify, int attemptNumber)
+        string path, string catalogue, ClassifyType? classify)
     {
         // 根据尝试次数调整提示词策略
         var enhancedPrompt = await GenerateThinkCataloguePromptAsync(classify, catalogue);
 
-        var history = new ChatHistory();
+        var history = new List<ChatMessage>();
 
-        history.AddSystemEnhance();
-
-        var contents = new ChatMessageContentItemCollection()
+        var contents = new List<AIContent>()
         {
-            new TextContent(enhancedPrompt),
-            new TextContent(
+            new Microsoft.Extensions.AI.TextContent(enhancedPrompt),
+            new Microsoft.Extensions.AI.TextContent(
                 $"""
                  <system-reminder>
                  <catalog_tool_usage_guidelines>
@@ -156,69 +152,47 @@ public static partial class GenerateThinkCatalogueService
 
                  </system-reminder>
                  """),
-            new TextContent(Prompt.Language)
+            new Microsoft.Extensions.AI.TextContent(Prompt.Language)
         };
-        history.AddUserMessage(contents);
-
-        var catalogueTool = new CatalogueFunction();
-        var analysisModel =await  KernelFactory.GetKernel(OpenAIOptions.Endpoint,
-            OpenAIOptions.ChatApiKey, path, OpenAIOptions.AnalysisModel, false, null,
-            builder =>
-            {
-                builder.Plugins.AddFromObject(catalogueTool, "catalog");
-            });
-
-        var chat = analysisModel.Services.GetService<IChatCompletionService>();
-        if (chat == null)
-        {
-            throw new InvalidOperationException("无法获取聊天完成服务");
-        }
-
-        // 根据尝试次数调整设置
-        var settings = new OpenAIPromptExecutionSettings()
-        {
-            ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions,
-            MaxTokens = DocumentsHelper.GetMaxTokens(OpenAIOptions.AnalysisModel)
-        };
+        history.Add(new ChatMessage(Microsoft.Extensions.AI.ChatRole.User, contents));
 
         int retry = 1;
         var inputTokenCount = 0;
         var outputTokenCount = 0;
+        var catalogueTool = new CatalogueFunction();
+
+        var agent = AgentFactory.CreateChatClientAgentAsync(OpenAIOptions.AnalysisModel,
+            (options =>
+            {
+                options.Name = "ThinkCatalogueAgent";
+                options.Instructions = PromptExtensions.System;
+                options.ChatOptions = new ChatOptions()
+                {
+                    MaxOutputTokens = DocumentsHelper.GetMaxTokens(OpenAIOptions.ChatModel),
+                    ToolMode = ChatToolMode.Auto,
+                    Tools = new List<AITool>(catalogueTool.Create())
+                    {
+                        new FileTool(path, null).Create()
+                    }
+                };
+            }));
+
+        var agentThread = agent.GetNewThread();
 
         retry:
         // 添加超时控制
-        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(20));
+        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+
 
         try
         {
             // 流式获取响应 - 添加取消令牌和异常处理
-            await foreach (var item in chat.GetStreamingChatMessageContentsAsync(
-                               history,
-                               settings,
-                               analysisModel,
-                               cts.Token).ConfigureAwait(false))
+            await foreach (var item in agent.RunStreamingAsync(history, agentThread, cancellationToken: cts.Token)
+                               .ConfigureAwait(false))
             {
-                // 定期检查取消
-                cts.Token.ThrowIfCancellationRequested();
-
-                switch (item.InnerContent)
+                if (!string.IsNullOrEmpty(item.Text))
                 {
-                    case StreamingChatCompletionUpdate { Usage.InputTokenCount: > 0 } content:
-                        inputTokenCount += content.Usage.InputTokenCount;
-                        outputTokenCount += content.Usage.OutputTokenCount;
-                        break;
-
-                    case StreamingChatCompletionUpdate tool when tool.ToolCallUpdates.Count > 0:
-                        break;
-
-                    case StreamingChatCompletionUpdate value:
-                        var text = value.ContentUpdate.FirstOrDefault()?.Text;
-                        if (!string.IsNullOrEmpty(text))
-                        {
-                            Console.Write(text);
-                        }
-
-                        break;
+                    Console.Write(item.Text);
                 }
             }
         }
@@ -251,12 +225,6 @@ public static partial class GenerateThinkCatalogueService
         // Prefer tool-stored JSON when available
         if (!string.IsNullOrWhiteSpace(catalogueTool.Content))
         {
-            // 质量增强逻辑
-            if (!DocumentOptions.RefineAndEnhanceQuality || attemptNumber >= 3) // 前几次尝试才进行质量增强
-                return ExtractAndParseJson(catalogueTool.Content);
-
-            await RefineResponse(history, chat, settings, analysisModel);
-
             return ExtractAndParseJson(catalogueTool.Content);
         }
         else
@@ -268,35 +236,6 @@ public static partial class GenerateThinkCatalogueService
             }
 
             goto retry;
-        }
-    }
-
-    private static async Task RefineResponse(ChatHistory history, IChatCompletionService chat,
-        OpenAIPromptExecutionSettings settings, Kernel kernel)
-    {
-        try
-        {
-            // 根据尝试次数调整细化策略
-            const string refinementPrompt = """
-                                                Refine the stored documentation_structure JSON iteratively using tools only:
-                                                - Use Catalogue.Read to inspect the current JSON.
-                                                - Apply several Catalogue.Edit operations to:
-                                                  • add Level 2/3 subsections for core components, features, data models, integrations
-                                                  • normalize kebab-case titles and maintain 'getting-started' then 'deep-dive' ordering
-                                                  • enrich each section's 'prompt' with actionable guidance (scope, code areas, outputs)
-                                                - Prefer localized edits; only use Catalogue.Write for a complete rewrite if necessary.
-                                                - Never print JSON in chat; use tools exclusively.
-                                                - Start by editing some parts that need optimization through catalog.MultiEdit.
-                                            """;
-
-            history.AddUserMessage(refinementPrompt);
-
-            await foreach (var _ in chat.GetStreamingChatMessageContentsAsync(history, settings, kernel))
-            {
-            }
-        }
-        catch (Exception ex)
-        {
         }
     }
 

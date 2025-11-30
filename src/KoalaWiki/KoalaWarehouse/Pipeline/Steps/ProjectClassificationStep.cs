@@ -18,7 +18,7 @@ public class ProjectClassificationStep(ILogger<ProjectClassificationStep> logger
         try
         {
             ClassifyType? classify;
-            
+
             if (context.Warehouse.Classify.HasValue)
             {
                 classify = context.Warehouse.Classify;
@@ -27,34 +27,22 @@ public class ProjectClassificationStep(ILogger<ProjectClassificationStep> logger
             else
             {
                 Logger.LogInformation("生成新的项目分类");
-                
-                // 确保有文件内核实例
-                if (context.FileKernelInstance == null)
-                {
-                    context.FileKernelInstance = await KernelFactory.GetKernel(
-                        OpenAIOptions.Endpoint,
-                        OpenAIOptions.ChatApiKey, 
-                        context.Document.GitPath, 
-                        OpenAIOptions.ChatModel, 
-                        false);
-                }
-                
+
                 classify = await WarehouseClassify.ClassifyAsync(
-                    context.FileKernelInstance, 
-                    context.Catalogue ?? string.Empty, 
+                    context.Catalogue ?? string.Empty,
                     context.Readme ?? string.Empty);
+                // 更新数据库
+                await context.DbContext.Warehouses.Where(x => x.Id == context.Warehouse.Id)
+                    .ExecuteUpdateAsync(x => x.SetProperty(y => y.Classify, classify),
+                        cancellationToken: cancellationToken);
             }
-            
+
             context.Classification = classify;
             activity?.SetTag("classify", classify?.ToString());
-            
-            // 更新数据库
-            await context.DbContext.Warehouses.Where(x => x.Id == context.Warehouse.Id)
-                .ExecuteUpdateAsync(x => x.SetProperty(y => y.Classify, classify), cancellationToken: cancellationToken);
-            
+
             context.SetStepResult(StepName, classify);
-            
-            Logger.LogInformation("完成 {StepName} 步骤，分类结果: {Classify}", 
+
+            Logger.LogInformation("完成 {StepName} 步骤，分类结果: {Classify}",
                 StepName, classify?.ToString());
         }
         catch (Exception ex)

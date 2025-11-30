@@ -86,7 +86,7 @@ export const HomePage = () => {
         refresh()
         setShowAddModal(false)
       } else {
-        toast.error(response?.error || t('repository.form.submitFailed'))
+        toast.error(response?.message || t('repository.form.submitFailed'))
       }
     } catch (error: any) {
       toast.error(error.message || t('repository.form.submitFailed'))

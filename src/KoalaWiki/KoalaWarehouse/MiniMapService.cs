@@ -1,10 +1,14 @@
 ﻿using System.Text;
 using System.Text.RegularExpressions;
+using KoalaWiki.Agents;
 using KoalaWiki.Domains.Warehouse;
 using KoalaWiki.Dto;
 using KoalaWiki.Prompts;
+using KoalaWiki.Tools;
+using Microsoft.Extensions.AI;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
+using ChatMessage = Microsoft.Extensions.AI.ChatMessage;
 
 namespace KoalaWiki.KoalaWarehouse;
 
@@ -30,28 +34,32 @@ public static class MiniMapService
 
         var miniMap = new StringBuilder();
 
-        var history = new ChatHistory();
+        var files = new List<string>();
+        var fileFunction = new FileTool(path, files);
 
-        history.AddSystemEnhance();
-
-        history.AddUserMessage(prompt);
-
-        var kernel =await  KernelFactory.GetKernel(OpenAIOptions.Endpoint, OpenAIOptions.ChatApiKey, path,
-            OpenAIOptions.ChatModel, false);
+        var agent = AgentFactory.CreateChatClientAgentAsync(OpenAIOptions.ChatModel, (options =>
+        {
+            options.Name = "KoalaWiki";
+            options.Description = PromptExtensions.System;
+            options.ChatOptions = new ChatOptions()
+            {
+                MaxOutputTokens = DocumentsHelper.GetMaxTokens(OpenAIOptions.ChatModel),
+                ToolMode = ChatToolMode.Auto,
+                Tools = new List<AITool>()
+                {
+                    fileFunction.Create()
+                }
+            };
+        }));
 
         int retry = 1;
         retry:
-        
-        await foreach (var item in kernel.GetRequiredService<IChatCompletionService>()
-                           .GetStreamingChatMessageContentsAsync(history, new OpenAIPromptExecutionSettings()
-                           {
-                               ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions,
-                               MaxTokens = DocumentsHelper.GetMaxTokens(OpenAIOptions.ChatModel)
-                           }, kernel))
+
+        await foreach (var item in agent.RunStreamingAsync(new ChatMessage(ChatRole.User, prompt)))
         {
-            if (!string.IsNullOrEmpty(item.Content))
+            if (!string.IsNullOrEmpty(item.Text))
             {
-                miniMap.Append(item.Content);
+                miniMap.Append(item.Text);
             }
         }
 
@@ -59,7 +67,7 @@ public static class MiniMapService
 
         var thinkingPattern = new Regex(@"<thinking>.*?</thinking>", RegexOptions.Singleline);
         miniMap = new StringBuilder(thinkingPattern.Replace(miniMap.ToString(), string.Empty).Trim());
-        
+
         // 如果内容是空的则再次执行
         if (miniMap.Length == 0)
         {
@@ -76,7 +84,7 @@ public static class MiniMapService
         var miniMapContent = miniMap.ToString();
 
         // 解析知识图谱 # region \n## 标题:文件
-        var lines = miniMapContent.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        var lines = miniMapContent.Split(['\n'], StringSplitOptions.RemoveEmptyEntries);
 
         var result = ParseMiniMapRecursive(lines, 0, 0);
 

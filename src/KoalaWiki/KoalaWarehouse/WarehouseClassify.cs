@@ -1,5 +1,7 @@
 ﻿using System.ClientModel.Primitives;
+using System.Text;
 using System.Text.RegularExpressions;
+using KoalaWiki.Agents;
 using KoalaWiki.Domains;
 using KoalaWiki.Dto;
 using KoalaWiki.Prompts;
@@ -13,7 +15,7 @@ public class WarehouseClassify
     /// <summary>
     /// 根据仓库信息分析得出仓库分类
     /// </summary>
-    public static async Task<ClassifyType?> ClassifyAsync(Kernel kernel, string catalog, string readme)
+    public static async Task<ClassifyType?> ClassifyAsync(string catalog, string readme)
     {
         var prompt = await PromptContext.Warehouse(nameof(PromptConstant.Warehouse.RepositoryClassification),
             new KernelArguments(new OpenAIPromptExecutionSettings()
@@ -26,43 +28,25 @@ public class WarehouseClassify
                 ["readme"] = readme
             }, OpenAIOptions.ChatModel);
 
-        var result = string.Empty;
-        var isDeep = false;
+        var result = new StringBuilder();
 
-        await foreach (var i in kernel.InvokePromptStreamingAsync(prompt))
+        var agent = AgentFactory.CreateChatClientAgentAsync(OpenAIOptions.ChatModel, (options =>
         {
-            var jsonContent = JsonSerializer.Deserialize<OpenAIResponse>(ModelReaderWriter.Write(i.InnerContent));
+            options.Name = "WarehouseClassifyAgent";
+        }));
 
-            if (!(jsonContent?.choices.Length > 0)) continue;
-            if (string.IsNullOrEmpty(jsonContent.choices[0].message?.reasoning_content) &&
-                string.IsNullOrEmpty(jsonContent.choices[0].delta?.reasoning_content))
+        await foreach (var i in agent.RunStreamingAsync(prompt))
+        {
+            if (!string.IsNullOrEmpty(i.Text))
             {
-                if (isDeep)
-                {
-                    result += "</think>";
-                    isDeep = false;
-                }
-
-                result += i.ToString();
-                continue;
+                result.Append(i.Text);
             }
-
-            if (isDeep == false)
-            {
-                result += "<think>";
-
-                isDeep = true;
-            }
-
-            // 提取分类结果
-            result += jsonContent.choices[0].message?.reasoning_content ??
-                      jsonContent.choices[0].delta?.reasoning_content;
         }
 
         // 提取分类结果正则表达式<classify>(.*?)</classify>
         var regex = new Regex(@"<classify>(.*?)</classify>", RegexOptions.Singleline);
 
-        var match = regex.Match(result);
+        var match = regex.Match(result.ToString());
         if (match.Success)
         {
             // 提取到的内容

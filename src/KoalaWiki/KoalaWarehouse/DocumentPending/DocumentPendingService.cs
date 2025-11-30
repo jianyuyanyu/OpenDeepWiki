@@ -1,4 +1,9 @@
-﻿namespace KoalaWiki.KoalaWarehouse.DocumentPending;
+﻿using KoalaWiki.Agents;
+using KoalaWiki.Tools;
+using Microsoft.Extensions.AI;
+using ChatMessage = OpenAI.Chat.ChatMessage;
+
+namespace KoalaWiki.KoalaWarehouse.DocumentPending;
 
 public partial class DocumentPendingService
 {
@@ -131,93 +136,97 @@ public partial class DocumentPendingService
                 DocumentContext.DocumentStore = new DocumentStore();
 
                 var docs = new DocsFunction();
-                // 为每个文档处理创建独立的Kernel实例，避免状态管理冲突
-                var documentKernel = await KernelFactory.GetKernel(
-                    OpenAIOptions.Endpoint,
-                    OpenAIOptions.ChatApiKey,
-                    path,
-                    OpenAIOptions.ChatModel,
-                    false, // 文档生成不需要代码分析功能
-                    files, (builder => { builder.Plugins.AddFromObject(docs, "Docs"); })
-                );
 
-                var chat = documentKernel.Services.GetService<IChatCompletionService>();
+                var agent = AgentFactory.CreateChatClientAgentAsync(OpenAIOptions.ChatModel, (options =>
+                {
+                    options.Name = "DocumentAgent";
+                    options.Instructions = PromptExtensions.SystemDocs;
+                    options.ChatOptions = new ChatOptions()
+                    {
+                        MaxOutputTokens = DocumentsHelper.GetMaxTokens(OpenAIOptions.ChatModel),
+                        ToolMode = ChatToolMode.Auto,
+                        Tools = new List<AITool>(docs.Create())
+                        {
+                            new FileTool(path, null).Create()
+                        }
+                    };
+                }));
+
+                var agentThread = agent.GetNewThread();
 
                 string prompt = await
                     GetDocumentPendingPrompt(classifyType, catalogue, gitRepository, branch, catalog.Name,
                         catalog.Prompt);
 
-                var history = new ChatHistory();
+                var history = new List<Microsoft.Extensions.AI.ChatMessage>();
 
-                history.AddSystemDocs();
-
-                var contents = new ChatMessageContentItemCollection
+                var contents = new List<AIContent>()
                 {
-                    new TextContent(prompt),
-                    new TextContent(
+                    new Microsoft.Extensions.AI.TextContent(prompt),
+                    new Microsoft.Extensions.AI.TextContent(
                         $"""
-                          ```xml
-                          <system-reminder>
-                          For maximum efficiency, whenever you need to perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially.
-                          Note: The repository's directory structure has been provided in <code_files>. Please utilize the provided structure directly for file navigation and reading operations, rather than relying on glob patterns or filesystem traversal methods.
-                          Below is an example of the directory structure of the warehouse, where /D represents a directory and /F represents a file:
-                          server/D
-                            src/D
-                              Main/F
-                          web/D
-                            components/D
-                              Header.tsx/F
-                          
-                          {Prompt.Language}
-                          
-                          ## Docs Tool Usage Guidelines
-                          
-                          **MANDATORY TOOL USAGE**
-                          - ABSOLUTE REQUIREMENT: ALL document generation, creation, editing, and output MUST use Docs tools exclusively
-                          - STRICTLY PROHIBITED: Direct output of document content in chat responses
-                          - CRITICAL: Never display document content directly in conversation - always use Docs.Write, Docs.MultiEdit, or Docs.Create
-                          - ENFORCEMENT: Any document-related task must result in actual Docs tool invocation, not chat-based content delivery
-                          
-                          **PARALLEL READ OPERATIONS**
-                          - MANDATORY: Always perform PARALLEL File.Read calls — batch multiple files in a SINGLE message for maximum efficiency
-                          - CRITICAL: Read MULTIPLE files simultaneously in one operation
-                          - PROHIBITED: Sequential one-by-one file reads (inefficient and wastes context capacity)
-                          
-                          **EDITING OPERATION LIMITS**
-                          - HARD LIMIT: Maximum of 3 editing operations total (Docs.MultiEdit only)
-                          - PRIORITY: Maximize each Docs.MultiEdit operation by bundling ALL related changes across multiple files
-                          - STRATEGIC PLANNING: Consolidate all modifications into minimal MultiEdit operations to stay within the limit
-                          - Use Docs.Write **only once** for initial creation or full rebuild (counts as initial structure creation, not part of the 3 edits)
-                          - Always verify content before further changes using Docs.Read (Reads do NOT count toward limit)
-                          
-                          **CRITICAL MULTIEDIT BEST PRACTICES**
-                          - MAXIMIZE EFFICIENCY: Each MultiEdit should target multiple distinct sections across files
-                          - AVOID CONFLICTS: Never edit overlapping or identical content regions within the same MultiEdit operation
-                          - UNIQUE TARGETS: Ensure each edit instruction addresses a completely different section or file
-                          - BATCH STRATEGY: Group all necessary changes by proximity and relevance, but maintain clear separation between edit targets
-                          
-                          **DOCUMENT OUTPUT ENFORCEMENT**
-                          - ZERO TOLERANCE: Never output complete documents or substantial document content directly in chat
-                          - TOOL-FIRST APPROACH: Every document creation request must immediately trigger Docs tool usage
-                          - NO EXCEPTIONS: Even for "previews," "examples," or "demonstrations" - use Docs tools to create actual files
-                          - VERIFICATION METHOD: After tool usage, only provide brief status updates and file location information
-                          
-                          **RECOMMENDED EDITING SEQUENCE**
-                          1. Initial creation → Docs.Write (one-time full structure creation)
-                          2. Bulk refinements → Docs.MultiEdit with maximum parallel changes (counts toward 3-operation limit)
-                          3. Validation → Use Docs.Read after each MultiEdit to verify success before next operation
-                          4. Final adjustments → Remaining MultiEdit operations for any missed changes
-                          
-                          **COMPLIANCE VERIFICATION**
-                          - SELF-CHECK: Before responding, verify that no substantial document content appears in your response
-                          - TOOL CONFIRMATION: Ensure every document-related request results in actual Docs tool invocation
-                          - STATUS REPORTING: Provide only brief summaries of what was created/modified, never the full content
-                          </system-reminder>
-                          """)
+                         ```xml
+                         <system-reminder>
+                         For maximum efficiency, whenever you need to perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially.
+                         Note: The repository's directory structure has been provided in <code_files>. Please utilize the provided structure directly for file navigation and reading operations, rather than relying on glob patterns or filesystem traversal methods.
+                         Below is an example of the directory structure of the warehouse, where /D represents a directory and /F represents a file:
+                         server/D
+                           src/D
+                             Main/F
+                         web/D
+                           components/D
+                             Header.tsx/F
+
+                         {Prompt.Language}
+
+                         ## Docs Tool Usage Guidelines
+
+                         **MANDATORY TOOL USAGE**
+                         - ABSOLUTE REQUIREMENT: ALL document generation, creation, editing, and output MUST use Docs tools exclusively
+                         - STRICTLY PROHIBITED: Direct output of document content in chat responses
+                         - CRITICAL: Never display document content directly in conversation - always use Docs.Write, Docs.MultiEdit, or Docs.Create
+                         - ENFORCEMENT: Any document-related task must result in actual Docs tool invocation, not chat-based content delivery
+
+                         **PARALLEL READ OPERATIONS**
+                         - MANDATORY: Always perform PARALLEL File.Read calls — batch multiple files in a SINGLE message for maximum efficiency
+                         - CRITICAL: Read MULTIPLE files simultaneously in one operation
+                         - PROHIBITED: Sequential one-by-one file reads (inefficient and wastes context capacity)
+
+                         **EDITING OPERATION LIMITS**
+                         - HARD LIMIT: Maximum of 3 editing operations total (Docs.MultiEdit only)
+                         - PRIORITY: Maximize each Docs.MultiEdit operation by bundling ALL related changes across multiple files
+                         - STRATEGIC PLANNING: Consolidate all modifications into minimal MultiEdit operations to stay within the limit
+                         - Use Docs.Write **only once** for initial creation or full rebuild (counts as initial structure creation, not part of the 3 edits)
+                         - Always verify content before further changes using Docs.Read (Reads do NOT count toward limit)
+
+                         **CRITICAL MULTIEDIT BEST PRACTICES**
+                         - MAXIMIZE EFFICIENCY: Each MultiEdit should target multiple distinct sections across files
+                         - AVOID CONFLICTS: Never edit overlapping or identical content regions within the same MultiEdit operation
+                         - UNIQUE TARGETS: Ensure each edit instruction addresses a completely different section or file
+                         - BATCH STRATEGY: Group all necessary changes by proximity and relevance, but maintain clear separation between edit targets
+
+                         **DOCUMENT OUTPUT ENFORCEMENT**
+                         - ZERO TOLERANCE: Never output complete documents or substantial document content directly in chat
+                         - TOOL-FIRST APPROACH: Every document creation request must immediately trigger Docs tool usage
+                         - NO EXCEPTIONS: Even for "previews," "examples," or "demonstrations" - use Docs tools to create actual files
+                         - VERIFICATION METHOD: After tool usage, only provide brief status updates and file location information
+
+                         **RECOMMENDED EDITING SEQUENCE**
+                         1. Initial creation → Docs.Write (one-time full structure creation)
+                         2. Bulk refinements → Docs.MultiEdit with maximum parallel changes (counts toward 3-operation limit)
+                         3. Validation → Use Docs.Read after each MultiEdit to verify success before next operation
+                         4. Final adjustments → Remaining MultiEdit operations for any missed changes
+
+                         **COMPLIANCE VERIFICATION**
+                         - SELF-CHECK: Before responding, verify that no substantial document content appears in your response
+                         - TOOL CONFIRMATION: Ensure every document-related request results in actual Docs tool invocation
+                         - STATUS REPORTING: Provide only brief summaries of what was created/modified, never the full content
+                         </system-reminder>
+                         """)
                 };
 
                 contents.AddDocsGenerateSystemReminder();
-                history.AddUserMessage(contents);
+                history.Add(new Microsoft.Extensions.AI.ChatMessage(ChatRole.User, contents));
 
                 var settings = new OpenAIPromptExecutionSettings()
                 {
@@ -237,39 +246,14 @@ public partial class DocumentPendingService
                     try
                     {
                         var hasReceivedContent = false;
-                        var lastActivityTime = DateTime.UtcNow;
 
-                        await foreach (var item in chat.GetStreamingChatMessageContentsAsync(
-                                           history,
-                                           settings,
-                                           documentKernel).ConfigureAwait(false))
+                        await foreach (var item in agent.RunStreamingAsync(history, agentThread).ConfigureAwait(false))
                         {
                             hasReceivedContent = true;
 
-                            switch (item.InnerContent)
+                            if (!string.IsNullOrEmpty(item.Text))
                             {
-                                case StreamingChatCompletionUpdate { Usage.InputTokenCount: > 0 } content:
-                                    inputTokenCount += content.Usage.InputTokenCount;
-                                    outputTokenCount += content.Usage.OutputTokenCount;
-                                    Console.WriteLine($"[Token统计] 输入: {inputTokenCount}, 输出: {outputTokenCount}");
-                                    break;
-
-                                case StreamingChatCompletionUpdate tool when tool.ToolCallUpdates.Count > 0:
-                                    
-                                    break;
-
-                                case StreamingChatCompletionUpdate value:
-                                    var text = value.ContentUpdate.FirstOrDefault()?.Text;
-                                    if (!string.IsNullOrEmpty(text))
-                                    {
-                                        Console.Write(text);
-                                    }
-                                    break;
-
-                                default:
-                                    // 记录未知的内容类型用于调试
-                                    Console.WriteLine($"[DEBUG] 未处理的内容类型: {item.InnerContent?.GetType().Name}");
-                                    break;
+                                Console.Write(item.Text);
                             }
                         }
 
@@ -348,96 +332,6 @@ public partial class DocumentPendingService
                     count++;
                     goto reset;
                 }
-
-
-                if (DocumentOptions.RefineAndEnhanceQuality)
-                {
-                    try
-                    {
-                        var refineContents = new ChatMessageContentItemCollection
-                        {
-                            new TextContent(
-                                """
-                                Please refine and enhance the previous documentation content while maintaining its structure and approach. Focus on:
-
-                                **Enhancement Areas:**
-                                - Deepen existing architectural explanations with more technical detail
-                                - Expand code analysis with additional insights from the repository
-                                - Strengthen existing Mermaid diagrams with more comprehensive representations
-                                - Improve clarity and readability of existing explanations
-                                - Add more specific code references and examples where appropriate
-                                - Enhance existing sections with additional technical depth
-
-                                **Quality Standards:**
-                                - Maintain the 90-10 description-to-code ratio established in the original
-                                - Ensure all additions are evidence-based from the actual code files
-                                - Preserve the Microsoft documentation style approach
-                                - Enhance conceptual understanding through improved explanations
-                                - Strengthen the progressive learning structure
-
-                                **Refinement Protocol (tools only):**
-                                1) Use Docs.Read to review the current document thoroughly.
-                                2) Plan improvements that preserve structure and voice.
-                                3) Apply multiple small, precise Docs.MultiEdit operations to improve clarity, add missing details, and strengthen diagrams/citations.
-                                4) After each edit, re-run Docs.Read to verify changes and continue iterating (at least 2–3 passes).
-                                5) Avoid full overwrites; prefer targeted edits that enhance existing content.
-
-                                Build upon the solid foundation that exists to create even more comprehensive and valuable documentation.
-                                """),
-                            new TextContent(
-                                """
-                                <system-reminder>
-                                CRITICAL: You are now in document refinement phase. Your task is to ENHANCE and IMPROVE the EXISTING documentation content that was just generated, NOT to create completely new content.
-
-                                MANDATORY REQUIREMENTS:
-                                1. PRESERVE the original document structure and organization
-                                2. ENHANCE existing explanations with more depth and clarity
-                                3. IMPROVE technical accuracy and completeness based on actual code analysis
-                                4. EXPAND existing sections with more detailed architectural analysis
-                                5. REFINE language for better readability while maintaining technical precision
-                                6. STRENGTHEN existing Mermaid diagrams or add complementary ones
-                                7. ENSURE all enhancements are based on the code files analyzed in the original generation
-
-                                FORBIDDEN ACTIONS:
-                                - Do NOT restructure or reorganize the document completely
-                                - Do NOT remove existing sections or content
-                                - Do NOT add content not based on the analyzed code files
-                                - Do NOT change the fundamental approach or style established in the original
-
-                                Your goal is to take the good foundation that exists and make it BETTER, MORE DETAILED, and MORE COMPREHENSIVE while preserving its core structure and insights.
-                                </system-reminder>
-                                """),
-                            new TextContent(Prompt.Language)
-                        };
-                        history.AddUserMessage(refineContents);
-
-                        int reset1 = 1;
-                        reset1:
-
-                        await chat.GetChatMessageContentAsync(history, settings, documentKernel);
-
-                        if (string.IsNullOrEmpty(docs.Content) && reset1 < 3)
-                        {
-                            reset1++;
-                            goto reset1;
-                        }
-
-                        // 检查精炼后的内容是否有效
-                        if (!string.IsNullOrWhiteSpace(docs.Content))
-                        {
-                            Log.Logger.Information("文档精炼成功，文档：{name}", catalog.Name);
-                        }
-                        else
-                        {
-                            Log.Logger.Warning("文档精炼后内容为空，使用原始内容，文档：{name}", catalog.Name);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Logger.Error("文档精炼失败，使用原始内容，文档：{name}，错误：{error}", catalog.Name, ex.Message);
-                    }
-                }
-
 
                 var fileItem = new DocumentFileItem()
                 {

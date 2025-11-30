@@ -1,10 +1,33 @@
 using System.ComponentModel;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.AI;
 
 namespace KoalaWiki.KoalaWarehouse.DocumentPending;
 
 public class DocsFunction
 {
+    public List<AITool> Create()
+    {
+        return
+        [
+            AIFunctionFactory.Create(Write, new AIFunctionFactoryOptions()
+            {
+                Name = "Write"
+            }),
+
+            AIFunctionFactory.Create(Read, new AIFunctionFactoryOptions()
+            {
+                Name = "Read"
+            }),
+
+            AIFunctionFactory.Create(MultiEdit, new AIFunctionFactoryOptions()
+            {
+                Name = "MultiEdit"
+            })
+
+        ];
+    }
+    
     /// <summary>
     /// 写入内容
     /// </summary>

@@ -80,7 +80,7 @@ public class StepExecutionConfig
     /// <summary>
     /// 步骤超时时间
     /// </summary>
-    public TimeSpan StepTimeout { get; set; } = TimeSpan.FromMinutes(10);
+    public TimeSpan StepTimeout { get; set; } = TimeSpan.FromMinutes(60);
     
     /// <summary>
     /// 失败时是否继续执行后续步骤
