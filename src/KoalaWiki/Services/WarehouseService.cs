@@ -477,7 +477,7 @@ public class WarehouseService(
             Description = string.Empty,
             Version = string.Empty,
             Error = string.Empty,
-            Branch = string.Empty,
+            Branch = "main",
             Type = "file",
             CreatedAt = DateTime.UtcNow,
             Id = Guid.NewGuid().ToString(),
