@@ -171,7 +171,12 @@ export const useRepositoryDetailStore = create<RepositoryDetailState>((set, get)
           address: response.git || '',
           branch: targetBranch,
           status: response.Status,
-          createdAt: response.lastUpdate || new Date().toISOString(),
+          createdAt: response.lastUpdate || '',
+        }
+        
+        // Log warning if WarehouseId is missing for debugging
+        if (!repositoryInfo.id) {
+          console.warn('WarehouseId is missing from document catalog response, download functionality may not work')
         }
         
         set({
