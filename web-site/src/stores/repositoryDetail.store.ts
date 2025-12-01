@@ -161,10 +161,24 @@ export const useRepositoryDetailStore = create<RepositoryDetailState>((set, get)
 
       if (response && response.items) {
         const nodes = convertToTreeNodes(response.items)
+        
+        // Build repository info from response data
+        const repositoryInfo: RepositoryInfo = {
+          id: response.WarehouseId || '',
+          organizationName: owner,
+          name: name,
+          description: response.Description || '',
+          address: response.git || '',
+          branch: targetBranch,
+          status: response.Status,
+          createdAt: response.lastUpdate || new Date().toISOString(),
+        }
+        
         set({
           documentNodes: nodes,
           loadingDocuments: false,
-          error: null // 成功时清除错误状态
+          error: null, // 成功时清除错误状态
+          repository: repositoryInfo.id ? repositoryInfo : null
         })
 
         // 自动选择第一个文件节点
