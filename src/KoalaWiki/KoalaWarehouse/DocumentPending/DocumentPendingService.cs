@@ -165,7 +165,6 @@ public partial class DocumentPendingService
                     new Microsoft.Extensions.AI.TextContent(prompt),
                     new Microsoft.Extensions.AI.TextContent(
                         $"""
-                         ```xml
                          <system-reminder>
                          For maximum efficiency, whenever you need to perform multiple independent operations, invoke all relevant tools simultaneously rather than sequentially.
                          Note: The repository's directory structure has been provided in <code_files>. Please utilize the provided structure directly for file navigation and reading operations, rather than relying on glob patterns or filesystem traversal methods.

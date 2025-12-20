@@ -17,16 +17,18 @@ public class AgentFactory
         {
             var openAIClient = new OpenAIClient(new ApiKeyCredential(OpenAIOptions.ChatApiKey), new OpenAIClientOptions
             {
-                Endpoint = new Uri(OpenAIOptions.Endpoint) // 您的自定义端点
+                Endpoint = new Uri(OpenAIOptions.Endpoint),
             });
 
             var chatClient = openAIClient.GetChatClient(modelId);
 
-            var agentOptions = new ChatClientAgentOptions();
-            agentOptions.ChatMessageStoreFactory = (messageContext) =>
+            var agentOptions = new ChatClientAgentOptions
             {
-                var logger = loggerFactory?.CreateLogger<AutoContextCompress>();
-                return new AutoContextCompress(messageContext, chatClient.AsIChatClient(), logger);
+                ChatMessageStoreFactory = (messageContext) =>
+                {
+                    var logger = loggerFactory?.CreateLogger<AutoContextCompress>();
+                    return new AutoContextCompress(messageContext, chatClient.AsIChatClient(), logger);
+                },
             };
             agentAction.Invoke(agentOptions);
 

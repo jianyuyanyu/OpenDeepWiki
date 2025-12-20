@@ -58,7 +58,7 @@ public class FileTool(string gitPath, List<string>? files)
     {
         return AIFunctionFactory.Create(ReadFileFromLineAsync, new AIFunctionFactoryOptions()
         {
-            Name = "Read"
+            Name = "ReadFile"
         });
     }
 
