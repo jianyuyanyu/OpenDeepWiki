@@ -79,7 +79,7 @@ public class DocumentCatalogService(IKoalaWikiContext dbAccess) : FastApi
             progress = progress,
             git = warehouse.Address,
             branchs = branchs,
-            document?.WarehouseId,
+            WarehouseId = warehouse.Id,
             document?.LikeCount,
             document?.Status,
             document?.CommentCount,
