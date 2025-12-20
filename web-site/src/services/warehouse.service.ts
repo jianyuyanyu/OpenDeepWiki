@@ -242,8 +242,20 @@ class WarehouseService {
     })
 
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.message || '下载失败')
+      let errorMessage = '下载失败'
+      try {
+        const contentType = response.headers.get('content-type')
+        if (contentType?.includes('application/json')) {
+          const error = await response.json()
+          errorMessage = error.message || error.error || '下载失败'
+        } else {
+          const text = await response.text()
+          errorMessage = text || `HTTP ${response.status}: ${response.statusText}`
+        }
+      } catch (e) {
+        errorMessage = `HTTP ${response.status}: ${response.statusText}`
+      }
+      throw new Error(errorMessage)
     }
 
     // 从响应头获取文件名

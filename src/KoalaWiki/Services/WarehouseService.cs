@@ -973,27 +973,35 @@ public class WarehouseService(
     [Authorize]
     public async Task ExportMarkdownZip(string warehouseId, HttpContext context)
     {
-        // 检查用户权限
-        if (!await CheckWarehouseAccessAsync(warehouseId))
+        try
         {
-            context.Response.StatusCode = 403;
-            await context.Response.WriteAsJsonAsync(new
+            // 检查用户权限
+            if (!await CheckWarehouseAccessAsync(warehouseId))
             {
-                code = 403,
-                message = "您没有权限访问此仓库"
-            });
-            return;
-        }
+                context.Response.StatusCode = 403;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    code = 403,
+                    message = "您没有权限访问此仓库"
+                });
+                return;
+            }
 
-        var query = await koala.Warehouses
-            .AsNoTracking()
-            .Where(x => x.Id == warehouseId)
-            .FirstOrDefaultAsync();
+            var query = await koala.Warehouses
+                .AsNoTracking()
+                .Where(x => x.Id == warehouseId)
+                .FirstOrDefaultAsync();
 
-        if (query == null)
-        {
-            throw new NotFoundException("文件不存在");
-        }
+            if (query == null)
+            {
+                context.Response.StatusCode = 404;
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    code = 404,
+                    message = "仓库不存在"
+                });
+                return;
+            }
 
         var fileName = $"{query.Name}.zip";
 
@@ -1073,14 +1081,24 @@ public class WarehouseService(
             }
         }
 
-        // 将内存流的位置重置到开始
-        memoryStream.Position = 0;
+            // 将内存流的位置重置到开始
+            memoryStream.Position = 0;
 
-        context.Response.ContentType = "application/zip";
-        context.Response.Headers["Content-Disposition"] = $"attachment; filename={fileName}";
+            context.Response.ContentType = "application/zip";
+            context.Response.Headers["Content-Disposition"] = $"attachment; filename={fileName}";
 
-        // 将zip文件流写入响应
-        await memoryStream.CopyToAsync(context.Response.Body);
+            // 将zip文件流写入响应
+            await memoryStream.CopyToAsync(context.Response.Body);
+        }
+        catch (Exception ex)
+        {
+            context.Response.StatusCode = 500;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                code = 500,
+                message = $"导出失败: {ex.Message}"
+            });
+        }
     }
 
 

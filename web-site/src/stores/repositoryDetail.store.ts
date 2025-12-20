@@ -161,7 +161,7 @@ export const useRepositoryDetailStore = create<RepositoryDetailState>((set, get)
 
       if (response && response.items) {
         const nodes = convertToTreeNodes(response.items)
-        
+
         // Build repository info from response data
         const repositoryInfo: RepositoryInfo = {
           id: response.WarehouseId || '',
@@ -173,17 +173,12 @@ export const useRepositoryDetailStore = create<RepositoryDetailState>((set, get)
           status: response.Status,
           createdAt: response.lastUpdate || '',
         }
-        
-        // Log warning if WarehouseId is missing for debugging
-        if (!repositoryInfo.id) {
-          console.warn('WarehouseId is missing from document catalog response, download functionality may not work')
-        }
-        
+
         set({
           documentNodes: nodes,
           loadingDocuments: false,
-          error: null, // 成功时清除错误状态
-          repository: repositoryInfo.id ? repositoryInfo : null
+          error: null,
+          repository: repositoryInfo
         })
 
         // 自动选择第一个文件节点
