@@ -7,14 +7,21 @@ import { SearchBar } from '@/components/SearchBar'
 import { RepositoryCard } from '@/components/repository/RepositoryCard'
 import { RepositoryForm, type RepositoryFormValues } from '@/components/repository/RepositoryForm/index'
 import { Pagination } from '@/components/Pagination'
-import { SponsorsSection } from '@/components/SponsorsSection'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useRepositories } from '@/hooks/useRepositories'
 import { warehouseService } from '@/services/warehouse.service'
-import { Loader2, RefreshCw, AlertCircle, Plus } from 'lucide-react'
+import {
+  Loader2,
+  RefreshCw,
+  AlertCircle,
+  Plus,
+  Sparkles,
+  BookOpen
+} from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
+import { motion } from 'motion/react'
 
 export const HomePage = () => {
   const { t } = useTranslation()
@@ -98,82 +105,130 @@ export const HomePage = () => {
       <Header />
 
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-b from-background via-background/95 to-background py-20 px-4">
-        <div className="container mx-auto text-center">
-          <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-secondary/5 py-24 px-4">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-secondary/10 rounded-full blur-3xl animate-pulse delay-700" />
+        </div>
+
+        <div className="container mx-auto text-center relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-primary">AI-Powered Knowledge Base</span>
+            </div>
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-primary via-primary/80 to-secondary bg-clip-text text-transparent"
+          >
             {t('home.title')}
-          </h1>
-          <p className="text-xl text-muted-foreground mb-12 max-w-2xl mx-auto">
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed"
+          >
             {t('home.subtitle')}
-          </p>
+          </motion.p>
 
           {/* Search Bar */}
-          <SearchBar
-            value={searchValue}
-            onChange={setSearchValue}
-            onSearch={handleSearch}
-            placeholder={t('home.search_placeholder')}
-            size="lg"
-            className="max-w-3xl"
-          />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+          >
+            <SearchBar
+              value={searchValue}
+              onChange={setSearchValue}
+              onSearch={handleSearch}
+              placeholder={t('home.search_placeholder')}
+              size="lg"
+              className="max-w-3xl shadow-lg"
+            />
+          </motion.div>
 
           {/* Quick Filters */}
-          <div className="flex items-center justify-center gap-2 mt-6 flex-wrap">
-            <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+            className="flex items-center justify-center gap-2 mt-8 flex-wrap"
+          >
+            <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80 transition-all hover:scale-105">
               {t('common.search')}
             </Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-secondary/80">
+            <Badge variant="outline" className="cursor-pointer hover:bg-secondary/80 transition-all hover:scale-105">
               {t('home.repository_card.recommended')}
             </Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-secondary/80">
+            <Badge variant="outline" className="cursor-pointer hover:bg-secondary/80 transition-all hover:scale-105">
               {t('home.repository_card.recently_updated')}
             </Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-secondary/80">
+            <Badge variant="outline" className="cursor-pointer hover:bg-secondary/80 transition-all hover:scale-105">
               {t('home.repository_card.status.1')}
             </Badge>
-            <Badge variant="outline" className="cursor-pointer hover:bg-secondary/80">
+            <Badge variant="outline" className="cursor-pointer hover:bg-secondary/80 transition-all hover:scale-105">
               {t('home.repository_card.status.2')}
             </Badge>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Repository List Section */}
       <section className="container mx-auto px-4 py-12">
         {/* Section Header */}
-        <div className="flex items-center justify-between mb-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="flex items-center justify-between mb-8"
+        >
           <div>
-            <h2 className="text-2xl font-bold mb-2">{t('home.repository_list.title')}</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+              {t('home.repository_list.title')}
+            </h2>
+            <p className="text-muted-foreground text-lg">
               {t('common.total', { count: totalCount })}
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button
-              size="sm"
+              size="default"
               onClick={() => setShowAddModal(true)}
-              className="bg-primary hover:bg-primary/90"
+              className="bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl transition-all hover:scale-105"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-5 w-5" />
               <span className="ml-2">{t('repository.form.addRepository')}</span>
             </Button>
 
             <Button
               variant="outline"
-              size="sm"
+              size="default"
               onClick={refresh}
               disabled={loading}
+              className="hover:bg-secondary/80 transition-all hover:scale-105"
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="h-5 w-5" />
               )}
               <span className="ml-2">{t('common.refresh')}</span>
             </Button>
           </div>
-        </div>
+        </motion.div>
 
         {/* Error State */}
         {error && (
@@ -196,22 +251,38 @@ export const HomePage = () => {
           <>
             {/* Repository Grid */}
             {repositories.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mb-12">
-                {repositories.map((repo) => (
-                  <RepositoryCard
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-12">
+                {repositories.map((repo, index) => (
+                  <motion.div
                     key={repo.id}
-                    repository={repo}
-                    onClick={handleRepositoryClick}
-                  />
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.4, delay: index * 0.05 }}
+                  >
+                    <RepositoryCard
+                      repository={repo}
+                      onClick={handleRepositoryClick}
+                    />
+                  </motion.div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-20">
-                <p className="text-muted-foreground text-lg">{t('home.repository_list.empty')}</p>
-                <p className="text-sm text-muted-foreground mt-2">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-center py-20"
+              >
+                <div className="inline-flex p-4 rounded-full bg-muted/50 mb-4">
+                  <BookOpen className="h-12 w-12 text-muted-foreground" />
+                </div>
+                <p className="text-muted-foreground text-xl font-medium mb-2">
+                  {t('home.repository_list.empty')}
+                </p>
+                <p className="text-sm text-muted-foreground">
                   {t('home.repository_list.empty_description')}
                 </p>
-              </div>
+              </motion.div>
             )}
 
             {/* Pagination */}
@@ -227,13 +298,8 @@ export const HomePage = () => {
         )}
       </section>
 
-      {/* Sponsors Section */}
-      <SponsorsSection
-        className="bg-muted/30"
-      />
-
       {/* Footer */}
-      <footer className="border-t">
+      <footer className="border-t mt-12">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between text-sm text-muted-foreground">
             <p>{t('footer.copyright', { year: new Date().getFullYear() })}</p>

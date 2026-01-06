@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { motion, AnimatePresence } from 'motion/react'
 import { Loader2, List, X, Eye, EyeOff } from 'lucide-react'
 import { documentService, type DocumentResponse } from '@/services/documentService'
 import { useRepositoryDetailStore } from '@/stores/repositoryDetail.store'
@@ -8,6 +9,8 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import TableOfContents from '@/components/common/TableOfContents'
+import DocumentSkeleton from '@/components/common/DocumentSkeleton'
+import { FadeIn, SlideIn, ZoomIn, StaggerContainer, StaggerItem } from '@/components/animate-ui'
 
 interface DocumentPageProps {
   className?: string
@@ -128,40 +131,49 @@ export default function DocumentPage({ className, branch }: DocumentPageProps) {
   }, [isMobileTocOpen])
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    return <DocumentSkeleton />
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-4">
-        <p className="text-lg text-muted-foreground">{error}</p>
-        <p className="text-sm text-muted-foreground">
-          {owner}/{name}/{path}
-        </p>
-      </div>
+      <FadeIn className="flex flex-col items-center justify-center h-full gap-4">
+        <ZoomIn className="text-center space-y-2">
+          <p className="text-lg text-muted-foreground">{error}</p>
+          <p className="text-sm text-muted-foreground">
+            {owner}/{name}/{path}
+          </p>
+        </ZoomIn>
+      </FadeIn>
     )
   }
 
   return (
     <div className={cn("flex-1 flex h-full relative", className)}>
       <div className="flex-1 overflow-auto h-full">
-        <article className="max-w-4xl mx-auto px-6 py-8 min-h-full">
-          {/* 显示文档标题 */}
-          {documentData?.title && (
-            <h1 className="text-3xl font-bold mb-4">{documentData.title}</h1>
-          )}
-          {/* 显示文档描述 */}
-          {documentData?.description && (
-            <p className="text-muted-foreground mb-6">{documentData.description}</p>
-          )}
+        <FadeIn asChild>
+          <article className="max-w-4xl mx-auto px-6 py-8 min-h-full">
+            <StaggerContainer staggerDelay={0.1}>
+              {/* 显示文档描述 */}
+              {documentData?.description && (
+                <StaggerItem>
+                  <motion.p
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-muted-foreground mb-6"
+                  >
+                    {documentData.description}
+                  </motion.p>
+                </StaggerItem>
+              )}
 
-          {/* 显示源文件信息 - 移到顶部 */}
-          {documentData?.fileSource && documentData.fileSource.length > 0 && (
-            <div className="mb-6 p-4 bg-muted/30 rounded-lg border">
+              {/* 显示源文件信息 */}
+              {documentData?.fileSource && documentData.fileSource.length > 0 && (
+                <StaggerItem>
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-6 p-4 bg-muted/30 rounded-lg border"
+                  >
               <details className="group">
                 <summary className="flex items-center gap-2 cursor-pointer font-medium text-sm">
                   <svg
@@ -196,19 +208,33 @@ export default function DocumentPage({ className, branch }: DocumentPageProps) {
                   )}
                 </div>
               </details>
-            </div>
-          )}
+                  </motion.div>
+                </StaggerItem>
+              )}
 
-          {/* 渲染 Markdown 内容 */}
-          <div className="markdown-content">
-            <MarkdownRenderer content={documentData?.content || ''} />
-          </div>
-        </article>
+              {/* 渲染 Markdown 内容 */}
+              <StaggerItem>
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="markdown-content"
+                >
+                  <MarkdownRenderer content={documentData?.content || ''} />
+                </motion.div>
+              </StaggerItem>
+            </StaggerContainer>
+          </article>
+        </FadeIn>
       </div>
 
-      {/* 桌面端 TOC - 自适应显示 */}
+      {/* 桌面端 TOC - 自适应显示，使用 motion */}
       {(hasTocContent || forceShowToc) && (
-        <aside className="w-64 border-l border-border/40 px-4 py-8 overflow-y-auto hidden lg:block">
+        <motion.aside
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+          className="w-64 border-l border-border/40 px-4 py-8 overflow-y-auto hidden lg:block"
+        >
           {/* TOC 手动控制按钮 - 仅在内容不足时显示 */}
           {!hasTocContent && (
             <div className="mb-4 flex items-center justify-between">
@@ -227,61 +253,105 @@ export default function DocumentPage({ className, branch }: DocumentPageProps) {
             </div>
           )}
           <TableOfContents />
-        </aside>
+        </motion.aside>
       )}
 
-      {/* 桌面端 TOC 显示按钮 - 仅在内容不足且未强制显示时显示 */}
-      {!hasTocContent && !forceShowToc && (
-        <Button
-          onClick={() => setForceShowToc(true)}
-          className="fixed top-24 right-6 h-10 px-3 rounded-full shadow-lg hidden lg:flex items-center gap-2 z-40"
-          variant="outline"
-          title={t('repository.document.showToc')}
-        >
-          <Eye className="h-4 w-4" />
-          <span className="text-sm">{t('repository.document.tableOfContents')}</span>
-        </Button>
-      )}
+      {/* 桌面端 TOC 显示按钮 - 使用 motion */}
+      <AnimatePresence>
+        {!hasTocContent && !forceShowToc && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            className="fixed top-24 right-6 z-40 hidden lg:block"
+          >
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                onClick={() => setForceShowToc(true)}
+                className="h-10 px-3 rounded-full shadow-lg flex items-center gap-2"
+                variant="outline"
+                title={t('repository.document.showToc')}
+              >
+                <Eye className="h-4 w-4" />
+                <span className="text-sm">{t('repository.document.tableOfContents')}</span>
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* 移动端 TOC 按钮 - 自适应显示 */}
-      {(hasTocContent || forceShowToc) && (
-        <Button
-          onClick={() => setIsMobileTocOpen(true)}
-          className={cn(
-            "fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg lg:hidden z-40 p-0 transition-all duration-300",
-            showMobileTocButton ? "translate-y-0 opacity-100" : "translate-y-16 opacity-0 pointer-events-none"
-          )}
-          size="icon"
-          aria-label="Open Table of Contents"
-        >
-          <List className="h-5 w-5" />
-        </Button>
-      )}
+      {/* 移动端 TOC 按钮 - 使用 motion */}
+      <AnimatePresence>
+        {(hasTocContent || forceShowToc) && showMobileTocButton && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.75, y: 20 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.3 }}
+            className="fixed bottom-6 right-6 z-40 lg:hidden"
+          >
+            <Button
+              onClick={() => setIsMobileTocOpen(true)}
+              className="h-12 w-12 rounded-full shadow-lg p-0"
+              size="icon"
+              aria-label="Open Table of Contents"
+            >
+              <List className="h-5 w-5" />
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* 移动端 TOC 显示按钮 - 仅在内容不足且未强制显示时显示 */}
-      {!hasTocContent && !forceShowToc && (
-        <Button
-          onClick={() => setForceShowToc(true)}
-          className="fixed bottom-6 right-6 h-12 px-4 rounded-full shadow-lg lg:hidden z-40 flex items-center gap-2"
-          variant="outline"
-          aria-label="Show Table of Contents"
-        >
-          <Eye className="h-4 w-4" />
-          <span className="text-sm">TOC</span>
-        </Button>
-      )}
+      {/* 移动端 TOC 显示按钮 - 使用 motion */}
+      <AnimatePresence>
+        {!hasTocContent && !forceShowToc && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            className="fixed bottom-6 right-6 z-40 lg:hidden"
+          >
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                onClick={() => setForceShowToc(true)}
+                className="h-12 px-4 rounded-full shadow-lg flex items-center gap-2"
+                variant="outline"
+                aria-label="Show Table of Contents"
+              >
+                <Eye className="h-4 w-4" />
+                <span className="text-sm">TOC</span>
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* 移动端 TOC 抽屉 - 自适应显示 */}
-      {(hasTocContent || forceShowToc) && isMobileTocOpen && (
-        <>
-          {/* 遮罩层 */}
-          <div
-            className="fixed inset-0 bg-black/50 z-50 lg:hidden animate-in fade-in duration-300"
-            onClick={() => setIsMobileTocOpen(false)}
-          />
+      {/* 移动端 TOC 抽屉 - 使用 AnimatePresence */}
+      <AnimatePresence>
+        {(hasTocContent || forceShowToc) && isMobileTocOpen && (
+          <>
+            {/* 遮罩层 - motion 动画 */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              className="fixed inset-0 bg-black/50 z-50 lg:hidden"
+              onClick={() => setIsMobileTocOpen(false)}
+            />
 
-          {/* TOC 抽屉 */}
-          <div className="fixed inset-y-0 right-0 w-80 max-w-[85vw] bg-background border-l border-border z-50 lg:hidden animate-in slide-in-from-right duration-300 shadow-2xl">
+            {/* TOC 抽屉 - motion 动画 */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="fixed inset-y-0 right-0 w-80 max-w-[85vw] bg-background border-l border-border z-50 lg:hidden shadow-2xl"
+            >
             <div className="flex flex-col h-full">
               {/* 头部 */}
               <div className="flex items-center justify-between p-4 border-b border-border">
@@ -314,9 +384,10 @@ export default function DocumentPage({ className, branch }: DocumentPageProps) {
                 />
               </div>
             </div>
-          </div>
-        </>
-      )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

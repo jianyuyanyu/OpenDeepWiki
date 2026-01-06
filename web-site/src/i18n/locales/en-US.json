@@ -80,6 +80,34 @@
     "search_placeholder": "Search repository name or address",
     "add_repository": "Add Repository",
     "query_last_repo": "Query Latest Repository",
+    "features": {
+      "title": "Core Features",
+      "subtitle": "Powerful capabilities to enhance your code knowledge management",
+      "multi_language": {
+        "title": "Multi-Language Support",
+        "description": "Supports code analysis for multiple programming languages including C#, Java, Python, JavaScript, Go, C++, and more"
+      },
+      "ai_powered": {
+        "title": "AI-Powered Analysis",
+        "description": "Leverages advanced AI technology to automatically generate documentation, analyze code structure, and create knowledge graphs"
+      },
+      "secure": {
+        "title": "Secure & Reliable",
+        "description": "Supports private deployment with full data control, ensuring your code remains secure"
+      },
+      "multi_provider": {
+        "title": "Multiple AI Providers",
+        "description": "Supports various AI service providers including OpenAI, Anthropic, Azure OpenAI, and more"
+      },
+      "documentation": {
+        "title": "Auto Documentation",
+        "description": "Intelligently generates README, directory structures, and API documentation, saving significant time"
+      },
+      "knowledge_graph": {
+        "title": "Knowledge Graph",
+        "description": "Automatically builds code relationship networks to help understand complex code structures and dependencies"
+      }
+    },
     "repository_list": {
       "title": "Repository List",
       "empty": "No repository data available",

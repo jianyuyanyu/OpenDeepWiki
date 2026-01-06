@@ -121,6 +121,10 @@ public class DocumentsHelper
         {
             return 32768;
         }
+        if (model.StartsWith("mimo-v2-flash", StringComparison.CurrentCultureIgnoreCase))
+        {
+            return 32768;
+        }
 
         return model switch
         {

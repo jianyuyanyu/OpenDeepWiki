@@ -80,6 +80,34 @@
     "search_placeholder": "搜索仓库名称或地址",
     "add_repository": "添加仓库",
     "query_last_repo": "查询最新仓库",
+    "features": {
+      "title": "核心特性",
+      "subtitle": "强大的功能助力您的代码知识管理",
+      "multi_language": {
+        "title": "多语言支持",
+        "description": "支持 C#、Java、Python、JavaScript、Go、C++ 等多种编程语言的代码分析"
+      },
+      "ai_powered": {
+        "title": "AI 智能分析",
+        "description": "利用先进的 AI 技术自动生成文档、分析代码结构和创建知识图谱"
+      },
+      "secure": {
+        "title": "安全可靠",
+        "description": "支持私有部署，数据完全掌控在您手中，确保代码安全"
+      },
+      "multi_provider": {
+        "title": "多 AI 提供商",
+        "description": "支持 OpenAI、Anthropic、Azure OpenAI 等多种 AI 服务提供商"
+      },
+      "documentation": {
+        "title": "自动文档生成",
+        "description": "智能生成 README、目录结构和 API 文档，节省大量时间"
+      },
+      "knowledge_graph": {
+        "title": "知识图谱",
+        "description": "自动构建代码关系网络，帮助理解复杂的代码结构和依赖关系"
+      }
+    },
     "repository_list": {
       "title": "知识库列表",
       "empty": "暂无仓库数据",

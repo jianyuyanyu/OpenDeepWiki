@@ -6,6 +6,9 @@ namespace KoalaWiki.KoalaWarehouse.DocumentPending;
 
 public class DocsFunction
 {
+    private readonly Stack<string> _contentHistory = new(); // 版本历史栈
+    private const int MaxHistorySize = 10; // 最多保留10个版本
+
     public List<AITool> Create()
     {
         return
@@ -42,6 +45,12 @@ public class DocsFunction
     public string Write(
         [Description("The content to write")] string content)
     {
+        // 保存当前版本到历史栈（如果存在内容）
+        if (!string.IsNullOrEmpty(Content))
+        {
+            SaveSnapshot();
+        }
+
         Content = content;
         if (string.IsNullOrEmpty(Content))
         {
@@ -49,7 +58,7 @@ public class DocsFunction
         }
 
         Content = Content.Trim();
-        return @$"<system-reminder>Write successful</system-reminder>";
+        return @$"<system-reminder>Write successful. Content length: {Content.Length} characters.</system-reminder>";
     }
 
 
@@ -63,7 +72,7 @@ public class DocsFunction
                                          """)]
     public string Read(
         [Description("The line number to start reading from. Only provide if the file is too large to read at once")]
-        int offset,
+        int offset = 0,
         [Description("The number of lines to read. Only provide if the file is too large to read at once.")]
         int limit = 2000)
     {
@@ -71,15 +80,27 @@ public class DocsFunction
         {
             return  "<system-reminder>Content cannot be empty.</system-reminder>";
         }
-        
+
         var lines = Content?.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
-        
-        if (offset < 0 || offset >= lines?.Length)
+
+        if (lines == null || lines.Length == 0)
         {
-            // 读取所有
-            return string.Join("\n", lines);
+            return "<system-reminder>Content is empty after splitting.</system-reminder>";
         }
 
+        // 修复：offset 超出范围时返回所有内容（向后兼容），但记录警告
+        if (offset < 0)
+        {
+            offset = 0;
+        }
+
+        if (offset >= lines.Length)
+        {
+            return "<system-reminder>Offset exceeds content length. Reading from beginning.</system-reminder>\n" +
+                   string.Join("\n", lines);
+        }
+
+        // 修复：limit <= 0 表示读取所有剩余内容
         if (limit <= 0 || offset + limit > lines.Length)
         {
             // 读取到结尾
@@ -155,27 +176,54 @@ When making edits:
             }
         }
 
+        // 保存当前版本到历史栈
+        SaveSnapshot();
+
         // Apply edits sequentially
         string currentContent = Content;
-        
+        var appliedEdits = new List<(int startIndex, int endIndex, string newContent)>(); // 跟踪已编辑区域
+
         for (int i = 0; i < edits.Length; i++)
         {
             var edit = edits[i];
-            
+
             if (!currentContent.Contains(edit.OldString))
             {
                 return $"<system-reminder>Edit {i + 1}: Old string not found in document.</system-reminder>";
             }
 
-            if (!edit.ReplaceAll && currentContent.Split(new[] { edit.OldString }, StringSplitOptions.None).Length > 2)
+            if (!edit.ReplaceAll)
             {
-                return $"<system-reminder>Edit {i + 1}: Old string is not unique. Use replaceAll=true or provide a longer unique string.</system-reminder>";
+                var occurrenceCount = CountOccurrences(currentContent, edit.OldString);
+
+                if (occurrenceCount > 1)
+                {
+                    return $"<system-reminder>Edit {i + 1}: Old string appears {occurrenceCount} times in document. Use replaceAll=true or provide a longer unique string with more context.</system-reminder>";
+                }
+
+                // 检查是否与之前的编辑区域重叠
+                var editIndex = currentContent.IndexOf(edit.OldString, StringComparison.Ordinal);
+                var editEndIndex = editIndex + edit.OldString.Length;
+
+                foreach (var appliedEdit in appliedEdits)
+                {
+                    if (editIndex < appliedEdit.endIndex && editEndIndex > appliedEdit.startIndex)
+                    {
+                        return $"<system-reminder>Edit {i + 1}: Overlaps with a previous edit. Edits must target distinct regions.</system-reminder>";
+                    }
+                }
+
+                appliedEdits.Add((editIndex, editEndIndex, edit.NewString));
             }
 
             // Apply the edit
             if (edit.ReplaceAll)
             {
+                var occurrenceCount = CountOccurrences(currentContent, edit.OldString);
                 currentContent = currentContent.Replace(edit.OldString, edit.NewString);
+
+                // replaceAll 时清空已编辑区域跟踪（因为内容整体变化）
+                appliedEdits.Clear();
             }
             else
             {
@@ -192,6 +240,57 @@ When making edits:
     /// 内容
     /// </summary>
     public string? Content { get; private set; }
+
+    /// <summary>
+    /// 计算字符串出现次数
+    /// </summary>
+    private static int CountOccurrences(string text, string pattern)
+    {
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(pattern))
+            return 0;
+
+        int count = 0;
+        int index = 0;
+
+        while ((index = text.IndexOf(pattern, index, StringComparison.Ordinal)) != -1)
+        {
+            count++;
+            index += pattern.Length;
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// 保存当前内容快照到历史栈
+    /// </summary>
+    private void SaveSnapshot()
+    {
+        if (string.IsNullOrEmpty(Content))
+            return;
+
+        _contentHistory.Push(Content);
+
+        // 限制历史栈大小，移除最旧的版本
+        if (_contentHistory.Count > MaxHistorySize)
+        {
+            var tempStack = new Stack<string>(_contentHistory.Reverse().Take(MaxHistorySize));
+            _contentHistory.Clear();
+            foreach (var item in tempStack.Reverse())
+            {
+                _contentHistory.Push(item);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 获取版本历史信息（用于调试）
+    /// </summary>
+    public string GetVersionInfo()
+    {
+        return $"Current version: {(string.IsNullOrEmpty(Content) ? "empty" : $"{Content.Length} chars")}, " +
+               $"History versions: {_contentHistory.Count}";
+    }
 }
 
 public class MultiEditInput

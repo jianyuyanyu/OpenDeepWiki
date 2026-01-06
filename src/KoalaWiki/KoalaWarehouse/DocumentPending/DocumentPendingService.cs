@@ -123,13 +123,21 @@ public partial class DocumentPendingService
         int retryCount = 0;
         const int retries = 5;
         var files = new List<string>();
+        bool semaphoreAcquired = false;
 
-        for (var i = 0; i < 3; i++)
+        try
         {
-            try
+            // 在最外层获取信号量，确保整个处理过程中只获取一次
+            if (semaphore != null)
             {
-                if (semaphore != null)
-                    await semaphore.WaitAsync();
+                await semaphore.WaitAsync();
+                semaphoreAcquired = true;
+            }
+
+            for (var i = 0; i < 3; i++)
+            {
+                try
+                {
 
                 Log.Logger.Information("处理仓库；{path} ,处理标题：{name}", path, catalog.Name);
 
@@ -176,7 +184,7 @@ public partial class DocumentPendingService
                            components/D
                              Header.tsx/F
 
-                         {Prompt.Language}
+                         {DocumentLanguageConfig.GetLanguageReminder()}
 
                          ## Docs Tool Usage Guidelines
 
@@ -351,47 +359,53 @@ public partial class DocumentPendingService
 
                 Log.Logger.Information("处理仓库；{path} ,处理标题：{name} 完成！", path, catalog.Name);
 
-                semaphore?.Release();
-
-                return (catalog, fileItem, files);
-            }
-            catch (Exception ex)
-            {
-                semaphore?.Release();
-                Log.Logger.Error("处理仓库；{path} ,处理标题：{name} 失败:{ex}", path, catalog.Name, ex.ToString());
-
-                retryCount++;
-                if (retryCount >= retries)
-                {
-                    Console.WriteLine($"处理 {catalog.Name} 失败，已重试 {retryCount} 次，错误：{ex.Message}");
-                    throw; // 重试耗尽后向上层抛出异常
+                    return (catalog, fileItem, files);
                 }
-                else
+                catch (Exception ex)
                 {
-                    // 根据异常类型决定等待时间
-                    int delayMs;
-                    if (ex is InvalidOperationException && ex.Message.Contains("文档质量"))
+                    Log.Logger.Error("处理仓库；{path} ,处理标题：{name} 失败:{ex}", path, catalog.Name, ex.ToString());
+
+                    retryCount++;
+                    if (retryCount >= retries)
                     {
-                        // 质量问题重试间隔较短，因为主要是内容生成问题
-                        delayMs = 5000 * retryCount;
-                        Log.Logger.Information("文档质量问题重试 - 仓库: {path}, 标题: {name}, 第{retry}次重试, 等待{delay}ms",
-                            path, catalog.Name, retryCount, delayMs);
+                        Console.WriteLine($"处理 {catalog.Name} 失败，已重试 {retryCount} 次，错误：{ex.Message}");
+                        throw; // 重试耗尽后向上层抛出异常
                     }
                     else
                     {
-                        // API限流等其他问题需要更长等待时间
-                        delayMs = 10000 * retryCount;
-                        Log.Logger.Information("API异常重试 - 仓库: {path}, 标题: {name}, 第{retry}次重试, 等待{delay}ms",
-                            path, catalog.Name, retryCount, delayMs);
-                    }
+                        // 根据异常类型决定等待时间
+                        int delayMs;
+                        if (ex is InvalidOperationException && ex.Message.Contains("文档质量"))
+                        {
+                            // 质量问题重试间隔较短，因为主要是内容生成问题
+                            delayMs = 5000 * retryCount;
+                            Log.Logger.Information("文档质量问题重试 - 仓库: {path}, 标题: {name}, 第{retry}次重试, 等待{delay}ms",
+                                path, catalog.Name, retryCount, delayMs);
+                        }
+                        else
+                        {
+                            // API限流等其他问题需要更长等待时间
+                            delayMs = 10000 * retryCount;
+                            Log.Logger.Information("API异常重试 - 仓库: {path}, 标题: {name}, 第{retry}次重试, 等待{delay}ms",
+                                path, catalog.Name, retryCount, delayMs);
+                        }
 
-                    await Task.Delay(delayMs);
+                        await Task.Delay(delayMs);
+                    }
                 }
             }
+
+            throw new Exception("处理失败，重试多次仍未成功: " + catalog.Name);
         }
-
-
-        throw new Exception("处理失败，重试多次仍未成功: " + catalog.Name);
+        finally
+        {
+            // 确保信号量在所有情况下都被释放（无论成功、失败还是异常）
+            if (semaphore != null && semaphoreAcquired)
+            {
+                semaphore.Release();
+                Log.Logger.Debug("信号量已释放 - {path}/{name}", path, catalog.Name);
+            }
+        }
     }
 
     /// <summary>
