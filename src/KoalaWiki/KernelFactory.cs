@@ -50,7 +50,8 @@ public static class KernelFactory
                     Timeout = TimeSpan.FromSeconds(240),
                 });
         }
-        else if (OpenAIOptions.ModelProvider.Equals("AzureOpenAI", StringComparison.OrdinalIgnoreCase))
+        else if (OpenAIOptions.ModelProvider.Equals("AzureOpenAI", StringComparison.OrdinalIgnoreCase) ||
+                 OpenAIOptions.ModelProvider.Equals("Azure", StringComparison.OrdinalIgnoreCase))
         {
             kernelBuilder.AddAzureOpenAIChatCompletion(model, chatEndpoint, apiKey, httpClient: new HttpClient(
                 new KoalaHttpClientHandler()
