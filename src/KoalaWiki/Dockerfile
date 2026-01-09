@@ -27,6 +27,7 @@ ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "./KoalaWiki.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM node:22-bullseye AS frontend-build
+ENV ROLLUP_USE_NATIVE=false
 WORKDIR /app
 COPY web-site/ .
 WORKDIR "/app"

@@ -1,618 +1,1026 @@
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
+
 import { useParams, useSearchParams } from 'react-router-dom'
+
 import { useTranslation } from 'react-i18next'
-import { Loader2, AlertCircle, RefreshCw, Maximize, Minimize, Download } from 'lucide-react'
+
+import { 
+
+  Loader2, 
+
+  AlertCircle, 
+
+  RefreshCw, 
+
+  Maximize, 
+
+  Minimize, 
+
+  Download, 
+
+  Info,
+
+  MousePointer2
+
+} from 'lucide-react'
+
 import { useRepositoryDetailStore } from '@/stores/repositoryDetail.store'
+
 import { fetchService } from '@/services/fetch'
+
 import { Button } from '@/components/ui/button'
-import { Card, CardHeader, CardContent } from '@/components/ui/card'
+
+import { Card, CardContent } from '@/components/ui/card'
+
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
-import { Skeleton } from '@/components/ui/skeleton'
+
 import { cn } from '@/lib/utils'
+
+import { useTheme } from '@/components/theme-provider'
+
 import 'mind-elixir/style'
 
+
+
+// --- Types ---
+
+
+
 interface MiniMapResult {
+
   title: string
+
   url: string
+
   nodes: MiniMapResult[]
+
 }
+
+
 
 interface MindMapResponse {
+
   code: number
+
   message: string
+
   data: MiniMapResult
+
 }
+
+
 
 interface MindElixirNode {
+
   topic: string
+
   id: string
+
   root?: boolean
+
   expanded?: boolean
+
   hyperLink?: string
+
   children?: MindElixirNode[]
+
 }
 
-class MindMapService {
-  async getMindMap(
-    owner: string,
-    repo: string,
-    branch?: string,
-    languageCode?: string
-  ): Promise<MindMapResponse> {
-    try {
-      const params = new URLSearchParams({
-        owner,
-        name: repo
-      })
 
-      if (branch) {
-        params.append('branch', branch)
-      }
 
-      if (languageCode) {
-        params.append('languageCode', languageCode)
-      }
+// --- Services ---
 
-      const response = await fetchService.get<MindMapResponse>(
-        `/api/Warehouse/MiniMap?${params.toString()}`
-      )
-      return response
-    } catch (error) {
-      console.error('Failed to fetch mind map:', error)
-      throw error
-    }
+
+
+const fetchMindMapData = async (
+
+  owner: string,
+
+  repo: string,
+
+  branch: string,
+
+  languageCode?: string
+
+): Promise<MindMapResult> => {
+
+  const params = new URLSearchParams({ owner, name: repo })
+
+  if (branch) params.append('branch', branch)
+
+  if (languageCode) params.append('languageCode', languageCode)
+
+
+
+  const response = await fetchService.get<MindMapResponse>(
+
+    `/api/Warehouse/MiniMap?${params.toString()}`
+
+  )
+
+
+
+  if (response.code !== 200 || !response.data) {
+
+    throw new Error(response.message || 'Failed to load mind map data')
+
   }
+
+
+
+  return response.data
+
 }
 
-const mindMapService = new MindMapService()
 
-// 转换为 mind-elixir 数据格式
+
+// --- Helpers ---
+
+
+
 const convertToMindElixirData = (miniMapData: MiniMapResult): MindElixirNode => {
+
   let nodeIdCounter = 0
 
+
+
   const buildMindNode = (node: MiniMapResult, isRoot = false): MindElixirNode => {
+
     const mindNode: MindElixirNode = {
+
       topic: node.title,
+
       id: isRoot ? 'root' : `node_${nodeIdCounter++}`,
+
       hyperLink: node.url
+
     }
+
+
 
     if (isRoot) {
+
       mindNode.root = true
+
     }
+
+
 
     if (node.nodes && node.nodes.length > 0) {
+
       mindNode.expanded = true
+
       mindNode.children = node.nodes.map(child => buildMindNode(child))
+
     }
 
+
+
     return mindNode
+
   }
 
+
+
   return buildMindNode(miniMapData, true)
+
 }
+
+
+
+// --- Components ---
 
 
 
 export default function MindMapPage({ className }: { className?: string }) {
+
   const { owner, name } = useParams<{ owner: string; name: string }>()
+
   const [searchParams] = useSearchParams()
+
   const { t, i18n } = useTranslation()
+
   const { selectedBranch } = useRepositoryDetailStore()
-  const [loading, setLoading] = useState(true)
-  const [mindMapData, setMindMapData] = useState<MiniMapResult | null>(null)
-  const [error, setError] = useState<string>('')
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const mindRef = useRef<any>(null)
-  const panCleanupRef = useRef<(() => void) | null>(null)
 
-  const branch = searchParams.get('branch') || selectedBranch || 'main'
+    const { theme: appTheme } = useTheme()
 
-  const fetchMindMap = async () => {
-    if (!owner || !name) return
+    
 
-    setLoading(true)
-    try {
-      const response = await mindMapService.getMindMap(
-        owner,
-        name,
-        branch,
-        i18n.language
-      )
+    const [loading, setLoading] = useState(true)
 
-      if (response.code === 200 && response.data) {
-        setMindMapData(response.data)
-        const mindData = convertToMindElixirData(response.data)
-        setTimeout(() => initMindElixir(mindData), 100)
-      } else {
-        setError(response.message || t('repository.mindMap.loadFailed'))
+    const [error, setError] = useState<string>('')
+
+    const [isFullscreen, setIsFullscreen] = useState(false)
+
+    const [mindData, setMindData] = useState<MindElixirNode | null>(null)
+
+    
+
+    // Refs
+
+    const containerRef = useRef<HTMLDivElement>(null)
+
+    const mindRef = useRef<any>(null)
+
+    const panCleanupRef = useRef<(() => void) | null>(null)
+
+  
+
+    const branch = searchParams.get('branch') || selectedBranch || 'main'
+
+  
+
+    // Determine actual theme (dark/light)
+
+    const isDark = 
+
+      appTheme === 'dark' || 
+
+      (appTheme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+
+  
+
+    const loadData = useCallback(async () => {
+
+      if (!owner || !name) return
+
+  
+
+      setLoading(true)
+
+      setError('')
+
+      // Clear previous data to ensure loading state shows
+
+      setMindData(null) 
+
+      try {
+
+        const data = await fetchMindMapData(owner, name, branch, i18n.language)
+
+        const convertedData = convertToMindElixirData(data)
+
+        // Set data to trigger render effect
+
+        setMindData(convertedData)
+
+      } catch (err: any) {
+
+        console.error('Failed to fetch mind map:', err)
+
+        setError(err?.message || t('repository.mindMap.loadFailed'))
+
+      } finally {
+
+        setLoading(false)
+
       }
-    } catch (err: any) {
-      console.error('Failed to fetch mind map:', err)
-      setError(err?.message || t('repository.mindMap.loadFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }
 
+    }, [owner, name, branch, i18n.language, t])
 
-  // 初始化 Mind Elixir
-  const initMindElixir = async (mindData: MindElixirNode) => {
-    if (!containerRef.current) return
+  
 
-    // 动态导入 mind-elixir
-    const MindElixir = (await import('mind-elixir')).default
+    // Initialize Mind Elixir
 
-    // 销毁旧实例
-    if (panCleanupRef.current) {
-      panCleanupRef.current()
-      panCleanupRef.current = null
-    }
+    const initMindElixir = useCallback(async (data: MindElixirNode) => {
 
-    if (mindRef.current) {
-      mindRef.current.destroy?.()
-    }
+      if (!containerRef.current) return
 
-    const options = {
-      el: containerRef.current,
-      direction: MindElixir.SIDE,
-      draggable: true,
-      contextMenu: true,
-      toolBar: false,
-      nodeMenu: true,
-      keypress: true,
-      locale: 'en' as const,
-      overflowHidden: false,
-      mainLinkStyle: 2,
-      mouseSelectionButton: 0 as const,
-      allowFreeTransform: true,
-      mouseMoveThreshold: 5,
-      primaryLinkStyle: 1,
-      primaryNodeHorizontalGap: 65,
-      primaryNodeVerticalGap: 25,
-      theme: {
-        name: 'Minimal',
-        palette: [
-          '#0f172a', '#475569', '#64748b', '#94a3b8',
-          '#cbd5e1', '#e2e8f0', '#f1f5f9', '#f8fafc',
-          '#0ea5e9', '#06b6d4'
-        ],
-        cssVar: {
-          '--main-color': '#0f172a',
-          '--main-bgcolor': '#2f2020',
-          '--color': '#1e293b',
-          '--bgcolor': '#f8fafc',
-          '--panel-color': '255, 255, 255',
-          '--panel-bgcolor': '248, 250, 252',
-        },
-      },
-    }
+  
 
-    const mind = new MindElixir(options)
+      // Dynamic import
 
-    const mindElixirData = {
-      nodeData: mindData,
-      linkData: {}
-    }
+      const MindElixir = (await import('mind-elixir')).default
 
-    mind.init(mindElixirData)
+  
 
-    const ensureFit = () => {
-      mind.scaleFit()
-      mind.toCenter()
-    }
+      // Cleanup previous instance
 
-    if (typeof window !== 'undefined') {
-      requestAnimationFrame(ensureFit)
-      setTimeout(ensureFit, 150)
-    } else {
-      ensureFit()
-    }
+      if (panCleanupRef.current) panCleanupRef.current()
 
-    const panState = {
-      isPanning: false,
-      lastX: 0,
-      lastY: 0
-    }
-
-    const isNodeElement = (target: EventTarget | null) => {
-      if (!(target instanceof HTMLElement)) return false
-      return Boolean(
-        target.closest('me-root') ||
-          target.closest('me-parent') ||
-          target.closest('me-tpc') ||
-          target.closest('#input-box')
-      )
-    }
-
-    const handleMouseDown = (event: MouseEvent) => {
-      if (event.button !== 0) return
-      if (isNodeElement(event.target)) return
-
-      panState.isPanning = true
-      panState.lastX = event.clientX
-      panState.lastY = event.clientY
-      if (mind.container) {
-        mind.container.style.cursor = 'grabbing'
-        mind.container.classList.add('grabbing')
-      }
-      event.preventDefault()
-    }
-
-    const handleMouseMove = (event: MouseEvent) => {
-      if (!panState.isPanning) return
-
-      const dx = event.clientX - panState.lastX
-      const dy = event.clientY - panState.lastY
-
-      if (dx !== 0 || dy !== 0) {
-        mind.move(dx, dy)
-        panState.lastX = event.clientX
-        panState.lastY = event.clientY
-      }
-    }
-
-    const stopPanning = () => {
-      if (!panState.isPanning) return
-      panState.isPanning = false
-      if (mind.container) {
-        mind.container.style.cursor = 'grab'
-        mind.container.classList.remove('grabbing')
-      }
-    }
-
-    mind.container?.addEventListener('mousedown', handleMouseDown)
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', stopPanning)
-    mind.container?.addEventListener('mouseleave', stopPanning)
-
-    panCleanupRef.current = () => {
-      mind.container?.removeEventListener('mousedown', handleMouseDown)
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', stopPanning)
-      mind.container?.removeEventListener('mouseleave', stopPanning)
-      if (mind.container) {
-        mind.container.style.cursor = ''
-        mind.container.classList.remove('grabbing')
-      }
-    }
-
-    if (mind.container) {
-      mind.container.style.cursor = 'grab'
-      mind.container.classList.remove('grabbing')
-    }
-
-    mind.bus.addListener('selectNode', (node: any) => {
-      if (node.hyperLink) {
-        window.open(node.hyperLink, '_blank')
-      }
-    })
-
-    mind.bus.addListener('operation', (operation: any) => {
-      console.log('Mind map operation:', operation)
-    })
-
-    mindRef.current = mind
-
-    const resizeObserver = new ResizeObserver(() => {
-      if (mind && containerRef.current) {
-        mind.refresh()
-      }
-    })
-
-    resizeObserver.observe(containerRef.current)
-
-    return () => {
-      resizeObserver.disconnect()
-      if (panCleanupRef.current) {
-        panCleanupRef.current()
-        panCleanupRef.current = null
-      }
-      if (mind) {
-        mind.destroy?.()
-      }
-    }
-  }
-
-  // 全屏切换
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen)
-    setTimeout(() => {
-      if (mindRef.current && containerRef.current) {
-        mindRef.current.refresh()
-      }
-    }, 100)
-  }
-
-  // 导出为图片
-  const exportImage = async () => {
-    if (!mindRef.current) {
-      console.error('思维导图未初始化')
-      return
-    }
-
-    try {
-      const blob = await mindRef.current.exportPng()
-      if (blob) {
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${owner}-${name}-mindmap.png`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
-      }
-    } catch (error) {
-      console.error('Export error:', error)
-    }
-  }
-
-  useEffect(() => {
-    fetchMindMap()
-  }, [owner, name, branch, i18n.language])
-
-  useEffect(() => {
-    return () => {
-      if (panCleanupRef.current) {
-        panCleanupRef.current()
-        panCleanupRef.current = null
-      }
       if (mindRef.current) {
-        mindRef.current.destroy?.()
+
+        try { mindRef.current.destroy?.() } catch (e) { console.warn(e) }
+
       }
+
+  
+
+      // Theme Configuration
+
+      const themeConfig = {
+
+        name: 'Koala Theme',
+
+        palette: isDark 
+
+          ? ['#e4e4e7', '#d4d4d8', '#a1a1aa', '#71717a', '#52525b'] // Zinc 200-600 (Dark Mode)
+
+          : ['#18181b', '#27272a', '#3f3f46', '#52525b', '#71717a'], // Zinc 900-500 (Light Mode)
+
+        cssVar: {
+
+          '--main-color': isDark ? '#fafafa' : '#09090b', // Zinc 50 / Zinc 950
+
+          '--main-bgcolor': isDark ? '#27272a' : '#f4f4f5', // Zinc 800 / Zinc 100
+
+          '--color': isDark ? '#e4e4e7' : '#27272a', // Zinc 200 / Zinc 800
+
+          '--bgcolor': isDark ? '#18181b' : '#ffffff', // Zinc 900 / White
+
+          '--panel-color': isDark ? '255, 255, 255' : '9, 9, 11',
+
+          '--panel-bgcolor': isDark ? '39, 39, 42' : '255, 255, 255',
+
+        },
+
+      }
+
+  
+
+      const options = {
+
+        el: containerRef.current,
+
+        direction: MindElixir.SIDE,
+
+        draggable: true,
+
+        contextMenu: true,
+
+        toolBar: false, // We use our own toolbar
+
+        nodeMenu: true,
+
+        keypress: true,
+
+        locale: 'en' as const,
+
+        overflowHidden: false,
+
+        mainLinkStyle: 2,
+
+        mouseSelectionButton: 0 as const,
+
+        allowFreeTransform: true,
+
+        mouseMoveThreshold: 5,
+
+        primaryLinkStyle: 1,
+
+        primaryNodeHorizontalGap: 65,
+
+        primaryNodeVerticalGap: 25,
+
+        theme: themeConfig
+
+      }
+
+  
+
+      const mind = new MindElixir(options)
+
+      
+
+      mind.init({
+
+        nodeData: data,
+
+        linkData: {}
+
+      })
+
+  
+
+      const ensureFit = () => {
+
+        try {
+
+          mind.scaleFit()
+
+          mind.toCenter()
+
+        } catch (e) {
+
+          console.warn('Mind map fit error:', e)
+
+        }
+
+      }
+
+  
+
+      // Ensure fit after render
+
+      requestAnimationFrame(ensureFit)
+
+      setTimeout(ensureFit, 300)
+
+  
+
+      // Setup Custom Pan/Zoom behaviors
+
+      setupInteractions(mind)
+
+  
+
+      mind.bus.addListener('selectNode', (node: any) => {
+
+        if (node.hyperLink) {
+
+          window.open(node.hyperLink, '_blank')
+
+        }
+
+      })
+
+  
+
+      mindRef.current = mind
+
+    }, [isDark])
+
+  
+
+    // Setup interactions (Pan, etc.)
+
+    const setupInteractions = (mind: any) => {
+
+      const panState = { isPanning: false, lastX: 0, lastY: 0 }
+
+      
+
+      const isNodeElement = (target: EventTarget | null) => {
+
+        if (!(target instanceof HTMLElement)) return false
+
+        return Boolean(
+
+          target.closest('me-root') ||
+
+          target.closest('me-parent') ||
+
+          target.closest('me-tpc') ||
+
+          target.closest('#input-box')
+
+        )
+
+      }
+
+  
+
+      const handleMouseDown = (event: MouseEvent) => {
+
+        if (event.button !== 0 || isNodeElement(event.target)) return
+
+        
+
+        panState.isPanning = true
+
+        panState.lastX = event.clientX
+
+        panState.lastY = event.clientY
+
+        
+
+        if (mind.container) {
+
+          mind.container.style.cursor = 'grabbing'
+
+          mind.container.classList.add('grabbing')
+
+        }
+
+        event.preventDefault()
+
+      }
+
+  
+
+      const handleMouseMove = (event: MouseEvent) => {
+
+        if (!panState.isPanning) return
+
+        
+
+        const dx = event.clientX - panState.lastX
+
+        const dy = event.clientY - panState.lastY
+
+        
+
+        if (dx !== 0 || dy !== 0) {
+
+          mind.move(dx, dy)
+
+          panState.lastX = event.clientX
+
+          panState.lastY = event.clientY
+
+        }
+
+      }
+
+  
+
+      const stopPanning = () => {
+
+        if (!panState.isPanning) return
+
+        panState.isPanning = false
+
+        if (mind.container) {
+
+          mind.container.style.cursor = 'grab'
+
+          mind.container.classList.remove('grabbing')
+
+        }
+
+      }
+
+  
+
+      mind.container?.addEventListener('mousedown', handleMouseDown)
+
+      window.addEventListener('mousemove', handleMouseMove)
+
+      window.addEventListener('mouseup', stopPanning)
+
+      mind.container?.addEventListener('mouseleave', stopPanning)
+
+  
+
+      // Save cleanup function
+
+      panCleanupRef.current = () => {
+
+        mind.container?.removeEventListener('mousedown', handleMouseDown)
+
+        window.removeEventListener('mousemove', handleMouseMove)
+
+        window.removeEventListener('mouseup', stopPanning)
+
+        mind.container?.removeEventListener('mouseleave', stopPanning)
+
+      }
+
+  
+
+      // Set initial cursor
+
+      if (mind.container) {
+
+        mind.container.style.cursor = 'grab'
+
+      }
+
     }
-  }, [])
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-[60vh]">
-        <Skeleton className="w-32 h-32" />
-      </div>
-    )
-  }
+  
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4">
-        <AlertCircle className="h-12 w-12 text-destructive" />
-        <div className="text-center space-y-2">
-          <p className="text-lg font-medium">{t('repository.mindMap.error')}</p>
-          <p className="text-sm text-muted-foreground">{error}</p>
-          <p className="text-xs text-muted-foreground">
-            {owner}/{name} - {branch}
-          </p>
+    // Handle Resize
+
+    useEffect(() => {
+
+      const handleResize = () => {
+
+        if (mindRef.current && containerRef.current) {
+
+          mindRef.current.refresh()
+
+        }
+
+      }
+
+      window.addEventListener('resize', handleResize)
+
+      return () => window.removeEventListener('resize', handleResize)
+
+    }, [])
+
+  
+
+    // Initial Load
+
+    useEffect(() => {
+
+      loadData()
+
+    }, [loadData])
+
+  
+
+    // Core Rendering Effect: This initializes or re-initializes the mind map
+
+    // whenever the data is loaded/changed or the theme is switched.
+
+    useEffect(() => {
+
+      if (mindData) {
+
+        initMindElixir(mindData)
+
+      }
+
+    }, [mindData, initMindElixir])
+
+  
+
+    // Cleanup
+
+    useEffect(() => {
+
+      return () => {
+
+        if (panCleanupRef.current) panCleanupRef.current()
+
+        if (mindRef.current) try { mindRef.current.destroy?.() } catch {}
+
+      }
+
+    }, [])
+
+  
+
+    // Actions
+
+    const toggleFullscreen = () => {
+
+      setIsFullscreen(!isFullscreen)
+
+      setTimeout(() => {
+
+        mindRef.current?.refresh()
+
+        mindRef.current?.toCenter()
+
+      }, 100)
+
+    }
+
+  
+
+    const exportImage = async () => {
+
+      if (!mindRef.current) return
+
+      try {
+
+        const blob = await mindRef.current.exportPng()
+
+        if (blob) {
+
+          const url = URL.createObjectURL(blob)
+
+          const a = document.createElement('a')
+
+          a.href = url
+
+          a.download = `${owner}-${name}-mindmap.png`
+
+          document.body.appendChild(a)
+
+          a.click()
+
+          document.body.removeChild(a)
+
+          URL.revokeObjectURL(url)
+
+        }
+
+      } catch (error) {
+
+        console.error('Export error:', error)
+
+      }
+
+    }
+
+  
+
+    // --- Render ---
+
+  
+
+    if (loading || !mindData) {
+
+      return (
+
+        <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+
+          <p className="text-muted-foreground animate-pulse">{t('common.loading')}</p>
+
         </div>
-        <Button onClick={fetchMindMap} variant="outline" className="gap-2">
-          <RefreshCw className="h-4 w-4" />
-          {t('common.retry')}
-        </Button>
-      </div>
+
+      )
+
+    }
+
+  
+
+    if (error) {
+
+      return (
+
+        <div className="flex flex-col items-center justify-center h-[60vh] gap-6 p-6">
+
+          <div className="bg-destructive/10 p-4 rounded-full">
+
+            <AlertCircle className="h-10 w-10 text-destructive" />
+
+          </div>
+
+          <div className="text-center space-y-2 max-w-md">
+
+            <h3 className="text-lg font-semibold">{t('repository.mindMap.error')}</h3>
+
+            <p className="text-sm text-muted-foreground bg-muted p-2 rounded break-all">{error}</p>
+
+          </div>
+
+          <Button onClick={loadData} variant="default" className="gap-2">
+
+            <RefreshCw className="h-4 w-4" />
+
+            {t('common.retry')}
+
+          </Button>
+
+        </div>
+
+      )
+
+    }
+
+  
+
+    return (
+
+      <TooltipProvider>
+
+        <div className={cn("flex flex-col h-[calc(100vh-140px)] w-full gap-4", className)}>
+
+          <Card className={cn(
+
+            "flex-1 flex flex-col overflow-hidden border-border/60 shadow-sm transition-all duration-300",
+
+            isFullscreen && "fixed inset-0 z-[50] rounded-none h-screen border-0"
+
+          )}>
+
+            {/* Toolbar Overlay */}
+
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-background/80 backdrop-blur-sm p-1.5 rounded-lg border shadow-sm">
+
+              <ActionBtn 
+
+                icon={<RefreshCw className="h-4 w-4" />} 
+
+                label={t('repository.mindMap.refresh')} 
+
+                onClick={loadData} 
+
+              />
+
+              <ActionBtn 
+
+                icon={<Download className="h-4 w-4" />} 
+
+                label={t('repository.mindMap.exportImage')} 
+
+                onClick={exportImage} 
+
+              />
+
+              <div className="w-px h-4 bg-border mx-1" />
+
+              <ActionBtn 
+
+                icon={isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />} 
+
+                label={isFullscreen ? t('repository.mindMap.fullscreenExit') : t('repository.mindMap.fullscreenEnter')} 
+
+                onClick={toggleFullscreen} 
+
+              />
+
+            </div>
+
+  
+
+            {/* Helper / Info Overlay */}
+
+            <div className="absolute bottom-4 right-4 z-10">
+
+              <Tooltip>
+
+                <TooltipTrigger asChild>
+
+                  <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm px-3 py-1.5 rounded-full border shadow-sm text-xs text-muted-foreground cursor-help hover:bg-accent transition-colors">
+
+                    <MousePointer2 className="h-3 w-3" />
+
+                    <span>{t('repository.mindMap.helpText')}</span>
+
+                    <Info className="h-3 w-3 ml-1" />
+
+                  </div>
+
+                </TooltipTrigger>
+
+                <TooltipContent side="left">
+
+                  <p className="max-w-xs">{t('repository.mindMap.helpDetail') || 'Use mouse to drag canvas. Click nodes to expand/collapse.'}</p>
+
+                </TooltipContent>
+
+              </Tooltip>
+
+            </div>
+
+  
+
+            <CardContent className="flex-1 p-0 relative w-full h-full bg-zinc-50 dark:bg-zinc-950">
+
+              <div
+
+                ref={containerRef}
+
+                className="w-full h-full relative"
+
+                onContextMenu={(e) => e.preventDefault()}
+
+              />
+
+            </CardContent>
+
+          </Card>
+
+  
+
+          {/* Scoped Styles for Mind Elixir */}
+
+          <style>{`
+
+            .mind-elixir {
+
+              --gap: 20px;
+
+            }
+
+            
+
+            /* Custom Scrollbars for the container */
+
+            .mind-elixir ::-webkit-scrollbar {
+
+              width: 8px;
+
+              height: 8px;
+
+            }
+
+            .mind-elixir ::-webkit-scrollbar-track {
+
+              background: transparent;
+
+            }
+
+            .mind-elixir ::-webkit-scrollbar-thumb {
+
+              background-color: var(--border, #a1a1aa);
+
+              border-radius: 4px;
+
+            }
+
+  
+
+            /* Node Styling Override */
+
+            .mind-elixir .node {
+
+              transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+            }
+
+            .mind-elixir .node:hover {
+
+              transform: scale(1.02);
+
+              box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+
+            }
+
+            
+
+            /* Root Node */
+
+            .mind-elixir .root {
+
+              font-size: 1.1rem !important;
+
+              padding: 12px 24px !important;
+
+              border-radius: 8px !important;
+
+              font-weight: 700 !important;
+
+            }
+
+  
+
+            /* Context Menu */
+
+            .mind-elixir-plugin-context-menu {
+
+              border-radius: 8px;
+
+              overflow: hidden;
+
+              box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+              background: var(--popover, white);
+
+              border: 1px solid var(--border, #e4e4e7);
+
+              padding: 4px;
+
+            }
+
+            .mind-elixir-plugin-context-menu li {
+
+              border-radius: 4px;
+
+              padding: 6px 12px;
+
+              font-size: 14px;
+
+              color: var(--foreground, #27272a);
+
+            }
+
+            .mind-elixir-plugin-context-menu li:hover {
+
+              background-color: var(--accent, #f4f4f5);
+
+              color: var(--accent-foreground, #18181b);
+
+            }
+
+          `}</style>
+
+        </div>
+
+      </TooltipProvider>
+
     )
+
   }
 
-  return (
-    <TooltipProvider>
-      <div className="h-full">
-        <Card className={`
-          relative flex flex-col
-          ${isFullscreen ? 'h-screen fixed top-0 left-0 w-screen z-[9999]' : 'h-[85vh]'}
-          transition-all duration-300 border-border/50 shadow-sm
-        `}>
-        <CardHeader>
-          <div className="flex justify-between  sm:flex-nowrap">
-            <div className="flex justify-end">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={fetchMindMap}
-                    className="h-8 w-8"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{t('repository.mindMap.refresh')}</p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={exportImage}
-                    className="h-8 w-8"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{t('repository.mindMap.exportImage')}</p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={toggleFullscreen}
-                    className="h-8 w-8"
-                  >
-                    {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{isFullscreen ? t('repository.mindMap.fullscreenExit') : t('repository.mindMap.fullscreenEnter')}</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className={`
-          ${isFullscreen ? 'h-[calc(100vh-80px)]' : 'h-[calc(85vh-80px)]'}
-          p-0 relative
-          w-full
-        `}>
-          <div
-            ref={containerRef}
-            className={`
-              w-full h-full relative select-none
-              bg-gradient-to-br from-slate-50 to-slate-200
-              ${isFullscreen ? 'rounded-none' : 'rounded-lg'}
-            `}
-            style={{
-              touchAction: 'none',
-              WebkitUserSelect: 'none',
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault()
-            }}
-            onMouseDown={(e) => {
-              if (e.button === 2) {
-                e.preventDefault()
-              }
-            }}
-            onTouchStart={(e) => {
-              if (e.touches.length > 1) {
-                e.preventDefault()
-              }
-            }}
-            onTouchMove={(e) => {
-              e.preventDefault()
-            }}
-            onDragStart={(e) => {
-              e.preventDefault()
-            }}
-          />
+  
 
-          <div className="absolute bottom-4 right-4 bg-black/70 text-white px-3 py-2 rounded text-xs z-[1000]">
-            {t('repository.mindMap.helpText')}
-          </div>
-        </CardContent>
-      </Card>
+  function ActionBtn({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick: () => void }) {
 
-      <style jsx global>{`
-        .mind-elixir {
-          width: 100%;
-          height: 100%;
-          touch-action: none !important;
-          user-select: none !important;
-          WebkitUserSelect: none !important;
-          MozUserSelect: none !important;
-          MsUserSelect: none !important;
-        }
+    return (
 
-        .mind-elixir .map-container {
-          background: transparent !important;
-          touch-action: none !important;
-          -ms-touch-action: none !important;
-          -webkit-touch-callout: none !important;
-          cursor: grab;
-        }
+      <Tooltip>
 
-        .mind-elixir .map-container.is-panning,
-        .mind-elixir .map-container.grabbing {
-          cursor: grabbing !important;
-        }
+        <TooltipTrigger asChild>
 
-        .mind-elixir .node-container {
-          cursor: pointer;
-          touch-action: none !important;
-        }
+          <Button
 
-        .mind-elixir .node-container:hover {
-          opacity: 0.9;
-          transform: scale(1.02);
-          transition: all 0.2s ease-in-out;
-        }
+            variant="ghost"
 
-        .mind-elixir .line {
-          stroke: #475569;
-          stroke-width: 1.5;
-        }
+            size="icon"
 
-        .mind-elixir .node {
-          border-radius: 8px;
-          border: 1px solid #e2e8f0;
-          background: #ffffff;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-          touch-action: none !important;
-          font-family: inherit;
-        }
+            onClick={onClick}
 
-        .mind-elixir .root {
-          background: linear-gradient(135deg, #0f172a, #1e293b) !important;
-          color: white !important;
-          font-weight: 600;
-          font-size: 16px;
-          border: none !important;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
-        }
+            className="h-8 w-8 hover:bg-accent text-muted-foreground hover:text-foreground"
 
-        .mind-elixir .primary {
-          background: #f8fafc !important;
-          border-color: #cbd5e1 !important;
-          color: #334155 !important;
-          font-weight: 500;
-        }
+          >
 
-        .mind-elixir .context-menu {
-          border-radius: 8px;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-          border: 1px solid #e2e8f0;
-          z-index: 9999 !important;
-          background: white;
-        }
+            {icon}
 
-        html {
-          -ms-touch-action: none !important;
-          touch-action: none !important;
-        }
+          </Button>
 
-        body {
-          -ms-touch-action: manipulation !important;
-          touch-action: manipulation !important;
-        }
+        </TooltipTrigger>
 
-        * {
-          -webkit-touch-callout: none !important;
-          -webkit-user-select: none !important;
-          -khtml-user-select: none !important;
-          -moz-user-select: none !important;
-          -ms-user-select: none !important;
-        }
+        <TooltipContent>
 
-        input, textarea, [contenteditable] {
-          -webkit-user-select: text !important;
-          -moz-user-select: text !important;
-          -ms-user-select: text !important;
-          user-select: text !important;
-        }
+          <p>{label}</p>
 
-        .mind-elixir ::-webkit-scrollbar {
-          width: 6px;
-          height: 6px;
-        }
+        </TooltipContent>
 
-        .mind-elixir ::-webkit-scrollbar-track {
-          background: #f1f5f9;
-          border-radius: 3px;
-        }
+      </Tooltip>
 
-        .mind-elixir ::-webkit-scrollbar-thumb {
-          background: #cbd5e1;
-          border-radius: 3px;
-        }
+    )
 
-        .mind-elixir ::-webkit-scrollbar-thumb:hover {
-          background: #94a3b8;
-        }
-      `}</style>
-      </div>
-    </TooltipProvider>
-  )
-}
+  }
+
+  

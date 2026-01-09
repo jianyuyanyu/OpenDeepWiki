@@ -190,7 +190,7 @@ const RepositoryDetailPage: React.FC = () => {
 
       } catch (error) {
         console.error('Failed to load repository data:', error)
-        toast.error(t('admin.repositories.detail.load_repository_data_failed'))
+        toast.error(t('admin.repositories.detail.loadRepositoryDataFailed'))
       } finally {
         setLoading(false)
       }
@@ -308,9 +308,9 @@ const RepositoryDetailPage: React.FC = () => {
       const contentStr = typeof selectedNode.content === 'string' ? selectedNode.content : String(selectedNode.content || '')
       // 调用API保存内容，传递仓库ID
       await repositoryService.saveFileContent(selectedNode.catalog!.id, contentStr)
-      toast.success(t('admin.repositories.detail.file_save_success'))
+      toast.success(t('admin.repositories.detail.fileSaveSuccess'))
     } catch (error) {
-      toast.error(t('admin.repositories.detail.file_save_failed'))
+      toast.error(t('admin.repositories.detail.fileSaveFailed'))
     } finally {
       setSaving(false)
     }
@@ -322,14 +322,14 @@ const RepositoryDetailPage: React.FC = () => {
     setRefreshing(true)
     try {
       await repositoryService.refreshWarehouse(id)
-      toast.success(t('admin.repositories.detail.repository_refresh_success'))
+      toast.success(t('admin.repositories.detail.repositoryRefreshSuccess'))
 
       // 重新加载数据
       setTimeout(() => {
         window.location.reload()
       }, 1000)
     } catch (error) {
-      toast.error(t('admin.repositories.detail.repository_refresh_failed'))
+      toast.error(t('admin.repositories.detail.repositoryRefreshFailed'))
     } finally {
       setRefreshing(false)
     }
@@ -340,10 +340,10 @@ const RepositoryDetailPage: React.FC = () => {
 
     try {
       await repositoryService.deleteWarehouse(id)
-      toast.success(t('admin.repositories.detail.repository_delete_success'))
+      toast.success(t('admin.repositories.detail.repositoryDeleteSuccess'))
       navigate('/admin/repositories')
     } catch (error) {
-      toast.error(t('admin.repositories.detail.repository_delete_failed'))
+      toast.error(t('admin.repositories.detail.repositoryDeleteFailed'))
     }
   }
 
@@ -352,14 +352,14 @@ const RepositoryDetailPage: React.FC = () => {
 
     try {
       await repositoryService.triggerManualSync(id)
-      toast.success(t('admin.repositories.detail.sync_task_started'))
+      toast.success(t('admin.repositories.detail.syncTaskStarted'))
       setSyncDialogOpen(false)
 
       // 刷新统计信息和同步记录
       await loadRepositoryStats(id)
       await loadSyncRecords(id)
     } catch (error) {
-      toast.error(t('admin.repositories.detail.sync_start_failed'))
+      toast.error(t('admin.repositories.detail.syncStartFailed'))
     }
   }
 
@@ -370,9 +370,13 @@ const RepositoryDetailPage: React.FC = () => {
     try {
       await repositoryService.updateWarehouseSync(id, { enableSync: enabled })
       setRepository(prev => prev ? { ...prev, enableSync: enabled } : null)
-      toast.success(enabled ? '已启用自动同步' : '已禁用自动同步')
+      toast.success(
+        enabled
+          ? t('admin.repositories.detail.auto_sync_enabled')
+          : t('admin.repositories.detail.auto_sync_disabled')
+      )
     } catch (error) {
-      toast.error('更新同步设置失败')
+      toast.error(t('admin.repositories.detail.sync_update_failed'))
     } finally {
       setUpdatingSyncSetting(false)
     }
@@ -392,9 +396,9 @@ const RepositoryDetailPage: React.FC = () => {
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
-      toast.success(t('admin.repositories.detail.export_success'))
+      toast.success(t('admin.repositories.detail.exportSuccess'))
     } catch (error) {
-      toast.error(t('admin.repositories.detail.export_failed'))
+      toast.error(t('admin.repositories.detail.exportFailed'))
     }
   }
 
@@ -424,20 +428,20 @@ const RepositoryDetailPage: React.FC = () => {
         await repositoryService.updateWarehouseSync(id, { enableSync: editForm.enableSync })
       }
 
-      toast.success('仓库信息更新成功')
+      toast.success(t('admin.repositories.messages.updateSuccess'))
       setEditDialog(false)
 
       // 重新加载仓库信息
       const repoResponse = await repositoryService.getRepositoryDetail(id)
       setRepository(repoResponse)
     } catch (error) {
-      toast.error('更新失败，请稍后重试')
+      toast.error(t('admin.repositories.messages.updateFailed'))
     }
   }
 
   const handleAiGenerate = async () => {
     if (!selectedNode?.catalog?.id) {
-      toast.error('请先选择一个文档目录')
+      toast.error(t('admin.repositories.detail.select_document_first'))
       return
     }
 
@@ -449,7 +453,7 @@ const RepositoryDetailPage: React.FC = () => {
         aiGeneratePrompt || undefined
       )
 
-      toast.success('AI生成任务已启动，请稍后刷新查看结果')
+      toast.success(t('admin.repositories.detail.ai_generate_started'))
       setAiGenerateDialog(false)
       setAiGeneratePrompt('')
 
@@ -457,12 +461,12 @@ const RepositoryDetailPage: React.FC = () => {
       setTimeout(async () => {
         if (selectedNode?.catalog?.id) {
           await loadFileContent(selectedNode.catalog.id)
-          toast.info('文档内容已刷新')
+          toast.info(t('admin.repositories.detail.document_refreshed'))
         }
       }, 5000)
     } catch (error) {
       console.error('AI生成失败:', error)
-      toast.error('AI生成失败，请稍后重试')
+      toast.error(t('admin.repositories.detail.ai_generate_failed'))
     } finally {
       setAiGenerating(false)
     }
@@ -563,7 +567,7 @@ const RepositoryDetailPage: React.FC = () => {
               <span className="truncate flex-1 text-left font-normal">{nodeName}</span>
               {node.catalog?.isCompleted && (
                 <span className="ml-2 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium flex-shrink-0">
-                  {t('admin.repositories.detail.completed')}
+          {t('admin.repositories.detail.completed')}
                 </span>
               )}
             </button>
@@ -701,7 +705,7 @@ const RepositoryDetailPage: React.FC = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                     <Input
                       type="text"
-                      placeholder={t('admin.repositories.detail.search_documents')}
+                      placeholder={t('admin.repositories.detail.searchDocuments')}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="pl-9 pr-14 h-8 text-sm bg-accent/30 border-0 focus:bg-accent/50 transition-colors placeholder:text-muted-foreground/60"
@@ -732,7 +736,7 @@ const RepositoryDetailPage: React.FC = () => {
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground/60 text-center py-4 px-6">
-                      {t('admin.repositories.detail.no_documents')}
+                      {t('admin.repositories.detail.noDocuments')}
                     </p>
                   )}
                 </div>
@@ -771,7 +775,7 @@ const RepositoryDetailPage: React.FC = () => {
                           className="flex items-center gap-2"
                         >
                           <Sparkles className="h-4 w-4" />
-                          {t('admin.repositories.detail.ai_generate')}
+                          {t('admin.repositories.detail.aiGenerate')}
                         </Button>
                         <Button
                           size="sm"
@@ -823,7 +827,7 @@ const RepositoryDetailPage: React.FC = () => {
                         language="zh-CN"
                         onSave={(value, html) => {
                           handleSave()
-                          toast.success(t('admin.repositories.detail.document_save_success'))
+                          toast.success(t('admin.repositories.detail.documentSaveSuccess'))
                         }}
                         onError={(error) => {
                           console.error('Editor error:', error)
@@ -841,9 +845,9 @@ const RepositoryDetailPage: React.FC = () => {
                   <FileText className="h-8 w-8 text-muted-foreground" />
                 </div>
                 <div>
-                  <h3 className="font-medium text-foreground">{t('admin.repositories.detail.select_document')}</h3>
+                  <h3 className="font-medium text-foreground">{t('admin.repositories.detail.selectDocument')}</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {t('admin.repositories.detail.select_document_description')}
+                    {t('admin.repositories.detail.selectDocumentDescription')}
                   </p>
                 </div>
               </div>
@@ -861,7 +865,7 @@ const RepositoryDetailPage: React.FC = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>{t('admin.repositories.detail.sync_management')}</CardTitle>
+              <CardTitle>{t('admin.repositories.detail.syncManagement')}</CardTitle>
               <CardDescription>{t('admin.repositories.detail.manage_sync_settings_history')}</CardDescription>
             </div>
             <div className="flex items-center space-x-2">
@@ -869,14 +873,14 @@ const RepositoryDetailPage: React.FC = () => {
                 <DialogTrigger asChild>
                   <Button>
                     <RefreshCw className="mr-2 h-4 w-4" />
-                    {t('admin.repositories.detail.manual_sync')}
+                    {t('admin.repositories.detail.manualSync')}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>{t('admin.repositories.detail.manual_sync_repository')}</DialogTitle>
+                    <DialogTitle>{t('admin.repositories.detail.manualSyncRepository')}</DialogTitle>
                     <DialogDescription>
-                      {t('admin.repositories.detail.sync_description')}
+                      {t('admin.repositories.detail.syncDescription')}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="flex justify-end space-x-2">
@@ -884,7 +888,7 @@ const RepositoryDetailPage: React.FC = () => {
                       {t('admin.repositories.detail.cancel')}
                     </Button>
                     <Button onClick={handleSync}>
-                      {t('admin.repositories.detail.start_sync')}
+                      {t('admin.repositories.detail.startSync')}
                     </Button>
                   </div>
                 </DialogContent>
@@ -895,20 +899,20 @@ const RepositoryDetailPage: React.FC = () => {
         <CardContent>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>{t('admin.repositories.detail.last_sync_label')}</Label>
+              <Label>{t('admin.repositories.detail.lastSyncTime')}</Label>
               <p className="text-sm text-muted-foreground">
                 {stats?.lastSyncTime
                   ? new Date(stats.lastSyncTime).toLocaleString()
-                  : t('admin.repositories.detail.never_synced_label')
+                  : t('admin.repositories.detail.neverSynced')
                 }
               </p>
             </div>
             <div className="space-y-2">
-              <Label>{t('admin.repositories.detail.sync_status_label')}</Label>
+              <Label>{t('admin.repositories.detail.syncStatus')}</Label>
               {getStatusBadge(stats?.processingStatus || 'Pending')}
             </div>
             <div className="space-y-2">
-              <Label>{t('admin.repositories.detail.auto_sync_label')}</Label>
+              <Label>{t('admin.repositories.detail.autoSync')}</Label>
               <div className="flex items-center space-x-2">
                 <Switch
                   checked={repository?.enableSync || false}
@@ -916,7 +920,7 @@ const RepositoryDetailPage: React.FC = () => {
                   disabled={updatingSyncSetting}
                 />
                 <span className="text-sm text-muted-foreground">
-                  {updatingSyncSetting ? t('admin.repositories.detail.sync_updating') : (repository?.enableSync ? t('admin.repositories.detail.enabled') : t('admin.repositories.detail.disabled'))}
+                  {updatingSyncSetting ? t('admin.repositories.detail.updating') : (repository?.enableSync ? t('admin.repositories.detail.enabled') : t('admin.repositories.detail.disabled'))}
                 </span>
               </div>
             </div>
@@ -927,7 +931,7 @@ const RepositoryDetailPage: React.FC = () => {
       {/* 同步历史 */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('admin.repositories.detail.sync_history')}</CardTitle>
+          <CardTitle>{t('admin.repositories.detail.syncHistory')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -943,16 +947,16 @@ const RepositoryDetailPage: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium">
-                          {sync.status === 'Success' ? t('admin.repositories.detail.sync_success') :
-                            sync.status === 'Failed' ? t('admin.repositories.detail.sync_failed') : t('admin.repositories.detail.syncing')}
+                          {sync.status === 'Success' ? t('admin.repositories.detail.syncSuccess') :
+                            sync.status === 'Failed' ? t('admin.repositories.detail.syncFailed') : t('admin.repositories.detail.syncing')}
                         </p>
                         <Badge variant={sync.trigger === 'Manual' ? 'default' : 'outline'} className="text-xs">
-                          {sync.trigger === 'Manual' ? t('admin.repositories.detail.manual_trigger') : t('admin.repositories.detail.auto_trigger')}
+                          {sync.trigger === 'Manual' ? t('admin.repositories.detail.manual') : t('admin.repositories.detail.auto')}
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {t('admin.repositories.detail.start_time')}: {new Date(sync.startTime).toLocaleString()}
-                        {sync.endTime && ` • ${t('admin.repositories.detail.end_time')}: ${new Date(sync.endTime).toLocaleString()}`}
+                        {t('admin.repositories.detail.startTime')}: {new Date(sync.startTime).toLocaleString()}
+                        {sync.endTime && ` • ${t('admin.repositories.detail.endTime')}: ${new Date(sync.endTime).toLocaleString()}`}
                       </p>
                       {sync.errorMessage && (
                         <p className="text-xs text-red-500 mt-1">{sync.errorMessage}</p>
@@ -992,13 +996,13 @@ const RepositoryDetailPage: React.FC = () => {
   const renderPermissionsTab = () => (
     <Card>
       <CardHeader>
-        <CardTitle>权限管理</CardTitle>
-        <CardDescription>管理用户和角色对此仓库的访问权限</CardDescription>
+        <CardTitle>{t('admin.repositories.detail.permissionManagement')}</CardTitle>
+        <CardDescription>{t('admin.repositories.detail.permissionManagementDescription')}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="text-center py-8">
           <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p className="text-muted-foreground">权限管理功能开发中...</p>
+          <p className="text-muted-foreground">{t('admin.repositories.detail.permissionDevelopment')}</p>
         </div>
       </CardContent>
     </Card>
@@ -1007,13 +1011,13 @@ const RepositoryDetailPage: React.FC = () => {
   const renderConfigTab = () => (
     <Card>
       <CardHeader>
-        <CardTitle>配置管理</CardTitle>
-        <CardDescription>管理仓库的各种配置选项</CardDescription>
+        <CardTitle>{t('admin.repositories.detail.configManagement')}</CardTitle>
+        <CardDescription>{t('admin.repositories.detail.configManagementDescription')}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="text-center py-8">
           <Cog className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p className="text-muted-foreground">配置管理功能开发中...</p>
+          <p className="text-muted-foreground">{t('admin.repositories.detail.configDevelopment')}</p>
         </div>
       </CardContent>
     </Card>
@@ -1022,13 +1026,13 @@ const RepositoryDetailPage: React.FC = () => {
   const renderTasksTab = () => (
     <Card>
       <CardHeader>
-        <CardTitle>任务管理</CardTitle>
-        <CardDescription>查看和管理仓库相关的处理任务</CardDescription>
+        <CardTitle>{t('admin.repositories.detail.taskManagement')}</CardTitle>
+        <CardDescription>{t('admin.repositories.detail.taskManagementDescription')}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="text-center py-8">
           <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p className="text-muted-foreground">任务管理功能开发中...</p>
+          <p className="text-muted-foreground">{t('admin.repositories.detail.taskDevelopment')}</p>
         </div>
       </CardContent>
     </Card>
@@ -1049,11 +1053,11 @@ const RepositoryDetailPage: React.FC = () => {
   if (!repository) {
     return (
       <div className="text-center py-8">
-        <p>{t('admin.repositories.detail.repository_not_found')}</p>
+        <p>{t('admin.repositories.detail.repositoryNotFound')}</p>
         <Button asChild className="mt-4">
           <Link to="/admin/repositories">
             <ChevronLeft className="mr-2 h-4 w-4" />
-            {t('admin.repositories.detail.return_to_repository_list')}
+            {t('admin.repositories.detail.returnToRepositoryList')}
           </Link>
         </Button>
       </div>
@@ -1121,8 +1125,8 @@ const RepositoryDetailPage: React.FC = () => {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="documents">{t('admin.repositories.detail.documents')}</TabsTrigger>
           <TabsTrigger value="sync">{t('admin.repositories.detail.sync')}</TabsTrigger>
-          <TabsTrigger value="generation">Wiki生成</TabsTrigger>
-          <TabsTrigger value="quality">{t('admin.repositories.detail.quality') || '质量评估'}</TabsTrigger>
+          <TabsTrigger value="generation">{t('admin.repositories.detail.wikiGeneration')}</TabsTrigger>
+          <TabsTrigger value="quality">{t('admin.repositories.detail.quality')}</TabsTrigger>
         </TabsList>
 
         {/* 文档管理标签页 */}
@@ -1151,36 +1155,36 @@ const RepositoryDetailPage: React.FC = () => {
       <Dialog open={editDialog} onOpenChange={setEditDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>编辑仓库信息</DialogTitle>
+            <DialogTitle>{t('admin.repositories.detail.editRepositoryInfo')}</DialogTitle>
             <DialogDescription>
-              修改仓库的基本信息和同步设置
+              {t('admin.repositories.detail.editRepositoryDescription')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">仓库名称</Label>
+              <Label htmlFor="name">{t('admin.repositories.detail.repositoryName')}</Label>
               <Input
                 id="name"
                 value={editForm.name}
                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                placeholder="输入仓库名称"
+                placeholder={t('admin.repositories.detail.repositoryNamePlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">仓库描述</Label>
+              <Label htmlFor="description">{t('admin.repositories.detail.repositoryDescription')}</Label>
               <Textarea
                 id="description"
                 value={editForm.description}
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                placeholder="输入仓库描述"
+                placeholder={t('admin.repositories.detail.repositoryDescriptionPlaceholder')}
                 className="min-h-[80px]"
               />
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="enableSync">自动同步</Label>
+                <Label htmlFor="enableSync">{t('admin.repositories.detail.enableAutoSync')}</Label>
                 <p className="text-sm text-muted-foreground">
-                  启用后系统将自动同步仓库更新
+                  {t('admin.repositories.detail.enableAutoSyncDescription')}
                 </p>
               </div>
               <Switch
@@ -1192,10 +1196,10 @@ const RepositoryDetailPage: React.FC = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialog(false)}>
-              取消
+              {t('admin.repositories.detail.cancel')}
             </Button>
             <Button onClick={handleSaveEdit}>
-              保存
+              {t('admin.repositories.detail.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1207,35 +1211,35 @@ const RepositoryDetailPage: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
-              AI智能生成文档内容
+              {t('admin.repositories.detail.aiGenerateDialog.title')}
             </DialogTitle>
             <DialogDescription>
-              为当前选中的文档目录生成内容。您可以输入自定义提示词来引导AI生成，留空则使用默认提示词。
+              {t('admin.repositories.detail.aiGenerateDialog.description')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="prompt">提示词（可选）</Label>
+              <Label htmlFor="prompt">{t('admin.repositories.detail.aiGenerateDialog.promptLabel')}</Label>
               <Textarea
                 id="prompt"
-                placeholder="例如：请生成详细的技术文档，包含代码示例和架构说明..."
+                placeholder={t('admin.repositories.detail.aiGenerateDialog.promptPlaceholder')}
                 value={aiGeneratePrompt}
                 onChange={(e) => setAiGeneratePrompt(e.target.value)}
                 className="min-h-[100px]"
                 disabled={aiGenerating}
               />
               <p className="text-sm text-muted-foreground">
-                提示：留空将使用系统默认提示词或之前保存的提示词
+                {t('admin.repositories.detail.aiGenerateDialog.promptHint')}
               </p>
             </div>
             {selectedNode?.catalog && (
               <div className="rounded-lg bg-muted p-3">
                 <p className="text-sm">
-                  <strong>目标文档：</strong>{selectedNode.title || selectedNode.name}
+                  <strong>{t('admin.repositories.detail.aiGenerateDialog.targetDocument')}</strong>{selectedNode.title || selectedNode.name}
                 </p>
                 {selectedNode.catalog.prompt && (
                   <p className="text-sm mt-1">
-                    <strong>当前提示词：</strong>{selectedNode.catalog.prompt}
+                    <strong>{t('admin.repositories.detail.aiGenerateDialog.currentPrompt')}</strong>{selectedNode.catalog.prompt}
                   </p>
                 )}
               </div>
@@ -1250,7 +1254,7 @@ const RepositoryDetailPage: React.FC = () => {
               }}
               disabled={aiGenerating}
             >
-              取消
+              {t('admin.repositories.detail.aiGenerateDialog.cancel')}
             </Button>
             <Button
               onClick={handleAiGenerate}
@@ -1259,12 +1263,12 @@ const RepositoryDetailPage: React.FC = () => {
               {aiGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  生成中...
+                  {t('admin.repositories.detail.aiGenerateDialog.generating')}
                 </>
               ) : (
                 <>
                   <Sparkles className="mr-2 h-4 w-4" />
-                  开始生成
+                  {t('admin.repositories.detail.aiGenerateDialog.startGenerate')}
                 </>
               )}
             </Button>

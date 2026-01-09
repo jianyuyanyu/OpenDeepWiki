@@ -19,51 +19,51 @@ const calloutConfig: Record<CalloutType, {
 }> = {
   note: {
     icon: Info,
-    className: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800',
+    className: 'bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400',
     iconClassName: 'text-blue-600 dark:text-blue-400',
-    title: '注意'
+    title: 'Note'
   },
   tip: {
     icon: Lightbulb,
-    className: 'bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800',
+    className: 'bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400',
     iconClassName: 'text-green-600 dark:text-green-400',
-    title: '提示'
+    title: 'Tip'
   },
   important: {
     icon: AlertCircle,
-    className: 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800',
+    className: 'bg-purple-500/10 border-purple-500/20 text-purple-600 dark:text-purple-400',
     iconClassName: 'text-purple-600 dark:text-purple-400',
-    title: '重要'
+    title: 'Important'
   },
   warning: {
     icon: AlertTriangle,
-    className: 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800',
+    className: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-400',
     iconClassName: 'text-yellow-600 dark:text-yellow-400',
-    title: '警告'
+    title: 'Warning'
   },
   caution: {
     icon: AlertTriangle,
-    className: 'bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800',
+    className: 'bg-orange-500/10 border-orange-500/20 text-orange-600 dark:text-orange-400',
     iconClassName: 'text-orange-600 dark:text-orange-400',
-    title: '小心'
+    title: 'Caution'
   },
   info: {
     icon: Info,
-    className: 'bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800',
-    iconClassName: 'text-sky-600 dark:text-sky-400',
-    title: '信息'
+    className: 'bg-zinc-500/10 border-zinc-500/20 text-zinc-600 dark:text-zinc-400',
+    iconClassName: 'text-zinc-600 dark:text-zinc-400',
+    title: 'Info'
   },
   success: {
     icon: CheckCircle,
-    className: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800',
+    className: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400',
     iconClassName: 'text-emerald-600 dark:text-emerald-400',
-    title: '成功'
+    title: 'Success'
   },
   danger: {
     icon: XCircle,
-    className: 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800',
+    className: 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400',
     iconClassName: 'text-red-600 dark:text-red-400',
-    title: '危险'
+    title: 'Danger'
   }
 }
 
@@ -74,24 +74,18 @@ export default function Callout({ type = 'note', title, children, className }: C
   return (
     <div
       className={cn(
-        'my-6 rounded-lg border-l-4 p-4 shadow-sm transition-all duration-200 hover:shadow-md',
+        'my-6 rounded-lg border p-4 text-sm',
         config.className,
         className
       )}
       role="alert"
     >
-      <div className="flex gap-3">
-        <div className="flex-shrink-0 mt-0.5">
-          <Icon className={cn('h-5 w-5', config.iconClassName)} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className={cn('text-sm font-semibold mb-1', config.iconClassName)}>
-            {title || config.title}
-          </div>
-          <div className="text-sm text-muted-foreground leading-relaxed prose prose-sm dark:prose-invert max-w-none">
-            {children}
-          </div>
-        </div>
+      <div className="flex items-center gap-2 font-medium mb-2">
+        <Icon className={cn('h-4 w-4', config.iconClassName)} />
+        <span>{title || config.title}</span>
+      </div>
+      <div className="text-muted-foreground prose-p:m-0">
+        {children}
       </div>
     </div>
   )

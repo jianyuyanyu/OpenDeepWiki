@@ -142,7 +142,8 @@ const RepositoryDetailPage = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="h-full overflow-y-auto px-6 py-8">
+      <div className="space-y-6 max-w-6xl mx-auto">
       {/* 页面标题 */}
       <div className="flex items-start justify-between">
         <div>
@@ -445,6 +446,7 @@ const RepositoryDetailPage = () => {
 
       {/* 文档质量评估 */}
       {repository?.id && <DocumentQualityEvaluation warehouseId={repository.id} />}
+      </div>
     </div>
   )
 }

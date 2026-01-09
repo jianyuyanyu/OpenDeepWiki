@@ -1,5 +1,7 @@
-import React, { useState } from 'react'
-import { Check, Copy, ChevronDown, ChevronUp } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Check, Copy } from 'lucide-react'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { cn } from '@/lib/utils'
 
 interface CodeBlockProps {
@@ -10,33 +12,32 @@ interface CodeBlockProps {
   showLineNumbers?: boolean
 }
 
-// 语言图标映射（可以后续扩展使用实际图标）
 const languageLabels: Record<string, string> = {
-  javascript: 'JS',
-  typescript: 'TS',
-  jsx: 'JSX',
-  tsx: 'TSX',
-  python: 'PY',
-  java: 'JAVA',
+  javascript: 'JavaScript',
+  typescript: 'TypeScript',
+  jsx: 'React',
+  tsx: 'React',
+  python: 'Python',
+  java: 'Java',
   csharp: 'C#',
-  go: 'GO',
-  rust: 'RUST',
+  go: 'Go',
+  rust: 'Rust',
   cpp: 'C++',
   c: 'C',
   php: 'PHP',
-  ruby: 'RUBY',
-  swift: 'SWIFT',
-  kotlin: 'KT',
-  bash: 'BASH',
-  shell: 'SHELL',
+  ruby: 'Ruby',
+  swift: 'Swift',
+  kotlin: 'Kotlin',
+  bash: 'Bash',
+  shell: 'Shell',
   sql: 'SQL',
   html: 'HTML',
   css: 'CSS',
   json: 'JSON',
   yaml: 'YAML',
   xml: 'XML',
-  markdown: 'MD',
-  dockerfile: 'DOCKER',
+  markdown: 'Markdown',
+  dockerfile: 'Dockerfile',
 }
 
 export default function CodeBlock({
@@ -47,9 +48,14 @@ export default function CodeBlock({
   showLineNumbers = false
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false)
-  const [collapsed, setCollapsed] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
-  // 提取代码内容
+  // Prevent hydration mismatch for syntax highlighter
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Extract code content
   const getCodeContent = (): string => {
     const codeElement = children as any
     if (codeElement?.props?.children) {
@@ -59,80 +65,65 @@ export default function CodeBlock({
         return codeElement.props.children.join('')
       }
     }
-    return String(children)
+    return String(children).replace(/\n$/, '')
   }
 
+  const codeContent = getCodeContent()
+
   const handleCopy = async () => {
-    const code = getCodeContent()
-    await navigator.clipboard.writeText(code)
+    await navigator.clipboard.writeText(codeContent)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const languageLabel = language ? languageLabels[language.toLowerCase()] || language.toUpperCase() : 'CODE'
+  const lang = language ? languageLabels[language.toLowerCase()] || language : 'Text'
+
+  // Custom style overrides for the syntax highlighter to match our theme
+  const customStyle = {
+    margin: 0,
+    padding: '1rem',
+    background: 'transparent',
+    fontSize: '0.875rem',
+    lineHeight: '1.5',
+  }
 
   return (
-    <div className="group relative my-4 rounded-lg border border-border/50 bg-muted/30 shadow-sm hover:shadow-md transition-all duration-200">
-      {/* 工具栏 */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 bg-muted/40">
-        <div className="flex items-center gap-3">
-          {/* 语言标签 */}
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-semibold rounded-md bg-primary/10 text-primary border border-primary/20">
-              {languageLabel}
-            </span>
-            {title && (
-              <span className="text-xs font-medium text-muted-foreground">
-                {title}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* 操作按钮 */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-md hover:bg-muted transition-colors"
-            title={collapsed ? '展开代码' : '折叠代码'}
-            aria-label={collapsed ? '展开代码' : '折叠代码'}
-          >
-            {collapsed ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronUp className="h-4 w-4 text-muted-foreground" />
-            )}
-          </button>
-          <button
-            onClick={handleCopy}
-            className="p-1.5 rounded-md hover:bg-muted transition-colors"
-            title={copied ? '已复制' : '复制代码'}
-            aria-label={copied ? '已复制' : '复制代码'}
-          >
-            {copied ? (
-              <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-            ) : (
-              <Copy className="h-4 w-4 text-muted-foreground" />
-            )}
-          </button>
-        </div>
+    <div className="my-6 overflow-hidden rounded-lg border border-border bg-muted/40 group relative">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border">
+        <span className="text-xs font-medium text-muted-foreground select-none">
+          {title || lang}
+        </span>
+        <button
+          onClick={handleCopy}
+          className="p-1.5 rounded-md hover:bg-background/80 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+          title="Copy code"
+        >
+          {copied ? (
+            <Check className="h-3.5 w-3.5 text-green-500" />
+          ) : (
+            <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+          )}
+        </button>
       </div>
-
-      {/* 代码内容 */}
-      {!collapsed && (
-        <div className="relative">
-          <pre
-            className={cn(
-              'overflow-x-auto p-4 text-sm leading-relaxed',
-              'bg-muted/20 dark:bg-muted/40',
-              showLineNumbers && 'pl-12',
-              className
-            )}
+      <div className="relative overflow-x-auto bg-[#282c34]"> {/* OneDark background color */}
+        {mounted ? (
+          <SyntaxHighlighter
+            language={language?.toLowerCase() || 'text'}
+            style={oneDark}
+            showLineNumbers={showLineNumbers}
+            customStyle={customStyle}
+            codeTagProps={{
+              className: "font-mono"
+            }}
           >
-            {children}
+            {codeContent}
+          </SyntaxHighlighter>
+        ) : (
+          <pre className={cn('p-4 text-[13px] leading-6 font-mono bg-transparent text-white', className)}>
+            {codeContent}
           </pre>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

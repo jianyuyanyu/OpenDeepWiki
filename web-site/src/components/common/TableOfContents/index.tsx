@@ -21,7 +21,8 @@ export default function TableOfContents({ className, onItemClick }: TableOfConte
 
   // 获取滚动容器
   const getScrollContainer = useCallback(() => {
-    return document.querySelector('.flex-1.overflow-auto') as HTMLElement ||
+    return document.getElementById('article-scroll-container') as HTMLElement ||
+           document.querySelector('.flex-1.overflow-auto') as HTMLElement ||
            document.querySelector('main') as HTMLElement ||
            document.documentElement
   }, [])
@@ -363,15 +364,8 @@ export default function TableOfContents({ className, onItemClick }: TableOfConte
   }
 
   return (
-    <nav className={cn("sticky top-20 max-h-[calc(100vh-5rem)]", className)}>
+    <nav className={cn("max-h-[calc(100vh-5rem)]", className)}>
       <div className="relative">
-        {/* 标题 */}
-        <div className="mb-6 px-3">
-          <h3 className="text-sm font-semibold text-foreground tracking-tight">
-            On This Page
-          </h3>
-        </div>
-
         {/* 目录列表容器 */}
         <div
           ref={tocRef}

@@ -73,7 +73,8 @@ import {
   Clock,
   Loader2
 } from 'lucide-react'
-import { type WarehouseInfo, type UpdateRepositoryDto, repositoryService } from '@/services/admin.service'
+import { WarehouseStatus } from '@/types/repository'
+import { type BatchOperationDto, type WarehouseInfo, type UpdateRepositoryDto, repositoryService } from '@/services/admin.service'
 import { toast } from 'sonner'
 
 const RepositoriesPage: React.FC = () => {
@@ -92,6 +93,7 @@ const RepositoriesPage: React.FC = () => {
   const [showDeleteAlert, setShowDeleteAlert] = useState(false)
   const [repositoryToDelete, setRepositoryToDelete] = useState<WarehouseInfo | null>(null)
   const [batchLoading, setBatchLoading] = useState(false)
+  const [showBatchDeleteAlert, setShowBatchDeleteAlert] = useState(false)
 
   // 加载仓库数据
   const loadRepositories = useCallback(async () => {
@@ -104,18 +106,14 @@ const RepositoriesPage: React.FC = () => {
         statusFilter === 'all' ? undefined : statusFilter
       ) as any
       // 调试日志
-      console.log('API Response:', data)
-      console.log('Response items:', data.items)
-      console.log('Response total:', data.total)
-      // 处理API响应数据结构
       setRepositories(data.items || [])
       setTotal(data.total || 0)
       // 清空选中状态
       setSelectedRepositories([])
     } catch (error) {
       console.error('Failed to load repositories:', error)
-      toast.error(t('admin.repositories.errors.loadFailed'), {
-        description: t('admin.repositories.errors.loadFailedDescription')
+      toast.error(t('repositories.errors.loadFailed'), {
+        description: t('repositories.errors.loadFailedDescription')
       })
     } finally {
       setLoading(false)
@@ -147,48 +145,100 @@ const RepositoriesPage: React.FC = () => {
     }
   }, [statusFilter])
 
-  const getStatusBadge = (status?: string) => {
+  const getStatusKey = (status?: WarehouseInfo['status']) => {
+    if (typeof status === 'number') {
+      switch (status) {
+        case WarehouseStatus.Pending:
+          return 'pending'
+        case WarehouseStatus.Processing:
+          return 'processing'
+        case WarehouseStatus.Completed:
+          return 'completed'
+        case WarehouseStatus.Canceled:
+          return 'canceled'
+        case WarehouseStatus.Unauthorized:
+          return 'unauthorized'
+        case WarehouseStatus.Failed:
+          return 'failed'
+        default:
+          return 'unknown'
+      }
+    }
+
+    if (typeof status === 'string') {
+      const normalized = status.toLowerCase()
+      if (['pending'].includes(normalized)) return 'pending'
+      if (['processing', 'inprogress'].includes(normalized)) return 'processing'
+      if (['completed', 'success'].includes(normalized)) return 'completed'
+      if (['failed', 'error'].includes(normalized)) return 'failed'
+      if (['canceled', 'cancelled'].includes(normalized)) return 'canceled'
+      if (['unauthorized', 'unauthorised'].includes(normalized)) return 'unauthorized'
+    }
+
+    return 'unknown'
+  }
+
+  const getStatusBadge = (status?: WarehouseInfo['status']) => {
+    const statusKey = getStatusKey(status)
     const statusConfig = {
-      'Pending': {
+      pending: {
         variant: 'secondary' as const,
-        text: '待处理',
+        text: t('repositories.statusLabels.pending'),
         color: 'text-gray-600 bg-gray-100',
         icon: Clock
       },
-      'Processing': {
+      processing: {
         variant: 'default' as const,
-        text: '处理中',
+        text: t('repositories.statusLabels.processing'),
         color: 'text-blue-600 bg-blue-100',
         icon: Loader2
       },
-      'Completed': {
+      completed: {
         variant: 'default' as const,
-        text: '已完成',
+        text: t('repositories.statusLabels.completed'),
         color: 'text-green-600 bg-green-100',
         icon: CheckCircle
       },
-      'Failed': {
+      failed: {
         variant: 'destructive' as const,
-        text: '失败',
+        text: t('repositories.statusLabels.failed'),
         color: 'text-red-600 bg-red-100',
+        icon: AlertCircle
+      },
+      canceled: {
+        variant: 'secondary' as const,
+        text: t('repositories.statusLabels.canceled'),
+        color: 'text-amber-700 bg-amber-100',
+        icon: AlertCircle
+      },
+      unauthorized: {
+        variant: 'secondary' as const,
+        text: t('repositories.statusLabels.unauthorized'),
+        color: 'text-purple-700 bg-purple-100',
+        icon: AlertCircle
+      },
+      unknown: {
+        variant: 'secondary' as const,
+        text: t('repositories.statusLabels.unknown'),
+        color: 'text-muted-foreground bg-muted/40',
         icon: AlertCircle
       }
     }
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.Pending
+    const config = statusConfig[statusKey as keyof typeof statusConfig] || statusConfig.pending
     const Icon = config.icon
 
     return (
       <Badge variant={config.variant} className={`${config.color} flex items-center gap-1`}>
-        <Icon className={`h-3 w-3 ${status === 'Processing' ? 'animate-spin' : ''}`} />
+        <Icon className={`h-3 w-3 ${statusKey === 'processing' ? 'animate-spin' : ''}`} />
         {config.text}
       </Badge>
     )
   }
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return '未知'
-    return new Date(dateString).toLocaleDateString('zh-CN')
+    if (!dateString) return t('messages.no_data')
+    return new Date(dateString).toLocaleDateString()
   }
 
   // 选择操作
@@ -219,13 +269,13 @@ const RepositoriesPage: React.FC = () => {
 
     try {
       await repositoryService.deleteRepository(repositoryToDelete.id)
-      toast.success(t('admin.repositories.messages.deleteSuccess'), {
-        description: t('admin.repositories.messages.deleteSuccessDescription', { name: repositoryToDelete.name })
+      toast.success(t('repositories.messages.deleteSuccess'), {
+        description: t('repositories.messages.deleteSuccessDescription', { name: repositoryToDelete.name })
       })
       loadRepositories()
     } catch (error) {
-      toast.error(t('admin.repositories.messages.deleteFailed'), {
-        description: t('admin.repositories.messages.deleteFailedDescription')
+      toast.error(t('repositories.messages.deleteFailed'), {
+        description: t('repositories.messages.deleteFailedDescription')
       })
     } finally {
       setShowDeleteAlert(false)
@@ -237,14 +287,62 @@ const RepositoriesPage: React.FC = () => {
   const handleRefreshRepository = async (id: string, name: string) => {
     try {
       await repositoryService.refreshRepository(id)
-      toast.success(t('admin.repositories.messages.refreshSuccess'), {
-        description: t('admin.repositories.messages.refreshSuccessDescription', { name })
+      toast.success(t('repositories.messages.refreshSuccess'), {
+        description: t('repositories.messages.refreshSuccessDescription', { name })
       })
       loadRepositories()
     } catch (error) {
-      toast.error(t('admin.repositories.messages.refreshFailed'), {
-        description: t('admin.repositories.messages.refreshFailedDescription')
+      toast.error(t('repositories.messages.refreshFailed'), {
+        description: t('repositories.messages.refreshFailedDescription')
       })
+    }
+  }
+
+  const handleBatchOperation = async (operation: BatchOperationDto['operation']) => {
+    if (selectedRepositories.length === 0) return
+
+    try {
+      setBatchLoading(true)
+      await repositoryService.batchOperateRepositories({
+        ids: selectedRepositories,
+        operation
+      })
+
+      if (operation === 'delete') {
+        toast.success(t('repositories.messages.deleteSuccess'), {
+          description: t('repositories.batchActionsCount', { count: selectedRepositories.length })
+        })
+      } else if (operation === 'refresh') {
+        toast.success(t('repositories.actions.reprocessRepository'), {
+          description: t('repositories.batchActionsCount', { count: selectedRepositories.length })
+        })
+      } else {
+        toast.success(t('common.success'))
+      }
+
+      loadRepositories()
+    } catch (error) {
+      if (operation === 'delete') {
+        toast.error(t('repositories.messages.deleteFailed'), {
+          description: t('repositories.messages.deleteFailedDescription')
+        })
+      } else if (operation === 'refresh') {
+        toast.error(t('repositories.messages.refreshFailed'), {
+          description: t('repositories.messages.refreshFailedDescription')
+        })
+      } else {
+        toast.error(t('common.error'))
+      }
+    } finally {
+      setBatchLoading(false)
+    }
+  }
+
+  const confirmBatchDelete = async () => {
+    try {
+      await handleBatchOperation('delete')
+    } finally {
+      setShowBatchDeleteAlert(false)
     }
   }
 
@@ -258,17 +356,17 @@ const RepositoriesPage: React.FC = () => {
   // 计算统计数据
   const getStatusStats = () => {
     const stats = repositories.reduce((acc, repo) => {
-      const status = repo.status || 'Pending'
-      acc[status] = (acc[status] || 0) + 1
+      const statusKey = getStatusKey(repo.status)
+      acc[statusKey] = (acc[statusKey] || 0) + 1
       return acc
     }, {} as Record<string, number>)
 
     return {
       total: total,
-      completed: stats.Completed || 0,
-      processing: stats.Processing || 0,
-      pending: stats.Pending || 0,
-      failed: stats.Failed || 0
+      completed: stats.completed || 0,
+      processing: stats.processing || 0,
+      pending: stats.pending || 0,
+      failed: stats.failed || 0
     }
   }
 
@@ -288,11 +386,32 @@ const RepositoriesPage: React.FC = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" disabled={batchLoading}>
                   {batchLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {t('admin.repositories.batchActionsCount', { count: selectedRepositories.length })}
+                  {t('repositories.batchActionsCount', { count: selectedRepositories.length })}
                 </Button>
               </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>{t('repositories.batchActions')}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleBatchOperation('refresh')} disabled={batchLoading}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  {t('repositories.actions.reprocessRepository')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-red-600 focus:text-red-700"
+                  onClick={() => setShowBatchDeleteAlert(true)}
+                  disabled={batchLoading}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t('repositories.actions.deleteRepository')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
             </DropdownMenu>
           )}
+          <Button variant="outline" size="sm" onClick={loadRepositories}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            {t('repositories.actions.refreshList', { defaultValue: 'Refresh' })}
+          </Button>
         </div>
       </div>
 
@@ -300,45 +419,45 @@ const RepositoriesPage: React.FC = () => {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">总仓库数</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('repositories.stats.totalRepositories')}</CardTitle>
             <Database className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-xs text-muted-foreground">所有仓库</p>
+            <p className="text-xs text-muted-foreground">{t('repositories.stats.totalRepositoriesDescription')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">已完成</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('repositories.stats.completedRepositories')}</CardTitle>
             <Database className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
-            <p className="text-xs text-muted-foreground">分析完成</p>
+            <p className="text-xs text-muted-foreground">{t('repositories.stats.completedRepositoriesDescription')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">处理中</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('repositories.stats.processingRepositories')}</CardTitle>
             <Database className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">{stats.processing}</div>
-            <p className="text-xs text-muted-foreground">正在分析</p>
+            <p className="text-xs text-muted-foreground">{t('repositories.stats.processingRepositoriesDescription')}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">待处理</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('repositories.stats.pendingRepositories')}</CardTitle>
             <Database className="h-4 w-4 text-gray-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-600">{stats.pending}</div>
-            <p className="text-xs text-muted-foreground">等待分析</p>
+            <p className="text-xs text-muted-foreground">{t('repositories.stats.pendingRepositoriesDescription')}</p>
           </CardContent>
         </Card>
       </div>
@@ -346,11 +465,11 @@ const RepositoriesPage: React.FC = () => {
       {/* 搜索和筛选 */}
       <Card>
         <CardHeader>
-          <CardTitle>仓库列表</CardTitle>
-          <CardDescription>共 {total} 个仓库</CardDescription>
+          <CardTitle>{t('repositories.repositoryList')}</CardTitle>
+          <CardDescription>{t('repositories.totalRepositories', { total })}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center space-x-4 mb-4">
+          <div className="flex flex-wrap items-center gap-4 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
@@ -361,18 +480,23 @@ const RepositoriesPage: React.FC = () => {
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-48">
                 <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="筛选状态" />
+                <SelectValue placeholder={t('repositories.filterStatus')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">全部状态</SelectItem>
-                <SelectItem value="Pending">待处理</SelectItem>
-                <SelectItem value="Processing">处理中</SelectItem>
-                <SelectItem value="Completed">已完成</SelectItem>
-                <SelectItem value="Failed">失败</SelectItem>
+                <SelectItem value="all">{t('repositories.allStatus')}</SelectItem>
+                <SelectItem value={String(WarehouseStatus.Pending)}>{t('repositories.statusLabels.pending')}</SelectItem>
+                <SelectItem value={String(WarehouseStatus.Processing)}>{t('repositories.statusLabels.processing')}</SelectItem>
+                <SelectItem value={String(WarehouseStatus.Completed)}>{t('repositories.statusLabels.completed')}</SelectItem>
+                <SelectItem value={String(WarehouseStatus.Failed)}>{t('repositories.statusLabels.failed')}</SelectItem>
+                <SelectItem value={String(WarehouseStatus.Canceled)}>{t('repositories.statusLabels.canceled')}</SelectItem>
+                <SelectItem value={String(WarehouseStatus.Unauthorized)}>{t('repositories.statusLabels.unauthorized')}</SelectItem>
               </SelectContent>
             </Select>
+            <Button variant="outline" size="sm" onClick={() => { setSearchQuery(''); setStatusFilter('all'); }}>
+              {t('common.reset')}
+            </Button>
           </div>
 
           {/* 仓库表格 */}
@@ -389,7 +513,7 @@ const RepositoriesPage: React.FC = () => {
                   <TableHead>{t('repositories.table.name')}</TableHead>
                   <TableHead>{t('repositories.table.organization')}</TableHead>
                   <TableHead>{t('repositories.table.status')}</TableHead>
-                  <TableHead className="text-center">{t('admin.repositories.table.statistics')}</TableHead>
+                  <TableHead className="text-center">{t('repositories.table.statistics')}</TableHead>
                   <TableHead>{t('repositories.table.created_at')}</TableHead>
                   <TableHead className="text-right">{t('repositories.table.actions')}</TableHead>
                 </TableRow>
@@ -409,7 +533,10 @@ const RepositoriesPage: React.FC = () => {
                   </TableRow>
                 ) : (
                   repositories.map((repo) => (
-                    <TableRow key={repo.id} className={selectedRepositories.includes(repo.id) ? 'bg-muted/50' : ''}>
+                    <TableRow
+                      key={repo.id}
+                      className={selectedRepositories.includes(repo.id) ? 'bg-blue-50' : ''}
+                    >
                       <TableCell>
                         <Checkbox
                           checked={selectedRepositories.includes(repo.id)}
@@ -425,19 +552,19 @@ const RepositoriesPage: React.FC = () => {
                             )}
                           </div>
                           {repo.address && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
                               <a
                                 href={repo.address.replace('.git', '')}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs text-blue-600 hover:underline flex items-center"
+                                className="text-blue-600 hover:underline flex items-center"
                               >
                                 <ExternalLink className="h-3 w-3 mr-1" />
                                 {repo.address.includes('github.com') ? 'GitHub' :
                                   repo.address.includes('gitee.com') ? 'Gitee' : 'Git'}
                               </a>
                               {repo.branch && (
-                                <div className="text-xs text-muted-foreground flex items-center">
+                                <div className="flex items-center">
                                   <GitBranch className="h-3 w-3 mr-1" />
                                   {repo.branch}
                                 </div>
@@ -445,7 +572,7 @@ const RepositoriesPage: React.FC = () => {
                             </div>
                           )}
                           {repo.description && (
-                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            <p className="text-xs text-muted-foreground truncate max-w-[240px]">
                               {repo.description}
                             </p>
                           )}
@@ -494,44 +621,44 @@ const RepositoriesPage: React.FC = () => {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">{t('admin.repositories.actions.openMenu')}</span>
+                              <span className="sr-only">{t('repositories.actions.openMenu')}</span>
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>{t('admin.repositories.actions.actionMenu')}</DropdownMenuLabel>
+                          <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuLabel>{t('repositories.actions.actionMenu')}</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem asChild>
                               <Link to={`/${repo.organizationName}/${repo.name}`}>
                                 <Eye className="mr-2 h-4 w-4" />
-                                {t('admin.repositories.actions.viewRepository')}
+                                {t('repositories.actions.viewRepository')}
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEditRepository(repo)}>
                               <Edit className="mr-2 h-4 w-4" />
-                              {t('admin.repositories.actions.editInfo')}
+                              {t('repositories.actions.editInfo')}
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
                               <Link to={`/admin/repositories/${repo.id}`}>
                                 <Settings className="mr-2 h-4 w-4" />
-                                {t('admin.repositories.actions.manageContent')}
+                                {t('repositories.actions.manageContent')}
                               </Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleRefreshRepository(repo.id, repo.name)}>
                               <RefreshCw className="mr-2 h-4 w-4" />
-                              {t('admin.repositories.actions.reprocessRepository')}
+                              {t('repositories.actions.reprocessRepository')}
                             </DropdownMenuItem>
                             <DropdownMenuItem>
                               <Download className="mr-2 h-4 w-4" />
-                              {t('admin.repositories.actions.exportMarkdown')}
+                              {t('repositories.actions.exportMarkdown')}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              className="text-red-600"
+                              className="text-red-600 focus:text-red-700"
                               onClick={() => handleDeleteRepository(repo)}
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
-                              {t('admin.repositories.actions.deleteRepository')}
+                              {t('repositories.actions.deleteRepository')}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -552,10 +679,10 @@ const RepositoriesPage: React.FC = () => {
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
               >
-                {t('admin.repositories.previous')}
+                {t('repositories.pagination.previous')}
               </Button>
               <div className="text-sm text-muted-foreground">
-                {t('admin.repositories.pageInfo', { current: currentPage, total: Math.ceil(total / pageSize) })}
+                {t('repositories.pagination.pageInfo', { current: currentPage, total: Math.ceil(total / pageSize) })}
               </div>
               <Button
                 variant="outline"
@@ -563,7 +690,7 @@ const RepositoriesPage: React.FC = () => {
                 onClick={() => setCurrentPage(prev => prev + 1)}
                 disabled={currentPage >= Math.ceil(total / pageSize)}
               >
-                {t('admin.repositories.next')}
+                {t('repositories.pagination.next')}
               </Button>
             </div>
           )}
@@ -592,19 +719,41 @@ const RepositoriesPage: React.FC = () => {
       <AlertDialog open={showDeleteAlert} onOpenChange={setShowDeleteAlert}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('admin.repositories.deleteDialog.title')}</AlertDialogTitle>
+            <AlertDialogTitle>{t('repositories.deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('admin.repositories.deleteDialog.description', { name: repositoryToDelete?.name })}
+              {t('repositories.deleteDialog.description', { name: repositoryToDelete?.name })}
               <br />
               <span className="text-red-600 font-medium">
-                {t('admin.repositories.deleteDialog.warning')}
+                {t('repositories.deleteDialog.warning')}
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('admin.repositories.deleteDialog.cancel')}</AlertDialogCancel>
+            <AlertDialogCancel>{t('repositories.deleteDialog.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteRepository} className="bg-red-600 hover:bg-red-700">
-              {t('admin.repositories.deleteDialog.confirmDelete')}
+              {t('repositories.deleteDialog.confirmDelete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 批量删除确认对话框 */}
+      <AlertDialog open={showBatchDeleteAlert} onOpenChange={setShowBatchDeleteAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('repositories.deleteDialog.title')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('repositories.deleteDialog.batchDescription', { count: selectedRepositories.length })}
+              <br />
+              <span className="text-red-600 font-medium">
+                {t('repositories.deleteDialog.warning')}
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('repositories.deleteDialog.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmBatchDelete} className="bg-red-600 hover:bg-red-700">
+              {t('repositories.deleteDialog.confirmDelete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -646,11 +795,11 @@ const EditRepositoryDialog: React.FC<{
     setLoading(true)
     try {
       await repositoryService.updateRepository(repository.id, formData)
-      toast.success(t('admin.repositories.messages.updateSuccess'))
+      toast.success(t('repositories.messages.updateSuccess'))
       onSuccess()
     } catch (error: any) {
-      toast.error(t('admin.repositories.messages.updateFailed'), {
-        description: error.message || t('admin.repositories.messages.updateFailedDescription')
+      toast.error(t('repositories.messages.updateFailed'), {
+        description: error.message || t('repositories.messages.updateFailedDescription')
       })
     } finally {
       setLoading(false)
@@ -662,9 +811,9 @@ const EditRepositoryDialog: React.FC<{
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{t('admin.repositories.editDialog.title')}</DialogTitle>
+        <DialogTitle>{t('repositories.editDialog.title')}</DialogTitle>
         <DialogDescription>
-          {t('admin.repositories.editDialog.description', {
+          {t('repositories.editDialog.description', {
             organizationName: repository.organizationName,
             name: repository.name
           })}
@@ -672,10 +821,10 @@ const EditRepositoryDialog: React.FC<{
       </DialogHeader>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <Label htmlFor="description">{t('admin.repositories.editDialog.repositoryDescription')}</Label>
+          <Label htmlFor="description">{t('repositories.editDialog.repositoryDescription')}</Label>
           <Textarea
             id="description"
-            placeholder={t('admin.repositories.editDialog.descriptionPlaceholder')}
+            placeholder={t('repositories.editDialog.descriptionPlaceholder')}
             value={formData.description}
             onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
             rows={3}
@@ -687,13 +836,13 @@ const EditRepositoryDialog: React.FC<{
             checked={formData.isRecommended}
             onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isRecommended: checked }))}
           />
-          <Label htmlFor="isRecommended">{t('admin.repositories.editDialog.isRecommended')}</Label>
+          <Label htmlFor="isRecommended">{t('repositories.editDialog.isRecommended')}</Label>
         </div>
         <div>
-          <Label htmlFor="prompt">{t('admin.repositories.editDialog.customPrompt')}</Label>
+          <Label htmlFor="prompt">{t('repositories.editDialog.customPrompt')}</Label>
           <Textarea
             id="prompt"
-            placeholder={t('admin.repositories.editDialog.promptPlaceholder')}
+            placeholder={t('repositories.editDialog.promptPlaceholder')}
             value={formData.prompt}
             onChange={(e) => setFormData(prev => ({ ...prev, prompt: e.target.value }))}
             rows={3}
@@ -701,11 +850,11 @@ const EditRepositoryDialog: React.FC<{
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onCancel}>
-            {t('admin.repositories.editDialog.cancel')}
+            {t('repositories.editDialog.cancel')}
           </Button>
           <Button type="submit" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {t('admin.repositories.editDialog.saveChanges')}
+            {t('repositories.editDialog.saveChanges')}
           </Button>
         </DialogFooter>
       </form>

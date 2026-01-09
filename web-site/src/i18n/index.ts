@@ -16,23 +16,29 @@ import adminZhCN from './locales/admin/zh-CN.json'
 import adminJaJP from './locales/admin/ja-JP.json'
 import adminKoKR from './locales/admin/ko-KR.json'
 
+// 补充包（完整合并版），用于兜底缺失翻译
+import supplementEnUS from './locales/i18n-complete-supplement-en-US.json'
+import supplementZhCN from './locales/i18n-complete-supplement-zh-CN.json'
+import supplementJaJP from './locales/i18n-complete-supplement-ja-JP.json'
+import supplementKoKR from './locales/i18n-complete-supplement-ko-KR.json'
+
+// 构建资源：补充包为主，缺失时回退到基础文件。注意补充包里的 admin 只放到 admin 命名空间，避免污染 translation。
+const buildLocale = (base: any, admin: any, supplement: any) => {
+  const { admin: supplementAdmin, ...supplementTranslation } = supplement || {}
+  const mergedAdmin = { ...(admin || {}), ...(supplementAdmin || {}) }
+  // 兼容历史：允许使用 t('admin.xxx') 访问（嵌套一层 admin 前缀）
+  const adminWithPrefix = { ...mergedAdmin, admin: mergedAdmin }
+  return {
+    translation: { ...(base || {}), ...(supplementTranslation || {}) },
+    admin: adminWithPrefix,
+  }
+}
+
 const resources = {
-  'en-US': {
-    translation: enUS,
-    admin: adminEnUS,
-  },
-  'zh-CN': {
-    translation: zhCN,
-    admin: adminZhCN,
-  },
-  'ja-JP': {
-    translation: jaJP,
-    admin: adminJaJP,
-  },
-  'ko-KR': {
-    translation: koKR,
-    admin: adminKoKR,
-  },
+  'en-US': buildLocale(enUS, adminEnUS, supplementEnUS),
+  'zh-CN': buildLocale(zhCN, adminZhCN, supplementZhCN),
+  'ja-JP': buildLocale(jaJP, adminJaJP, supplementJaJP),
+  'ko-KR': buildLocale(koKR, adminKoKR, supplementKoKR),
 }
 
 i18n

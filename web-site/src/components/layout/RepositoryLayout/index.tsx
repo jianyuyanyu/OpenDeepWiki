@@ -29,9 +29,10 @@ import {
 
 interface RepositoryLayoutProps {
   children?: React.ReactNode
+  className?: string
 }
 
-export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) => {
+export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children, className }) => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
@@ -190,83 +191,21 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
   }, [])
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* 顶部导航栏 */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur-sm supports-[backdrop-filter]:bg-background/60">
-        <div className="flex h-16 items-center px-4 lg:px-6">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            {/* 移动端菜单按钮 */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden h-8 w-8"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </Button>
+    <div className={cn("h-screen bg-background relative overflow-hidden", className)}>
+      {/* 移动端菜单按钮 - 替代顶栏 */}
+      <Button
+        variant="outline"
+        size="icon"
+        className="fixed left-4 top-4 z-40 lg:hidden shadow-md bg-background/80 backdrop-blur-sm"
+        onClick={() => setMobileMenuOpen(true)}
+      >
+        <Menu className="h-4 w-4" />
+      </Button>
 
-
-            <nav className="flex items-center gap-1 min-w-0 flex-1">
-              {error ? (
-                <div className="flex items-center gap-2 text-destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <span className="text-sm font-medium">{t('repository.layout.repositoryNotFound')}</span>
-                </div>
-              ) : (
-                <>
-                  <span className="text-sm font-medium text-muted-foreground hover:text-foreground cursor-pointer">
-                    {owner}
-                  </span>
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60" />
-                  <span className="text-sm font-semibold text-foreground truncate">
-                    {name}
-                  </span>
-                </>
-              )}
-            </nav>
-          </div>
-
-          {/* 右侧操作按钮 */}
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="hidden lg:flex h-8 px-2"
-              disabled
-            >
-              <Search className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2"
-              onClick={handleDownload}
-              disabled={isDownloading || !repository}
-              title={t('repository.layout.downloadTooltip')}
-            >
-              {isDownloading ? (
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-            </Button>
-            <ThemeToggle />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2"
-              onClick={() => window.open(`https://github.com/${owner}/${name}`, '_blank')}
-            >
-              <Github className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex relative">
+      <div className="flex relative h-full">
         <aside
           className={cn(
-            "hidden lg:block min-h-[calc(100vh-4rem)] fixed left-0 z-10",
+            "hidden lg:block h-full fixed left-0 top-0 z-30",
             "w-72 bg-background border-r border-border",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
@@ -288,9 +227,11 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
               selectedPath={selectedNode?.path}
               onSelectNode={handleNodeSelect}
               loading={loadingBranches || loadingDocuments}
-              className="h-[calc(100vh-4rem)]"
+              className="h-full"
               sidebarOpen={sidebarOpen}
               onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+              onDownload={handleDownload}
+              isDownloading={isDownloading}
             />
           )}
         </aside>
@@ -302,7 +243,7 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
               className="fixed inset-0 z-40 bg-black/50 lg:hidden"
               onClick={() => setMobileMenuOpen(false)}
             />
-            <aside className="fixed left-0 top-16 z-40 h-[calc(100vh-4rem)] w-72 bg-background lg:hidden">
+            <aside className="fixed left-0 top-0 z-50 h-full w-72 bg-background lg:hidden shadow-xl animate-in slide-in-from-left duration-200">
               {owner && name && (
                 <FumadocsSidebar
                   owner={owner}
@@ -317,6 +258,8 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
                   className="h-full"
                   sidebarOpen={true}
                   onSidebarToggle={() => setMobileMenuOpen(false)}
+                  onDownload={handleDownload}
+                  isDownloading={isDownloading}
                 />
               )}
             </aside>
@@ -326,7 +269,7 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
         {/* 主内容区 - 优化布局 */}
         <main
           className={cn(
-            "h-[calc(100vh-4rem)] relative flex flex-col w-full",
+            "h-full relative flex flex-col w-full bg-background overflow-hidden",
             sidebarOpen ? "lg:ml-72" : "lg:ml-0"
           )}
           style={{
@@ -340,7 +283,7 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
             size="icon"
             onClick={() => setSidebarOpen(true)}
             className={cn(
-              "fixed left-4 top-24 z-30 shadow-lg",
+              "fixed left-4 top-4 z-30 shadow-lg",
               "bg-background/95 backdrop-blur-sm border-border/50",
               "hover:bg-accent hover:text-accent-foreground",
               "hidden lg:flex h-8 w-8",
@@ -354,7 +297,7 @@ export const RepositoryLayout: React.FC<RepositoryLayoutProps> = ({ children }) 
             <PanelLeftOpen className="h-4 w-4" />
           </Button>
 
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 h-full overflow-hidden">
             {error && !isFixedRoute() ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center space-y-3">

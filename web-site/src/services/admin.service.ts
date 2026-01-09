@@ -732,44 +732,153 @@ export const systemSettingsService = {
 }
 
 // 统计数据接口
-export interface ComprehensiveDashboard {
-  userStats: {
-    totalUsers: number
-    activeUsers: number
-    newUsersToday: number
-    userGrowth: number
-  }
-  repositoryStats: {
-    totalRepositories: number
-    activeRepositories: number
-    newRepositoriesToday: number
-    repositoryGrowth: number
-  }
-  documentStats: {
-    totalDocuments: number
-    processedDocuments: number
-    newDocumentsToday: number
-    documentGrowth: number
-  }
-  systemStats: {
-    cpuUsage: number
-    memoryUsage: number
-    diskUsage: number
-    uptime: string
-  }
-  recentActivities: Array<{
-    id: string
-    type: string
-    description: string
-    user: string
-    timestamp: string
-  }>
-  topRepositories: Array<{
+export interface TrendData {
+  date: string
+  value: number
+}
+
+export interface PerformanceTrend {
+  time: string
+  cpuUsage: number
+  memoryUsage: number
+  activeConnections: number
+}
+
+export interface SystemStatistics {
+  totalUsers: number
+  totalRepositories: number
+  totalDocuments: number
+  totalViews: number
+  monthlyNewUsers: number
+  monthlyNewRepositories: number
+  monthlyNewDocuments: number
+  monthlyViews: number
+  userGrowthRate: number
+  repositoryGrowthRate: number
+  documentGrowthRate: number
+  viewGrowthRate: number
+}
+
+export interface SystemPerformance {
+  cpuUsage: number
+  memoryUsage: number
+  diskUsage: number
+  totalMemory: number
+  usedMemory: number
+  totalDiskSpace: number
+  usedDiskSpace: number
+  systemStartTime: string
+  uptimeSeconds: number
+  activeConnections: number
+}
+
+export interface RepositoryStatusDistribution {
+  status: string
+  count: number
+  percentage: number
+}
+
+export interface UserActivityStats {
+  onlineUsers: number
+  dailyActiveUsers: number
+  weeklyActiveUsers: number
+  monthlyActiveUsers: number
+  activeUserGrowthRate: number
+  recentLoginUsers: Array<{
     id: string
     name: string
-    documentCount: number
-    lastActivity: string
+    avatar?: string
+    loginTime: string
+    ipAddress?: string
+    isOnline: boolean
   }>
+}
+
+export interface RecentRepository {
+  id: string
+  name: string
+  organizationName: string
+  description: string
+  createdAt: string
+  status: string
+  isRecommended: boolean
+  documentCount: number
+}
+
+export interface RecentUser {
+  id: string
+  name: string
+  email: string
+  createdAt: string
+  lastLoginAt?: string
+  roles: string[]
+  isOnline: boolean
+  avatar?: string
+}
+
+export interface PopularContent {
+  id: string
+  title: string
+  type: string
+  viewCount: number
+  lastViewAt: string
+}
+
+export interface SystemErrorLog {
+  id: string
+  level: string
+  message: string
+  source: string
+  userId?: string
+  userName?: string
+  createdAt: string
+  exception?: string
+  path?: string
+  method?: string
+  statusCode?: number
+}
+
+export interface HealthCheckItem {
+  name: string
+  status: string
+  isHealthy: boolean
+  responseTime: number
+  error?: string
+  lastCheckTime: string
+}
+
+export interface SystemHealthCheck {
+  overallScore: number
+  healthLevel: string
+  database: HealthCheckItem
+  aiService: HealthCheckItem
+  emailService: HealthCheckItem
+  fileStorage: HealthCheckItem
+  systemPerformance: HealthCheckItem
+  checkTime: string
+  warnings: string[]
+  errors: string[]
+}
+
+export interface DashboardTrends {
+  userTrends: TrendData[]
+  repositoryTrends: TrendData[]
+  documentTrends: TrendData[]
+  viewTrends: TrendData[]
+  performanceTrends: PerformanceTrend[]
+}
+
+export interface ComprehensiveDashboard {
+  systemStats: SystemStatistics
+  performance: SystemPerformance
+  repositoryStatusDistribution: RepositoryStatusDistribution[]
+  userActivity: UserActivityStats
+  recentRepositories: RecentRepository[]
+  recentUsers: RecentUser[]
+  popularContent: PopularContent[]
+  recentErrors: SystemErrorLog[]
+  healthCheck: SystemHealthCheck
+  trends: DashboardTrends
 }
 
 // 统计数据管理API
@@ -777,64 +886,188 @@ export const statsService = {
   // 获取综合仪表板数据
   getComprehensiveDashboard: async (): Promise<ComprehensiveDashboard> => {
     try {
-      const response = await request.get<ComprehensiveDashboard>('/api/stats/dashboard')
+      const response = await request.get<ComprehensiveDashboard>('/api/Statistics/ComprehensiveDashboard')
       return response || {
-        userStats: {
-          totalUsers: 0,
-          activeUsers: 0,
-          newUsersToday: 0,
-          userGrowth: 0
-        },
-        repositoryStats: {
-          totalRepositories: 0,
-          activeRepositories: 0,
-          newRepositoriesToday: 0,
-          repositoryGrowth: 0
-        },
-        documentStats: {
-          totalDocuments: 0,
-          processedDocuments: 0,
-          newDocumentsToday: 0,
-          documentGrowth: 0
-        },
         systemStats: {
+          totalUsers: 0,
+          totalRepositories: 0,
+          totalDocuments: 0,
+          totalViews: 0,
+          monthlyNewUsers: 0,
+          monthlyNewRepositories: 0,
+          monthlyNewDocuments: 0,
+          monthlyViews: 0,
+          userGrowthRate: 0,
+          repositoryGrowthRate: 0,
+          documentGrowthRate: 0,
+          viewGrowthRate: 0
+        },
+        performance: {
           cpuUsage: 0,
           memoryUsage: 0,
           diskUsage: 0,
-          uptime: '0d 0h 0m'
+          totalMemory: 0,
+          usedMemory: 0,
+          totalDiskSpace: 0,
+          usedDiskSpace: 0,
+          systemStartTime: new Date(0).toISOString(),
+          uptimeSeconds: 0,
+          activeConnections: 0
         },
-        recentActivities: [],
-        topRepositories: []
+        repositoryStatusDistribution: [],
+        userActivity: {
+          onlineUsers: 0,
+          dailyActiveUsers: 0,
+          weeklyActiveUsers: 0,
+          monthlyActiveUsers: 0,
+          activeUserGrowthRate: 0,
+          recentLoginUsers: []
+        },
+        recentRepositories: [],
+        recentUsers: [],
+        popularContent: [],
+        recentErrors: [],
+        healthCheck: {
+          overallScore: 0,
+          healthLevel: '',
+          database: {
+            name: '',
+            status: '',
+            isHealthy: false,
+            responseTime: 0,
+            lastCheckTime: new Date(0).toISOString()
+          },
+          aiService: {
+            name: '',
+            status: '',
+            isHealthy: false,
+            responseTime: 0,
+            lastCheckTime: new Date(0).toISOString()
+          },
+          emailService: {
+            name: '',
+            status: '',
+            isHealthy: false,
+            responseTime: 0,
+            lastCheckTime: new Date(0).toISOString()
+          },
+          fileStorage: {
+            name: '',
+            status: '',
+            isHealthy: false,
+            responseTime: 0,
+            lastCheckTime: new Date(0).toISOString()
+          },
+          systemPerformance: {
+            name: '',
+            status: '',
+            isHealthy: false,
+            responseTime: 0,
+            lastCheckTime: new Date(0).toISOString()
+          },
+          checkTime: new Date(0).toISOString(),
+          warnings: [],
+          errors: []
+        },
+        trends: {
+          userTrends: [],
+          repositoryTrends: [],
+          documentTrends: [],
+          viewTrends: [],
+          performanceTrends: []
+        }
       }
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
       return {
-        userStats: {
-          totalUsers: 0,
-          activeUsers: 0,
-          newUsersToday: 0,
-          userGrowth: 0
-        },
-        repositoryStats: {
-          totalRepositories: 0,
-          activeRepositories: 0,
-          newRepositoriesToday: 0,
-          repositoryGrowth: 0
-        },
-        documentStats: {
-          totalDocuments: 0,
-          processedDocuments: 0,
-          newDocumentsToday: 0,
-          documentGrowth: 0
-        },
         systemStats: {
+          totalUsers: 0,
+          totalRepositories: 0,
+          totalDocuments: 0,
+          totalViews: 0,
+          monthlyNewUsers: 0,
+          monthlyNewRepositories: 0,
+          monthlyNewDocuments: 0,
+          monthlyViews: 0,
+          userGrowthRate: 0,
+          repositoryGrowthRate: 0,
+          documentGrowthRate: 0,
+          viewGrowthRate: 0
+        },
+        performance: {
           cpuUsage: 0,
           memoryUsage: 0,
           diskUsage: 0,
-          uptime: '0d 0h 0m'
+          totalMemory: 0,
+          usedMemory: 0,
+          totalDiskSpace: 0,
+          usedDiskSpace: 0,
+          systemStartTime: new Date(0).toISOString(),
+          uptimeSeconds: 0,
+          activeConnections: 0
         },
-        recentActivities: [],
-        topRepositories: []
+        repositoryStatusDistribution: [],
+        userActivity: {
+          onlineUsers: 0,
+          dailyActiveUsers: 0,
+          weeklyActiveUsers: 0,
+          monthlyActiveUsers: 0,
+          activeUserGrowthRate: 0,
+          recentLoginUsers: []
+        },
+        recentRepositories: [],
+        recentUsers: [],
+        popularContent: [],
+        recentErrors: [],
+        healthCheck: {
+          overallScore: 0,
+          healthLevel: '',
+          database: {
+            name: '',
+            status: '',
+            isHealthy: false,
+            responseTime: 0,
+            lastCheckTime: new Date(0).toISOString()
+          },
+          aiService: {
+            name: '',
+            status: '',
+            isHealthy: false,
+            responseTime: 0,
+            lastCheckTime: new Date(0).toISOString()
+          },
+          emailService: {
+            name: '',
+            status: '',
+            isHealthy: false,
+            responseTime: 0,
+            lastCheckTime: new Date(0).toISOString()
+          },
+          fileStorage: {
+            name: '',
+            status: '',
+            isHealthy: false,
+            responseTime: 0,
+            lastCheckTime: new Date(0).toISOString()
+          },
+          systemPerformance: {
+            name: '',
+            status: '',
+            isHealthy: false,
+            responseTime: 0,
+            lastCheckTime: new Date(0).toISOString()
+          },
+          checkTime: new Date(0).toISOString(),
+          warnings: [],
+          errors: []
+        },
+        trends: {
+          userTrends: [],
+          repositoryTrends: [],
+          documentTrends: [],
+          viewTrends: [],
+          performanceTrends: []
+        }
       }
     }
   }

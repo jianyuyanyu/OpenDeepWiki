@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { motion, AnimatePresence } from 'motion/react'
-import { Loader2, List, X, Eye, EyeOff } from 'lucide-react'
+import { Loader2, List, X, Eye, EyeOff, Edit, Calendar } from 'lucide-react'
 import { documentService, type DocumentResponse } from '@/services/documentService'
 import { useRepositoryDetailStore } from '@/stores/repositoryDetail.store'
 import { cn } from '@/lib/utils'
@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import MarkdownRenderer from '@/components/common/MarkdownRenderer'
 import TableOfContents from '@/components/common/TableOfContents'
 import DocumentSkeleton from '@/components/common/DocumentSkeleton'
+import { DocsBreadcrumb } from '@/components/common/DocsBreadcrumb'
+import { DocsPager } from '@/components/common/DocsPager'
 import { FadeIn, SlideIn, ZoomIn, StaggerContainer, StaggerItem } from '@/components/animate-ui'
 
 interface DocumentPageProps {
@@ -21,7 +23,7 @@ export default function DocumentPage({ className, branch }: DocumentPageProps) {
   const { owner, name, '*': path } = useParams<{ owner: string; name: string; '*': string }>()
   const [searchParams] = useSearchParams()
   const { t, i18n } = useTranslation()
-  const { selectedBranch } = useRepositoryDetailStore()
+  const { selectedBranch, documentNodes, repository } = useRepositoryDetailStore()
   const [loading, setLoading] = useState(true)
   const [documentData, setDocumentData] = useState<DocumentResponse | null>(null)
   const [error, setError] = useState<string>('')
@@ -147,139 +149,160 @@ export default function DocumentPage({ className, branch }: DocumentPageProps) {
     )
   }
 
-  return (
-    <div className={cn("flex-1 flex h-full relative", className)}>
-      <div className="flex-1 overflow-auto h-full">
-        <FadeIn asChild>
-          <article className="max-w-4xl mx-auto px-6 py-8 min-h-full">
-            <StaggerContainer staggerDelay={0.1}>
-              {/* 显示文档描述 */}
-              {documentData?.description && (
-                <StaggerItem>
-                  <motion.p
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-muted-foreground mb-6"
-                  >
-                    {documentData.description}
-                  </motion.p>
-                </StaggerItem>
-              )}
+  const currentBranch = searchParams.get('branch') || selectedBranch || branch || 'main'
 
-              {/* 显示源文件信息 */}
-              {documentData?.fileSource && documentData.fileSource.length > 0 && (
+  return (
+    <div className={cn("flex-1 grid grid-rows-[auto_1fr] h-full relative bg-background/60", className)}>
+      <div className="grid lg:grid-cols-[minmax(0,1fr)_240px] gap-10 items-start h-full overflow-hidden">
+        {/* 主要内容区域，带滚动条 */}
+        <main 
+          id="article-scroll-container"
+          className="overflow-y-auto h-full px-6 py-8 lg:px-10 lg:py-10 scroll-smooth"
+        >
+          <article className="mx-auto min-h-full max-w-4xl">
+            <div className="min-w-0">
+              <StaggerContainer staggerDelay={0.08} className="space-y-6">
+                
+                {/* 面包屑导航 */}
+                <StaggerItem>
+                  <DocsBreadcrumb 
+                    nodes={documentNodes} 
+                    currentPath={path} 
+                    owner={owner!} 
+                    name={name!} 
+                  />
+                </StaggerItem>
+
+                {/* 标题区域 */}
+                <StaggerItem>
+                  <div className="space-y-2 mb-8">
+                     <h1 className="text-3xl font-bold tracking-tight text-foreground scroll-m-20">
+                       {documentData?.title || path?.split('/').pop()?.replace('.md', '')}
+                     </h1>
+                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        {documentData?.lastUpdate && (
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>Updated {new Date(documentData.lastUpdate).toLocaleDateString()}</span>
+                          </div>
+                        )}
+                        {/* 这里可以加 Edit on GitHub 链接，如果有仓库地址 */}
+                        {repository?.address && path && (
+                          <a 
+                            href={`${repository.address}/blob/${currentBranch}/${path}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 hover:text-primary transition-colors"
+                          >
+                            <Edit className="h-3 w-3" />
+                            <span>Edit on GitHub</span>
+                          </a>
+                        )}
+                     </div>
+                  </div>
+                </StaggerItem>
+
+                {/* 显示文档描述 */}
+                {documentData?.description && (
+                  <StaggerItem>
+                    <motion.div
+                      layout
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
+                    >
+                      {documentData.description}
+                    </motion.div>
+                  </StaggerItem>
+                )}
+
+                {/* 显示源文件信息 */}
+                {documentData?.fileSource && documentData.fileSource.length > 0 && (
+                  <StaggerItem>
+                    <motion.div
+                      layout
+                      initial={{ opacity: 0, y: 18 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3"
+                    >
+                      <details className="group">
+                        <summary className="flex items-center gap-2 cursor-pointer font-medium text-sm text-foreground select-none">
+                          <svg
+                            className="w-4 h-4 transition-transform group-open:rotate-90 text-muted-foreground"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                          {t('repository.document.relevantSourceFiles')}
+                        </summary>
+                        <div className="mt-3 max-h-48 overflow-y-auto space-y-2 pl-6 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                          {documentData.fileSource.map((source, index) => (
+                            <a
+                              key={index}
+                              href={source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-sm text-primary hover:underline hover:bg-muted/40 px-2 py-1 rounded transition-colors"
+                            >
+                              <svg className="w-4 h-4 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              <span className="truncate">{source.name}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </details>
+                    </motion.div>
+                  </StaggerItem>
+                )}
+
+                {/* 渲染 Markdown 内容 */}
                 <StaggerItem>
                   <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    layout
+                    initial={{ opacity: 0, y: 18 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mb-6 p-4 bg-muted/30 rounded-lg border"
+                    className="markdown-content"
                   >
-              <details className="group">
-                <summary className="flex items-center gap-2 cursor-pointer font-medium text-sm">
-                  <svg
-                    className="w-4 h-4 transition-transform group-open:rotate-90"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                  {t('repository.document.relevantSourceFiles')}
-                </summary>
-                <div className="mt-3 max-h-48 overflow-y-auto space-y-2 pl-6 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-                  {documentData.fileSource.map((source, index) => (
-                    <a
-                      key={index}
-                      href={source.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-primary hover:underline hover:bg-muted/50 px-2 py-1 rounded transition-colors"
-                    >
-                      <svg className="w-4 h-4 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <span className="truncate">{source.name}</span>
-                    </a>
-                  ))}
-                  {documentData.fileSource.length > 8 && (
-                    <div className="text-xs text-muted-foreground italic px-2 py-1">
-                      {t('repository.document.showingSourceFiles', { count: documentData.fileSource.length })}
-                    </div>
-                  )}
-                </div>
-              </details>
+                    <MarkdownRenderer content={documentData?.content || ''} />
                   </motion.div>
                 </StaggerItem>
-              )}
 
-              {/* 渲染 Markdown 内容 */}
-              <StaggerItem>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="markdown-content"
-                >
-                  <MarkdownRenderer content={documentData?.content || ''} />
-                </motion.div>
-              </StaggerItem>
-            </StaggerContainer>
-          </article>
-        </FadeIn>
-      </div>
-
-      {/* 桌面端 TOC - 自适应显示，使用 motion */}
-      {(hasTocContent || forceShowToc) && (
-        <motion.aside
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-          className="w-64 border-l border-border/40 px-4 py-8 overflow-y-auto hidden lg:block"
-        >
-          {/* TOC 手动控制按钮 - 仅在内容不足时显示 */}
-          {!hasTocContent && (
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground tracking-tight">
-                {t('repository.document.tableOfContents')}
-              </h3>
-              <Button
-                onClick={() => setForceShowToc(false)}
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 hover:bg-muted"
-                title={t('repository.document.hideToc')}
-              >
-                <EyeOff className="h-4 w-4" />
-              </Button>
+                {/* 分页导航 */}
+                <StaggerItem>
+                  <DocsPager 
+                    nodes={documentNodes} 
+                    currentPath={path} 
+                    owner={owner!} 
+                    name={name!} 
+                    branch={currentBranch} 
+                  />
+                </StaggerItem>
+              </StaggerContainer>
             </div>
-          )}
-          <TableOfContents />
-        </motion.aside>
-      )}
-
-      {/* 桌面端 TOC 显示按钮 - 使用 motion */}
-      <AnimatePresence>
-        {!hasTocContent && !forceShowToc && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8, y: -10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-            className="fixed top-24 right-6 z-40 hidden lg:block"
+            
+            {/* Footer space */}
+            <div className="h-20" />
+          </article>
+        </main>
+        
+        {/* 右侧 TOC（桌面） */}
+        {(hasTocContent || forceShowToc) && (
+          <motion.aside
+            layout
+            initial={{ opacity: 0, x: 18 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 18 }}
+            transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+            className="hidden lg:block h-full overflow-y-auto py-10 pr-6 pl-2" // 让 TOC 区域自己滚动
           >
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                onClick={() => setForceShowToc(true)}
-                className="h-10 px-3 rounded-full shadow-lg flex items-center gap-2"
-                variant="outline"
-                title={t('repository.document.showToc')}
-              >
-                <Eye className="h-4 w-4" />
-                <span className="text-sm">{t('repository.document.tableOfContents')}</span>
-              </Button>
-            </motion.div>
-          </motion.div>
+            <div className="text-sm font-semibold mb-4 text-foreground">{t('repository.document.tableOfContents')}</div>
+            <TableOfContents className="p-0 border-0 shadow-none bg-transparent" />
+          </motion.aside>
         )}
-      </AnimatePresence>
+      </div>
 
       {/* 移动端 TOC 按钮 - 使用 motion */}
       <AnimatePresence>

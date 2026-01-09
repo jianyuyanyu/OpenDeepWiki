@@ -7,7 +7,8 @@ import {
   Info,
   HelpCircle,
   Plus,
-  X
+  X,
+  AlertTriangle
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { SystemSetting, ValidationErrors } from '@/types/systemSettings'
@@ -21,6 +22,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'
+import { useNavigate } from 'react-router-dom'
 
 interface DocumentSettingsTabProps {
   settings: SystemSetting[]
@@ -36,6 +38,7 @@ const DocumentSettingsTab: React.FC<DocumentSettingsTabProps> = ({
   loading = false
 }) => {
   const { t } = useTranslation('admin')
+  const navigate = useNavigate()
 
   // 获取设置值的辅助函数
   const getSettingValue = (key: string) => {
@@ -163,6 +166,27 @@ const DocumentSettingsTab: React.FC<DocumentSettingsTabProps> = ({
         </div>
 
         <div className="space-y-6">
+          {/* 增量更新配置迁移提醒 */}
+          <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium mb-1">增量更新配置已迁移</p>
+                  <p className="text-sm">增量更新已经修改成单仓库配置，请前往仓库管理指定一个仓库详情管理，启用这个仓库的增量更新。</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/admin/repositories')}
+                  className="ml-4 border-amber-300 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300 dark:hover:bg-amber-900/30"
+                >
+                  前往仓库管理
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+
           {/* 基本文档设置 */}
           <Card>
             <CardHeader>
@@ -172,17 +196,23 @@ const DocumentSettingsTab: React.FC<DocumentSettingsTabProps> = ({
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between opacity-60">
                 <div className="space-y-0.5">
-                  <Label>{t('settings.document.enableIncrementalUpdate')}</Label>
+                  <Label className="flex items-center gap-2">
+                    {t('settings.document.enableIncrementalUpdate')}
+                    <Badge variant="secondary" className="text-xs">已迁移</Badge>
+                  </Label>
                   <p className="text-sm text-muted-foreground">
                     {t('settings.document.enableIncrementalUpdateHelp')}
+                  </p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                    该设置已迁移至各仓库的单独配置中
                   </p>
                 </div>
                 <Switch
                   checked={getBooleanValue('EnableIncrementalUpdate')}
                   onCheckedChange={(checked) => onUpdate('EnableIncrementalUpdate', checked.toString())}
-                  disabled={loading}
+                  disabled={true}
                 />
               </div>
               <div className="space-y-2">

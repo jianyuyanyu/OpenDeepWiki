@@ -9,6 +9,7 @@ const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
 const AboutPage = lazy(() => import('@/pages/about/index'))
 const ProfilePage = lazy(() => import('@/pages/profile/index'))
+const RepositoriesPage = lazy(() => import('@/pages/RepositoriesPage/index'))
 const RepositoryLayout = lazy(() => import('@/components/layout/RepositoryLayout/index'))
 const RepositoryDetailPage = lazy(() => import('@/pages/repository/RepositoryDetailPage/index'))
 const DocumentPage = lazy(() => import('@/pages/repository/DocumentPage/index'))
@@ -22,6 +23,7 @@ const AdminRoles = lazy(() => import('@/pages/admin/RolesPage/index'))
 const AdminRepositories = lazy(() => import('@/pages/admin/RepositoriesPage/index'))
 const AdminRepositoryDetail = lazy(() => import('@/pages/admin/RepositoryDetailPage/index'))
 const AdminSystemSettings = lazy(() => import('@/pages/admin/SystemSettingsPage/index'))
+const TermsPage = lazy(() => import('@/pages/legal/TermsPage'))
 
 // 加载组件
 const Loading = () => (
@@ -72,10 +74,26 @@ const routes = [
     ),
   },
   {
+    path: "/terms",
+    element: (
+      <Suspense fallback={<Loading />}>
+        <TermsPage />
+      </Suspense>
+    ),
+  },
+  {
     path: "/profile",
     element: (
       <Suspense fallback={<Loading />}>
         <ProfilePage />
+      </Suspense>
+    ),
+  },
+  {
+    path: "/repositories",
+    element: (
+      <Suspense fallback={<Loading />}>
+        <RepositoriesPage />
       </Suspense>
     ),
   },
