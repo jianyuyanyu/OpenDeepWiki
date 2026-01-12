@@ -17,6 +17,8 @@
         <PackageReference Include="Microsoft.Agents.AI" />
         <PackageReference Include="Microsoft.Agents.AI.AzureAI" />
         <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
+        <PackageReference Include="Azure.AI.OpenAI" />
+        <PackageReference Include="OpenAI" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" />

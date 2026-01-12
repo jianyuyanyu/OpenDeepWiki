@@ -41,7 +41,7 @@
     <PackageVersion Include="ModelContextProtocol.Core" Version="0.4.0-preview.3" />
     <PackageVersion Include="ModelContextProtocolServer.Sse" Version="0.6.0" />
     <PackageVersion Include="MySql.EntityFrameworkCore" Version="9.0.6" />
-    <PackageVersion Include="OpenAI" Version="2.4.0" />
+    <PackageVersion Include="OpenAI" Version="2.8.0" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.9.0" />
     <!-- Entity Framework Core -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.7" />
@@ -100,7 +100,7 @@
     <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="9.0.2" />
     <PackageVersion Include="Sdcb.DashScope" Version="2.0.0" />
     <PackageVersion Include="Google.Apis.Auth" Version="1.69.0" />
-    <PackageVersion Include="Azure.AI.OpenAI" Version="2.1.0" />
+    <PackageVersion Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
     <PackageVersion Include="ERNIE-Bot.SDK" Version="0.14.4" />
     <PackageVersion Include="TencentCloudSDK.Hunyuan" Version="3.0.1194" />
     <PackageVersion Include="MessagePack" Version="3.1.3" />
