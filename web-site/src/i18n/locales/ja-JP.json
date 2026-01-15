@@ -99,7 +99,7 @@
         "2": "完了",
         "3": "失敗",
         "5": "キャンセル済み",
-        "99": "認可されていない"
+        "99": "権限なし"
       }
     },
     "sponsors": {
@@ -303,7 +303,7 @@
     },
     "document": {
       "relevantSourceFiles": "関連ソースファイル",
-      "showingSourceFiles": "{{count}} 個のソースファイルを表示中",
+      "showingSourceFiles": "{{count}}個のソースファイル表示",
       "tableOfContents": "目次",
       "showToc": "目次を表示",
       "hideToc": "目次を非表示",
@@ -1422,6 +1422,127 @@
       "pleaseInputAppName": "アプリケーション名を入力してください",
       "pleaseInputOrganization": "組織名を入力してください",
       "pleaseInputRepository": "リポジトリ名を入力してください"
+    }
+  },
+  "chat": {
+    "toolCall": {
+      "title": "ツール呼び出し",
+      "hideDetails": "詳細を非表示",
+      "showDetails": "詳細を表示",
+      "function": "関数",
+      "arguments": "引数"
+    },
+    "reasoning": {
+      "title": "推論プロセス"
+    },
+    "issues": {
+      "related": "関連する問題",
+      "view": "表示"
+    },
+    "alert": {
+      "note": "注意",
+      "info": "情報",
+      "tip": "ヒント",
+      "important": "重要",
+      "warning": "警告",
+      "caution": "注意",
+      "details": "詳細"
+    },
+    "message": {
+      "copied": "コピーしました！",
+      "copy": "コピー",
+      "delete": "削除",
+      "deleteConfirmTitle": "メッセージの削除",
+      "deleteConfirmDescription": "このメッセージを削除してもよろしいですか？この操作は元に戻せません。"
+    },
+    "panel": {
+      "title": "AIアシスタント",
+      "emptyTitle": "会話を開始",
+      "emptyDescription": "リポジトリについて質問したり、コードの説明を依頼したり、ドキュメントのヘルプを受けることができます。",
+      "reasoning": "推論中...",
+      "thinking": "思考中...",
+      "clearTitle": "すべてのメッセージをクリア",
+      "clearDescription": "すべてのメッセージをクリアしてもよろしいですか？この操作は元に戻せません。",
+      "clearAction": "すべてクリア"
+    },
+    "floating": {
+      "tooltip": "AIアシスタントを開く"
+    }
+  },
+  "documentQuality": {
+    "title": "ドキュメント品質評価",
+    "description": "ドキュメント品質の評価と分析",
+    "development": "ドキュメント品質評価機能は開発中です..."
+  },
+  "wikiManagement": {
+    "title": "Wiki生成管理",
+    "description": "Wikiドキュメント生成の管理和設定",
+    "development": "Wiki生成管理機能は開発中です..."
+  },
+  "search": {
+    "placeholder": "リポジトリ名またはアドレスで検索"
+  },
+  "errorBoundary": {
+    "title": "問題が発生しました",
+    "description": "ページで予期しないエラーが発生しました。ページを更新するか、ホームページに戻ってください。",
+    "details": "エラー詳細（開発環境でのみ表示）",
+    "errorInfo": "エラー情報：",
+    "errorStack": "エラースタック：",
+    "componentStack": "コンポーネントスタック：",
+    "retry": "再試行",
+    "home": "ホームページに戻る",
+    "contactSupport": "問題が解決しない場合は、技術サポートにお問い合わせください。",
+    "componentFailed": "コンポーネントの読み込みに失敗しました",
+    "encounteredError": "予期しないエラーが発生しました",
+    "reload": "再読み込み"
+  },
+  "markdownEditor": {
+    "uploadSuccess": "画像のアップロードに成功しました",
+    "uploadFailed": "画像のアップロードに失敗しました"
+  },
+  "languageSwitcher": {
+    "changed": "言語を切り替えました：",
+    "failed": "言語の切り替えに失敗しました："
+  },
+  "header": {
+    "star": "Star",
+    "starCount": "{{count}}",
+    "loading": "..."
+  },
+  "home": {
+    "hero": {
+      "tagline": "AI駆動の知識ベース"
+    },
+    "quickActions": {
+      "startGuide": "入門ガイド",
+      "apiDocs": "APIドキュメント",
+      "architecture": "システムアーキテクチャ"
+    }
+  },
+  "settings": {
+    "loadUserFailed": "ユーザー情報の読み込みに失敗しました：",
+    "loadSettingsFailed": "ユーザー設定の読み込みに失敗しました：",
+    "updateUserSuccess": "ユーザー情報が正常に更新されました",
+    "updateSettingsSuccess": "ユーザー設定が正常に更新されました",
+    "updateUserFailed": "ユーザー情報の更新に失敗しました：",
+    "updateSettingsFailed": "ユーザー設定の更新に失敗しました："
+  },
+  "auth": {
+    "getUserFailed": "ユーザー情報の取得に失敗しました：",
+    "getSocialFailed": "ソーシャルログイン方法の取得に失敗しました：",
+    "registerError": "登録エラー：",
+    "loginError": "ログインエラー："
+  },
+  "warehouse": {
+    "getBranchesFailed": "ブランチリストの取得に失敗しました："
+  },
+  "admin": {
+    "repository": {
+      "aiGenerationFailed": "AI生成に失敗しました："
+    },
+    "roles": {
+      "copyPermissionsFailed": "権限のコピー中にエラーが発生しました：",
+      "copyAssignmentsFailed": "ユーザー割り当てのコピー中にエラーが発生しました："
     }
   }
 }

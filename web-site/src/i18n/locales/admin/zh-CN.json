@@ -1,4 +1,4 @@
-﻿{
+{
   "title": "管理控制台",
   "messages": {
     "no_permission": "您没有权限访问管理控制台",
@@ -394,7 +394,6 @@
       "documentContent": "文档内容...",
       "documentSaveSuccess": "文档保存成功",
       "syncManagement": "同步管理",
-      "manage_sync_settings_history": "管理仓库同步设置和历史记录",
       "syncManagementDescription": "管理仓库的同步设置和历史",
       "manualSync": "手动同步",
       "manualSyncRepository": "手动同步仓库",

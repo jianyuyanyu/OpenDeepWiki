@@ -1,12 +1,12 @@
-﻿{
-  "title": "관리 콘솔",
+{
+  "title": "관리자 콘솔",
   "messages": {
-    "no_permission": "관리 콘솔에 접근할 권한이 없습니다",
+    "no_permission": "관리자 콘솔에 대한 접근 권한이 없습니다",
     "loading": "로딩 중...",
     "no_data": "데이터 없음"
   },
   "dashboard": {
-    "fetchFailed": "대시보드 데이터 가져오기 실패",
+    "fetchFailed": "대시보드 데이터를 가져오지 못했습니다",
     "lastUpdated": "마지막 업데이트",
     "autoRefresh": "자동 새로고침",
     "refresh": "새로고침",
@@ -16,7 +16,7 @@
     "weekActive": "이번 주 활성",
     "monthlyActiveUsers": "이번 달 활성 사용자",
     "userActivityStats": "사용자 활동 통계",
-    "recentUsers": "최근 가입한 사용자",
+    "recentUsers": "최근 가입 사용자",
     "recentRepositories": "최근 생성된 저장소",
     "recentErrorLogs": "최근 오류 로그",
     "documentCount": "문서 수",
@@ -42,8 +42,8 @@
     "userGrowthRate": "사용자 증가율",
     "documentGrowthRate": "문서 증가율",
     "repositoryGrowthRate": "저장소 증가율",
-    "dailyActiveUsers": "오늘 활성",
-    "weeklyActiveUsers": "이번 주 활성",
+    "dailyActiveUsers": "오늘 활성 사용자",
+    "weeklyActiveUsers": "이번 주 활성 사용자",
     "onlineUsers": "온라인 사용자",
     "activeUserGrowthRate": "증가율",
     "retryButton": "재시도",
@@ -78,10 +78,13 @@
     "warning": "경고",
     "error": "오류",
     "status": "상태",
-    "completed": "완료",
+    "completed": "완료됨",
     "processing": "처리 중",
     "pending": "대기 중",
-    "failed": "실패"
+    "failed": "실패",
+    "min": "최소값",
+    "max": "최대값",
+    "durationFormat": "{{days}}일 {{hours}}시간 {{minutes}}분"
   },
   "users": {
     "userList": "사용자 목록",
@@ -257,11 +260,11 @@
     },
     "messages": {
       "deleteSuccess": "삭제 성공",
-      "deleteSuccessDescription": "저장소 \"{{name}}\"이(가) 삭제되었습니다",
+      "deleteSuccessDescription": "저장소 \\\"{{name}}\\\"이(가) 삭제되었습니다",
       "deleteFailed": "삭제 실패",
       "deleteFailedDescription": "저장소를 삭제할 수 없습니다",
       "refreshSuccess": "새로고침 성공",
-      "refreshSuccessDescription": "저장소 \"{{name}}\"이(가) 재처리를 시작했습니다",
+      "refreshSuccessDescription": "저장소 \\\"{{name}}\\\"이(가) 재처리를 시작했습니다",
       "refreshFailed": "새로고침 실패",
       "refreshFailedDescription": "저장소를 새로고침할 수 없습니다",
       "updateSuccess": "저장소 정보가 성공적으로 업데이트되었습니다",
@@ -270,7 +273,7 @@
     },
     "deleteDialog": {
       "title": "저장소 삭제 확인",
-      "description": "저장소 \"{{name}}\"을(를) 삭제하시겠습니까?",
+      "description": "저장소 \\\"{{name}}\\\"을(를) 삭제하시겠습니까?",
       "batchDescription": "선택한 저장소 {{count}}개를 삭제하시겠습니까?",
       "warning": "이 작업은 되돌릴 수 없으며 저장소 및 모든 문서 데이터가 삭제됩니다.",
       "cancel": "취소",
@@ -423,7 +426,7 @@
     "enable": "활성화",
     "load_failed": "로드 실패",
     "load_error": "역할 목록을 로드할 수 없습니다",
-    "confirm_delete": "역할 \"{{name}}\"을(를) 삭제하시겠습니까?",
+    "confirm_delete": "역할 \\\"{{name}}\\\"을(를) 삭제하시겠습니까?",
     "delete_success": "삭제 성공",
     "role_deleted": "역할이 삭제되었습니다",
     "delete_failed": "삭제 실패",
@@ -452,7 +455,7 @@
       "custom": "사용자 정의 역할"
     },
     "messages": {
-      "confirmDelete": "역할 \"{{name}}\"을(를) 삭제하시겠습니까?",
+      "confirmDelete": "역할 \\\"{{name}}\\\"을(를) 삭제하시겠습니까?",
       "deleteSuccess": "삭제 성공",
       "deleteSuccessDescription": "역할이 삭제되었습니다",
       "deleteFailed": "삭제 실패",
@@ -487,7 +490,7 @@
     "dialog": {
       "copyRole": {
         "title": "역할 복사",
-        "description": "역할 \"{{name}}\"을(를) 복사하여 새 역할을 만듭니다.",
+        "description": "역할 \\\"{{name}}\\\"을(를) 복사하여 새 역할을 만듭니다.",
         "sourceRoleInfo": "소스 역할 정보",
         "roleName": "역할 이름",
         "userCount": "사용자 수",
@@ -505,7 +508,7 @@
       },
       "roleMembers": {
         "title": "역할 멤버 관리",
-        "description": "역할 \"{{name}}\"의 멤버 목록을 확인 및 관리합니다",
+        "description": "역할 \\\"{{name}}\\\"의 멤버 목록을 확인 및 관리합니다",
         "memberCount": "멤버 수: {{count}}",
         "searchPlaceholder": "멤버 이름 또는 이메일로 검색...",
         "noMembers": "멤버 없음",
@@ -516,11 +519,11 @@
           "actions": "작업"
         },
         "removeUser": "제거",
-        "confirmRemove": "사용자 \"{{name}}\"을(를) 역할 \"{{role}}\"에서 제거하시겠습니까?"
+        "confirmRemove": "사용자 \\\"{{name}}\\\"을(를) 역할 \\\"{{role}}\\\"에서 제거하시겠습니까?"
       },
       "permissions": {
         "title": "역할 권한 설정",
-        "description": "역할 \"{{name}}\"에 대한 저장소 액세스 권한을 설정합니다. 저장소를 선택하고 해당 작업 권한을 설정하세요.",
+        "description": "역할 \\\"{{name}}\\\"에 대한 저장소 액세스 권한을 설정합니다. 저장소를 선택하고 해당 작업 권한을 설정하세요.",
         "overviewTitle": "권한 개요",
         "selectedRepositories": "{{selected}} / {{total}}개 저장소 선택됨",
         "loadingMessage": "권한 설정 로딩 중...",

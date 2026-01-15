@@ -1,4 +1,4 @@
-﻿{
+{
   "title": "管理コンソール",
   "messages": {
     "no_permission": "管理コンソールにアクセスする権限がありません",
@@ -81,7 +81,10 @@
     "completed": "完了",
     "processing": "処理中",
     "pending": "保留中",
-    "failed": "失敗"
+    "failed": "失敗",
+    "min": "最小値",
+    "max": "最大値",
+    "durationFormat": "{{days}}日 {{hours}}時間 {{minutes}}分"
   },
   "users": {
     "userList": "ユーザーリスト",

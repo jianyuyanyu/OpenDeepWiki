@@ -1451,5 +1451,126 @@
       "pleaseInputOrganization": "请输入组织名称",
       "pleaseInputRepository": "请输入仓库名称"
     }
+  },
+  "chat": {
+    "toolCall": {
+      "title": "工具调用",
+      "hideDetails": "隐藏详情",
+      "showDetails": "显示详情",
+      "function": "函数",
+      "arguments": "参数"
+    },
+    "reasoning": {
+      "title": "推理过程"
+    },
+    "issues": {
+      "related": "相关问题",
+      "view": "查看"
+    },
+    "alert": {
+      "note": "注意",
+      "info": "信息",
+      "tip": "提示",
+      "important": "重要",
+      "warning": "警告",
+      "caution": "小心",
+      "details": "详情"
+    },
+    "message": {
+      "copied": "已复制！",
+      "copy": "复制",
+      "delete": "删除",
+      "deleteConfirmTitle": "删除消息",
+      "deleteConfirmDescription": "确定要删除这条消息吗？此操作无法撤销。"
+    },
+    "panel": {
+      "title": "AI助手",
+      "emptyTitle": "开始对话",
+      "emptyDescription": "询问关于仓库的问题、请求代码解释，或获取文档帮助。",
+      "reasoning": "推理中...",
+      "thinking": "思考中...",
+      "clearTitle": "清除所有消息",
+      "clearDescription": "确定要清除所有消息吗？此操作无法撤销。",
+      "clearAction": "全部清除"
+    },
+    "floating": {
+      "tooltip": "打开AI助手"
+    }
+  },
+  "documentQuality": {
+    "title": "文档质量评估",
+    "description": "评估和分析文档质量",
+    "development": "文档质量评估功能开发中..."
+  },
+  "wikiManagement": {
+    "title": "Wiki生成管理",
+    "description": "管理和配置Wiki文档生成",
+    "development": "Wiki生成管理功能开发中..."
+  },
+  "search": {
+    "placeholder": "搜索仓库名称或地址"
+  },
+  "errorBoundary": {
+    "title": "出现了一些问题",
+    "description": "页面遇到了意外错误，请尝试刷新页面或返回首页。",
+    "details": "错误详情（仅开发环境显示）",
+    "errorInfo": "错误信息：",
+    "errorStack": "错误堆栈：",
+    "componentStack": "组件堆栈：",
+    "retry": "重试",
+    "home": "返回首页",
+    "contactSupport": "如果问题持续存在，请联系技术支持。",
+    "componentFailed": "组件加载失败",
+    "encounteredError": "遇到了意外错误",
+    "reload": "重新加载"
+  },
+  "markdownEditor": {
+    "uploadSuccess": "图片上传成功",
+    "uploadFailed": "图片上传失败"
+  },
+  "languageSwitcher": {
+    "changed": "语言已切换至：",
+    "failed": "切换语言失败："
+  },
+  "header": {
+    "star": "Star",
+    "starCount": "{{count}}",
+    "loading": "..."
+  },
+  "home": {
+    "hero": {
+      "tagline": "AI驱动的知识库"
+    },
+    "quickActions": {
+      "startGuide": "入门指南",
+      "apiDocs": "API文档",
+      "architecture": "系统架构"
+    }
+  },
+  "settings": {
+    "loadUserFailed": "加载用户信息失败：",
+    "loadSettingsFailed": "加载用户设置失败：",
+    "updateUserSuccess": "用户信息更新成功",
+    "updateSettingsSuccess": "用户设置更新成功",
+    "updateUserFailed": "用户信息更新失败：",
+    "updateSettingsFailed": "用户设置更新失败："
+  },
+  "auth": {
+    "getUserFailed": "获取用户信息失败：",
+    "getSocialFailed": "获取第三方登录方式失败：",
+    "registerError": "注册错误：",
+    "loginError": "登录错误："
+  },
+  "warehouse": {
+    "getBranchesFailed": "获取分支列表失败："
+  },
+  "admin": {
+    "repository": {
+      "aiGenerationFailed": "AI生成失败："
+    },
+    "roles": {
+      "copyPermissionsFailed": "复制权限时出错：",
+      "copyAssignmentsFailed": "复制用户分配时出错："
+    }
   }
 }

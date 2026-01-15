@@ -9,7 +9,7 @@
     "save": "저장",
     "edit": "편집",
     "delete": "삭제",
-    "loading": "로딩 중...",
+    "loading": "불러오는 중...",
     "refresh": "새로고침",
     "clear": "지우기",
     "close": "닫기",
@@ -85,7 +85,7 @@
       "empty": "저장소 데이터 없음",
       "empty_description": "검색 조건을 조정하거나 나중에 다시 시도해 주세요",
       "not_found": "관련 저장소를 찾을 수 없음",
-      "loading": "저장소 데이터 로딩 중..."
+      "loading": "저장소 데이터 불러오는 중..."
     },
     "repository_card": {
       "recommended": "추천",
@@ -94,7 +94,7 @@
       "updated": "업데이트일",
       "recently_updated": "최근 업데이트",
       "status": {
-        "0": "대기 중",
+        "0": "처리 대기 중",
         "1": "처리 중",
         "2": "완료",
         "3": "실패",
@@ -258,7 +258,7 @@
       "noDocuments": "문서 없음",
       "fetchBranchesError": "브랜치 목록 가져오기 실패",
       "fetchDocumentsError": "문서 목록 가져오기 실패",
-      "loadingDocuments": "문서 로딩 중...",
+      "loadingDocuments": "문서 불러오는 중...",
       "searchDocuments": "문서 검색",
       "expandAll": "모두 펼치기",
       "collapseAll": "모두 접기",
@@ -266,19 +266,19 @@
       "expandSidebar": "사이드바 펼치기",
       "introduction": "소개",
       "repositoryNotFound": "저장소가 존재하지 않습니다",
-      "loadingRepository": "저장소 로딩 중...",
+      "loadingRepository": "저장소 불러오는 중...",
       "branchSwitcher": "브랜치 전환",
       "checkRepositoryAddress": "저장소 주소가 올바른지 확인하세요",
       "backToHome": "홈으로 돌아가기",
       "overview": "개요",
-      "mindMap": "마인드맵",
+      "mindMap": "지식 그래프",
       "fileTree": "파일 트리",
       "codeSearch": "코드 검색",
       "mindMapDescription": "저장소의 지식 구조와 문서 관계를 시각화",
-      "loadingMindMap": "마인드맵 로딩 중...",
-      "mindMapLoadFailed": "마인드맵 로드 실패",
-      "noMindMapData": "마인드맵 데이터 없음",
-      "mindMapGenerating": "마인드맵이 생성 중일 수 있습니다. 나중에 새로고침하세요",
+      "loadingMindMap": "지식 그래프 불러오는 중...",
+      "mindMapLoadFailed": "지식 그래프 로드 실패",
+      "noMindMapData": "지식 그래프 데이터 없음",
+      "mindMapGenerating": "지식 그래프이 생성 중일 수 있습니다. 나중에 새로고침하세요",
       "mindMapControls": "제어판",
       "searchNodes": "노드 검색",
       "totalNodes": "총 노드 수",
@@ -303,7 +303,7 @@
     },
     "document": {
       "relevantSourceFiles": "관련 소스 파일",
-      "showingSourceFiles": "{{count}}개 소스 파일 표시",
+      "showingSourceFiles": "{{count}}개의 소스 파일 표시",
       "tableOfContents": "목차",
       "showToc": "목차 표시",
       "hideToc": "목차 숨기기",
@@ -313,10 +313,10 @@
       "notFound": "문서가 존재하지 않습니다"
     },
     "mindMap": {
-      "loading": "마인드맵 로딩 중...",
-      "loadFailed": "마인드맵 로드 실패",
-      "renderFailed": "마인드맵 렌더링 실패",
-      "error": "마인드맵 오류",
+      "loading": "지식 그래프 불러오는 중...",
+      "loadFailed": "지식 그래프 로드 실패",
+      "renderFailed": "지식 그래프 렌더링 실패",
+      "error": "지식 그래프 오류",
       "refresh": "새로고침",
       "exportImage": "이미지 내보내기",
       "fullscreenEnter": "전체 화면",
@@ -496,11 +496,11 @@
         "completedRepositoriesDescription": "분석 완료",
         "processingRepositories": "처리 중",
         "processingRepositoriesDescription": "분석 중",
-        "pendingRepositories": "대기 중",
+        "pendingRepositories": "처리 대기 중",
         "pendingRepositoriesDescription": "분석 대기"
       },
       "statusLabels": {
-        "pending": "대기 중",
+        "pending": "처리 대기 중",
         "processing": "처리 중",
         "completed": "완료됨",
         "failed": "실패"
@@ -576,7 +576,7 @@
         "save": "저장",
         "saving": "저장 중...",
         "lastModified": "마지막 수정",
-        "loadingEditor": "에디터 로딩 중...",
+        "loadingEditor": "에디터 불러오는 중...",
         "fileContent": "파일 내용...",
         "documentContent": "문서 내용...",
         "documentSaveSuccess": "문서 저장 성공",
@@ -1243,13 +1243,13 @@
       "optimizationTips": "처리 최적화 팁",
       "tip1": "스마트 필터를 활성화하면 처리 속도가 크게 향상됩니다",
       "tip2": "제외 파일과 폴더 규칙을 합리적으로 설정하세요",
-      "readMaxTokens": "最大读取令牌数",
-      "readMaxTokensHelp": "单次AI请求的最大令牌数限制（1000-200000）",
-      "proxy": "Git代理",
-      "proxyHelp": "Git操作的HTTP/HTTPS代理，格式：http://代理服务器:端口",
+      "readMaxTokens": "최대 읽기 토큰 수",
+      "readMaxTokensHelp": "단일 AI 요청의 최대 토큰 수 제한 (1000-200000)",
+      "proxy": "Git 프록시",
+      "proxyHelp": "Git 작업을 위한 HTTP/HTTPS 프록시, 형식: http://프록시서버:포트",
       "proxyPlaceholder": "http://proxy.example.com:8080",
-      "enableAgentTool": "启用Agent工具",
-      "enableAgentToolHelp": "启用Agent工具插件以增强功能，默认提供深入思考规划",
+      "enableAgentTool": "Agent 도구 활성화",
+      "enableAgentToolHelp": "Agent 도구 플러그인을 활성화하여 기능을 향상시키며, 기본적으로 심층 사고 계획을 제공합니다",
       "tip3": "저장소 크기와 AI 모델 제한에 따라 최대 읽기 토큰 수를 조정하세요",
       "tip4": "처리에 실패한 작업을 정기적으로 정리하세요",
       "tip5": "AI 모델의 사용 할당량을 모니터링하세요"
@@ -1422,6 +1422,127 @@
       "pleaseInputAppName": "앱 이름을 입력하세요",
       "pleaseInputOrganization": "조직 이름을 입력하세요",
       "pleaseInputRepository": "저장소 이름을 입력하세요"
+    }
+  },
+  "chat": {
+    "toolCall": {
+      "title": "도구 호출",
+      "hideDetails": "세부 정보 숨기기",
+      "showDetails": "세부 정보 표시",
+      "function": "함수",
+      "arguments": "인수"
+    },
+    "reasoning": {
+      "title": "추론 과정"
+    },
+    "issues": {
+      "related": "관련 이슈",
+      "view": "보기"
+    },
+    "alert": {
+      "note": "참고",
+      "info": "정보",
+      "tip": "팁",
+      "important": "중요",
+      "warning": "경고",
+      "caution": "주의",
+      "details": "세부 정보"
+    },
+    "message": {
+      "copied": "복사됨!",
+      "copy": "복사",
+      "delete": "삭제",
+      "deleteConfirmTitle": "메시지 삭제",
+      "deleteConfirmDescription": "이 메시지를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+    },
+    "panel": {
+      "title": "AI 어시스턴트",
+      "emptyTitle": "대화 시작하기",
+      "emptyDescription": "저장소에 대해 질문하거나, 코드 설명을 요청하거나, 도움말 문서를 확인하세요.",
+      "reasoning": "추론 중...",
+      "thinking": "생각 중...",
+      "clearTitle": "모든 메시지 지우기",
+      "clearDescription": "모든 메시지를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+      "clearAction": "모두 지우기"
+    },
+    "floating": {
+      "tooltip": "AI 어시스턴트 열기"
+    }
+  },
+  "documentQuality": {
+    "title": "문서 품질 평가",
+    "description": "문서 품질을 평가하고 분석",
+    "development": "문서 품질 평가 기능 개발 중..."
+  },
+  "wikiManagement": {
+    "title": "Wiki 생성 관리",
+    "description": "Wiki 문서 생성을 관리하고 구성",
+    "development": "Wiki 생성 관리 기능 개발 중..."
+  },
+  "search": {
+    "placeholder": "저장소 이름 또는 주소 검색"
+  },
+  "errorBoundary": {
+    "title": "문제가 발생했습니다",
+    "description": "페이지에서 예기치 않은 오류가 발생했습니다. 페이지를 새로고침하거나 홈페이지로 돌아가세요.",
+    "details": "오류 세부 정보(개발 환경만 표시)",
+    "errorInfo": "오류 정보:",
+    "errorStack": "오류 스택:",
+    "componentStack": "구성 요소 스택:",
+    "retry": "재시도",
+    "home": "홈으로 돌아가기",
+    "contactSupport": "문제가 지속되면 기술 지원에 문의하세요.",
+    "componentFailed": "구성 요소 로드 실패",
+    "encounteredError": "예기치 않은 오류가 발생했습니다",
+    "reload": "다시 로드"
+  },
+  "markdownEditor": {
+    "uploadSuccess": "이미지 업로드 성공",
+    "uploadFailed": "이미지 업로드 실패"
+  },
+  "languageSwitcher": {
+    "changed": "언어가 다음으로 변경됨:",
+    "failed": "언어 변경 실패:"
+  },
+  "header": {
+    "star": "Star",
+    "starCount": "{{count}}",
+    "loading": "..."
+  },
+  "home": {
+    "hero": {
+      "tagline": "AI 기반 지식 베이스"
+    },
+    "quickActions": {
+      "startGuide": "시작 가이드",
+      "apiDocs": "API 문서",
+      "architecture": "시스템 아키텍처"
+    }
+  },
+  "settings": {
+    "loadUserFailed": "사용자 정보 로드 실패:",
+    "loadSettingsFailed": "사용자 설정 로드 실패:",
+    "updateUserSuccess": "사용자 정보 업데이트 성공",
+    "updateSettingsSuccess": "사용자 설정 업데이트 성공",
+    "updateUserFailed": "사용자 정보 업데이트 실패:",
+    "updateSettingsFailed": "사용자 설정 업데이트 실패:"
+  },
+  "auth": {
+    "getUserFailed": "사용자 정보 가져오기 실패:",
+    "getSocialFailed": "소셜 로그인 방법 가져오기 실패:",
+    "registerError": "등록 오류:",
+    "loginError": "로그인 오류:"
+  },
+  "warehouse": {
+    "getBranchesFailed": "분기 목록 가져오기 실패:"
+  },
+  "admin": {
+    "repository": {
+      "aiGenerationFailed": "AI 생성 실패:"
+    },
+    "roles": {
+      "copyPermissionsFailed": "권한 복사 오류:",
+      "copyAssignmentsFailed": "사용자 할당 복사 오류:"
     }
   }
 }

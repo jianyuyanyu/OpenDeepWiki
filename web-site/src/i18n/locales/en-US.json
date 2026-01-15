@@ -5,7 +5,7 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "submit": "Submit",
-    "submitting": "Submitting...",
+    "submitting": "Please wait...",
     "save": "Save",
     "edit": "Edit",
     "delete": "Delete",
@@ -14,8 +14,8 @@
     "clear": "Clear",
     "close": "Close",
     "back": "Back",
-    "next": "Next Page",
-    "prev": "Previous Page",
+    "next": "Next",
+    "prev": "Previous",
     "total": "Total {{count}} items",
     "no_data": "No data",
     "error": "Error occurred",
@@ -50,8 +50,8 @@
     "fitToScreen": "Fit to screen",
     "time": {
       "justNow": "Just now",
-      "minutesAgo": "{{count}} minutes ago",
-      "minutesAgo_one": "{{count}} minute ago",
+      "minutesAgo": "{{count}} min ago",
+      "minutesAgo_one": "{{count}} min ago",
       "hoursAgo": "{{count}} hours ago",
       "hoursAgo_one": "{{count}} hour ago",
       "daysAgo": "{{count}} days ago",
@@ -110,7 +110,7 @@
     },
     "repository_list": {
       "title": "Repository List",
-      "empty": "No repository data available",
+      "empty": "No repositories found",
       "empty_description": "Try adjusting search criteria or try again later",
       "not_found": "No related repositories found",
       "loading": "Loading repository data..."
@@ -299,14 +299,14 @@
       "checkRepositoryAddress": "Please check if the repository address is correct",
       "backToHome": "Back to Home",
       "overview": "Overview",
-      "mindMap": "Mind Map",
+      "mindMap": "Knowledge Graph",
       "fileTree": "File Tree",
       "codeSearch": "Code Search",
       "mindMapDescription": "Visually display the knowledge structure and document relationships of the repository",
-      "loadingMindMap": "Loading mind map...",
-      "mindMapLoadFailed": "Mind map loading failed",
-      "noMindMapData": "No mind map data available",
-      "mindMapGenerating": "Mind map may be generating, please refresh later",
+      "loadingMindMap": "Loading knowledge graph...",
+      "mindMapLoadFailed": "Knowledge graph loading failed",
+      "noMindMapData": "No knowledge graph data available",
+      "mindMapGenerating": "Knowledge graph may be generating, please refresh later",
       "mindMapControls": "Control Panel",
       "searchNodes": "Search Nodes",
       "totalNodes": "Total Nodes",
@@ -341,10 +341,10 @@
       "notFound": "Document not found"
     },
     "mindMap": {
-      "loading": "Loading mind map...",
-      "loadFailed": "Mind map loading failed",
-      "renderFailed": "Mind map rendering failed",
-      "error": "Mind map error",
+      "loading": "Loading knowledge graph...",
+      "loadFailed": "Knowledge graph loading failed",
+      "renderFailed": "Knowledge graph rendering failed",
+      "error": "Knowledge graph error",
       "refresh": "Refresh",
       "exportImage": "Export Image",
       "fullscreenEnter": "Fullscreen",
@@ -443,8 +443,8 @@
       "actionsMenu": "Actions",
       "resetPassword": "Reset Password",
       "batchDeleteSelected": "Delete Selected ({{count}})",
-      "previous": "Previous Page",
-      "next": "Next Page",
+      "previous": "Previous",
+      "next": "Next",
       "pageInfo": "Page {{current}} / {{total}}",
       "title": "User Management",
       "subtitle": "Manage system user accounts and permissions",
@@ -467,9 +467,9 @@
         "all_roles": "All Roles"
       },
       "pagination": {
-        "previous": "Previous Page",
+        "previous": "Previous",
         "page_info": "Page {{current}} / {{total}}",
-        "next": "Next Page"
+        "next": "Next"
       },
       "load_failed": "Load Failed",
       "load_error": "Unable to load user list",
@@ -514,8 +514,8 @@
       "reprocessRepository": "Reprocess Repository",
       "exportMarkdown": "Export Markdown",
       "deleteRepository": "Delete Repository",
-      "previous": "Previous Page",
-      "next": "Next Page",
+      "previous": "Previous",
+      "next": "Next",
       "pageInfo": "Page {{current}} / {{total}}",
       "stats": {
         "totalRepositories": "Total Repositories",
@@ -719,9 +719,9 @@
         "enable": "Enable"
       },
       "pagination": {
-        "previous": "Previous Page",
+        "previous": "Previous",
         "pageInfo": "Page {{current}} / {{total}}",
-        "next": "Next Page"
+        "next": "Next"
       }
     },
     "tokens": {
@@ -1450,6 +1450,127 @@
       "pleaseInputAppName": "Please enter application name",
       "pleaseInputOrganization": "Please enter organization name",
       "pleaseInputRepository": "Please enter repository name"
+    }
+  },
+  "chat": {
+    "toolCall": {
+      "title": "Tool Call",
+      "hideDetails": "Hide Details",
+      "showDetails": "Show Details",
+      "function": "Function",
+      "arguments": "Arguments"
+    },
+    "reasoning": {
+      "title": "Reasoning Process"
+    },
+    "issues": {
+      "related": "Related Issues",
+      "view": "View"
+    },
+    "alert": {
+      "note": "Note",
+      "info": "Info",
+      "tip": "Tip",
+      "important": "Important",
+      "warning": "Warning",
+      "caution": "Caution",
+      "details": "Details"
+    },
+    "message": {
+      "copied": "Copied!",
+      "copy": "Copy",
+      "delete": "Delete",
+      "deleteConfirmTitle": "Delete Message",
+      "deleteConfirmDescription": "Are you sure you want to delete this message? This action cannot be undone."
+    },
+    "panel": {
+      "title": "AI Assistant",
+      "emptyTitle": "Start a conversation",
+      "emptyDescription": "Ask questions about the repository, request code explanations, or get help with documentation.",
+      "reasoning": "Reasoning...",
+      "thinking": "Thinking...",
+      "clearTitle": "Clear All Messages",
+      "clearDescription": "Are you sure you want to clear all messages? This action cannot be undone.",
+      "clearAction": "Clear All"
+    },
+    "floating": {
+      "tooltip": "Open AI Assistant"
+    }
+  },
+  "documentQuality": {
+    "title": "Document Quality Assessment",
+    "description": "Evaluate and analyze document quality",
+    "development": "Document quality assessment feature under development..."
+  },
+  "wikiManagement": {
+    "title": "Wiki Generation Management",
+    "description": "Manage and configure Wiki document generation",
+    "development": "Wiki generation management feature under development..."
+  },
+  "search": {
+    "placeholder": "Search repository name or address"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "description": "The page encountered an unexpected error. Please try refreshing the page or return to the homepage.",
+    "details": "Error details (development only)",
+    "errorInfo": "Error info:",
+    "errorStack": "Error stack:",
+    "componentStack": "Component stack:",
+    "retry": "Retry",
+    "home": "Back to Home",
+    "contactSupport": "If the problem persists, please contact technical support.",
+    "componentFailed": "Component loading failed",
+    "encounteredError": "An unexpected error occurred",
+    "reload": "Reload"
+  },
+  "markdownEditor": {
+    "uploadSuccess": "Image uploaded successfully",
+    "uploadFailed": "Image upload failed"
+  },
+  "languageSwitcher": {
+    "changed": "Language switched to:",
+    "failed": "Failed to switch language:"
+  },
+  "header": {
+    "star": "Star",
+    "starCount": "{{count}}",
+    "loading": "..."
+  },
+  "home": {
+    "hero": {
+      "tagline": "AI-Powered Knowledge Base"
+    },
+    "quickActions": {
+      "startGuide": "Start Guide",
+      "apiDocs": "API Documentation",
+      "architecture": "System Architecture"
+    }
+  },
+  "settings": {
+    "loadUserFailed": "Failed to load user information:",
+    "loadSettingsFailed": "Failed to load user settings:",
+    "updateUserSuccess": "User information updated successfully",
+    "updateSettingsSuccess": "User settings updated successfully",
+    "updateUserFailed": "Failed to update user information:",
+    "updateSettingsFailed": "Failed to update user settings:"
+  },
+  "auth": {
+    "getUserFailed": "Failed to get user information:",
+    "getSocialFailed": "Failed to get social login methods:",
+    "registerError": "Registration error:",
+    "loginError": "Login error:"
+  },
+  "warehouse": {
+    "getBranchesFailed": "Failed to get branch list:"
+  },
+  "admin": {
+    "repository": {
+      "aiGenerationFailed": "AI generation failed:"
+    },
+    "roles": {
+      "copyPermissionsFailed": "Error copying permissions:",
+      "copyAssignmentsFailed": "Error copying user assignments:"
     }
   }
 }
