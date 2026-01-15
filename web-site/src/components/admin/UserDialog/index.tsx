@@ -31,7 +31,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
   user,
   onSuccess
 }) => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [roles, setRoles] = useState<RoleInfo[]>([])
@@ -80,31 +80,31 @@ const UserDialog: React.FC<UserDialogProps> = ({
     const newErrors: Record<string, string> = {}
 
     if (!form.name.trim()) {
-      newErrors.name = '用户名不能为空'
+      newErrors.name = t('users.validation.nameRequired')
     } else if (form.name.length < 2) {
-      newErrors.name = '用户名至少2个字符'
+      newErrors.name = t('users.validation.nameMinLength')
     }
 
     if (!form.email.trim()) {
-      newErrors.email = '邮箱不能为空'
+      newErrors.email = t('users.validation.emailRequired')
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      newErrors.email = '邮箱格式不正确'
+      newErrors.email = t('users.validation.emailInvalid')
     }
 
     if (!isEdit) {
       if (!form.password) {
-        newErrors.password = '密码不能为空'
+        newErrors.password = t('users.validation.passwordRequired')
       } else if (form.password.length < 6) {
-        newErrors.password = '密码至少6个字符'
+        newErrors.password = t('users.validation.passwordMinLength')
       }
 
       if (!form.confirmPassword) {
-        newErrors.confirmPassword = '请确认密码'
+        newErrors.confirmPassword = t('users.validation.confirmPasswordRequired')
       } else if (form.password !== form.confirmPassword) {
-        newErrors.confirmPassword = '两次输入的密码不一致'
+        newErrors.confirmPassword = t('users.validation.passwordMismatch')
       }
     } else if (form.password && form.password !== form.confirmPassword) {
-      newErrors.confirmPassword = '两次输入的密码不一致'
+      newErrors.confirmPassword = t('users.validation.passwordMismatch')
     }
 
     setErrors(newErrors)
@@ -125,8 +125,8 @@ const UserDialog: React.FC<UserDialogProps> = ({
           avatar: form.avatar,
           password: form.password || undefined
         })
-        toast.success('更新成功', {
-          description: '用户信息已更新'
+        toast.success(t('users.messages.updateSuccess'), {
+          description: t('users.messages.updateSuccessDescription')
         })
       } else {
         await userService.createUser({
@@ -135,16 +135,16 @@ const UserDialog: React.FC<UserDialogProps> = ({
           password: form.password,
           avatar: form.avatar
         })
-        toast.success('创建成功', {
-          description: '用户已创建'
+        toast.success(t('users.messages.createSuccess'), {
+          description: t('users.messages.createSuccessDescription')
         })
       }
 
       onOpenChange(false)
       onSuccess?.()
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || '操作失败'
-      toast.error('操作失败', {
+      const message = error?.response?.data?.message || error?.message || t('common.operationFailed')
+      toast.error(isEdit ? t('users.messages.updateFailed') : t('users.messages.createFailed'), {
         description: message
       })
     } finally {
@@ -158,16 +158,16 @@ const UserDialog: React.FC<UserDialogProps> = ({
 
     // 验证文件类型
     if (!['image/jpeg', 'image/png', 'image/gif'].includes(file.type)) {
-      toast.error('格式错误', {
-        description: '只支持 JPG、PNG、GIF 格式的图片'
+      toast.error(t('users.validation.formatError'), {
+        description: t('users.validation.imageFormat')
       })
       return
     }
 
     // 验证文件大小 (2MB)
     if (file.size > 2 * 1024 * 1024) {
-      toast.error('文件过大', {
-        description: '图片大小不能超过 2MB'
+      toast.error(t('users.validation.fileTooLarge'), {
+        description: t('users.validation.imageSizeLimit')
       })
       return
     }
@@ -187,12 +187,12 @@ const UserDialog: React.FC<UserDialogProps> = ({
       }
       reader.readAsDataURL(file)
 
-      toast.success('上传成功', {
-        description: '头像已更新'
+      toast.success(t('users.messages.uploadSuccess'), {
+        description: t('users.messages.avatarUpdated')
       })
     } catch (error) {
-      toast.error('上传失败', {
-        description: '无法上传头像'
+      toast.error(t('users.messages.uploadFailed'), {
+        description: t('users.messages.uploadFailedDescription')
       })
     } finally {
       setUploading(false)
@@ -227,7 +227,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
                     <Upload className="h-4 w-4" />
                   )}
                   <span className="text-sm">
-                    {uploading ? '上传中...' : '上传头像'}
+                    {uploading ? t('users.form.uploading') : t('users.form.uploadAvatar')}
                   </span>
                 </div>
               </Label>
@@ -251,7 +251,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
                   onClick={() => setForm(prev => ({ ...prev, avatar: '' }))}
                 >
                   <X className="h-3 w-3 mr-1" />
-                  删除头像
+                  {t('users.form.removeAvatar')}
                 </Button>
               )}
             </div>
@@ -264,7 +264,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
               id="name"
               value={form.name}
               onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="请输入用户名"
+              placeholder={t('users.form.usernamePlaceholder')}
               className={errors.name ? 'border-red-500' : ''}
             />
             {errors.name && (
@@ -280,7 +280,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
               type="email"
               value={form.email}
               onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
-              placeholder="请输入邮箱"
+              placeholder={t('users.form.emailPlaceholder')}
               className={errors.email ? 'border-red-500' : ''}
             />
             {errors.email && (
@@ -292,14 +292,14 @@ const UserDialog: React.FC<UserDialogProps> = ({
           <div className="space-y-2">
             <Label htmlFor="password">
               {t('users.form.password')}
-              {isEdit && <span className="text-sm text-gray-500 ml-1">(留空表示不修改)</span>}
+              {isEdit && <span className="text-sm text-gray-500 ml-1">({t('users.form.leaveBlankNoChange')})</span>}
             </Label>
             <Input
               id="password"
               type="password"
               value={form.password}
               onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
-              placeholder={isEdit ? "留空表示不修改密码" : "请输入密码"}
+              placeholder={isEdit ? t('users.form.passwordPlaceholderEdit') : t('users.form.passwordPlaceholder')}
               className={errors.password ? 'border-red-500' : ''}
             />
             {errors.password && (
@@ -318,7 +318,7 @@ const UserDialog: React.FC<UserDialogProps> = ({
                 type="password"
                 value={form.confirmPassword}
                 onChange={(e) => setForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                placeholder="请确认密码"
+                placeholder={t('users.form.confirmPasswordPlaceholder')}
                 className={errors.confirmPassword ? 'border-red-500' : ''}
               />
               {errors.confirmPassword && (
@@ -335,14 +335,14 @@ const UserDialog: React.FC<UserDialogProps> = ({
             onClick={() => onOpenChange(false)}
             disabled={loading}
           >
-            取消
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
             onClick={handleSubmit}
             disabled={loading}
           >
-            {loading ? '提交中...' : (isEdit ? '更新' : '创建')}
+            {loading ? t('common.submitting') : (isEdit ? t('common.update') : t('common.create'))}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -31,7 +31,7 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
   user,
   onSuccess
 }) => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [roles, setRoles] = useState<RoleInfo[]>([])
@@ -48,8 +48,8 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
       setRoles(rolesData)
     } catch (error) {
       console.error('Failed to load roles:', error)
-      toast.error('加载失败', {
-        description: '无法加载角色列表'
+      toast.error(t('users.messages.loadFailed'), {
+        description: t('users.messages.loadRolesFailed')
       })
     } finally {
       setLoading(false)
@@ -67,8 +67,8 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
       setSelectedRoleIds([...roleIds])
     } catch (error) {
       console.error('Failed to load user roles:', error)
-      toast.error('加载失败', {
-        description: '无法加载用户角色'
+      toast.error(t('users.messages.loadFailed'), {
+        description: t('users.messages.loadUserRolesFailed')
       })
     }
   }
@@ -100,15 +100,15 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
 
       await userService.assignUserRoles(user.id, selectedRoleIds)
 
-      toast.success('分配成功', {
-        description: '用户角色已更新'
+      toast.success(t('users.messages.assignSuccess'), {
+        description: t('users.messages.assignSuccessDescription')
       })
 
       onOpenChange(false)
       onSuccess?.()
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || '分配失败'
-      toast.error('分配失败', {
+      const message = error?.response?.data?.message || error?.message || t('users.messages.assignFailed')
+      toast.error(t('users.messages.assignFailed'), {
         description: message
       })
     } finally {
@@ -152,7 +152,7 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
         <DialogHeader>
           <DialogTitle>{t('admin.users.assign_roles')}</DialogTitle>
           <DialogDescription>
-            为用户分配角色和权限
+            {t('users.dialogs.assignRolesDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -173,11 +173,11 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="ml-2">加载角色列表...</span>
+              <span className="ml-2">{t('users.dialogs.loadingRoles')}</span>
             </div>
           ) : roles.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
-              暂无可分配的角色
+              {t('users.dialogs.noRolesAvailable')}
             </div>
           ) : (
             <div className="space-y-3">
@@ -206,7 +206,7 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
                         </label>
                         {role.isSystemRole && (
                           <Badge variant="secondary" className="text-xs">
-                            系统角色
+                            {t('roles.type.system')}
                           </Badge>
                         )}
                         {changeStatus !== 'unchanged' && (
@@ -214,7 +214,7 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
                             variant="outline"
                             className={`text-xs ${getRoleStatusColor(changeStatus)}`}
                           >
-                            {changeStatus === 'added' ? '新增' : '移除'}
+                            {changeStatus === 'added' ? t('common.added') : t('common.removed')}
                           </Badge>
                         )}
                       </div>
@@ -224,9 +224,9 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
                         </p>
                       )}
                       <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                        <span>用户数: {role.userCount || 0}</span>
-                        <span>权限数: {role.warehousePermissionCount || 0}</span>
-                        <span>状态: {role.isActive ? '启用' : '禁用'}</span>
+                        <span>{t('users.dialogs.userCount')}: {role.userCount || 0}</span>
+                        <span>{t('users.dialogs.permissionCount')}: {role.warehousePermissionCount || 0}</span>
+                        <span>{t('users.dialogs.status')}: {role.isActive ? t('common.enabled') : t('common.disabled')}</span>
                       </div>
                     </div>
                   </div>
@@ -239,7 +239,7 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
         {/* 变更摘要 */}
         {hasChanges() && (
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">变更摘要</h4>
+            <h4 className="font-medium text-blue-900 mb-2">{t('users.dialogs.changeSummary')}</h4>
             <div className="space-y-1 text-sm">
               {roles
                 .filter(role => getRoleChangeStatus(role.id) !== 'unchanged')
@@ -251,7 +251,7 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
                         status === 'added' ? 'bg-green-500' : 'bg-red-500'
                       }`} />
                       <span>
-                        {status === 'added' ? '添加' : '移除'} 角色：{role.name}
+                        {status === 'added' ? t('common.add') : t('common.remove')} {t('users.dialogs.role')}: {role.name}
                       </span>
                     </div>
                   )
@@ -267,7 +267,7 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
             onClick={() => onOpenChange(false)}
             disabled={submitting}
           >
-            取消
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -277,10 +277,10 @@ const UserRoleDialog: React.FC<UserRoleDialogProps> = ({
             {submitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                分配中...
+                {t('users.dialogs.assigning')}
               </>
             ) : (
-              '确认分配'
+              t('users.dialogs.confirmAssign')
             )}
           </Button>
         </DialogFooter>

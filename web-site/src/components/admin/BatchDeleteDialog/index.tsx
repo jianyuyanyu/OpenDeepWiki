@@ -30,7 +30,7 @@ const BatchDeleteDialog: React.FC<BatchDeleteDialogProps> = ({
   users,
   onSuccess
 }) => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const [loading, setLoading] = useState(false)
 
   // 提交批量删除
@@ -43,15 +43,15 @@ const BatchDeleteDialog: React.FC<BatchDeleteDialogProps> = ({
       const userIds = users.map(user => user.id)
       await userService.batchDeleteUsers(userIds)
 
-      toast.success('删除成功', {
-        description: `已删除 ${users.length} 个用户`
+      toast.success(t('users.messages.deleteSuccess'), {
+        description: t('users.messages.batchDeleteSuccessDescription', { count: users.length })
       })
 
       onOpenChange(false)
       onSuccess?.()
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || '删除失败'
-      toast.error('删除失败', {
+      const message = error?.response?.data?.message || error?.message || t('users.messages.deleteFailed')
+      toast.error(t('users.messages.deleteFailed'), {
         description: message
       })
     } finally {
@@ -67,10 +67,10 @@ const BatchDeleteDialog: React.FC<BatchDeleteDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center space-x-2">
             <Trash2 className="h-5 w-5 text-red-500" />
-            <span>批量删除用户</span>
+            <span>{t('users.dialogs.batchDeleteTitle')}</span>
           </DialogTitle>
           <DialogDescription>
-            确认删除以下 {users.length} 个用户？此操作不可撤销。
+            {t('users.dialogs.batchDeleteDescription', { count: users.length })}
           </DialogDescription>
         </DialogHeader>
 
@@ -78,11 +78,11 @@ const BatchDeleteDialog: React.FC<BatchDeleteDialogProps> = ({
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>警告：</strong>删除用户将会：
+            <strong>{t('users.dialogs.deleteWarningTitle')}:</strong> {t('users.dialogs.deleteWarningContent')}
             <ul className="mt-2 ml-4 list-disc space-y-1">
-              <li>永久删除用户账户信息</li>
-              <li>移除所有角色分配</li>
-              <li>用户将无法登录系统</li>
+              <li>{t('users.dialogs.deleteWarningItem1')}</li>
+              <li>{t('users.dialogs.deleteWarningItem2')}</li>
+              <li>{t('users.dialogs.deleteWarningItem3')}</li>
             </ul>
           </AlertDescription>
         </Alert>
@@ -90,7 +90,7 @@ const BatchDeleteDialog: React.FC<BatchDeleteDialogProps> = ({
         {/* 用户列表 */}
         <div className="space-y-3 max-h-64 overflow-y-auto">
           <div className="font-medium text-sm text-gray-700">
-            将要删除的用户：
+            {t('users.dialogs.usersToDelete')}
           </div>
           {users.map((user) => (
             <div
@@ -106,7 +106,7 @@ const BatchDeleteDialog: React.FC<BatchDeleteDialogProps> = ({
                 <div className="text-xs text-gray-500 truncate">{user.email}</div>
               </div>
               <div className="text-xs text-red-600 font-medium">
-                将被删除
+                {t('users.dialogs.willBeDeleted')}
               </div>
             </div>
           ))}
@@ -114,10 +114,9 @@ const BatchDeleteDialog: React.FC<BatchDeleteDialogProps> = ({
 
         {/* 确认提示 */}
         <div className="p-4 bg-gray-50 border rounded-lg">
-          <div className="font-medium text-sm mb-2">操作确认</div>
+          <div className="font-medium text-sm mb-2">{t('users.dialogs.operationConfirmation')}</div>
           <div className="text-sm text-gray-600">
-            请确认您要删除这 <strong className="text-red-600">{users.length}</strong> 个用户。
-            此操作将立即生效且无法撤销。
+            {t('users.dialogs.deleteConfirmation', { count: users.length })}
           </div>
         </div>
 
@@ -128,7 +127,7 @@ const BatchDeleteDialog: React.FC<BatchDeleteDialogProps> = ({
             onClick={() => onOpenChange(false)}
             disabled={loading}
           >
-            取消
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -139,12 +138,12 @@ const BatchDeleteDialog: React.FC<BatchDeleteDialogProps> = ({
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                删除中...
+                {t('users.dialogs.deleting')}
               </>
             ) : (
               <>
                 <Trash2 className="h-4 w-4 mr-2" />
-                确认删除 ({users.length})
+                {t('users.dialogs.confirmDelete', { count: users.length })}
               </>
             )}
           </Button>

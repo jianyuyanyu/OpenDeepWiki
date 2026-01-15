@@ -32,7 +32,7 @@ const UserPasswordDialog: React.FC<UserPasswordDialogProps> = ({
   user,
   onSuccess
 }) => {
-  const { t } = useTranslation()
+  const { t } = useTranslation('admin')
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
     newPassword: '',
@@ -54,15 +54,15 @@ const UserPasswordDialog: React.FC<UserPasswordDialogProps> = ({
     const newErrors: Record<string, string> = {}
 
     if (!form.newPassword) {
-      newErrors.newPassword = '新密码不能为空'
+      newErrors.newPassword = t('users.validation.passwordRequired')
     } else if (form.newPassword.length < 6) {
-      newErrors.newPassword = '密码至少6个字符'
+      newErrors.newPassword = t('users.validation.passwordMinLength')
     }
 
     if (!form.confirmPassword) {
-      newErrors.confirmPassword = '请确认新密码'
+      newErrors.confirmPassword = t('users.validation.confirmPasswordRequired')
     } else if (form.newPassword !== form.confirmPassword) {
-      newErrors.confirmPassword = '两次输入的密码不一致'
+      newErrors.confirmPassword = t('users.validation.passwordMismatch')
     }
 
     setErrors(newErrors)
@@ -78,15 +78,15 @@ const UserPasswordDialog: React.FC<UserPasswordDialogProps> = ({
 
       await userService.resetUserPassword(user.id, form.newPassword)
 
-      toast.success('重置成功', {
-        description: '用户密码已重置'
+      toast.success(t('users.messages.resetSuccess'), {
+        description: t('users.messages.resetSuccessDescription')
       })
 
       onOpenChange(false)
       onSuccess?.()
     } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || '重置失败'
-      toast.error('重置失败', {
+      const message = error?.response?.data?.message || error?.message || t('users.messages.resetFailed')
+      toast.error(t('users.messages.resetFailed'), {
         description: message
       })
     } finally {
@@ -107,9 +107,9 @@ const UserPasswordDialog: React.FC<UserPasswordDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[450px]">
         <DialogHeader>
-          <DialogTitle>重置用户密码</DialogTitle>
+          <DialogTitle>{t('users.dialogs.resetPasswordTitle')}</DialogTitle>
           <DialogDescription>
-            为用户设置新的登录密码
+            {t('users.dialogs.resetPasswordDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -129,39 +129,39 @@ const UserPasswordDialog: React.FC<UserPasswordDialogProps> = ({
         <Alert>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            密码重置后，用户需要使用新密码重新登录。请确保将新密码安全地传达给用户。
+            {t('users.dialogs.resetPasswordWarning')}
           </AlertDescription>
         </Alert>
 
         <div className="space-y-4">
           {/* 新密码 */}
           <div className="space-y-2">
-            <Label htmlFor="newPassword">新密码</Label>
+            <Label htmlFor="newPassword">{t('users.form.newPassword')}</Label>
             <Input
               id="newPassword"
               type="password"
               value={form.newPassword}
               onChange={(e) => setForm(prev => ({ ...prev, newPassword: e.target.value }))}
-              placeholder="请输入新密码"
+              placeholder={t('users.form.newPasswordPlaceholder')}
               className={errors.newPassword ? 'border-red-500' : ''}
             />
             {errors.newPassword && (
               <p className="text-sm text-red-500">{errors.newPassword}</p>
             )}
             <p className="text-xs text-gray-500">
-              密码建议至少6个字符，包含字母和数字
+              {t('users.form.passwordHint')}
             </p>
           </div>
 
           {/* 确认密码 */}
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">确认新密码</Label>
+            <Label htmlFor="confirmPassword">{t('users.form.confirmPassword')}</Label>
             <Input
               id="confirmPassword"
               type="password"
               value={form.confirmPassword}
               onChange={(e) => setForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-              placeholder="请再次输入新密码"
+              placeholder={t('users.form.confirmPasswordPlaceholder')}
               className={errors.confirmPassword ? 'border-red-500' : ''}
             />
             {errors.confirmPassword && (
@@ -177,7 +177,7 @@ const UserPasswordDialog: React.FC<UserPasswordDialogProps> = ({
             onClick={() => onOpenChange(false)}
             disabled={loading}
           >
-            取消
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -188,10 +188,10 @@ const UserPasswordDialog: React.FC<UserPasswordDialogProps> = ({
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                重置中...
+                {t('users.dialogs.resetting')}
               </>
             ) : (
-              '确认重置'
+              t('users.dialogs.confirmReset')
             )}
           </Button>
         </DialogFooter>
