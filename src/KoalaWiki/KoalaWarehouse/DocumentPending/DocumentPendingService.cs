@@ -148,9 +148,9 @@ public partial class DocumentPendingService
                 var agent = AgentFactory.CreateChatClientAgentAsync(OpenAIOptions.ChatModel, (options =>
                 {
                     options.Name = "DocumentAgent";
-                    options.Instructions = PromptExtensions.SystemDocs;
                     options.ChatOptions = new ChatOptions()
                     {
+                        Instructions = PromptExtensions.SystemDocs,
                         MaxOutputTokens = DocumentsHelper.GetMaxTokens(OpenAIOptions.ChatModel),
                         ToolMode = ChatToolMode.Auto,
                         Tools = new List<AITool>(docs.Create())

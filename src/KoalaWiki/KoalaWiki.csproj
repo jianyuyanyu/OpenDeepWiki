@@ -14,11 +14,11 @@
         <PackageReference Include="LibGit2Sharp" />
         <PackageReference Include="Mapster.DependencyInjection" />
         <PackageReference Include="Mem0.NET" />
+        <PackageReference Include="OpenAI" />
         <PackageReference Include="Microsoft.Agents.AI" />
         <PackageReference Include="Microsoft.Agents.AI.AzureAI" />
         <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
         <PackageReference Include="Azure.AI.OpenAI" />
-        <PackageReference Include="OpenAI" />
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" />
@@ -50,7 +50,10 @@
         <PackageReference Include="Microsoft.NET.Test.Sdk" />
         <PackageReference Include="SharpToken" />
         <PackageReference Include="xunit" />
-        <PackageReference Include="xunit.runner.visualstudio" />
+        <PackageReference Include="xunit.runner.visualstudio">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
     </ItemGroup>
 
     <ItemGroup>

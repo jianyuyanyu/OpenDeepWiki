@@ -165,11 +165,12 @@ public static partial class GenerateThinkCatalogueService
             (options =>
             {
                 options.Name = "ThinkCatalogueAgent";
-                options.Instructions = PromptExtensions.System;
+                
                 options.ChatOptions = new ChatOptions()
                 {
                     MaxOutputTokens = DocumentsHelper.GetMaxTokens(OpenAIOptions.ChatModel),
                     ToolMode = ChatToolMode.Auto,
+                    Instructions = PromptExtensions.System,
                     Tools = new List<AITool>(catalogueTool.Create())
                     {
                         new FileTool(path, null).Create()

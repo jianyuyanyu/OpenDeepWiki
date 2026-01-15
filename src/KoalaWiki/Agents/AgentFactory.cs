@@ -24,11 +24,11 @@ public class AgentFactory
 
             var agentOptions = new ChatClientAgentOptions
             {
-                ChatMessageStoreFactory = (messageContext) =>
-                {
-                    var logger = loggerFactory?.CreateLogger<AutoContextCompress>();
-                    return new AutoContextCompress(messageContext, chatClient.AsIChatClient(), logger);
-                },
+                // ChatMessageStoreFactory = (messageContext) =>
+                // {
+                //     var logger = loggerFactory?.CreateLogger<AutoContextCompress>();
+                //     return new AutoContextCompress(messageContext, chatClient.AsIChatClient(), logger);
+                // },
             };
             agentAction.Invoke(agentOptions);
 
@@ -44,11 +44,11 @@ public class AgentFactory
             var chatClient = azureOpenAIClient.GetChatClient(modelId);
 
             var agentOptions = new ChatClientAgentOptions();
-            agentOptions.ChatMessageStoreFactory = (messageContext) =>
-            {
-                var logger = loggerFactory?.CreateLogger<AutoContextCompress>();
-                return new AutoContextCompress(messageContext, chatClient.AsIChatClient(), logger);
-            };
+            // agentOptions.ChatMessageStoreFactory = (messageContext) =>
+            // {
+            //     var logger = loggerFactory?.CreateLogger<AutoContextCompress>();
+            //     return new AutoContextCompress(messageContext, chatClient.AsIChatClient(), logger);
+            // };
             agentAction.Invoke(agentOptions);
             var agent = chatClient.CreateAIAgent(agentOptions);
 
