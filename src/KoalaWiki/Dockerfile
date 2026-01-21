@@ -26,17 +26,7 @@ FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "./KoalaWiki.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
-FROM node:22-bullseye AS frontend-build
-ENV ROLLUP_USE_NATIVE=false
-WORKDIR /app
-COPY web-site/ .
-WORKDIR "/app"
-RUN npm install
-RUN npm run build
-
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-# Copy built frontend files to wwwroot
-COPY --from=frontend-build /app/dist ./wwwroot
 ENTRYPOINT ["dotnet", "KoalaWiki.dll"]
