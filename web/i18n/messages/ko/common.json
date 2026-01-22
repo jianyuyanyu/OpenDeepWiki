@@ -1,0 +1,27 @@
+{
+  "login": "로그인",
+  "logout": "로그아웃",
+  "profile": "프로필",
+  "settings": "설정",
+  "theme": "테마",
+  "language": "언어",
+  "save": "저장",
+  "cancel": "취소",
+  "confirm": "확인",
+  "delete": "삭제",
+  "edit": "편집",
+  "search": "검색",
+  "loading": "로딩 중...",
+  "error": "오류",
+  "success": "성공",
+  "user": "사용자",
+  "weekdays": {
+    "sunday": "일요일",
+    "monday": "월요일",
+    "tuesday": "화요일",
+    "wednesday": "수요일",
+    "thursday": "목요일",
+    "friday": "금요일",
+    "saturday": "토요일"
+  }
+}

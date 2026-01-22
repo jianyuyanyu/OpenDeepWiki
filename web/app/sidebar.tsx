@@ -23,14 +23,15 @@ import {
 } from "@/components/animate-ui/components/radix/sidebar";
 import React from "react";
 import Link from "next/link";
+import { useTranslations } from "@/hooks/use-translations";
 
-export const items = [
-    { title: "探索", url: "/", icon: Compass },
-    { title: "推荐", url: "/recommend", icon: ThumbsUp },
-    { title: "私有仓库", url: "/private", icon: GitFork },
-    { title: "订阅", url: "/subscribe", icon: Star },
-    { title: "收藏夹", url: "/bookmarks", icon: Bookmark },
-    { title: "机构目录", url: "/organizations", icon: Building2 },
+const itemKeys = [
+    { key: "explore", url: "/", icon: Compass },
+    { key: "recommend", url: "/recommend", icon: ThumbsUp },
+    { key: "private", url: "/private", icon: GitFork },
+    { key: "subscribe", url: "/subscribe", icon: Star },
+    { key: "bookmarks", url: "/bookmarks", icon: Bookmark },
+    { key: "organizations", url: "/organizations", icon: Building2 },
 ];
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -39,11 +40,21 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 }
 
 export function AppSidebar({ activeItem, onItemClick, ...props }: AppSidebarProps) {
+    const t = useTranslations();
+
+    const items = itemKeys.map(item => ({
+        title: t(`sidebar.${item.key}`),
+        url: item.url,
+        icon: item.icon,
+    }));
+
     return (
         <Sidebar collapsible="icon" {...props}>
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel>Menu</SidebarGroupLabel>
+                    <SidebarGroupLabel>
+                        OpenDeepWiki
+                    </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {items.map((item) => (
@@ -68,10 +79,10 @@ export function AppSidebar({ activeItem, onItemClick, ...props }: AppSidebarProp
             <SidebarFooter>
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton asChild tooltip="GitHub">
-                            <Link href="https://github.com" target="_blank">
+                        <SidebarMenuButton asChild tooltip={t("sidebar.github")}>
+                            <Link href="https://github.com/AIDotNet/OpenDeepWiki" target="_blank">
                                 <Github />
-                                <span>GitHub</span>
+                                <span>{t("sidebar.github")}</span>
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>

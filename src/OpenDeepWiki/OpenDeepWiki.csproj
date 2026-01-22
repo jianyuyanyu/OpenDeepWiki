@@ -17,4 +17,9 @@
         <PackageReference Include="Scalar.AspNetCore" />
     </ItemGroup>
 
+    <ItemGroup>
+        <ProjectReference Include="..\OpenDeepWiki.EFCore\OpenDeepWiki.EFCore.csproj" />
+        <ProjectReference Include="..\OpenDeepWiki.Entities\OpenDeepWiki.Entities.csproj" />
+    </ItemGroup>
+
 </Project>

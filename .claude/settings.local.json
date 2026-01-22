@@ -18,7 +18,10 @@
       "Bash(git commit:*)",
       "Bash(docker-compose build:*)",
       "Bash(git push:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "mcp__MCP_DOCKER__code-mode",
+      "Bash(List files in repo root)",
+      "Bash(rg:*)"
     ],
     "deny": [],
     "ask": []

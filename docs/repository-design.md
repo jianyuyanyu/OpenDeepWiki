@@ -36,6 +36,7 @@
 - `AuthAccount`（可为空）
 - `AuthPassword`（可为空）
 - `IsPublic`（默认 `true`）
+- `Status`（默认 `Pending`，状态见下文）
 
 > **规则：** 当 `AuthAccount`/`AuthPassword` 为空时，`IsPublic` 不能置为 `false`。
 
@@ -82,6 +83,24 @@
 - **公开/私有切换**：
   - 若仓库凭据缺失（账户/密码为空）→ 禁止设为私有。
   - 若仓库凭据存在 → 允许设为私有。
+
+## 仓库处理状态
+
+- `Pending`：提交后默认状态，等待后台处理。
+- `Processing`：后台正在处理仓库。
+- `Completed`：处理完成。
+- `Failed`：处理失败。
+
+## 后台处理流程
+
+- 定时任务扫描 `Pending` 状态的仓库，按创建时间顺序处理。
+- 开始处理时更新状态为 `Processing`。
+- 处理流程：
+  - 分析仓库内容。
+  - 生成 Wiki 树形目录结构。
+  - 为每个目录生成 Docs。
+- 处理成功后更新为 `Completed`。
+- 处理异常则更新为 `Failed`，继续处理下一条。
 
 ## 业务流程（Markdown 流程图）
 

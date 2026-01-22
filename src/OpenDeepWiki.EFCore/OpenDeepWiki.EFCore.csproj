@@ -10,4 +10,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\OpenDeepWiki.Entities\OpenDeepWiki.Entities.csproj" />
+  </ItemGroup>
+
 </Project>
