@@ -23,6 +23,17 @@ public class RepositoryBranch : AggregateRoot<string>
     public string BranchName { get; set; } = string.Empty;
 
     /// <summary>
+    /// 最后处理的 commit ID
+    /// </summary>
+    [StringLength(40)]
+    public string? LastCommitId { get; set; }
+
+    /// <summary>
+    /// 最后处理时间（UTC）
+    /// </summary>
+    public DateTime? LastProcessedAt { get; set; }
+
+    /// <summary>
     /// 仓库导航属性
     /// </summary>
     [ForeignKey("RepositoryId")]

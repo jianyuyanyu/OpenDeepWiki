@@ -1,0 +1,504 @@
+using LibGit2Sharp;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using OpenDeepWiki.Entities;
+using GitRepository = LibGit2Sharp.Repository;
+
+namespace OpenDeepWiki.Services.Repositories;
+
+/// <summary>
+/// Configuration options for the repository analyzer.
+/// </summary>
+public class RepositoryAnalyzerOptions
+{
+    /// <summary>
+    /// The base directory for storing repository clones.
+    /// Default: /data on Linux, C:\data on Windows.
+    /// </summary>
+    public string RepositoriesDirectory { get; set; } = 
+        OperatingSystem.IsWindows() ? @"C:\data" : "/data";
+
+    /// <summary>
+    /// Whether to clean up the working directory after processing.
+    /// </summary>
+    public bool CleanupAfterProcessing { get; set; } = false;
+
+    /// <summary>
+    /// Maximum retry attempts for clone/pull operations.
+    /// </summary>
+    public int MaxRetryAttempts { get; set; } = 3;
+
+    /// <summary>
+    /// Delay between retry attempts in milliseconds.
+    /// </summary>
+    public int RetryDelayMs { get; set; } = 1000;
+}
+
+/// <summary>
+/// Implementation of IRepositoryAnalyzer using LibGit2Sharp.
+/// Handles cloning, updating, and analyzing Git repositories.
+/// </summary>
+public class RepositoryAnalyzer : IRepositoryAnalyzer
+{
+    private readonly RepositoryAnalyzerOptions _options;
+    private readonly ILogger<RepositoryAnalyzer> _logger;
+
+    public RepositoryAnalyzer(
+        IOptions<RepositoryAnalyzerOptions> options,
+        ILogger<RepositoryAnalyzer> logger)
+    {
+        _options = options.Value;
+        _logger = logger;
+    }
+
+    /// <inheritdoc />
+    public async Task<RepositoryWorkspace> PrepareWorkspaceAsync(
+        Entities.Repository repository,
+        string branchName,
+        string? previousCommitId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var workspace = new RepositoryWorkspace
+        {
+            Organization = repository.OrgName,
+            RepositoryName = repository.RepoName,
+            BranchName = branchName,
+            GitUrl = repository.GitUrl,
+            PreviousCommitId = previousCommitId,
+            WorkingDirectory = GetWorkingDirectory(repository.OrgName, repository.RepoName)
+        };
+
+        _logger.LogInformation(
+            "Preparing workspace for {Org}/{Repo} branch {Branch} at {Path}",
+            workspace.Organization, workspace.RepositoryName, branchName, workspace.WorkingDirectory);
+
+        // Ensure the parent directory exists
+        var parentDir = Path.GetDirectoryName(workspace.WorkingDirectory);
+        if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
+        {
+            Directory.CreateDirectory(parentDir);
+        }
+
+        // Build credentials if provided
+        var credentials = BuildCredentials(repository);
+
+        // Clone or pull the repository
+        if (Directory.Exists(workspace.WorkingDirectory) && 
+            Directory.Exists(Path.Combine(workspace.WorkingDirectory, ".git")))
+        {
+            // Repository exists, pull latest changes
+            await PullRepositoryAsync(workspace, credentials, cancellationToken);
+        }
+        else
+        {
+            // Clone the repository
+            await CloneRepositoryAsync(workspace, credentials, cancellationToken);
+        }
+
+        // Get the current HEAD commit ID
+        workspace.CommitId = GetHeadCommitId(workspace.WorkingDirectory);
+
+        _logger.LogInformation(
+            "Workspace prepared. Current commit: {CommitId}, Previous commit: {PreviousCommitId}",
+            workspace.CommitId, workspace.PreviousCommitId ?? "none");
+
+        return workspace;
+    }
+
+
+    /// <inheritdoc />
+    public Task CleanupWorkspaceAsync(RepositoryWorkspace workspace, CancellationToken cancellationToken = default)
+    {
+        if (!_options.CleanupAfterProcessing)
+        {
+            _logger.LogDebug("Cleanup disabled, keeping workspace at {Path}", workspace.WorkingDirectory);
+            return Task.CompletedTask;
+        }
+
+        if (Directory.Exists(workspace.WorkingDirectory))
+        {
+            _logger.LogInformation("Cleaning up workspace at {Path}", workspace.WorkingDirectory);
+            
+            try
+            {
+                // Force delete all files including read-only ones (common in .git folder)
+                DeleteDirectoryRecursive(workspace.WorkingDirectory);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to cleanup workspace at {Path}", workspace.WorkingDirectory);
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task<string[]> GetChangedFilesAsync(
+        RepositoryWorkspace workspace,
+        string? fromCommitId,
+        string toCommitId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(fromCommitId))
+        {
+            // Initial processing - return all files
+            _logger.LogInformation("No previous commit, returning all files");
+            return Task.FromResult(GetAllTrackedFiles(workspace.WorkingDirectory));
+        }
+
+        _logger.LogInformation(
+            "Getting changed files between {FromCommit} and {ToCommit}",
+            fromCommitId, toCommitId);
+
+        var changedFiles = GetChangedFilesBetweenCommits(
+            workspace.WorkingDirectory, 
+            fromCommitId, 
+            toCommitId);
+
+        _logger.LogInformation("Found {Count} changed files", changedFiles.Length);
+
+        return Task.FromResult(changedFiles);
+    }
+
+    /// <summary>
+    /// Gets the working directory path for a repository.
+    /// Format: {RepositoriesDirectory}/{organization}/{name}/tree/
+    /// </summary>
+    private string GetWorkingDirectory(string organization, string repositoryName)
+    {
+        // Sanitize organization and repository names to prevent path traversal
+        var safeOrg = SanitizePathComponent(organization);
+        var safeRepo = SanitizePathComponent(repositoryName);
+
+        return Path.Combine(_options.RepositoriesDirectory, safeOrg, safeRepo, "tree");
+    }
+
+    /// <summary>
+    /// Sanitizes a path component to prevent directory traversal attacks.
+    /// </summary>
+    private static string SanitizePathComponent(string component)
+    {
+        if (string.IsNullOrWhiteSpace(component))
+        {
+            throw new ArgumentException("Path component cannot be empty.", nameof(component));
+        }
+
+        // Remove any path separators and dangerous characters
+        var sanitized = component
+            .Replace('/', '_')
+            .Replace('\\', '_')
+            .Replace("..", "_")
+            .Trim();
+
+        if (string.IsNullOrWhiteSpace(sanitized))
+        {
+            throw new ArgumentException("Path component is invalid after sanitization.", nameof(component));
+        }
+
+        return sanitized;
+    }
+
+    /// <summary>
+    /// Builds LibGit2Sharp credentials from repository authentication info.
+    /// </summary>
+    private static Credentials? BuildCredentials(Entities.Repository repository)
+    {
+        if (string.IsNullOrWhiteSpace(repository.AuthAccount) && 
+            string.IsNullOrWhiteSpace(repository.AuthPassword))
+        {
+            return null;
+        }
+
+        return new UsernamePasswordCredentials
+        {
+            Username = repository.AuthAccount ?? string.Empty,
+            Password = repository.AuthPassword ?? string.Empty
+        };
+    }
+
+
+    /// <summary>
+    /// Clones a repository to the working directory.
+    /// </summary>
+    private async Task CloneRepositoryAsync(
+        RepositoryWorkspace workspace,
+        Credentials? credentials,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Cloning repository {Url} to {Path}", workspace.GitUrl, workspace.WorkingDirectory);
+
+        // Clean up any existing partial clone
+        if (Directory.Exists(workspace.WorkingDirectory))
+        {
+            DeleteDirectoryRecursive(workspace.WorkingDirectory);
+        }
+
+        var cloneOptions = new CloneOptions
+        {
+            BranchName = workspace.BranchName,
+            RecurseSubmodules = false
+        };
+
+        if (credentials != null)
+        {
+            cloneOptions.FetchOptions.CredentialsProvider = (_, _, _) => credentials;
+        }
+
+        var retryCount = 0;
+        Exception? lastException = null;
+
+        while (retryCount < _options.MaxRetryAttempts)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                await Task.Run(() =>
+                {
+                    GitRepository.Clone(workspace.GitUrl, workspace.WorkingDirectory, cloneOptions);
+                }, cancellationToken);
+
+                _logger.LogInformation("Repository cloned successfully");
+                return;
+            }
+            catch (LibGit2SharpException ex)
+            {
+                lastException = ex;
+                retryCount++;
+
+                if (retryCount < _options.MaxRetryAttempts)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Clone attempt {Attempt} failed, retrying in {Delay}ms",
+                        retryCount, _options.RetryDelayMs);
+
+                    await Task.Delay(_options.RetryDelayMs, cancellationToken);
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Failed to clone repository after {_options.MaxRetryAttempts} attempts: {workspace.GitUrl}",
+            lastException);
+    }
+
+    /// <summary>
+    /// Pulls latest changes from the remote repository.
+    /// </summary>
+    private async Task PullRepositoryAsync(
+        RepositoryWorkspace workspace,
+        Credentials? credentials,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Pulling latest changes for {Path}", workspace.WorkingDirectory);
+
+        var retryCount = 0;
+        Exception? lastException = null;
+
+        while (retryCount < _options.MaxRetryAttempts)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                await Task.Run(() =>
+                {
+                    using var repo = new GitRepository(workspace.WorkingDirectory);
+
+                    // Fetch from remote
+                    var remote = repo.Network.Remotes["origin"];
+                    var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
+
+                    var fetchOptions = new FetchOptions();
+                    if (credentials != null)
+                    {
+                        fetchOptions.CredentialsProvider = (_, _, _) => credentials;
+                    }
+
+                    Commands.Fetch(repo, remote.Name, refSpecs, fetchOptions, null);
+
+                    // Checkout the target branch
+                    var branch = repo.Branches[workspace.BranchName] 
+                        ?? repo.Branches[$"origin/{workspace.BranchName}"];
+
+                    if (branch == null)
+                    {
+                        throw new InvalidOperationException($"Branch '{workspace.BranchName}' not found");
+                    }
+
+                    // If it's a remote tracking branch, create a local branch
+                    if (branch.IsRemote)
+                    {
+                        var localBranch = repo.Branches[workspace.BranchName];
+                        if (localBranch == null)
+                        {
+                            localBranch = repo.CreateBranch(workspace.BranchName, branch.Tip);
+                            repo.Branches.Update(localBranch, b => b.TrackedBranch = branch.CanonicalName);
+                        }
+                        branch = localBranch;
+                    }
+
+                    Commands.Checkout(repo, branch);
+
+                    // Pull (merge) changes
+                    var pullOptions = new PullOptions
+                    {
+                        FetchOptions = fetchOptions,
+                        MergeOptions = new MergeOptions
+                        {
+                            FastForwardStrategy = FastForwardStrategy.Default
+                        }
+                    };
+
+                    var signature = new Signature("OpenDeepWiki", "wiki@opendeepwiki.local", DateTimeOffset.Now);
+                    Commands.Pull(repo, signature, pullOptions);
+
+                }, cancellationToken);
+
+                _logger.LogInformation("Repository pulled successfully");
+                return;
+            }
+            catch (LibGit2SharpException ex)
+            {
+                lastException = ex;
+                retryCount++;
+
+                if (retryCount < _options.MaxRetryAttempts)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Pull attempt {Attempt} failed, retrying in {Delay}ms",
+                        retryCount, _options.RetryDelayMs);
+
+                    await Task.Delay(_options.RetryDelayMs, cancellationToken);
+                }
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Failed to pull repository after {_options.MaxRetryAttempts} attempts",
+            lastException);
+    }
+
+
+    /// <summary>
+    /// Gets the HEAD commit ID of a repository.
+    /// </summary>
+    private string GetHeadCommitId(string workingDirectory)
+    {
+        using var repo = new GitRepository(workingDirectory);
+        return repo.Head.Tip.Sha;
+    }
+
+    /// <summary>
+    /// Gets all tracked files in the repository.
+    /// </summary>
+    private string[] GetAllTrackedFiles(string workingDirectory)
+    {
+        using var repo = new GitRepository(workingDirectory);
+        
+        var files = new List<string>();
+        var tree = repo.Head.Tip.Tree;
+
+        CollectFilesFromTree(tree, string.Empty, files);
+
+        return files.ToArray();
+    }
+
+    /// <summary>
+    /// Recursively collects file paths from a Git tree.
+    /// </summary>
+    private static void CollectFilesFromTree(Tree tree, string basePath, List<string> files)
+    {
+        foreach (var entry in tree)
+        {
+            var path = string.IsNullOrEmpty(basePath) 
+                ? entry.Name 
+                : $"{basePath}/{entry.Name}";
+
+            if (entry.TargetType == TreeEntryTargetType.Blob)
+            {
+                files.Add(path);
+            }
+            else if (entry.TargetType == TreeEntryTargetType.Tree)
+            {
+                CollectFilesFromTree((Tree)entry.Target, path, files);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets files changed between two commits.
+    /// </summary>
+    private string[] GetChangedFilesBetweenCommits(
+        string workingDirectory,
+        string fromCommitId,
+        string toCommitId)
+    {
+        using var repo = new GitRepository(workingDirectory);
+
+        var fromCommit = repo.Lookup<Commit>(fromCommitId);
+        var toCommit = repo.Lookup<Commit>(toCommitId);
+
+        if (fromCommit == null)
+        {
+            _logger.LogWarning("From commit {CommitId} not found, returning all files", fromCommitId);
+            return GetAllTrackedFiles(workingDirectory);
+        }
+
+        if (toCommit == null)
+        {
+            throw new InvalidOperationException($"To commit {toCommitId} not found");
+        }
+
+        var changes = repo.Diff.Compare<TreeChanges>(fromCommit.Tree, toCommit.Tree);
+
+        var changedFiles = new List<string>();
+
+        foreach (var change in changes)
+        {
+            // Include added, modified, and renamed files
+            switch (change.Status)
+            {
+                case ChangeKind.Added:
+                case ChangeKind.Modified:
+                case ChangeKind.Renamed:
+                case ChangeKind.Copied:
+                    changedFiles.Add(change.Path);
+                    break;
+                case ChangeKind.Deleted:
+                    // We might want to track deleted files separately
+                    // For now, we don't include them in the changed files list
+                    break;
+            }
+        }
+
+        return changedFiles.ToArray();
+    }
+
+    /// <summary>
+    /// Recursively deletes a directory, handling read-only files.
+    /// </summary>
+    private static void DeleteDirectoryRecursive(string path)
+    {
+        if (!Directory.Exists(path))
+        {
+            return;
+        }
+
+        // Remove read-only attributes from all files
+        foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+        {
+            var attributes = File.GetAttributes(file);
+            if ((attributes & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+            {
+                File.SetAttributes(file, attributes & ~FileAttributes.ReadOnly);
+            }
+        }
+
+        // Delete the directory
+        Directory.Delete(path, true);
+    }
+}

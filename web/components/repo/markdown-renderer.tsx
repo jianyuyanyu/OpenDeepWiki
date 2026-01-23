@@ -17,7 +17,8 @@ function getText(children: React.ReactNode): string {
   }
 
   if (React.isValidElement(children)) {
-    return getText(children.props.children);
+    const props = children.props as { children?: React.ReactNode };
+    return getText(props.children);
   }
 
   return "";

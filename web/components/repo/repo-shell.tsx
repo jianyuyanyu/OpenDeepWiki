@@ -23,22 +23,11 @@ export function RepoShell({ owner, repo, nodes, children }: RepoShellProps) {
   const currentWeekday = t(`common.weekdays.${weekdayKey}`);
   const title = `${owner}/${repo}`;
 
-  const user = {
-    name: t("common.user"),
-    avatar: "",
-    email: "user@example.com",
-  };
-
   return (
     <SidebarProvider>
       <RepoSidebar owner={owner} repo={repo} nodes={nodes} />
       <SidebarInset>
-        <Header
-          title={title}
-          currentWeekday={currentWeekday}
-          isAuthenticated={false}
-          user={user}
-        />
+        <Header title={title} currentWeekday={currentWeekday} />
         <div className="flex min-h-[calc(100vh-4rem)] flex-col">{children}</div>
       </SidebarInset>
     </SidebarProvider>

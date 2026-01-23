@@ -5,18 +5,19 @@ import { MarkdownRenderer } from "@/components/repo/markdown-renderer";
 import { RepoToc } from "@/components/repo/repo-toc";
 
 interface RepoDocPageProps {
-  params: {
+  params: Promise<{
     owner: string;
     repo: string;
     slug: string[];
-  };
+  }>;
 }
 
 export default async function RepoDocPage({ params }: RepoDocPageProps) {
-  const slug = params.slug.join("/");
+  const { owner, repo, slug: slugParts } = await params;
+  const slug = slugParts.join("/");
 
   try {
-    const doc = await fetchRepoDoc(params.owner, params.repo, slug);
+    const doc = await fetchRepoDoc(owner, repo, slug);
     const headings = extractHeadings(doc.content, 3);
 
     return (

@@ -81,4 +81,51 @@ public class RepositoryService(IContext context)
         await context.SaveChangesAsync();
         return assignment;
     }
+
+    /// <summary>
+    /// 获取仓库列表（含状态）
+    /// </summary>
+    [HttpGet("/list")]
+    public async Task<RepositoryListResponse> GetListAsync(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] string? ownerId = null,
+        [FromQuery] RepositoryStatus? status = null)
+    {
+        var query = context.Repositories.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(ownerId))
+        {
+            query = query.Where(r => r.OwnerUserId == ownerId);
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(r => r.Status == status.Value);
+        }
+
+        var total = await query.CountAsync();
+
+        var repositories = await query
+            .OrderByDescending(r => r.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new RepositoryListResponse
+        {
+            Total = total,
+            Items = repositories.Select(r => new RepositoryItemResponse
+            {
+                Id = r.Id,
+                OrgName = r.OrgName,
+                RepoName = r.RepoName,
+                GitUrl = r.GitUrl,
+                Status = r.Status,
+                IsPublic = r.IsPublic,
+                CreatedAt = r.CreatedAt,
+                UpdatedAt = r.UpdatedAt
+            }).ToList()
+        };
+    }
 }

@@ -23,15 +23,17 @@ import {
 } from "@/components/animate-ui/components/radix/sidebar";
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "@/hooks/use-translations";
+import { useAuth } from "@/contexts/auth-context";
 
 const itemKeys = [
-    { key: "explore", url: "/", icon: Compass },
-    { key: "recommend", url: "/recommend", icon: ThumbsUp },
-    { key: "private", url: "/private", icon: GitFork },
-    { key: "subscribe", url: "/subscribe", icon: Star },
-    { key: "bookmarks", url: "/bookmarks", icon: Bookmark },
-    { key: "organizations", url: "/organizations", icon: Building2 },
+    { key: "explore", url: "/", icon: Compass, requireAuth: false },
+    { key: "recommend", url: "/recommend", icon: ThumbsUp, requireAuth: false },
+    { key: "private", url: "/private", icon: GitFork, requireAuth: true },
+    { key: "subscribe", url: "/subscribe", icon: Star, requireAuth: true },
+    { key: "bookmarks", url: "/bookmarks", icon: Bookmark, requireAuth: true },
+    { key: "organizations", url: "/organizations", icon: Building2, requireAuth: false },
 ];
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -41,12 +43,23 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({ activeItem, onItemClick, ...props }: AppSidebarProps) {
     const t = useTranslations();
+    const router = useRouter();
+    const { isAuthenticated } = useAuth();
 
     const items = itemKeys.map(item => ({
         title: t(`sidebar.${item.key}`),
         url: item.url,
         icon: item.icon,
+        requireAuth: item.requireAuth,
     }));
+
+    const handleItemClick = (item: typeof items[0]) => {
+        if (item.requireAuth && !isAuthenticated) {
+            router.push("/auth");
+            return;
+        }
+        onItemClick?.(item.title);
+    };
 
     return (
         <Sidebar collapsible="icon" {...props}>
@@ -63,9 +76,16 @@ export function AppSidebar({ activeItem, onItemClick, ...props }: AppSidebarProp
                                         asChild
                                         tooltip={item.title}
                                         isActive={activeItem === item.title}
-                                        onClick={() => onItemClick?.(item.title)}
+                                        onClick={(e) => {
+                                            if (item.requireAuth && !isAuthenticated) {
+                                                e.preventDefault();
+                                                handleItemClick(item);
+                                            } else {
+                                                onItemClick?.(item.title);
+                                            }
+                                        }}
                                     >
-                                        <Link href={item.url}>
+                                        <Link href={item.requireAuth && !isAuthenticated ? "#" : item.url}>
                                             <item.icon />
                                             <span>{item.title}</span>
                                         </Link>

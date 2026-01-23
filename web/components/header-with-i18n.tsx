@@ -17,29 +17,26 @@ import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useTranslations } from "@/hooks/use-translations";
+import { useAuth } from "@/contexts/auth-context";
+import { Loader2 } from "lucide-react";
 
 interface HeaderProps {
   title: string;
   currentTime: string;
-  isAuthenticated?: boolean;
-  user?: {
-    name: string;
-    avatar?: string;
-    email?: string;
-  };
 }
 
-export function HeaderWithI18n({ title, currentTime, isAuthenticated = false, user }: HeaderProps) {
+export function HeaderWithI18n({ title, currentTime }: HeaderProps) {
   const router = useRouter();
-  const t = useTranslations('common');
+  const t = useTranslations("common");
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
 
   const handleLogin = () => {
     router.push("/auth");
   };
 
   const handleLogout = () => {
-    // TODO: Implement logout logic
-    console.log("Logout");
+    logout();
+    router.refresh();
   };
 
   return (
@@ -54,13 +51,17 @@ export function HeaderWithI18n({ title, currentTime, isAuthenticated = false, us
         <span className="text-sm text-muted-foreground hidden md:inline-block">
           {currentTime}
         </span>
-        
+
         <div className="flex items-center gap-1">
           <LanguageToggle />
           <ThemeToggle />
         </div>
-        
-        {isAuthenticated && user ? (
+
+        {isLoading ? (
+          <Button variant="ghost" size="sm" disabled>
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </Button>
+        ) : isAuthenticated && user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-9 w-9 rounded-full">
@@ -82,17 +83,15 @@ export function HeaderWithI18n({ title, currentTime, isAuthenticated = false, us
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>{t('profile')}</DropdownMenuItem>
-              <DropdownMenuItem>{t('settings')}</DropdownMenuItem>
+              <DropdownMenuItem>{t("profile")}</DropdownMenuItem>
+              <DropdownMenuItem>{t("settings")}</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout}>
-                {t('logout')}
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>{t("logout")}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
           <Button size="sm" onClick={handleLogin}>
-            {t('login')}
+            {t("login")}
           </Button>
         )}
       </div>

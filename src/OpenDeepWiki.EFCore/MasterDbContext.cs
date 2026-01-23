@@ -19,6 +19,7 @@ public interface IContext
     DbSet<BranchLanguage> BranchLanguages { get; set; }
     DbSet<DocDirectory> DocDirectories { get; set; }
     DbSet<DocFile> DocFiles { get; set; }
+    DbSet<DocCatalog> DocCatalogs { get; set; }
     DbSet<RepositoryAssignment> RepositoryAssignments { get; set; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
@@ -43,6 +44,7 @@ public abstract class MasterDbContext : DbContext, IContext
     public DbSet<BranchLanguage> BranchLanguages { get; set; } = null!;
     public DbSet<DocDirectory> DocDirectories { get; set; } = null!;
     public DbSet<DocFile> DocFiles { get; set; } = null!;
+    public DbSet<DocCatalog> DocCatalogs { get; set; } = null!;
     public DbSet<RepositoryAssignment> RepositoryAssignments { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -74,5 +76,24 @@ public abstract class MasterDbContext : DbContext, IContext
             .HasOne(directory => directory.DocFile)
             .WithOne()
             .HasForeignKey<DocDirectory>(directory => directory.DocFileId);
+
+        // DocCatalog 树形结构配置
+        modelBuilder.Entity<DocCatalog>()
+            .HasOne(catalog => catalog.Parent)
+            .WithMany(catalog => catalog.Children)
+            .HasForeignKey(catalog => catalog.ParentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // DocCatalog 路径唯一索引（同一分支语言下路径唯一）
+        modelBuilder.Entity<DocCatalog>()
+            .HasIndex(catalog => new { catalog.BranchLanguageId, catalog.Path })
+            .IsUnique();
+
+        // DocCatalog 与 DocFile 关联
+        modelBuilder.Entity<DocCatalog>()
+            .HasOne(catalog => catalog.DocFile)
+            .WithMany()
+            .HasForeignKey(catalog => catalog.DocFileId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

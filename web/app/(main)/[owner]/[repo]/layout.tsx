@@ -5,18 +5,20 @@ import { RepoShell } from "@/components/repo/repo-shell";
 
 interface RepoLayoutProps {
   children: React.ReactNode;
-  params: {
+  params: Promise<{
     owner: string;
     repo: string;
-  };
+  }>;
 }
 
 export default async function RepoLayout({ children, params }: RepoLayoutProps) {
+  const { owner, repo } = await params;
+  
   try {
-    const tree = await fetchRepoTree(params.owner, params.repo);
+    const tree = await fetchRepoTree(owner, repo);
 
     return (
-      <RepoShell owner={params.owner} repo={params.repo} nodes={tree.nodes}>
+      <RepoShell owner={owner} repo={repo} nodes={tree.nodes}>
         {children}
       </RepoShell>
     );

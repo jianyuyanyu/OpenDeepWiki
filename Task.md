@@ -4,7 +4,7 @@
 
 [×] Design backend repo tree/doc API shapes and DTOs
   [×] Implement backend repo tree/doc MiniApi service
-  [ ] Add frontend repo routes with redirect and layout
-  [ ] Build frontend tree sidebar, markdown renderer, and TOC
-  [ ] Wire frontend data fetching for repo tree/docs
-  [ ] Run targeted checks/tests
+  [×] Add frontend repo routes with redirect and layout
+  [×] Build frontend tree sidebar, markdown renderer, and TOC
+  [×] Wire frontend data fetching for repo tree/docs
+  [×] Run targeted checks/tests
