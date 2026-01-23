@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 
@@ -32,11 +33,20 @@ public class DocTool
     /// <param name="catalogPath">The catalog item path, e.g., "1-overview".</param>
     /// <param name="content">The Markdown content for the document.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    [Description("为指定目录项写入文档内容")]
+    [Description(@"Writes document content for a catalog item.
+
+Usage:
+- Creates a new document or updates existing one
+- Content should be in Markdown format
+- The catalog item must exist before writing content
+
+Example:
+catalogPath: '1-overview'
+content: '# Overview\n\nThis is the overview section...'")]
     public async Task WriteAsync(
-        [Description("目录项路径，如 '1-overview'")] 
+        [Description("Catalog item path, e.g., '1-overview' or '2-api/2.1-endpoints'")] 
         string catalogPath,
-        [Description("Markdown 格式的文档内容")] 
+        [Description("Document content in Markdown format")] 
         string content,
         CancellationToken cancellationToken = default)
     {
@@ -101,13 +111,24 @@ public class DocTool
     /// <param name="oldContent">The content to be replaced.</param>
     /// <param name="newContent">The new content to replace with.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    [Description("编辑指定目录项的文档内容")]
+    [Description(@"Edits existing document content by replacing specified text.
+
+Usage:
+- Performs exact string replacement in the document
+- oldContent must exist in the document (exact match required)
+- Use ReadAsync first to see current content
+- For large changes, consider using WriteAsync instead
+
+Example:
+catalogPath: '1-overview'
+oldContent: '## Old Section'
+newContent: '## New Section\n\nUpdated content here'")]
     public async Task EditAsync(
-        [Description("目录项路径")] 
+        [Description("Catalog item path containing the document to edit")] 
         string catalogPath,
-        [Description("要替换的原始内容")] 
+        [Description("Exact text to find and replace (must exist in document)")] 
         string oldContent,
-        [Description("新的内容")] 
+        [Description("New text to replace the old content with")] 
         string newContent,
         CancellationToken cancellationToken = default)
     {
@@ -165,9 +186,17 @@ public class DocTool
     /// <param name="catalogPath">The catalog item path.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The document content or null if not found.</returns>
-    [Description("读取指定目录项的文档内容")]
+    [Description(@"Reads the document content for a catalog item.
+
+Returns:
+- The Markdown content of the document
+- null if no document exists for the path
+
+Usage:
+- Use before EditAsync to see current content
+- Use to verify document was written correctly")]
     public async Task<string?> ReadAsync(
-        [Description("目录项路径")] 
+        [Description("Catalog item path, e.g., '1-overview'")] 
         string catalogPath,
         CancellationToken cancellationToken = default)
     {
@@ -200,9 +229,17 @@ public class DocTool
     /// <param name="catalogPath">The catalog item path.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>True if a document exists, false otherwise.</returns>
-    [Description("检查指定目录项是否有关联的文档")]
+    [Description(@"Checks if a document exists for a catalog item.
+
+Returns:
+- true if document exists and is not deleted
+- false if no document or catalog item not found
+
+Usage:
+- Quick check before writing to avoid overwriting
+- Verify document creation was successful")]
     public async Task<bool> ExistsAsync(
-        [Description("目录项路径")] 
+        [Description("Catalog item path to check")] 
         string catalogPath,
         CancellationToken cancellationToken = default)
     {
@@ -223,5 +260,32 @@ public class DocTool
 
         return await _context.DocFiles
             .AnyAsync(d => d.Id == catalog.DocFileId && !d.IsDeleted, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets the list of AI tools provided by this DocTool.
+    /// </summary>
+    /// <returns>List of AITool instances for document operations.</returns>
+    public List<AITool> GetTools()
+    {
+        return new List<AITool>
+        {
+            AIFunctionFactory.Create(WriteAsync, new AIFunctionFactoryOptions
+            {
+                Name = "WriteDoc"
+            }),
+            AIFunctionFactory.Create(EditAsync, new AIFunctionFactoryOptions
+            {
+                Name = "EditDoc"
+            }),
+            AIFunctionFactory.Create(ReadAsync, new AIFunctionFactoryOptions
+            {
+                Name = "ReadDoc"
+            }),
+            AIFunctionFactory.Create(ExistsAsync, new AIFunctionFactoryOptions
+            {
+                Name = "DocExists"
+            })
+        };
     }
 }

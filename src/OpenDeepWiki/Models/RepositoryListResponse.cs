@@ -59,6 +59,11 @@ public class RepositoryItemResponse
     public bool IsPublic { get; set; }
 
     /// <summary>
+    /// 是否设置了密码
+    /// </summary>
+    public bool HasPassword { get; set; }
+
+    /// <summary>
     /// 创建时间
     /// </summary>
     public DateTime CreatedAt { get; set; }

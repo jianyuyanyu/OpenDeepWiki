@@ -1,16 +1,33 @@
+using System.Collections.Concurrent;
 using System.ComponentModel;
+using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.AI;
 
 namespace OpenDeepWiki.Agents.Tools;
 
 /// <summary>
-/// AI Tool for reading and searching repository code.
-/// Provides methods for AI agents to access repository files with path abstraction.
-/// The actual file system path is hidden from the AI agent.
+/// Unified AI Tool for repository file operations including read, search, and list.
+/// All file paths are relative to the repository root - actual filesystem paths are abstracted.
 /// </summary>
 public class GitTool
 {
     private readonly string _workingDirectory;
+
+    /// <summary>
+    /// Default maximum number of lines to read from a file.
+    /// </summary>
+    private const int DefaultReadLimit = 2000;
+
+    /// <summary>
+    /// Maximum characters per line before truncation.
+    /// </summary>
+    private const int MaxLineLength = 2000;
+
+    /// <summary>
+    /// Default context lines for grep results.
+    /// </summary>
+    private const int DefaultContextLines = 2;
 
     /// <summary>
     /// Initializes a new instance of GitTool with the specified working directory.
@@ -24,7 +41,7 @@ public class GitTool
         }
 
         _workingDirectory = Path.GetFullPath(workingDirectory);
-        
+
         if (!Directory.Exists(_workingDirectory))
         {
             throw new DirectoryNotFoundException($"Working directory does not exist: {_workingDirectory}");
@@ -32,48 +49,124 @@ public class GitTool
     }
 
     /// <summary>
-    /// Reads the content of a file at the specified relative path.
+    /// Enumerates files matching a glob pattern.
+    /// Supports *, **, and ? wildcards.
     /// </summary>
-    /// <param name="relativePath">The path relative to the repository root, e.g., "src/main.cs" or "README.md".</param>
-    /// <returns>The file content as a string.</returns>
-    [Description("读取仓库中指定文件的内容")]
-    public string Read(
-        [Description("相对于仓库根目录的文件路径，如 'src/main.cs' 或 'README.md'")] 
-        string relativePath)
+    /// <param name="glob">Glob pattern (e.g., "*.cs", "**/*.json", "src/**/*.ts")</param>
+    /// <returns>Enumerable of matching file paths (full paths)</returns>
+    private IEnumerable<string> EnumerateFilesWithGlob(string? glob)
     {
-        if (string.IsNullOrWhiteSpace(relativePath))
+        if (string.IsNullOrWhiteSpace(glob))
         {
-            throw new ArgumentException("Relative path cannot be empty.", nameof(relativePath));
+            // No pattern - return all files
+            foreach (var file in Directory.EnumerateFiles(_workingDirectory, "*", SearchOption.AllDirectories))
+            {
+                yield return file;
+            }
+
+            yield break;
         }
 
-        // Normalize the path to prevent directory traversal attacks
-        var normalizedPath = NormalizePath(relativePath);
-        var fullPath = Path.GetFullPath(Path.Combine(_workingDirectory, normalizedPath));
+        // Convert glob to regex pattern
+        var globRegex = GlobToRegex(glob);
 
-        // Security check: ensure the resolved path is within the working directory
-        if (!fullPath.StartsWith(_workingDirectory, StringComparison.OrdinalIgnoreCase))
+        foreach (var file in Directory.EnumerateFiles(_workingDirectory, "*", SearchOption.AllDirectories))
         {
-            throw new UnauthorizedAccessException($"Access denied: path '{relativePath}' is outside the repository.");
+            var relativePath = GetRelativePath(file);
+            if (globRegex.IsMatch(relativePath))
+            {
+                yield return file;
+            }
         }
-
-        if (!File.Exists(fullPath))
-        {
-            throw new FileNotFoundException($"File not found: {relativePath}");
-        }
-
-        return File.ReadAllText(fullPath);
     }
 
     /// <summary>
-    /// Reads the content of a file asynchronously at the specified relative path.
+    /// Converts a glob pattern to a regex pattern.
+    /// Supports: * (any chars except /), ** (any chars including /), ? (single char)
+    /// </summary>
+    private static Regex GlobToRegex(string glob)
+    {
+        var pattern = new StringBuilder("^");
+
+        for (int i = 0; i < glob.Length; i++)
+        {
+            var c = glob[i];
+            switch (c)
+            {
+                case '*':
+                    if (i + 1 < glob.Length && glob[i + 1] == '*')
+                    {
+                        // ** matches any path including /
+                        pattern.Append(".*");
+                        i++; // Skip next *
+                        // Skip trailing / after **
+                        if (i + 1 < glob.Length && (glob[i + 1] == '/' || glob[i + 1] == '\\'))
+                        {
+                            i++;
+                        }
+                    }
+                    else
+                    {
+                        // * matches any chars except /
+                        pattern.Append("[^/\\\\]*");
+                    }
+
+                    break;
+                case '?':
+                    pattern.Append("[^/\\\\]");
+                    break;
+                case '.':
+                case '(':
+                case ')':
+                case '[':
+                case ']':
+                case '{':
+                case '}':
+                case '+':
+                case '^':
+                case '$':
+                case '|':
+                    pattern.Append('\\').Append(c);
+                    break;
+                case '\\':
+                case '/':
+                    pattern.Append("[/\\\\]");
+                    break;
+                default:
+                    pattern.Append(c);
+                    break;
+            }
+        }
+
+        pattern.Append('$');
+        return new Regex(pattern.ToString(), RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    }
+
+    /// <summary>
+    /// Reads the content of a file at the specified relative path.
     /// </summary>
     /// <param name="relativePath">The path relative to the repository root.</param>
+    /// <param name="offset">Line number to start reading from (1-based).</param>
+    /// <param name="limit">Maximum number of lines to read.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The file content as a string.</returns>
-    [Description("异步读取仓库中指定文件的内容")]
+    /// <returns>The file content as a string with line numbers.</returns>
+    [Description(@"Reads a file from the repository.
+
+Usage:
+- The path parameter must be relative to the repository root (e.g., 'src/main.cs', 'README.md')
+- By default reads up to 2000 lines starting from the beginning
+- You can optionally specify offset and limit for large files
+- Lines longer than 2000 characters will be truncated
+- Results include line numbers in 'N: content' format
+- Binary files (images, executables, etc.) are not supported
+- Hidden files/directories (starting with .) are accessible but filtered in search results")]
     public async Task<string> ReadAsync(
-        [Description("相对于仓库根目录的文件路径，如 'src/main.cs' 或 'README.md'")] 
+        [Description("Relative path to the file from repository root, e.g., 'src/main.cs' or 'docs/README.md'")]
         string relativePath,
+        [Description("Line number to start reading from (1-based). Use for large files. Default: 1")]
+        int offset = 1,
+        [Description("Maximum number of lines to read. Use for large files. Default: 2000")]
+        int limit = DefaultReadLimit,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(relativePath))
@@ -94,110 +187,242 @@ public class GitTool
             throw new FileNotFoundException($"File not found: {relativePath}");
         }
 
-        return await File.ReadAllTextAsync(fullPath, cancellationToken);
+        var lines = await File.ReadAllLinesAsync(fullPath, cancellationToken);
+        var startIndex = Math.Max(0, offset - 1);
+        var endIndex = Math.Min(lines.Length, startIndex + limit);
+
+        var result = new StringBuilder();
+        for (int i = startIndex; i < endIndex; i++)
+        {
+            var line = lines[i];
+            if (line.Length > MaxLineLength)
+            {
+                line = line[..MaxLineLength] + "... [truncated]";
+            }
+
+            result.AppendLine($"{i + 1}: {line}");
+        }
+
+        if (endIndex < lines.Length)
+        {
+            result.AppendLine($"[{lines.Length - endIndex} more lines not shown. Use offset/limit to read more.]");
+        }
+
+        return result.ToString();
     }
 
     /// <summary>
     /// Searches for patterns in repository files.
     /// </summary>
     /// <param name="pattern">The search pattern (supports regex).</param>
-    /// <param name="filePattern">Optional file extension filter, e.g., "*.cs".</param>
-    /// <returns>Array of grep results with file paths and matching lines.</returns>
-    [Description("在仓库中搜索匹配指定模式的内容")]
-    public GrepResult[] Grep(
-        [Description("搜索模式，支持正则表达式")] 
+    /// <param name="glob">Optional glob pattern to filter files.</param>
+    /// <param name="caseSensitive">Whether the search is case sensitive.</param>
+    /// <param name="contextLines">Number of context lines before and after each match.</param>
+    /// <param name="maxResults">Maximum number of results to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    [Description(@"A powerful search tool for finding patterns in repository files.
+
+Usage:
+- Supports full regex syntax (e.g., 'log.*Error', 'function\s+\w+', 'class\s+\w+')
+- Filter files with glob parameter (e.g., '*.cs', '*.ts', '**/*.json')
+- Use caseSensitive=false for case-insensitive search (default)
+- Context lines show surrounding code for better understanding
+- Binary files and hidden directories (starting with .) are automatically skipped
+- Results are capped at maxResults to prevent overwhelming output
+
+Pattern Examples:
+- Find class definitions: 'class\s+\w+'
+- Find TODO comments: 'TODO|FIXME|HACK'
+- Find function calls: 'functionName\s*\('
+- Find imports: '^using|^import'")]
+    public async Task<GrepResult[]> GrepAsync(
+        [Description("The regex pattern to search for in file contents. Supports full regex syntax.")]
         string pattern,
-        [Description("可选的文件扩展名过滤，如 '*.cs'")] 
-        string? filePattern = null)
+        [Description("Glob pattern to filter files (e.g., '*.cs', '*.ts', '**/*.json'). Default: all files")]
+        string? glob = null,
+        [Description("Whether the search is case sensitive. Default: false")]
+        bool caseSensitive = false,
+        [Description("Number of context lines to show before and after each match. Default: 2")]
+        int contextLines = DefaultContextLines,
+        [Description("Maximum number of results to return. Default: 50")]
+        int maxResults = 50,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(pattern))
         {
             throw new ArgumentException("Search pattern cannot be empty.", nameof(pattern));
         }
 
-        var results = new List<GrepResult>();
-        var regex = new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        var searchPattern = string.IsNullOrWhiteSpace(filePattern) ? "*" : filePattern;
-
-        try
+        var regexOptions = RegexOptions.Compiled;
+        if (!caseSensitive)
         {
-            var files = Directory.GetFiles(_workingDirectory, searchPattern, SearchOption.AllDirectories);
+            regexOptions |= RegexOptions.IgnoreCase;
+        }
 
-            foreach (var file in files)
+        var regex = new Regex(pattern, regexOptions);
+        var results = new ConcurrentBag<GrepResult>();
+        var resultCount = 0;
+
+        await Task.Run(() =>
+        {
+            try
             {
-                // Skip binary files and hidden directories
-                if (IsBinaryFile(file) || IsHiddenPath(file))
-                {
-                    continue;
-                }
+                var files = EnumerateFilesWithGlob(glob)
+                    .Where(f => !IsBinaryFile(f) && !IsHiddenPath(f));
 
-                try
-                {
-                    var lines = File.ReadAllLines(file);
-                    for (int i = 0; i < lines.Length; i++)
+                Parallel.ForEach(files, new ParallelOptions
                     {
-                        if (regex.IsMatch(lines[i]))
+                        CancellationToken = cancellationToken,
+                        MaxDegreeOfParallelism = Environment.ProcessorCount
+                    },
+                    (file, state) =>
+                    {
+                        if (Volatile.Read(ref resultCount) >= maxResults)
                         {
-                            // Return relative path only - hide actual file system path
-                            var relativePath = GetRelativePath(file);
-                            results.Add(new GrepResult
-                            {
-                                FilePath = relativePath,
-                                LineNumber = i + 1,
-                                LineContent = lines[i].Trim()
-                            });
+                            state.Stop();
+                            return;
                         }
-                    }
-                }
-                catch (Exception)
-                {
-                    // Skip files that cannot be read
-                }
-            }
-        }
-        catch (Exception)
-        {
-            // Return empty results if directory enumeration fails
-        }
 
-        return results.ToArray();
+                        try
+                        {
+                            SearchInFile(file, regex, contextLines, maxResults, results, ref resultCount);
+                        }
+                        catch
+                        {
+                            // Skip files that cannot be read
+                        }
+                    });
+            }
+            catch (OperationCanceledException)
+            {
+                // Cancelled
+            }
+            catch
+            {
+                // Return empty results if directory enumeration fails
+            }
+        }, cancellationToken);
+
+        return [.. results.OrderBy(r => r.FilePath).ThenBy(r => r.LineNumber).Take(maxResults)];
     }
 
     /// <summary>
-    /// Searches for patterns in repository files asynchronously.
+    /// Searches for pattern matches in a single file.
     /// </summary>
-    /// <param name="pattern">The search pattern (supports regex).</param>
-    /// <param name="filePattern">Optional file extension filter.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Array of grep results.</returns>
-    [Description("异步在仓库中搜索匹配指定模式的内容")]
-    public async Task<GrepResult[]> GrepAsync(
-        [Description("搜索模式，支持正则表达式")] 
-        string pattern,
-        [Description("可选的文件扩展名过滤，如 '*.cs'")] 
-        string? filePattern = null,
-        CancellationToken cancellationToken = default)
+    private void SearchInFile(string file, Regex regex, int contextLines, int maxResults,
+        ConcurrentBag<GrepResult> results, ref int resultCount)
     {
-        return await Task.Run(() => Grep(pattern, filePattern), cancellationToken);
+        var relativePath = GetRelativePath(file);
+        using var reader = new StreamReader(file);
+        var lineBuffer = new Queue<string>(contextLines + 1);
+        var lineNumber = 0;
+        string? line;
+
+        while ((line = reader.ReadLine()) != null && Volatile.Read(ref resultCount) < maxResults)
+        {
+            lineNumber++;
+
+            if (regex.IsMatch(line))
+            {
+                var contextBuilder = new StringBuilder();
+
+                // Add buffered context lines before
+                var bufferLineNum = lineNumber - lineBuffer.Count;
+                foreach (var bufLine in lineBuffer)
+                {
+                    contextBuilder.AppendLine($"  {bufferLineNum}: {TruncateLine(bufLine)}");
+                    bufferLineNum++;
+                }
+
+                // Add matching line
+                contextBuilder.AppendLine($"> {lineNumber}: {TruncateLine(line)}");
+
+                // Read context lines after
+                for (int j = 0; j < contextLines && Volatile.Read(ref resultCount) < maxResults; j++)
+                {
+                    var nextLine = reader.ReadLine();
+                    if (nextLine == null) break;
+                    lineNumber++;
+                    contextBuilder.AppendLine($"  {lineNumber}: {TruncateLine(nextLine)}");
+
+                    // Check if next line also matches
+                    if (regex.IsMatch(nextLine))
+                    {
+                        lineBuffer.Clear();
+                        lineBuffer.Enqueue(nextLine);
+                    }
+                }
+
+                results.Add(new GrepResult
+                {
+                    FilePath = relativePath,
+                    LineNumber = lineNumber - contextLines,
+                    LineContent = line.Trim(),
+                    Context = contextBuilder.ToString().TrimEnd()
+                });
+
+                Interlocked.Increment(ref resultCount);
+                lineBuffer.Clear();
+            }
+            else
+            {
+                // Maintain rolling buffer for context
+                if (lineBuffer.Count >= contextLines)
+                {
+                    lineBuffer.Dequeue();
+                }
+
+                lineBuffer.Enqueue(line);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Truncates a line if it exceeds the maximum length.
+    /// </summary>
+    private static string TruncateLine(string line)
+    {
+        return line.Length > MaxLineLength ? line[..MaxLineLength] + "..." : line;
     }
 
     /// <summary>
     /// Lists files in the repository matching the specified pattern.
     /// </summary>
-    /// <param name="filePattern">Optional file pattern filter, e.g., "*.cs".</param>
+    /// <param name="glob">Optional glob pattern filter.</param>
+    /// <param name="maxResults">Maximum number of files to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Array of relative file paths.</returns>
-    [Description("列出仓库中匹配指定模式的文件")]
-    public string[] ListFiles(
-        [Description("可选的文件模式过滤，如 '*.cs'")] 
-        string? filePattern = null)
-    {
-        var searchPattern = string.IsNullOrWhiteSpace(filePattern) ? "*" : filePattern;
-        var files = Directory.GetFiles(_workingDirectory, searchPattern, SearchOption.AllDirectories);
+    [Description(@"Lists files in the repository matching the specified pattern.
 
-        return files
-            .Where(f => !IsHiddenPath(f))
-            .Select(GetRelativePath)
-            .ToArray();
+Usage:
+- Returns relative file paths from repository root
+- Supports full glob syntax: *, **, ?
+- Hidden files/directories (starting with .) are excluded by default
+- Results are sorted alphabetically
+- Use maxResults to limit output for large repositories
+
+Glob Examples:
+- List all C# files: glob='*.cs'
+- List all files recursively: glob='**/*'
+- List TypeScript in src: glob='src/**/*.ts'
+- List JSON configs: glob='**/*.json'
+- Single char wildcard: glob='file?.txt'")]
+    public async Task<string[]> ListFilesAsync(
+        [Description("Glob pattern (e.g., '*.cs', 'src/**/*.ts', '**/*.json'). Default: all files")]
+        string? glob = null,
+        [Description("Maximum number of files to return. Default: 20")]
+        int maxResults = 20,
+        CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            return EnumerateFilesWithGlob(glob)
+                .Where(f => !IsHiddenPath(f))
+                .Select(GetRelativePath)
+                .OrderBy(f => f)
+                .Take(maxResults)
+                .ToArray();
+        }, cancellationToken);
     }
 
     /// <summary>
@@ -207,13 +432,13 @@ public class GitTool
     {
         // Replace backslashes with forward slashes
         var normalized = path.Replace('\\', '/');
-        
+
         // Remove leading slashes
         normalized = normalized.TrimStart('/');
-        
+
         // Remove any ".." components to prevent directory traversal
         var parts = normalized.Split('/').Where(p => p != ".." && p != ".").ToArray();
-        
+
         return string.Join(Path.DirectorySeparatorChar.ToString(), parts);
     }
 
@@ -254,14 +479,33 @@ public class GitTool
     {
         var relativePath = GetRelativePath(fullPath);
         var parts = relativePath.Split('/', '\\');
-        
+
         // Check if any directory component starts with . (except current directory)
         return parts.Any(p => p.StartsWith('.') && p != ".");
+    }
+
+    public List<AITool> GetTools()
+    {
+        return new List<AITool>
+        {
+            AIFunctionFactory.Create(ReadAsync, new AIFunctionFactoryOptions
+            {
+                Name = "ReadFile"
+            }),
+            AIFunctionFactory.Create(ListFilesAsync, new AIFunctionFactoryOptions
+            {
+                Name = "ListFiles"
+            }),
+            AIFunctionFactory.Create(GrepAsync, new AIFunctionFactoryOptions
+            {
+                Name = "Grep"
+            })
+        };
     }
 }
 
 /// <summary>
-/// Represents a grep search result.
+/// Represents a grep search result with context.
 /// </summary>
 public class GrepResult
 {
@@ -276,7 +520,12 @@ public class GrepResult
     public int LineNumber { get; set; }
 
     /// <summary>
-    /// The content of the matching line.
+    /// The content of the matching line (trimmed).
     /// </summary>
     public string LineContent { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The context around the match including surrounding lines.
+    /// </summary>
+    public string Context { get; set; } = string.Empty;
 }

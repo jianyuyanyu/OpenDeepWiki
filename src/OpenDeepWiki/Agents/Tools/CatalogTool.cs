@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using Microsoft.Extensions.AI;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Services.Wiki;
 
@@ -32,7 +33,12 @@ public class CatalogTool
     /// Reads the current wiki catalog structure.
     /// </summary>
     /// <returns>JSON string representing the current catalog structure.</returns>
-    [Description("读取当前的 Wiki 目录结构，返回 JSON 格式的目录树")]
+    [Description(@"Reads the current wiki catalog structure.
+
+Returns:
+- JSON string containing the complete catalog tree
+- Each item has: title, path, order, children (nested items)
+- Use this to understand the current document structure before making changes")]
     public async Task<string> ReadAsync(CancellationToken cancellationToken = default)
     {
         return await _storage.GetCatalogJsonAsync(cancellationToken);
@@ -43,9 +49,26 @@ public class CatalogTool
     /// Replaces all existing catalog items for the branch language.
     /// </summary>
     /// <param name="catalogJson">JSON string representing the complete catalog structure.</param>
-    [Description("写入完整的 Wiki 目录结构，替换现有的所有目录项")]
+    [Description(@"Writes a complete wiki catalog structure, replacing all existing items.
+
+Usage:
+- Provide a complete JSON catalog structure
+- This will REPLACE all existing catalog items
+- Use ReadAsync first to get current structure if you need to preserve some items
+
+JSON Format:
+{
+  ""items"": [
+    {
+      ""title"": ""Getting Started"",
+      ""path"": ""1-getting-started"",
+      ""order"": 1,
+      ""children"": []
+    }
+  ]
+}")]
     public async Task WriteAsync(
-        [Description("JSON 格式的目录结构，包含 items 数组，每个 item 包含 title, path, order, children")] 
+        [Description("Complete catalog JSON with 'items' array. Each item needs: title, path, order, children")] 
         string catalogJson,
         CancellationToken cancellationToken = default)
     {
@@ -79,11 +102,20 @@ public class CatalogTool
     /// </summary>
     /// <param name="path">The path of the node to edit, e.g., "1-overview".</param>
     /// <param name="nodeJson">JSON string representing the updated node data.</param>
-    [Description("编辑目录结构中的指定节点，合并更改并保留未修改的节点")]
+    [Description(@"Edits a specific node in the catalog structure.
+
+Usage:
+- Provide the path of the node to edit and the new node data
+- Only the specified node will be updated, other nodes are preserved
+- Use this for targeted updates instead of rewriting the entire catalog
+
+Example:
+path: '1-overview'
+nodeJson: {""title"": ""Updated Title"", ""path"": ""1-overview"", ""order"": 1, ""children"": []}")]
     public async Task EditAsync(
-        [Description("要编辑的节点路径，如 '1-overview'")] 
+        [Description("Path of the catalog node to edit, e.g., '1-overview' or '2-api/2.1-endpoints'")] 
         string path,
-        [Description("新的节点数据 JSON，包含 title, path, order, children")] 
+        [Description("Updated node JSON with title, path, order, and children fields")] 
         string nodeJson,
         CancellationToken cancellationToken = default)
     {
@@ -151,5 +183,28 @@ public class CatalogTool
         {
             ValidateCatalogItem(child);
         }
+    }
+
+    /// <summary>
+    /// Gets the list of AI tools provided by this CatalogTool.
+    /// </summary>
+    /// <returns>List of AITool instances for catalog operations.</returns>
+    public List<AITool> GetTools()
+    {
+        return new List<AITool>
+        {
+            AIFunctionFactory.Create(ReadAsync, new AIFunctionFactoryOptions
+            {
+                Name = "ReadCatalog"
+            }),
+            AIFunctionFactory.Create(WriteAsync, new AIFunctionFactoryOptions
+            {
+                Name = "WriteCatalog"
+            }),
+            AIFunctionFactory.Create(EditAsync, new AIFunctionFactoryOptions
+            {
+                Name = "EditCatalog"
+            })
+        };
     }
 }

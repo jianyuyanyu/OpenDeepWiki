@@ -3,5 +3,53 @@
   "searchPlaceholder": "在这里粘贴Github仓库链接或者通过关键词搜索",
   "addPrivateRepo": "添加私人仓库",
   "exploreTrending": "探索本周的 热门仓库",
-  "mcpIntegration": "把 OpenDeepWiki MCP 接入你的开发工具 🔥"
+  "mcpIntegration": "把 OpenDeepWiki MCP 接入你的开发工具 🔥",
+  "publicRepository": {
+    "title": "公开仓库",
+    "empty": "暂无公开仓库",
+    "noResults": "没有找到匹配的仓库",
+    "loadError": "加载仓库失败"
+  },
+  "repository": {
+    "submitTitle": "提交仓库",
+    "submitDescription": "添加仓库以生成 Wiki 文档",
+    "gitUrl": "Git 地址",
+    "gitUrlPlaceholder": "https://github.com/owner/repo.git",
+    "gitUrlRequired": "Git 地址不能为空",
+    "gitUrlInvalid": "请输入有效的 Git 地址",
+    "branchName": "分支名称",
+    "branchNamePlaceholder": "main",
+    "branchNameRequired": "分支名称不能为空",
+    "language": "语言",
+    "languageRequired": "请选择语言",
+    "isPublic": "公开仓库",
+    "publicDesc": "任何人都可以查看此仓库",
+    "privateDesc": "仅您可以访问此仓库",
+    "authHint": "私有仓库需要身份验证",
+    "authAccount": "用户名（可选）",
+    "authAccountPlaceholder": "用于私有仓库",
+    "authPassword": "密码/令牌（可选）",
+    "authPasswordPlaceholder": "访问令牌或密码",
+    "submit": "提交",
+    "submitting": "提交中...",
+    "submitSuccess": "仓库提交成功",
+    "submitError": "仓库提交失败",
+    "listTitle": "我的仓库",
+    "noRepositories": "暂无仓库",
+    "status": {
+      "pending": "等待中",
+      "processing": "处理中",
+      "completed": "已完成",
+      "failed": "失败"
+    },
+    "viewWiki": "查看 Wiki",
+    "retry": "重试",
+    "createdAt": "创建时间",
+    "languages": {
+      "en": "英语",
+      "zh": "中文",
+      "ja": "日语",
+      "ko": "韩语"
+    }
+  }
 }

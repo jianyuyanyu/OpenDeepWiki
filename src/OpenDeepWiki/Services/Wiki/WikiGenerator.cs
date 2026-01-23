@@ -1,12 +1,17 @@
+using System.Text;
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OpenAI.Chat;
+using OpenAI.Responses;
 using OpenDeepWiki.Agents;
 using OpenDeepWiki.Agents.Tools;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Services.Prompts;
 using OpenDeepWiki.Services.Repositories;
+using ChatMessage = Microsoft.Extensions.AI.ChatMessage;
 
 namespace OpenDeepWiki.Services.Wiki;
 
@@ -47,7 +52,7 @@ public class WikiGenerator : IWikiGenerator
     {
         _logger.LogInformation(
             "Generating catalog for {Org}/{Repo} branch {Branch} language {Language}",
-            workspace.Organization, workspace.RepositoryName, 
+            workspace.Organization, workspace.RepositoryName,
             workspace.BranchName, branchLanguage.LanguageCode);
 
         var prompt = await _promptPlugin.LoadPromptAsync(
@@ -63,12 +68,46 @@ public class WikiGenerator : IWikiGenerator
         var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
         var catalogTool = new CatalogTool(catalogStorage);
 
+        var tools = gitTool.GetTools()
+            .Concat(catalogTool.GetTools())
+            .ToArray();
+
+        var userMessage = $@"Please generate a Wiki catalog structure for repository {workspace.Organization}/{workspace.RepositoryName}.
+
+## Task Requirements
+
+1. **Analyze Repository Structure**
+   - Use ListFiles to get file list and understand overall project structure
+   - Prioritize reading README.md, package.json, *.csproj and other key files
+   - Identify project type (frontend/backend/fullstack/library/tool, etc.)
+
+2. **Design Catalog Structure**
+   - Organize content from user's learning and usage perspective
+   - Maximum 3 levels of nesting, avoid overly deep structures
+   - Follow logical order: Overview → Getting Started → Architecture → Core Modules → API → Configuration → FAQ
+
+3. **Output Requirements**
+   - Catalog titles should be in {branchLanguage.LanguageCode} language
+   - Path field must use lowercase English with hyphens (e.g., getting-started)
+   - Each node must contain title, path, order, children fields
+   - Use WriteCatalog tool to write the final catalog structure
+
+## Execution Steps
+
+1. Call ListFiles() to get file overview
+2. Read key files (README, config files, entry files)
+3. Use Grep to search for key patterns (class definitions, interfaces, API endpoints, etc.)
+4. Design catalog structure that fits the project characteristics
+5. Call WriteCatalog to write the catalog
+
+Please start executing the task.";
+
         await ExecuteAgentWithRetryAsync(
             _options.CatalogModel,
             _options.GetCatalogRequestOptions(),
             prompt,
-            "分析仓库结构并生成 Wiki 目录结构",
-            new object[] { gitTool, catalogTool },
+            userMessage,
+            tools,
             cancellationToken);
 
         _logger.LogInformation("Catalog generation completed for {Org}/{Repo}",
@@ -140,12 +179,57 @@ public class WikiGenerator : IWikiGenerator
         var catalogTool = new CatalogTool(catalogStorage);
         var docTool = new DocTool(_context, branchLanguage.Id);
 
+        var tools = gitTool.GetTools()
+            .Concat(catalogTool.GetTools())
+            .Concat(docTool.GetTools())
+            .ToArray();
+
+        var userMessage = $@"Please analyze code changes in repository {workspace.Organization}/{workspace.RepositoryName} and update relevant Wiki documentation.
+
+## Change Information
+
+- Changed Files Count: {changedFiles.Length}
+
+## Task Requirements
+
+1. **Analyze Change Impact**
+   - Read changed files to understand modifications
+   - Evaluate change types: API changes, configuration changes, new features, bug fixes, refactoring, etc.
+   - Determine which documents need updating
+
+2. **Update Strategy**
+   - High Priority: Breaking API changes, new features → Must update immediately
+   - Medium Priority: Behavior modifications, config changes → Update affected sections
+   - Low Priority: Bug fixes, internal refactoring → Usually no documentation update needed
+
+3. **Execute Updates**
+   - Use ReadCatalog to get current catalog structure
+   - Use ReadDoc to read documents that need updating
+   - For minor changes, use EditDoc for precise replacements
+   - For major changes, use WriteDoc to rewrite entire document
+   - If new catalog items needed, use EditCatalog or WriteCatalog
+
+4. **Quality Requirements**
+   - Ensure code examples match current implementation
+   - Maintain documentation language as {branchLanguage.LanguageCode}
+   - Update API signatures, configuration options, usage examples, etc.
+
+## Execution Steps
+
+1. Read changed files and analyze change content
+2. Read current catalog structure to identify affected documents
+3. Read content of affected documents
+4. Execute necessary document updates
+5. Verify updates are complete
+
+Please start executing the task.";
+
         await ExecuteAgentWithRetryAsync(
             _options.ContentModel,
             _options.GetContentRequestOptions(),
             prompt,
-            "分析变更文件并更新相关的 Wiki 文档",
-            new object[] { gitTool, catalogTool, docTool },
+            userMessage,
+            tools,
             cancellationToken);
 
         _logger.LogInformation("Incremental update completed for {Org}/{Repo}",
@@ -178,12 +262,60 @@ public class WikiGenerator : IWikiGenerator
         var gitTool = new GitTool(workspace.WorkingDirectory);
         var docTool = new DocTool(_context, branchLanguage.Id);
 
+        var tools = gitTool.GetTools()
+            .Concat(docTool.GetTools())
+            .ToArray();
+
+        var userMessage = $@"Please generate Wiki document content for catalog item ""{catalogTitle}"" (path: {catalogPath}).
+
+## Repository Information
+
+- Repository: {workspace.Organization}/{workspace.RepositoryName}
+- Target Language: {branchLanguage.LanguageCode}
+
+## Task Requirements
+
+1. **Gather Source Material**
+   - Use ListFiles to find source files related to ""{catalogTitle}""
+   - Read key implementation files, interface definitions, configuration files
+   - Use Grep to search for related classes, functions, API endpoints
+
+2. **Document Structure** (Must Include)
+   - Title (H1): Must match catalog title
+   - Overview: Explain purpose and use cases
+   - Main Content: Detailed explanation of implementation, architecture, or usage
+   - Usage Examples: Code examples extracted from actual source code
+   - Configuration Options (if applicable): List options in table format
+   - API Reference (if applicable): Method signatures, parameters, return values
+   - Related Links: Links to related documentation
+
+3. **Content Quality Requirements**
+   - All information must be based on actual source code, do not fabricate
+   - Code examples must be extracted from repository with syntax highlighting
+   - Explain design intent (WHY), not just description (WHAT)
+   - Write document content in {branchLanguage.LanguageCode} language
+   - Keep code identifiers in original form, do not translate
+
+4. **Output Requirements**
+   - Use WriteDoc tool to write the document
+   - catalogPath parameter: {catalogPath}
+
+## Execution Steps
+
+1. Analyze catalog title to determine document scope
+2. Use ListFiles and Grep to find related source files
+3. Read key files, extract information and code examples
+4. Organize content following document structure template
+5. Call WriteDoc(""{catalogPath}"", content) to write document
+
+Please start executing the task.";
+
         await ExecuteAgentWithRetryAsync(
             _options.ContentModel,
             _options.GetContentRequestOptions(),
             prompt,
-            $"为 '{catalogTitle}' 生成 Wiki 文档内容",
-            new object[] { gitTool, docTool },
+            userMessage,
+            tools,
             cancellationToken);
     }
 
@@ -196,7 +328,7 @@ public class WikiGenerator : IWikiGenerator
         AiRequestOptions requestOptions,
         string systemPrompt,
         string userMessage,
-        object[] tools,
+        AITool[] tools,
         CancellationToken cancellationToken)
     {
         var retryCount = 0;
@@ -208,29 +340,102 @@ public class WikiGenerator : IWikiGenerator
 
             try
             {
+                // Create chat options with the tools
+                var chatOptions = new ChatClientAgentOptions
+                {
+                    ChatOptions = new ChatOptions()
+                    {
+                        ToolMode = ChatToolMode.Auto,
+                        MaxOutputTokens = 32000,
+                        Tools = tools
+                    }
+                };
+
                 // Create the chat client with tools using the AgentFactory
                 var (chatClient, aiTools) = _agentFactory.CreateChatClientWithTools(
                     model,
                     tools,
+                    chatOptions,
                     requestOptions);
 
                 // Build the conversation with system prompt and user message
                 var messages = new List<ChatMessage>
                 {
                     new(ChatRole.System, systemPrompt),
-                    new(ChatRole.User, userMessage)
+                    new(ChatRole.User, new List<AIContent>()
+                    {
+                        new TextContent(userMessage),
+                        new TextContent("""
+                                        <system-remind>
+                                        IMPORTANT REMINDERS:
+                                        1. You MUST use the provided tools to complete the task. Do not just describe what you would do.
+                                        2. All content must be based on actual source code from the repository. Do NOT fabricate or assume.
+                                        3. After completing all tool calls, provide a brief summary of what was accomplished.
+                                        4. If you encounter errors, retry with adjusted parameters or report the issue.
+                                        5. Do NOT output the full document content in your response - write it using the tools instead.
+                                        </system-remind>
+                                        """)
+                    })
                 };
 
-                // Create chat options with the tools
-                var chatOptions = new ChatOptions
+                // Use streaming response for real-time output
+                var contentBuilder = new System.Text.StringBuilder();
+                UsageDetails? usageDetails = null;
+
+                _logger.LogInformation("Starting streaming response for: {Message}", userMessage);
+
+                var thread = await chatClient.GetNewThreadAsync(cancellationToken);
+
+                await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
                 {
-                    Tools = aiTools
-                };
+                    // Print streaming content
+                    if (!string.IsNullOrEmpty(update.Text))
+                    {
+                        Console.Write(update.Text);
+                        contentBuilder.Append(update.Text);
+                    }
 
-                // Use the chat client with automatic function calling
-                var response = await chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
-                
-                // The response should contain the result after tool execution
+                    if (update.RawRepresentation is StreamingChatCompletionUpdate chatCompletionUpdate &&
+                        chatCompletionUpdate.ToolCallUpdates.Count > 0)
+                    {
+                        foreach (var tool in chatCompletionUpdate.ToolCallUpdates)
+                        {
+                            if (!string.IsNullOrEmpty(tool.FunctionName))
+                            {
+                                Console.WriteLine();
+                                Console.Write("Call Function:" + tool.FunctionName);
+                            }
+                            else
+                            {
+                                Console.Write(" " +
+                                              Encoding.UTF8.GetString(tool.FunctionArgumentsUpdate.ToArray()));
+                            }
+                        }
+                    }
+
+                    // Check for usage information in the update contents (typically in the final update)
+                    var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
+                    if (usage != null)
+                    {
+                        usageDetails = usage;
+                    }
+                }
+
+                // Print newline after streaming completes
+                Console.WriteLine();
+
+                // Log usage statistics
+                if (usageDetails != null)
+                {
+                    _logger.LogInformation(
+                        "Usage - Input tokens: {InputTokens}, Output tokens: {OutputTokens}, Total tokens: {TotalTokens}",
+                        usageDetails.InputTokenCount,
+                        usageDetails.OutputTokenCount,
+                        usageDetails.TotalTokenCount);
+                }
+
+                _logger.LogDebug("Streaming response completed. Total content length: {Length}", contentBuilder.Length);
+
                 return;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

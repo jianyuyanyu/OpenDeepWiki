@@ -68,6 +68,9 @@ builder.Services.AddScoped<IOAuthService, OAuthService>();
 // 添加HttpClient
 builder.Services.AddHttpClient();
 
+// 注册Git平台服务
+builder.Services.AddScoped<IGitPlatformService, GitPlatformService>();
+
 builder.Services.AddOptions<AiRequestOptions>()
     .Bind(builder.Configuration.GetSection("AI"))
     .PostConfigure(options =>

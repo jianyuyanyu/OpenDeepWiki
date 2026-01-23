@@ -3,5 +3,53 @@
   "searchPlaceholder": "GitHub 저장소 링크를 붙여넣거나 키워드로 검색",
   "addPrivateRepo": "비공개 저장소 추가",
   "exploreTrending": "이번 주 인기 저장소 탐색",
-  "mcpIntegration": "개발 도구에 OpenDeepWiki MCP 통합 🔥"
+  "mcpIntegration": "개발 도구에 OpenDeepWiki MCP 통합 🔥",
+  "publicRepository": {
+    "title": "공개 저장소",
+    "empty": "공개 저장소가 없습니다",
+    "noResults": "검색과 일치하는 저장소가 없습니다",
+    "loadError": "저장소를 불러오는데 실패했습니다"
+  },
+  "repository": {
+    "submitTitle": "저장소 제출",
+    "submitDescription": "Wiki 문서를 생성할 저장소 추가",
+    "gitUrl": "Git URL",
+    "gitUrlPlaceholder": "https://github.com/owner/repo.git",
+    "gitUrlRequired": "Git URL은 필수입니다",
+    "gitUrlInvalid": "유효한 Git URL을 입력하세요",
+    "branchName": "브랜치 이름",
+    "branchNamePlaceholder": "main",
+    "branchNameRequired": "브랜치 이름은 필수입니다",
+    "language": "언어",
+    "languageRequired": "언어를 선택하세요",
+    "isPublic": "공개 저장소",
+    "publicDesc": "누구나 이 저장소를 볼 수 있습니다",
+    "privateDesc": "본인만 이 저장소에 접근할 수 있습니다",
+    "authHint": "비공개 저장소는 인증이 필요합니다",
+    "authAccount": "사용자 이름 (선택)",
+    "authAccountPlaceholder": "비공개 저장소용",
+    "authPassword": "비밀번호/토큰 (선택)",
+    "authPasswordPlaceholder": "액세스 토큰 또는 비밀번호",
+    "submit": "제출",
+    "submitting": "제출 중...",
+    "submitSuccess": "저장소가 성공적으로 제출되었습니다",
+    "submitError": "저장소 제출에 실패했습니다",
+    "listTitle": "내 저장소",
+    "noRepositories": "저장소가 없습니다",
+    "status": {
+      "pending": "대기 중",
+      "processing": "처리 중",
+      "completed": "완료",
+      "failed": "실패"
+    },
+    "viewWiki": "Wiki 보기",
+    "retry": "재시도",
+    "createdAt": "생성일",
+    "languages": {
+      "en": "영어",
+      "zh": "중국어",
+      "ja": "일본어",
+      "ko": "한국어"
+    }
+  }
 }

@@ -65,7 +65,7 @@ public class RepositoryProcessingWorker(
             // Get the oldest pending repository (ordered by creation time)
             var repository = await context.Repositories
                 .OrderBy(item => item.CreatedAt)
-                .FirstOrDefaultAsync(item => item.Status == RepositoryStatus.Pending, stoppingToken);
+                .FirstOrDefaultAsync(item => item.Status == RepositoryStatus.Pending || item.Status == RepositoryStatus.Processing, stoppingToken);
 
             if (repository is null)
             {

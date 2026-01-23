@@ -6,13 +6,20 @@ import { SidebarInset, SidebarProvider } from "@/components/animate-ui/component
 import { Header } from "@/components/header";
 import { useTranslations } from "@/hooks/use-translations";
 
+interface HeaderSearchBoxProps {
+  value: string;
+  onChange: (value: string) => void;
+  visible: boolean;
+}
+
 interface AppLayoutProps {
   children: React.ReactNode;
   activeItem?: string;
   onItemClick?: (item: string) => void;
+  searchBox?: HeaderSearchBoxProps;
 }
 
-export function AppLayout({ children, activeItem, onItemClick }: AppLayoutProps) {
+export function AppLayout({ children, activeItem, onItemClick, searchBox }: AppLayoutProps) {
   const t = useTranslations();
   const defaultActiveItem = activeItem || t("sidebar.explore");
 
@@ -27,7 +34,11 @@ export function AppLayout({ children, activeItem, onItemClick }: AppLayoutProps)
     <SidebarProvider>
       <AppSidebar activeItem={defaultActiveItem} onItemClick={onItemClick} />
       <SidebarInset>
-        <Header title={defaultActiveItem} currentWeekday={currentWeekday} />
+        <Header
+          title={defaultActiveItem}
+          currentWeekday={currentWeekday}
+          searchBox={searchBox}
+        />
         {children}
       </SidebarInset>
     </SidebarProvider>

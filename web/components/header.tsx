@@ -16,16 +16,24 @@ import {
 import { useRouter } from "next/navigation";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
+import { HeaderSearchBox } from "@/components/header-search-box";
 import { useTranslations } from "@/hooks/use-translations";
 import { useAuth } from "@/contexts/auth-context";
 import { Loader2 } from "lucide-react";
 
+interface HeaderSearchBoxProps {
+  value: string;
+  onChange: (value: string) => void;
+  visible: boolean;
+}
+
 interface HeaderProps {
   title: string;
   currentWeekday: string;
+  searchBox?: HeaderSearchBoxProps;
 }
 
-export function Header({ title, currentWeekday }: HeaderProps) {
+export function Header({ title, currentWeekday, searchBox }: HeaderProps) {
   const router = useRouter();
   const t = useTranslations();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
@@ -51,6 +59,14 @@ export function Header({ title, currentWeekday }: HeaderProps) {
         <span className="text-sm text-muted-foreground hidden md:inline-block">
           {currentWeekday}
         </span>
+
+        {searchBox && (
+          <HeaderSearchBox
+            value={searchBox.value}
+            onChange={searchBox.onChange}
+            visible={searchBox.visible}
+          />
+        )}
 
         <div className="flex items-center gap-1">
           <LanguageToggle />

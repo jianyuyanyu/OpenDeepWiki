@@ -109,6 +109,66 @@ namespace OpenDeepWiki.Sqlite.Migrations
                     b.ToTable("Departments");
                 });
 
+            modelBuilder.Entity("OpenDeepWiki.Entities.DocCatalog", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BranchLanguageId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DocFileId")
+                        .HasMaxLength(36)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ParentId")
+                        .HasMaxLength(36)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("BLOB");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocFileId");
+
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("BranchLanguageId", "Path")
+                        .IsUnique();
+
+                    b.ToTable("DocCatalogs");
+                });
+
             modelBuilder.Entity("OpenDeepWiki.Entities.DocDirectory", b =>
                 {
                     b.Property<string>("Id")
@@ -388,6 +448,9 @@ namespace OpenDeepWiki.Sqlite.Migrations
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("ForkCount")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("GitUrl")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -413,6 +476,9 @@ namespace OpenDeepWiki.Sqlite.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("StarCount")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
@@ -499,6 +565,13 @@ namespace OpenDeepWiki.Sqlite.Migrations
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("LastCommitId")
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastProcessedAt")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("RepositoryId")
                         .IsRequired()
@@ -769,6 +842,31 @@ namespace OpenDeepWiki.Sqlite.Migrations
                     b.Navigation("Parent");
                 });
 
+            modelBuilder.Entity("OpenDeepWiki.Entities.DocCatalog", b =>
+                {
+                    b.HasOne("OpenDeepWiki.Entities.BranchLanguage", "BranchLanguage")
+                        .WithMany()
+                        .HasForeignKey("BranchLanguageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OpenDeepWiki.Entities.DocFile", "DocFile")
+                        .WithMany()
+                        .HasForeignKey("DocFileId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("OpenDeepWiki.Entities.DocCatalog", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("BranchLanguage");
+
+                    b.Navigation("DocFile");
+
+                    b.Navigation("Parent");
+                });
+
             modelBuilder.Entity("OpenDeepWiki.Entities.DocDirectory", b =>
                 {
                     b.HasOne("OpenDeepWiki.Entities.BranchLanguage", "BranchLanguage")
@@ -895,6 +993,11 @@ namespace OpenDeepWiki.Sqlite.Migrations
                     b.Navigation("Role");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("OpenDeepWiki.Entities.DocCatalog", b =>
+                {
+                    b.Navigation("Children");
                 });
 #pragma warning restore 612, 618
         }

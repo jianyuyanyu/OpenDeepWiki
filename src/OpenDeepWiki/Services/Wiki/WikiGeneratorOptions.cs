@@ -15,13 +15,13 @@ public class WikiGeneratorOptions
     /// The AI model to use for catalog structure generation.
     /// Default: gpt-4o-mini (faster and cheaper for structural tasks).
     /// </summary>
-    public string CatalogModel { get; set; } = "gpt-4o-mini";
+    public string CatalogModel { get; set; } = "gpt-5-mini";
 
     /// <summary>
     /// The AI model to use for document content generation.
     /// Default: gpt-4o (better quality for content generation).
     /// </summary>
-    public string ContentModel { get; set; } = "gpt-4o";
+    public string ContentModel { get; set; } = "gpt-5.2";
 
     /// <summary>
     /// Optional custom endpoint for catalog generation.

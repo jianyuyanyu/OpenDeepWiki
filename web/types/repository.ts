@@ -21,3 +21,50 @@ export interface RepoHeading {
   text: string;
   level: number;
 }
+
+// Repository submission and list types
+export type RepositoryStatus = "Pending" | "Processing" | "Completed" | "Failed";
+
+export interface RepositorySubmitRequest {
+  ownerUserId: string;
+  gitUrl: string;
+  repoName: string;
+  orgName: string;
+  authAccount?: string;
+  authPassword?: string;
+  branchName: string;
+  languageCode: string;
+  isPublic: boolean;
+}
+
+export interface RepositoryItemResponse {
+  id: string;
+  orgName: string;
+  repoName: string;
+  gitUrl: string;
+  status: number;
+  statusName: RepositoryStatus;
+  isPublic: boolean;
+  hasPassword: boolean;  // 新增：是否设置了密码，用于判断是否可设为私有
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface RepositoryListResponse {
+  items: RepositoryItemResponse[];
+  total: number;
+}
+
+// Visibility update types for private repository management
+export interface UpdateVisibilityRequest {
+  repositoryId: string;
+  isPublic: boolean;
+  ownerUserId: string;
+}
+
+export interface UpdateVisibilityResponse {
+  id: string;
+  isPublic: boolean;
+  success: boolean;
+  errorMessage?: string;
+}

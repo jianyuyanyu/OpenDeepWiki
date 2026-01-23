@@ -70,6 +70,16 @@ public class Repository : AggregateRoot<string>
     public RepositoryStatus Status { get; set; } = RepositoryStatus.Pending;
 
     /// <summary>
+    /// Star数量
+    /// </summary>
+    public int StarCount { get; set; }
+
+    /// <summary>
+    /// Fork数量
+    /// </summary>
+    public int ForkCount { get; set; }
+
+    /// <summary>
     /// 所属用户导航属性
     /// </summary>
     [ForeignKey("OwnerUserId")]

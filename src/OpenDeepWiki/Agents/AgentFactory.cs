@@ -47,184 +47,32 @@ namespace OpenDeepWiki.Agents
         public string? Name { get; set; }
     }
 
-    public class AgentFactory
+    public class AgentFactory(IOptions<AiRequestOptions> options)
     {
         private const string DefaultEndpoint = "https://api.routin.ai/v1";
-        private readonly AiRequestOptions? _options;
+        private readonly AiRequestOptions? _options = options?.Value;
 
-        public AgentFactory(IOptions<AiRequestOptions> options)
-        {
-            _options = options?.Value;
-        }
-
-        /// <summary>
-        /// 创建Agent
-        /// </summary>
-        /// <param name="model"></param>
-        /// <param name="clientAgentOptions"></param>
-        /// <returns></returns>
-        public ChatClientAgent CreateAgent(
+        public static ChatClientAgent CreateAgentInternal(
             string model,
-            Action<ChatClientAgentOptions> clientAgentOptions,
-            AiRequestOptions? overrideOptions = null)
-        {
-            var resolvedOptions = ResolveOptions(overrideOptions ?? _options, allowEnvironmentFallback: true);
-            return CreateAgentInternal(model, clientAgentOptions, resolvedOptions);
-        }
-
-        /// <summary>
-        /// 创建Agent with instructions and tools
-        /// </summary>
-        /// <param name="model">The model name</param>
-        /// <param name="instructions">System instructions for the agent</param>
-        /// <param name="tools">Tools available to the agent</param>
-        /// <param name="overrideOptions">Optional override options</param>
-        /// <returns>A configured ChatClientAgent</returns>
-        public ChatClientAgent CreateAgentWithTools(
-            string model,
-            string? instructions,
-            IEnumerable<object>? tools,
-            AiRequestOptions? overrideOptions = null)
-        {
-            var resolvedOptions = ResolveOptions(overrideOptions ?? _options, allowEnvironmentFallback: true);
-            return CreateAgentWithToolsInternal(model, instructions, tools, resolvedOptions);
-        }
-
-        /// <summary>
-        /// Creates an IChatClient with function calling support
-        /// </summary>
-        /// <param name="model">The model name</param>
-        /// <param name="tools">Tools available to the chat client</param>
-        /// <param name="overrideOptions">Optional override options</param>
-        /// <returns>A tuple containing the IChatClient and the list of AITools</returns>
-        public (IChatClient Client, IList<AITool> Tools) CreateChatClientWithTools(
-            string model,
-            IEnumerable<object>? tools,
-            AiRequestOptions? overrideOptions = null)
-        {
-            var resolvedOptions = ResolveOptions(overrideOptions ?? _options, allowEnvironmentFallback: true);
-            return CreateChatClientWithToolsInternal(model, tools, resolvedOptions);
-        }
-
-        /// <summary>
-        /// 创建Agent
-        /// </summary>
-        /// <param name="model"></param>
-        /// <param name="clientAgentOptions"></param>
-        /// <returns></returns>
-        public static ChatClientAgent CreateAgent(string model, Action<ChatClientAgentOptions> clientAgentOptions)
-        {
-            var resolvedOptions = ResolveOptions(null, allowEnvironmentFallback: true);
-            return CreateAgentInternal(model, clientAgentOptions, resolvedOptions);
-        }
-
-        private static ChatClientAgent CreateAgentInternal(
-            string model,
-            Action<ChatClientAgentOptions> clientAgentOptions,
+            ChatClientAgentOptions clientAgentOptions,
             AiRequestOptions options)
         {
+            var option = ResolveOptions(options, true);
+
             var openAiClient = new OpenAIClient(
-                new ApiKeyCredential(options.ApiKey ?? string.Empty),
+                new ApiKeyCredential(option.ApiKey ?? string.Empty),
                 new OpenAIClientOptions()
                 {
-                    Endpoint = new Uri(options.Endpoint ?? DefaultEndpoint),
+                    Endpoint = new Uri(option.Endpoint ?? DefaultEndpoint),
                 });
-
-            var agentOptions = new ChatClientAgentOptions();
-            clientAgentOptions.Invoke(agentOptions);
-
-            return options.RequestType switch
+            return option.RequestType switch
             {
-                AiRequestType.OpenAI => openAiClient.GetChatClient(model).AsAIAgent(agentOptions),
-                AiRequestType.OpenAIResponses => openAiClient.GetResponsesClient(model).AsAIAgent(agentOptions),
+                AiRequestType.OpenAI => openAiClient.GetChatClient(model).AsAIAgent(clientAgentOptions),
+                AiRequestType.OpenAIResponses => openAiClient.GetResponsesClient(model).AsAIAgent(clientAgentOptions),
                 AiRequestType.AzureOpenAI => throw new NotSupportedException("AzureOpenAI is not supported yet."),
                 AiRequestType.Anthropic => throw new NotSupportedException("Anthropic is not supported yet."),
                 _ => throw new NotSupportedException("Unknown AI request type.")
             };
-        }
-
-        private static ChatClientAgent CreateAgentWithToolsInternal(
-            string model,
-            string? instructions,
-            IEnumerable<object>? tools,
-            AiRequestOptions options)
-        {
-            var openAiClient = new OpenAIClient(
-                new ApiKeyCredential(options.ApiKey ?? string.Empty),
-                new OpenAIClientOptions()
-                {
-                    Endpoint = new Uri(options.Endpoint ?? DefaultEndpoint),
-                });
-
-            var chatClient = openAiClient.GetChatClient(model);
-
-            // Convert tools to AITool instances using reflection to find methods with Description attribute
-            var aiTools = new List<AITool>();
-            if (tools != null)
-            {
-                foreach (var tool in tools)
-                {
-                    var toolType = tool.GetType();
-                    var methods = toolType.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-                        .Where(m => m.GetCustomAttributes(typeof(System.ComponentModel.DescriptionAttribute), false).Any());
-
-                    foreach (var method in methods)
-                    {
-                        // Create a delegate for the method
-                        var aiFunction = AIFunctionFactory.Create(method, tool);
-                        aiTools.Add(aiFunction);
-                    }
-                }
-            }
-
-            return options.RequestType switch
-            {
-                AiRequestType.OpenAI => new ChatClientAgent(
-                    chatClient.AsIChatClient(),
-                    instructions: instructions,
-                    tools: aiTools),
-                AiRequestType.OpenAIResponses => openAiClient.GetResponsesClient(model).AsAIAgent(new ChatClientAgentOptions()),
-                AiRequestType.AzureOpenAI => throw new NotSupportedException("AzureOpenAI is not supported yet."),
-                AiRequestType.Anthropic => throw new NotSupportedException("Anthropic is not supported yet."),
-                _ => throw new NotSupportedException("Unknown AI request type.")
-            };
-        }
-
-        private static (IChatClient Client, IList<AITool> Tools) CreateChatClientWithToolsInternal(
-            string model,
-            IEnumerable<object>? tools,
-            AiRequestOptions options)
-        {
-            var openAiClient = new OpenAIClient(
-                new ApiKeyCredential(options.ApiKey ?? string.Empty),
-                new OpenAIClientOptions()
-                {
-                    Endpoint = new Uri(options.Endpoint ?? DefaultEndpoint),
-                });
-
-            var chatClient = openAiClient.GetChatClient(model).AsIChatClient();
-
-            // Convert tools to AIFunction instances using reflection to find methods with Description attribute
-            var aiTools = new List<AITool>();
-            if (tools != null)
-            {
-                foreach (var tool in tools)
-                {
-                    var toolType = tool.GetType();
-                    var methods = toolType.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
-                        .Where(m => m.GetCustomAttributes(typeof(System.ComponentModel.DescriptionAttribute), false).Any());
-
-                    foreach (var method in methods)
-                    {
-                        var aiFunction = AIFunctionFactory.Create(method, tool);
-                        aiTools.Add(aiFunction);
-                    }
-                }
-            }
-
-            // Wrap the chat client with function invocation middleware
-            var functionInvokingClient = new FunctionInvokingChatClient(chatClient);
-            return (functionInvokingClient, aiTools);
         }
 
         private static AiRequestOptions ResolveOptions(
@@ -279,6 +127,31 @@ namespace OpenDeepWiki.Agents
             return Enum.TryParse<AiRequestType>(requestType, true, out var parsed)
                 ? parsed
                 : null;
+        }
+
+        /// <summary>
+        /// Creates a ChatClientAgent with the specified tools.
+        /// </summary>
+        /// <param name="model">The model name to use.</param>
+        /// <param name="tools">The AI tools to make available to the agent.</param>
+        /// <param name="clientAgentOptions">Options for the chat client agent.</param>
+        /// <param name="requestOptions">Optional request options override.</param>
+        /// <returns>A tuple containing the ChatClientAgent and the tools list.</returns>
+        public (ChatClientAgent Agent, IList<AITool> Tools) CreateChatClientWithTools(
+            string model,
+            AITool[] tools,
+            ChatClientAgentOptions clientAgentOptions,
+            AiRequestOptions? requestOptions = null)
+        {
+            var option = ResolveOptions(requestOptions ?? _options, true);
+
+            // Ensure tools are set in chat options
+            clientAgentOptions.ChatOptions ??= new ChatOptions();
+            clientAgentOptions.ChatOptions.Tools = tools;
+
+            var agent = CreateAgentInternal(model, clientAgentOptions, option);
+
+            return (agent, tools);
         }
     }
 }

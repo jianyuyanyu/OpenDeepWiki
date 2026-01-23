@@ -3,5 +3,53 @@
   "searchPlaceholder": "GitHubリポジトリのリンクを貼り付けるか、キーワードで検索",
   "addPrivateRepo": "プライベートリポジトリを追加",
   "exploreTrending": "今週のトレンドリポジトリを探索",
-  "mcpIntegration": "OpenDeepWiki MCPを開発ツールに統合 🔥"
+  "mcpIntegration": "OpenDeepWiki MCPを開発ツールに統合 🔥",
+  "publicRepository": {
+    "title": "公開リポジトリ",
+    "empty": "公開リポジトリがありません",
+    "noResults": "検索に一致するリポジトリがありません",
+    "loadError": "リポジトリの読み込みに失敗しました"
+  },
+  "repository": {
+    "submitTitle": "リポジトリを送信",
+    "submitDescription": "Wikiドキュメントを生成するリポジトリを追加",
+    "gitUrl": "Git URL",
+    "gitUrlPlaceholder": "https://github.com/owner/repo.git",
+    "gitUrlRequired": "Git URLは必須です",
+    "gitUrlInvalid": "有効なGit URLを入力してください",
+    "branchName": "ブランチ名",
+    "branchNamePlaceholder": "main",
+    "branchNameRequired": "ブランチ名は必須です",
+    "language": "言語",
+    "languageRequired": "言語を選択してください",
+    "isPublic": "公開リポジトリ",
+    "publicDesc": "誰でもこのリポジトリを閲覧できます",
+    "privateDesc": "あなただけがこのリポジトリにアクセスできます",
+    "authHint": "プライベートリポジトリには認証が必要です",
+    "authAccount": "ユーザー名（任意）",
+    "authAccountPlaceholder": "プライベートリポジトリ用",
+    "authPassword": "パスワード/トークン（任意）",
+    "authPasswordPlaceholder": "アクセストークンまたはパスワード",
+    "submit": "送信",
+    "submitting": "送信中...",
+    "submitSuccess": "リポジトリが正常に送信されました",
+    "submitError": "リポジトリの送信に失敗しました",
+    "listTitle": "マイリポジトリ",
+    "noRepositories": "リポジトリがありません",
+    "status": {
+      "pending": "保留中",
+      "processing": "処理中",
+      "completed": "完了",
+      "failed": "失敗"
+    },
+    "viewWiki": "Wikiを見る",
+    "retry": "再試行",
+    "createdAt": "作成日",
+    "languages": {
+      "en": "英語",
+      "zh": "中国語",
+      "ja": "日本語",
+      "ko": "韓国語"
+    }
+  }
 }

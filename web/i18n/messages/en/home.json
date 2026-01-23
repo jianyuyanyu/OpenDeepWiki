@@ -3,5 +3,53 @@
   "searchPlaceholder": "Paste a GitHub repository link or search by keywords",
   "addPrivateRepo": "Add Private Repository",
   "exploreTrending": "Explore This Week's Trending Repos",
-  "mcpIntegration": "Integrate OpenDeepWiki MCP into your dev tools 🔥"
+  "mcpIntegration": "Integrate OpenDeepWiki MCP into your dev tools 🔥",
+  "publicRepository": {
+    "title": "Public Repositories",
+    "empty": "No public repositories available",
+    "noResults": "No repositories match your search",
+    "loadError": "Failed to load repositories"
+  },
+  "repository": {
+    "submitTitle": "Submit Repository",
+    "submitDescription": "Add a repository to generate wiki documentation",
+    "gitUrl": "Git URL",
+    "gitUrlPlaceholder": "https://github.com/owner/repo.git",
+    "gitUrlRequired": "Git URL is required",
+    "gitUrlInvalid": "Please enter a valid Git URL",
+    "branchName": "Branch Name",
+    "branchNamePlaceholder": "main",
+    "branchNameRequired": "Branch name is required",
+    "language": "Language",
+    "languageRequired": "Language is required",
+    "isPublic": "Public Repository",
+    "publicDesc": "Anyone can view this repository",
+    "privateDesc": "Only you can access this repository",
+    "authHint": "Authentication required for private repositories",
+    "authAccount": "Username (optional)",
+    "authAccountPlaceholder": "For private repositories",
+    "authPassword": "Password/Token (optional)",
+    "authPasswordPlaceholder": "Access token or password",
+    "submit": "Submit",
+    "submitting": "Submitting...",
+    "submitSuccess": "Repository submitted successfully",
+    "submitError": "Failed to submit repository",
+    "listTitle": "My Repositories",
+    "noRepositories": "No repositories found",
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "viewWiki": "View Wiki",
+    "retry": "Retry",
+    "createdAt": "Created",
+    "languages": {
+      "en": "English",
+      "zh": "Chinese",
+      "ja": "Japanese",
+      "ko": "Korean"
+    }
+  }
 }
