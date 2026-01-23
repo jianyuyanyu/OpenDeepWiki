@@ -5,7 +5,7 @@ import { AppLayout } from "@/components/app-layout";
 import { useTranslations } from "@/hooks/use-translations";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Bell, BellOff, Star } from "lucide-react";
+import { Bell, BellOff } from "lucide-react";
 
 export default function SubscribePage() {
   const t = useTranslations();
@@ -38,7 +38,7 @@ export default function SubscribePage() {
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">{t("sidebar.subscribe")}</h1>
           <p className="text-muted-foreground">
-            Repositories you're watching for updates
+            Repositories you&apos;re watching for updates
           </p>
         </div>
 

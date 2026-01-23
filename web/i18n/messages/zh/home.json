@@ -4,6 +4,17 @@
   "addPrivateRepo": "添加私人仓库",
   "exploreTrending": "探索本周的 热门仓库",
   "mcpIntegration": "把 OpenDeepWiki MCP 接入你的开发工具 🔥",
+  "private": {
+    "visibility": {
+      "public": "公开",
+      "private": "私有",
+      "setPublicSuccess": "仓库已设为公开",
+      "setPrivateSuccess": "仓库已设为私有",
+      "updateError": "更新可见性失败",
+      "noPasswordError": "无法将没有密码的仓库设为私有",
+      "noPasswordTooltip": "此仓库没有设置访问密码，无法设为私有。请先在仓库设置中添加密码。"
+    }
+  },
   "publicRepository": {
     "title": "公开仓库",
     "empty": "暂无公开仓库",

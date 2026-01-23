@@ -80,6 +80,21 @@ public class Repository : AggregateRoot<string>
     public int ForkCount { get; set; }
 
     /// <summary>
+    /// 收藏数量
+    /// </summary>
+    public int BookmarkCount { get; set; } = 0;
+
+    /// <summary>
+    /// 订阅数量
+    /// </summary>
+    public int SubscriptionCount { get; set; } = 0;
+
+    /// <summary>
+    /// 浏览数量
+    /// </summary>
+    public int ViewCount { get; set; } = 0;
+
+    /// <summary>
     /// 所属用户导航属性
     /// </summary>
     [ForeignKey("OwnerUserId")]

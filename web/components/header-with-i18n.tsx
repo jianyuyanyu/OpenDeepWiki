@@ -27,7 +27,7 @@ interface HeaderProps {
 
 export function HeaderWithI18n({ title, currentTime }: HeaderProps) {
   const router = useRouter();
-  const t = useTranslations("common");
+  const t = useTranslations();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
 
   const handleLogin = () => {
@@ -83,15 +83,15 @@ export function HeaderWithI18n({ title, currentTime }: HeaderProps) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>{t("profile")}</DropdownMenuItem>
-              <DropdownMenuItem>{t("settings")}</DropdownMenuItem>
+              <DropdownMenuItem>{t("common.profile")}</DropdownMenuItem>
+              <DropdownMenuItem>{t("common.settings")}</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout}>{t("logout")}</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>{t("common.logout")}</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
           <Button size="sm" onClick={handleLogin}>
-            {t("login")}
+            {t("common.login")}
           </Button>
         )}
       </div>

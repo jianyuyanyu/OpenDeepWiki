@@ -4,6 +4,17 @@
   "addPrivateRepo": "비공개 저장소 추가",
   "exploreTrending": "이번 주 인기 저장소 탐색",
   "mcpIntegration": "개발 도구에 OpenDeepWiki MCP 통합 🔥",
+  "private": {
+    "visibility": {
+      "public": "공개",
+      "private": "비공개",
+      "setPublicSuccess": "저장소가 공개되었습니다",
+      "setPrivateSuccess": "저장소가 비공개되었습니다",
+      "updateError": "가시성 업데이트에 실패했습니다",
+      "noPasswordError": "비밀번호가 없는 저장소는 비공개로 설정할 수 없습니다",
+      "noPasswordTooltip": "이 저장소에는 액세스 비밀번호가 설정되어 있지 않아 비공개로 설정할 수 없습니다. 먼저 저장소 설정에서 비밀번호를 추가하세요."
+    }
+  },
   "publicRepository": {
     "title": "공개 저장소",
     "empty": "공개 저장소가 없습니다",

@@ -4,6 +4,17 @@
   "addPrivateRepo": "Add Private Repository",
   "exploreTrending": "Explore This Week's Trending Repos",
   "mcpIntegration": "Integrate OpenDeepWiki MCP into your dev tools 🔥",
+  "private": {
+    "visibility": {
+      "public": "Public",
+      "private": "Private",
+      "setPublicSuccess": "Repository is now public",
+      "setPrivateSuccess": "Repository is now private",
+      "updateError": "Failed to update visibility",
+      "noPasswordError": "Cannot set repository without password to private",
+      "noPasswordTooltip": "This repository has no access password set and cannot be made private. Please add a password in repository settings first."
+    }
+  },
   "publicRepository": {
     "title": "Public Repositories",
     "empty": "No public repositories available",

@@ -11,18 +11,27 @@ interface RepoLayoutProps {
   }>;
 }
 
+async function getTreeData(owner: string, repo: string) {
+  try {
+    const tree = await fetchRepoTree(owner, repo);
+    return tree;
+  } catch {
+    return null;
+  }
+}
+
 export default async function RepoLayout({ children, params }: RepoLayoutProps) {
   const { owner, repo } = await params;
   
-  try {
-    const tree = await fetchRepoTree(owner, repo);
-
-    return (
-      <RepoShell owner={owner} repo={repo} nodes={tree.nodes}>
-        {children}
-      </RepoShell>
-    );
-  } catch {
+  const tree = await getTreeData(owner, repo);
+  
+  if (!tree) {
     notFound();
   }
+
+  return (
+    <RepoShell owner={owner} repo={repo} nodes={tree.nodes}>
+      {children}
+    </RepoShell>
+  );
 }

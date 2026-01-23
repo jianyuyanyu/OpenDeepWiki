@@ -21,6 +21,8 @@ public interface IContext
     DbSet<DocFile> DocFiles { get; set; }
     DbSet<DocCatalog> DocCatalogs { get; set; }
     DbSet<RepositoryAssignment> RepositoryAssignments { get; set; }
+    DbSet<UserBookmark> UserBookmarks { get; set; }
+    DbSet<UserSubscription> UserSubscriptions { get; set; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
@@ -46,6 +48,8 @@ public abstract class MasterDbContext : DbContext, IContext
     public DbSet<DocFile> DocFiles { get; set; } = null!;
     public DbSet<DocCatalog> DocCatalogs { get; set; } = null!;
     public DbSet<RepositoryAssignment> RepositoryAssignments { get; set; } = null!;
+    public DbSet<UserBookmark> UserBookmarks { get; set; } = null!;
+    public DbSet<UserSubscription> UserSubscriptions { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -95,5 +99,15 @@ public abstract class MasterDbContext : DbContext, IContext
             .WithMany()
             .HasForeignKey(catalog => catalog.DocFileId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // UserBookmark 唯一索引（同一用户对同一仓库只能收藏一次）
+        modelBuilder.Entity<UserBookmark>()
+            .HasIndex(b => new { b.UserId, b.RepositoryId })
+            .IsUnique();
+
+        // UserSubscription 唯一索引（同一用户对同一仓库只能订阅一次）
+        modelBuilder.Entity<UserSubscription>()
+            .HasIndex(s => new { s.UserId, s.RepositoryId })
+            .IsUnique();
     }
 }

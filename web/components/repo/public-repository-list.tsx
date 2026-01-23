@@ -51,12 +51,12 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
       });
       setRepositories(response.items);
     } catch (err) {
-      setError(t("home.publicRepository.loadError"));
+      setError("Failed to load repositories");
       console.error("Failed to fetch public repositories:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [keyword, t]);
+  }, [keyword]);
 
   useEffect(() => {
     loadRepositories();
@@ -91,7 +91,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
         </h2>
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <XCircle className="h-12 w-12 text-destructive mb-4" />
-          <p className="text-muted-foreground mb-4">{error}</p>
+          <p className="text-muted-foreground mb-4">{t("home.publicRepository.loadError")}</p>
           <Button variant="outline" onClick={loadRepositories}>
             <RefreshCw className="mr-2 h-4 w-4" />
             {t("home.repository.retry")}

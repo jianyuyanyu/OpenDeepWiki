@@ -11,24 +11,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { locales, localeNames, type Locale } from "@/i18n/request";
 import { useLocale } from "next-intl";
-import { useRouter, usePathname } from "next/navigation";
 
 export function LanguageToggle() {
   const locale = useLocale() as Locale;
-  const router = useRouter();
-  const pathname = usePathname();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
 
-  const changeLocale = (newLocale: Locale) => {
+  const changeLocale = React.useCallback((newLocale: Locale) => {
     // 设置 cookie
     document.cookie = `NEXT_LOCALE=${newLocale}; path=/; max-age=31536000`;
     // 刷新页面以应用新语言
     window.location.reload();
-  };
+  }, []);
 
   if (!mounted) {
     return (

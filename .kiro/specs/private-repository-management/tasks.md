@@ -47,36 +47,36 @@
     - 添加 `updateRepositoryVisibility` 函数
     - _需求: 2.1, 5.1_
 
-- [ ] 4. 前端组件开发
-  - [-] 4.1 创建 VisibilityToggle 组件
+- [x] 4. 前端组件开发
+  - [x] 4.1 创建 VisibilityToggle 组件
     - 创建 `web/components/repo/visibility-toggle.tsx`
     - 实现切换按钮UI，使用现有UI组件
     - 实现无密码仓库禁用逻辑和Tooltip提示
     - 实现加载状态和错误处理
     - _需求: 2.1, 2.2, 2.3, 2.4, 3.1, 3.3_
 
-  - [~] 4.2 扩展 RepositoryCard 组件
+  - [x] 4.2 扩展 RepositoryCard 组件
     - 修改 `web/components/repo/repository-list.tsx`
     - 集成 VisibilityToggle 组件
     - 确保Wiki导航链接正确编码
     - _需求: 1.5, 4.1, 4.2, 4.3, 4.4_
 
-  - [~] 4.3 更新私有仓库页面
+  - [x] 4.3 更新私有仓库页面
     - 修改 `web/app/(main)/private/page.tsx`
     - 确保仓库列表正确刷新
     - 添加成功/失败Toast提示
     - _需求: 2.2, 2.3_
 
-- [~] 5. 检查点 - 确保前端构建通过
+- [x] 5. 检查点 - 确保前端构建通过
   - 运行 `npm run build` 和 `npm run lint`
   - 确保无编译错误和lint警告
 
-- [ ] 6. 集成测试
-  - [~] 6.1 编写属性测试：请求序列化往返一致性
+- [x] 6. 集成测试
+  - [x] 6.1 编写属性测试：请求序列化往返一致性
     - **Property 8: 请求序列化往返一致性**
     - **验证: 需求 5.6**
 
-- [~] 7. 最终检查点 - 确保所有测试通过
+- [ ] 7. 最终检查点 - 确保所有测试通过
   - 确保所有测试通过，如有问题请询问用户。
 
 ## 备注

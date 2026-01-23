@@ -22,10 +22,9 @@ import {
   ExternalLink,
   RefreshCw,
   GitBranch,
-  Globe,
-  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { VisibilityToggle } from "@/components/repo/visibility-toggle";
 
 interface RepositoryListProps {
   ownerId?: string;
@@ -79,9 +78,25 @@ function StatusBadge({ status }: { status: RepositoryStatus }) {
   );
 }
 
-function RepositoryCard({ repo }: { repo: RepositoryItemResponse }) {
+function RepositoryCard({ 
+  repo, 
+  ownerUserId,
+  onVisibilityChange 
+}: { 
+  repo: RepositoryItemResponse;
+  ownerUserId: string;
+  onVisibilityChange: (repoId: string, newIsPublic: boolean) => void;
+}) {
   const t = useTranslations();
   const createdDate = new Date(repo.createdAt).toLocaleDateString();
+
+  // 生成正确编码的Wiki导航URL
+  // 使用encodeURIComponent处理特殊字符，确保URL安全
+  const wikiUrl = `/${encodeURIComponent(repo.orgName)}/${encodeURIComponent(repo.repoName)}`;
+
+  const handleVisibilityChange = (newIsPublic: boolean) => {
+    onVisibilityChange(repo.id, newIsPublic);
+  };
 
   return (
     <Card className="transition-shadow hover:shadow-md">
@@ -93,11 +108,6 @@ function RepositoryCard({ repo }: { repo: RepositoryItemResponse }) {
               <h3 className="font-medium truncate">
                 {repo.orgName}/{repo.repoName}
               </h3>
-              {repo.isPublic ? (
-                <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              ) : (
-                <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              )}
             </div>
             <p className="mt-1 text-sm text-muted-foreground truncate">
               {repo.gitUrl}
@@ -108,9 +118,16 @@ function RepositoryCard({ repo }: { repo: RepositoryItemResponse }) {
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <StatusBadge status={repo.statusName} />
+            <VisibilityToggle
+              repositoryId={repo.id}
+              isPublic={repo.isPublic}
+              hasPassword={repo.hasPassword}
+              onVisibilityChange={handleVisibilityChange}
+              ownerUserId={ownerUserId}
+            />
             {repo.statusName === "Completed" && (
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/${repo.orgName}/${repo.repoName}`}>
+                <Link href={wikiUrl}>
                   <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                   {t("home.repository.viewWiki")}
                 </Link>
@@ -169,6 +186,15 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
       setIsLoading(false);
     }
   }, [ownerId]);
+
+  // 处理可见性变化，更新本地状态
+  const handleVisibilityChange = useCallback((repoId: string, newIsPublic: boolean) => {
+    setRepositories((prev) =>
+      prev.map((repo) =>
+        repo.id === repoId ? { ...repo, isPublic: newIsPublic } : repo
+      )
+    );
+  }, []);
 
   useEffect(() => {
     loadRepositories();
@@ -256,7 +282,12 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
         ) : (
           <div className="space-y-4">
             {repositories.map((repo) => (
-              <RepositoryCard key={repo.id} repo={repo} />
+              <RepositoryCard 
+                key={repo.id} 
+                repo={repo} 
+                ownerUserId={ownerId || ""}
+                onVisibilityChange={handleVisibilityChange}
+              />
             ))}
           </div>
         )}

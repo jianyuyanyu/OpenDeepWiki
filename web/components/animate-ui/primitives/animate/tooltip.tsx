@@ -257,6 +257,7 @@ function TooltipOverlay() {
       }),
       flip(),
       shift({ padding: 8 }),
+      // eslint-disable-next-line react-hooks/refs
       floatingArrow({ element: arrowRef }),
     ],
   });

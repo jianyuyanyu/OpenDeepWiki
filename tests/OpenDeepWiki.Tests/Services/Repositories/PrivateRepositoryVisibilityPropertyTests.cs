@@ -827,4 +827,184 @@ public class PrivateRepositoryVisibilityPropertyTests
     }
 
     #endregion
+
+    #region Property 8: 请求序列化往返一致性
+
+    /// <summary>
+    /// Local representation of UpdateVisibilityRequest for serialization testing.
+    /// Mirrors the structure in OpenDeepWiki.Models.UpdateVisibilityRequest.
+    /// </summary>
+    private class SerializableUpdateVisibilityRequest
+    {
+        public string RepositoryId { get; set; } = string.Empty;
+        public bool IsPublic { get; set; }
+        public string OwnerUserId { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// Local representation of UpdateVisibilityResponse for serialization testing.
+    /// Mirrors the structure in OpenDeepWiki.Models.UpdateVisibilityResponse.
+    /// </summary>
+    private class SerializableUpdateVisibilityResponse
+    {
+        public string Id { get; set; } = string.Empty;
+        public bool IsPublic { get; set; }
+        public bool Success { get; set; }
+        public string? ErrorMessage { get; set; }
+    }
+
+    /// <summary>
+    /// Generates a valid UpdateVisibilityRequest for serialization testing.
+    /// </summary>
+    private static Gen<SerializableUpdateVisibilityRequest> GenerateSerializableUpdateVisibilityRequest()
+    {
+        return GenerateGuidString().SelectMany(repositoryId =>
+            GenerateGuidString().SelectMany(ownerUserId =>
+                ArbMap.Default.GeneratorFor<bool>().Select(isPublic =>
+                    new SerializableUpdateVisibilityRequest
+                    {
+                        RepositoryId = repositoryId,
+                        IsPublic = isPublic,
+                        OwnerUserId = ownerUserId
+                    })));
+    }
+
+    /// <summary>
+    /// Generates a valid UpdateVisibilityResponse for serialization testing.
+    /// </summary>
+    private static Gen<SerializableUpdateVisibilityResponse> GenerateSerializableUpdateVisibilityResponse()
+    {
+        return GenerateGuidString().SelectMany(id =>
+            ArbMap.Default.GeneratorFor<bool>().SelectMany(isPublic =>
+                ArbMap.Default.GeneratorFor<bool>().SelectMany(success =>
+                    Gen.Elements<string?>(null, "", "仓库不存在", "无权限修改此仓库", "仓库凭据为空时不允许设置为私有").Select(errorMessage =>
+                        new SerializableUpdateVisibilityResponse
+                        {
+                            Id = id,
+                            IsPublic = isPublic,
+                            Success = success,
+                            ErrorMessage = errorMessage
+                        }))));
+    }
+
+    /// <summary>
+    /// Property 8: 请求序列化往返一致性 - UpdateVisibilityRequest
+    /// For any UpdateVisibilityRequest object, JSON serialization followed by 
+    /// deserialization should produce an equivalent object.
+    /// **Validates: Requirements 5.6**
+    /// </summary>
+    [Property(MaxTest = 100)]
+    public Property RequestSerialization_RoundTrip_UpdateVisibilityRequest()
+    {
+        return Prop.ForAll(
+            GenerateSerializableUpdateVisibilityRequest().ToArbitrary(),
+            request =>
+            {
+                // Serialize to JSON
+                var json = System.Text.Json.JsonSerializer.Serialize(request);
+
+                // Deserialize back to object
+                var deserialized = System.Text.Json.JsonSerializer.Deserialize<SerializableUpdateVisibilityRequest>(json);
+
+                // Verify round-trip consistency
+                return deserialized != null &&
+                       deserialized.RepositoryId == request.RepositoryId &&
+                       deserialized.IsPublic == request.IsPublic &&
+                       deserialized.OwnerUserId == request.OwnerUserId;
+            })
+            .Label("Feature: private-repository-management, Property 8: 请求序列化往返一致性");
+    }
+
+    /// <summary>
+    /// Property 8: 请求序列化往返一致性 - UpdateVisibilityResponse
+    /// For any UpdateVisibilityResponse object, JSON serialization followed by 
+    /// deserialization should produce an equivalent object.
+    /// **Validates: Requirements 5.6**
+    /// </summary>
+    [Property(MaxTest = 100)]
+    public Property RequestSerialization_RoundTrip_UpdateVisibilityResponse()
+    {
+        return Prop.ForAll(
+            GenerateSerializableUpdateVisibilityResponse().ToArbitrary(),
+            response =>
+            {
+                // Serialize to JSON
+                var json = System.Text.Json.JsonSerializer.Serialize(response);
+
+                // Deserialize back to object
+                var deserialized = System.Text.Json.JsonSerializer.Deserialize<SerializableUpdateVisibilityResponse>(json);
+
+                // Verify round-trip consistency
+                return deserialized != null &&
+                       deserialized.Id == response.Id &&
+                       deserialized.IsPublic == response.IsPublic &&
+                       deserialized.Success == response.Success &&
+                       deserialized.ErrorMessage == response.ErrorMessage;
+            })
+            .Label("Feature: private-repository-management, Property 8: 请求序列化往返一致性 - Response");
+    }
+
+    /// <summary>
+    /// Property 8: 请求序列化往返一致性 - JSON格式验证
+    /// Serialized JSON should contain all expected property names.
+    /// **Validates: Requirements 5.6**
+    /// </summary>
+    [Property(MaxTest = 100)]
+    public Property RequestSerialization_JsonContainsExpectedProperties()
+    {
+        return Prop.ForAll(
+            GenerateSerializableUpdateVisibilityRequest().ToArbitrary(),
+            request =>
+            {
+                // Serialize to JSON
+                var json = System.Text.Json.JsonSerializer.Serialize(request);
+
+                // Verify JSON contains expected property names (case-sensitive by default)
+                return json.Contains("RepositoryId") &&
+                       json.Contains("IsPublic") &&
+                       json.Contains("OwnerUserId");
+            })
+            .Label("Feature: private-repository-management, Property 8: 请求序列化往返一致性 - JSON格式验证");
+    }
+
+    /// <summary>
+    /// Property 8: 请求序列化往返一致性 - 多次序列化一致性
+    /// Multiple serialization/deserialization cycles should produce consistent results.
+    /// **Validates: Requirements 5.6**
+    /// </summary>
+    [Property(MaxTest = 100)]
+    public Property RequestSerialization_MultipleRoundTrips_AreConsistent()
+    {
+        return Prop.ForAll(
+            GenerateSerializableUpdateVisibilityRequest().ToArbitrary(),
+            request =>
+            {
+                // First round-trip
+                var json1 = System.Text.Json.JsonSerializer.Serialize(request);
+                var deserialized1 = System.Text.Json.JsonSerializer.Deserialize<SerializableUpdateVisibilityRequest>(json1);
+
+                // Second round-trip
+                var json2 = System.Text.Json.JsonSerializer.Serialize(deserialized1);
+                var deserialized2 = System.Text.Json.JsonSerializer.Deserialize<SerializableUpdateVisibilityRequest>(json2);
+
+                // Third round-trip
+                var json3 = System.Text.Json.JsonSerializer.Serialize(deserialized2);
+                var deserialized3 = System.Text.Json.JsonSerializer.Deserialize<SerializableUpdateVisibilityRequest>(json3);
+
+                // Verify all round-trips produce consistent results
+                return deserialized1 != null && deserialized2 != null && deserialized3 != null &&
+                       // All JSON strings should be identical
+                       json1 == json2 && json2 == json3 &&
+                       // All deserialized objects should be equivalent
+                       deserialized1.RepositoryId == deserialized2.RepositoryId &&
+                       deserialized2.RepositoryId == deserialized3.RepositoryId &&
+                       deserialized1.IsPublic == deserialized2.IsPublic &&
+                       deserialized2.IsPublic == deserialized3.IsPublic &&
+                       deserialized1.OwnerUserId == deserialized2.OwnerUserId &&
+                       deserialized2.OwnerUserId == deserialized3.OwnerUserId;
+            })
+            .Label("Feature: private-repository-management, Property 8: 请求序列化往返一致性 - 多次序列化一致性");
+    }
+
+    #endregion
 }

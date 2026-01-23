@@ -56,7 +56,7 @@ export function VisibilityToggle({
 
     // 如果尝试设为私有但没有密码，阻止操作
     if (!newIsPublic && !canSetPrivate) {
-      toast.error(t("private.visibility.noPasswordError"));
+      toast.error(t("home.private.visibility.noPasswordError"));
       return;
     }
 
@@ -74,15 +74,15 @@ export function VisibilityToggle({
         onVisibilityChange(response.isPublic);
         toast.success(
           response.isPublic
-            ? t("private.visibility.setPublicSuccess")
-            : t("private.visibility.setPrivateSuccess")
+            ? t("home.private.visibility.setPublicSuccess")
+            : t("home.private.visibility.setPrivateSuccess")
         );
       } else {
-        toast.error(response.errorMessage || t("private.visibility.updateError"));
+        toast.error(response.errorMessage || t("home.private.visibility.updateError"));
       }
     } catch (error) {
       console.error("Failed to update visibility:", error);
-      toast.error(t("private.visibility.updateError"));
+      toast.error(t("home.private.visibility.updateError"));
     } finally {
       setIsLoading(false);
     }
@@ -102,10 +102,10 @@ export function VisibilityToggle({
         checked={currentIsPublic}
         onCheckedChange={handleToggle}
         disabled={isDisabled}
-        aria-label={currentIsPublic ? t("private.visibility.public") : t("private.visibility.private")}
+        aria-label={currentIsPublic ? t("home.private.visibility.public") : t("home.private.visibility.private")}
       />
       <span className="text-sm text-muted-foreground">
-        {currentIsPublic ? t("private.visibility.public") : t("private.visibility.private")}
+        {currentIsPublic ? t("home.private.visibility.public") : t("home.private.visibility.private")}
       </span>
     </div>
   );
@@ -127,7 +127,7 @@ export function VisibilityToggle({
         </PopoverTrigger>
         <PopoverContent className="w-64 p-3" side="top">
           <p className="text-sm text-muted-foreground">
-            {t("private.visibility.noPasswordTooltip")}
+            {t("home.private.visibility.noPasswordTooltip")}
           </p>
         </PopoverContent>
       </Popover>

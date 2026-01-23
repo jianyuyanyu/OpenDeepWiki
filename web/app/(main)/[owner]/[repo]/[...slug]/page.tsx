@@ -12,25 +12,36 @@ interface RepoDocPageProps {
   }>;
 }
 
+async function getDocData(owner: string, repo: string, slug: string) {
+  try {
+    const doc = await fetchRepoDoc(owner, repo, slug);
+    const headings = extractHeadings(doc.content, 3);
+    return { doc, headings };
+  } catch {
+    return null;
+  }
+}
+
 export default async function RepoDocPage({ params }: RepoDocPageProps) {
   const { owner, repo, slug: slugParts } = await params;
   const slug = slugParts.join("/");
 
-  try {
-    const doc = await fetchRepoDoc(owner, repo, slug);
-    const headings = extractHeadings(doc.content, 3);
-
-    return (
-      <div className="flex gap-8 p-6">
-        <div className="min-w-0 flex-1">
-          <MarkdownRenderer content={doc.content} />
-        </div>
-        <aside className="hidden w-64 shrink-0 xl:block">
-          <RepoToc headings={headings} />
-        </aside>
-      </div>
-    );
-  } catch {
+  const data = await getDocData(owner, repo, slug);
+  
+  if (!data) {
     notFound();
   }
+
+  const { doc, headings } = data;
+
+  return (
+    <div className="flex gap-8 p-6">
+      <div className="min-w-0 flex-1">
+        <MarkdownRenderer content={doc.content} />
+      </div>
+      <aside className="hidden w-64 shrink-0 xl:block">
+        <RepoToc headings={headings} />
+      </aside>
+    </div>
+  );
 }
