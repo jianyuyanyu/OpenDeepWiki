@@ -204,5 +204,7 @@ app.UseAuthorization();
 app.MapMiniApis();
 app.MapAuthEndpoints();
 app.MapOAuthEndpoints();
+app.MapBookmarkEndpoints();
+app.MapSubscriptionEndpoints();
 
 app.Run();
