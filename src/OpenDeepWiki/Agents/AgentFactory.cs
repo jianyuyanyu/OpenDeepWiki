@@ -6,6 +6,7 @@ using OpenAI.Chat;
 using OpenAI.Responses;
 using System;
 using System.ClientModel;
+using Anthropic;
 
 #pragma warning disable OPENAI001
 
@@ -59,20 +60,50 @@ namespace OpenDeepWiki.Agents
         {
             var option = ResolveOptions(options, true);
 
-            var openAiClient = new OpenAIClient(
-                new ApiKeyCredential(option.ApiKey ?? string.Empty),
-                new OpenAIClientOptions()
-                {
-                    Endpoint = new Uri(option.Endpoint ?? DefaultEndpoint),
-                });
-            return option.RequestType switch
+            if (option.RequestType == AiRequestType.OpenAI)
             {
-                AiRequestType.OpenAI => openAiClient.GetChatClient(model).AsAIAgent(clientAgentOptions),
-                AiRequestType.OpenAIResponses => openAiClient.GetResponsesClient(model).AsAIAgent(clientAgentOptions),
-                AiRequestType.AzureOpenAI => throw new NotSupportedException("AzureOpenAI is not supported yet."),
-                AiRequestType.Anthropic => throw new NotSupportedException("Anthropic is not supported yet."),
-                _ => throw new NotSupportedException("Unknown AI request type.")
-            };
+                var openAiClient = new OpenAIClient(
+                    new ApiKeyCredential(option.ApiKey ?? string.Empty),
+                    new OpenAIClientOptions()
+                    {
+                        Endpoint = new Uri(option.Endpoint ?? DefaultEndpoint),
+                    });
+
+                var openAIClient = openAiClient.GetChatClient(model);
+
+                return openAIClient.AsAIAgent(clientAgentOptions);
+            }
+            else if (option.RequestType == AiRequestType.OpenAIResponses)
+            {
+                var openAiClient = new OpenAIClient(
+                    new ApiKeyCredential(option.ApiKey ?? string.Empty),
+                    new OpenAIClientOptions()
+                    {
+                        Endpoint = new Uri(option.Endpoint ?? DefaultEndpoint),
+                    });
+
+                var openAIClient = openAiClient.GetResponsesClient(model);
+
+                return openAIClient.AsAIAgent(clientAgentOptions);
+            }
+            else if (option.RequestType == AiRequestType.Anthropic)
+            {
+                AnthropicClient client = new()
+                {
+                    BaseUrl = new Uri(option.Endpoint ?? DefaultEndpoint),
+                    APIKey = option.ApiKey ?? string.Empty,
+                };
+
+                clientAgentOptions.ChatOptions = new ChatOptions()
+                {
+                    ModelId = model,
+                };
+                var anthropicClient = client.AsAIAgent(clientAgentOptions);
+
+                return anthropicClient;
+            }
+
+            throw new NotSupportedException("Unknown AI request type.");
         }
 
         private static AiRequestOptions ResolveOptions(

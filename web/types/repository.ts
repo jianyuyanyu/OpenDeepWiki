@@ -9,6 +9,9 @@ export interface RepoTreeResponse {
   repo: string;
   defaultSlug: string;
   nodes: RepoTreeNode[];
+  status: number;
+  statusName: RepositoryStatus;
+  exists: boolean;
 }
 
 export interface RepoDocResponse {

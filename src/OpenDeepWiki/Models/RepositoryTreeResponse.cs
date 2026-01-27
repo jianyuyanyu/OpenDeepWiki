@@ -1,3 +1,5 @@
+using OpenDeepWiki.Entities;
+
 namespace OpenDeepWiki.Models;
 
 /// <summary>
@@ -24,4 +26,19 @@ public class RepositoryTreeResponse
     /// 目录树节点
     /// </summary>
     public List<RepositoryTreeNodeResponse> Nodes { get; set; } = [];
+
+    /// <summary>
+    /// 仓库处理状态
+    /// </summary>
+    public RepositoryStatus Status { get; set; } = RepositoryStatus.Completed;
+
+    /// <summary>
+    /// 状态名称
+    /// </summary>
+    public string StatusName => Status.ToString();
+
+    /// <summary>
+    /// 仓库是否存在
+    /// </summary>
+    public bool Exists { get; set; } = true;
 }

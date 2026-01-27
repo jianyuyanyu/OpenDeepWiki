@@ -51,7 +51,15 @@
       "pending": "保留中",
       "processing": "処理中",
       "completed": "完了",
-      "failed": "失敗"
+      "failed": "失敗",
+      "pendingDescription": "リポジトリが送信されました。処理キューで待機中...",
+      "processingDescription": "AIがリポジトリを分析し、Wikiドキュメントを生成しています。お待ちください...",
+      "completedDescription": "Wikiドキュメントの生成が完了しました",
+      "failedDescription": "Wiki生成中にエラーが発生しました。再試行してください",
+      "autoRefreshHint": "ページは自動的に更新され、最新のステータスを取得します",
+      "retry": "再生成",
+      "notFound": "リポジトリが見つかりません",
+      "notFoundDescription": "リポジトリが見つかりませんでした。URLを確認してください"
     },
     "viewWiki": "Wikiを見る",
     "retry": "再試行",

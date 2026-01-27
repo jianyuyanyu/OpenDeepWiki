@@ -10,201 +10,227 @@ using OpenDeepWiki.Services.Prompts;
 using OpenDeepWiki.Services.Repositories;
 using OpenDeepWiki.Services.Wiki;
 using Scalar.AspNetCore;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+// Bootstrap logger for startup error capture
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
-builder.Services.AddMiniApis();
-
-// 根据配置添加数据库服务
-builder.Services.AddDatabase(builder.Configuration);
-
-// 配置JWT
-builder.Services.AddOptions<JwtOptions>()
-    .Bind(builder.Configuration.GetSection("Jwt"))
-    .PostConfigure(options =>
-    {
-        if (string.IsNullOrWhiteSpace(options.SecretKey))
-        {
-            options.SecretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") 
-                ?? throw new InvalidOperationException("JWT密钥未配置");
-        }
-    });
-
-// 添加JWT认证
-var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
-var secretKey = jwtOptions.SecretKey;
-if (string.IsNullOrWhiteSpace(secretKey))
+try
 {
-    secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") 
-        ?? "OpenDeepWiki-Default-Secret-Key-Please-Change-In-Production-Environment-2024";
-}
+    Log.Information("Starting OpenDeepWiki application");
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
+    var builder = WebApplication.CreateBuilder(args);
+
+    // Add Serilog logging
+    builder.AddSerilogLogging();
+
+    // Add services to the container.
+    // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+    builder.Services.AddOpenApi();
+    builder.Services.AddMiniApis();
+
+    // 根据配置添加数据库服务
+    builder.Services.AddDatabase(builder.Configuration);
+
+    // 配置JWT
+    builder.Services.AddOptions<JwtOptions>()
+        .Bind(builder.Configuration.GetSection("Jwt"))
+        .PostConfigure(options =>
         {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
-            ValidateIssuer = true,
-            ValidIssuer = jwtOptions.Issuer,
-            ValidateAudience = true,
-            ValidAudience = jwtOptions.Audience,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
-        };
-    });
-
-builder.Services.AddAuthorization();
-
-// 注册认证服务
-builder.Services.AddScoped<IJwtService, JwtService>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IOAuthService, OAuthService>();
-
-// 添加HttpClient
-builder.Services.AddHttpClient();
-
-// 注册Git平台服务
-builder.Services.AddScoped<IGitPlatformService, GitPlatformService>();
-
-builder.Services.AddOptions<AiRequestOptions>()
-    .Bind(builder.Configuration.GetSection("AI"))
-    .PostConfigure(options =>
-    {
-        if (string.IsNullOrWhiteSpace(options.ApiKey))
-        {
-            options.ApiKey = Environment.GetEnvironmentVariable("CHAT_API_KEY");
-        }
-
-        if (string.IsNullOrWhiteSpace(options.Endpoint))
-        {
-            options.Endpoint = Environment.GetEnvironmentVariable("ENDPOINT");
-        }
-
-        if (!options.RequestType.HasValue)
-        {
-            var modelProvider = Environment.GetEnvironmentVariable("MODEL_PROVIDER");
-            if (Enum.TryParse<AiRequestType>(modelProvider, true, out var parsed))
+            if (string.IsNullOrWhiteSpace(options.SecretKey))
             {
-                options.RequestType = parsed;
+                options.SecretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+                    ?? throw new InvalidOperationException("JWT密钥未配置");
             }
-        }
-    });
+        });
 
-builder.Services
-    .AddCors(options =>
+    // 添加JWT认证
+    var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
+    var secretKey = jwtOptions.SecretKey;
+    if (string.IsNullOrWhiteSpace(secretKey))
     {
-        options.AddPolicy("AllowAll",
-            builder => builder
-                .SetIsOriginAllowed(_ => true)
-                .AllowAnyMethod()
-                .AllowAnyHeader()
-                .AllowCredentials());
-    });
-builder.Services.AddSingleton<AgentFactory>();
-
-// 配置 Repository Analyzer
-builder.Services.AddOptions<RepositoryAnalyzerOptions>()
-    .Bind(builder.Configuration.GetSection("RepositoryAnalyzer"))
-    .PostConfigure(options =>
-    {
-        var repoDir = Environment.GetEnvironmentVariable("REPOSITORIES_DIRECTORY");
-        if (!string.IsNullOrWhiteSpace(repoDir))
-        {
-            options.RepositoriesDirectory = repoDir;
-        }
-    });
-builder.Services.AddScoped<IRepositoryAnalyzer, RepositoryAnalyzer>();
-
-// 配置 Wiki Generator
-builder.Services.AddOptions<WikiGeneratorOptions>()
-    .Bind(builder.Configuration.GetSection(WikiGeneratorOptions.SectionName))
-    .PostConfigure(options =>
-    {
-        // Allow environment variable overrides
-        var catalogModel = Environment.GetEnvironmentVariable("WIKI_CATALOG_MODEL");
-        if (!string.IsNullOrWhiteSpace(catalogModel))
-        {
-            options.CatalogModel = catalogModel;
-        }
-
-        var contentModel = Environment.GetEnvironmentVariable("WIKI_CONTENT_MODEL");
-        if (!string.IsNullOrWhiteSpace(contentModel))
-        {
-            options.ContentModel = contentModel;
-        }
-
-        var catalogEndpoint = Environment.GetEnvironmentVariable("WIKI_CATALOG_ENDPOINT");
-        if (!string.IsNullOrWhiteSpace(catalogEndpoint))
-        {
-            options.CatalogEndpoint = catalogEndpoint;
-        }
-
-        var contentEndpoint = Environment.GetEnvironmentVariable("WIKI_CONTENT_ENDPOINT");
-        if (!string.IsNullOrWhiteSpace(contentEndpoint))
-        {
-            options.ContentEndpoint = contentEndpoint;
-        }
-
-        var catalogApiKey = Environment.GetEnvironmentVariable("WIKI_CATALOG_API_KEY");
-        if (!string.IsNullOrWhiteSpace(catalogApiKey))
-        {
-            options.CatalogApiKey = catalogApiKey;
-        }
-
-        var contentApiKey = Environment.GetEnvironmentVariable("WIKI_CONTENT_API_KEY");
-        if (!string.IsNullOrWhiteSpace(contentApiKey))
-        {
-            options.ContentApiKey = contentApiKey;
-        }
-    });
-
-// 注册 Prompt Plugin
-builder.Services.AddSingleton<IPromptPlugin>(sp =>
-{
-    var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<WikiGeneratorOptions>>().Value;
-    var promptsDir = Path.Combine(AppContext.BaseDirectory, options.PromptsDirectory);
-    
-    // Fallback to current directory if base directory doesn't have prompts
-    if (!Directory.Exists(promptsDir))
-    {
-        promptsDir = Path.Combine(Directory.GetCurrentDirectory(), options.PromptsDirectory);
+        secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+            ?? "OpenDeepWiki-Default-Secret-Key-Please-Change-In-Production-Environment-2024";
     }
-    
-    return new FilePromptPlugin(promptsDir);
-});
 
-// 注册 Wiki Generator
-builder.Services.AddScoped<IWikiGenerator, WikiGenerator>();
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                ValidateIssuer = true,
+                ValidIssuer = jwtOptions.Issuer,
+                ValidateAudience = true,
+                ValidAudience = jwtOptions.Audience,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
+            };
+        });
 
-builder.Services.AddHostedService<RepositoryProcessingWorker>();
+    builder.Services.AddAuthorization();
 
-var app = builder.Build();
+    // 注册认证服务
+    builder.Services.AddScoped<IJwtService, JwtService>();
+    builder.Services.AddScoped<IAuthService, AuthService>();
+    builder.Services.AddScoped<IOAuthService, OAuthService>();
 
-// 初始化数据库
-await DbInitializer.InitializeAsync(app.Services);
+    // 添加HttpClient
+    builder.Services.AddHttpClient();
 
-// 启用 CORS
-app.UseCors("AllowAll");
+    // 注册Git平台服务
+    builder.Services.AddScoped<IGitPlatformService, GitPlatformService>();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-    app.MapScalarApiReference("/v1/scalar");
+    builder.Services.AddOptions<AiRequestOptions>()
+        .Bind(builder.Configuration.GetSection("AI"))
+        .PostConfigure(options =>
+        {
+            if (string.IsNullOrWhiteSpace(options.ApiKey))
+            {
+                options.ApiKey = Environment.GetEnvironmentVariable("CHAT_API_KEY");
+            }
+
+            if (string.IsNullOrWhiteSpace(options.Endpoint))
+            {
+                options.Endpoint = Environment.GetEnvironmentVariable("ENDPOINT");
+            }
+
+            if (!options.RequestType.HasValue)
+            {
+                var modelProvider = Environment.GetEnvironmentVariable("MODEL_PROVIDER");
+                if (Enum.TryParse<AiRequestType>(modelProvider, true, out var parsed))
+                {
+                    options.RequestType = parsed;
+                }
+            }
+        });
+
+    builder.Services
+        .AddCors(options =>
+        {
+            options.AddPolicy("AllowAll",
+                policyBuilder => policyBuilder
+                    .SetIsOriginAllowed(_ => true)
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+                    .AllowCredentials());
+        });
+    builder.Services.AddSingleton<AgentFactory>();
+
+    // 配置 Repository Analyzer
+    builder.Services.AddOptions<RepositoryAnalyzerOptions>()
+        .Bind(builder.Configuration.GetSection("RepositoryAnalyzer"))
+        .PostConfigure(options =>
+        {
+            var repoDir = Environment.GetEnvironmentVariable("REPOSITORIES_DIRECTORY");
+            if (!string.IsNullOrWhiteSpace(repoDir))
+            {
+                options.RepositoriesDirectory = repoDir;
+            }
+        });
+    builder.Services.AddScoped<IRepositoryAnalyzer, RepositoryAnalyzer>();
+
+    // 配置 Wiki Generator
+    builder.Services.AddOptions<WikiGeneratorOptions>()
+        .Bind(builder.Configuration.GetSection(WikiGeneratorOptions.SectionName))
+        .PostConfigure(options =>
+        {
+            // Allow environment variable overrides
+            var catalogModel = Environment.GetEnvironmentVariable("WIKI_CATALOG_MODEL");
+            if (!string.IsNullOrWhiteSpace(catalogModel))
+            {
+                options.CatalogModel = catalogModel;
+            }
+
+            var contentModel = Environment.GetEnvironmentVariable("WIKI_CONTENT_MODEL");
+            if (!string.IsNullOrWhiteSpace(contentModel))
+            {
+                options.ContentModel = contentModel;
+            }
+
+            var catalogEndpoint = Environment.GetEnvironmentVariable("WIKI_CATALOG_ENDPOINT");
+            if (!string.IsNullOrWhiteSpace(catalogEndpoint))
+            {
+                options.CatalogEndpoint = catalogEndpoint;
+            }
+
+            var contentEndpoint = Environment.GetEnvironmentVariable("WIKI_CONTENT_ENDPOINT");
+            if (!string.IsNullOrWhiteSpace(contentEndpoint))
+            {
+                options.ContentEndpoint = contentEndpoint;
+            }
+
+            var catalogApiKey = Environment.GetEnvironmentVariable("WIKI_CATALOG_API_KEY");
+            if (!string.IsNullOrWhiteSpace(catalogApiKey))
+            {
+                options.CatalogApiKey = catalogApiKey;
+            }
+
+            var contentApiKey = Environment.GetEnvironmentVariable("WIKI_CONTENT_API_KEY");
+            if (!string.IsNullOrWhiteSpace(contentApiKey))
+            {
+                options.ContentApiKey = contentApiKey;
+            }
+        });
+
+    // 注册 Prompt Plugin
+    builder.Services.AddSingleton<IPromptPlugin>(sp =>
+    {
+        var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<WikiGeneratorOptions>>().Value;
+        var promptsDir = Path.Combine(AppContext.BaseDirectory, options.PromptsDirectory);
+
+        // Fallback to current directory if base directory doesn't have prompts
+        if (!Directory.Exists(promptsDir))
+        {
+            promptsDir = Path.Combine(Directory.GetCurrentDirectory(), options.PromptsDirectory);
+        }
+
+        return new FilePromptPlugin(promptsDir);
+    });
+
+    // 注册 Wiki Generator
+    builder.Services.AddScoped<IWikiGenerator, WikiGenerator>();
+
+    builder.Services.AddHostedService<RepositoryProcessingWorker>();
+
+    var app = builder.Build();
+
+    // 初始化数据库
+    await DbInitializer.InitializeAsync(app.Services);
+
+    // 启用 CORS
+    app.UseCors("AllowAll");
+
+    // Add Serilog request logging
+    app.UseSerilogLogging();
+
+    // Configure the HTTP request pipeline.
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapOpenApi();
+        app.MapScalarApiReference("/v1/scalar");
+    }
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.MapMiniApis();
+    app.MapAuthEndpoints();
+    app.MapOAuthEndpoints();
+    app.MapBookmarkEndpoints();
+    app.MapSubscriptionEndpoints();
+
+    app.Run();
 }
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapMiniApis();
-app.MapAuthEndpoints();
-app.MapOAuthEndpoints();
-app.MapBookmarkEndpoints();
-app.MapSubscriptionEndpoints();
-
-app.Run();
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}

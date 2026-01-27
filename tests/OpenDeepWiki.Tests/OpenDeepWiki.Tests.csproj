@@ -21,11 +21,14 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\OpenDeepWiki.Entities\OpenDeepWiki.Entities.csproj" />
     <ProjectReference Include="..\..\src\OpenDeepWiki.EFCore\OpenDeepWiki.EFCore.csproj" />
+    <ProjectReference Include="..\..\src\OpenDeepWiki\OpenDeepWiki.csproj" />
   </ItemGroup>
 
 </Project>

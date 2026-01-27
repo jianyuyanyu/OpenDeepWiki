@@ -290,6 +290,18 @@ Every generated document MUST follow this structure:
 - Key concepts and terminology
 - When and why to use it}
 
+## Architecture
+
+{REQUIRED: Include a Mermaid diagram showing the component architecture or relationships}
+
+```mermaid
+graph TD
+    A[Component A] --> B[Component B]
+    B --> C[Component C]
+```
+
+{Explanation of the architecture diagram}
+
 ## {Main Content Section}
 
 {The primary content varies based on topic type:
@@ -301,6 +313,20 @@ Every generated document MUST follow this structure:
 
 {Detailed content with explanations}
 
+## Core Flow
+
+{REQUIRED for process/workflow topics: Include a sequence or flow diagram}
+
+```mermaid
+sequenceDiagram
+    participant A as Component A
+    participant B as Component B
+    A->>B: Request
+    B-->>A: Response
+```
+
+{Explanation of the flow}
+
 ## Usage Examples
 
 {Practical examples showing how to use the feature}
@@ -310,12 +336,14 @@ Every generated document MUST follow this structure:
 ```{language}
 {Simple code example from actual source}
 ```
+> Source: [filename](https://github.com/{org}/{repo}/blob/{branch}/{filepath}#L{startLine}-L{endLine})
 
 ### Advanced Usage
 
 ```{language}
 {More complex example showing advanced features}
 ```
+> Source: [filename](https://github.com/{org}/{repo}/blob/{branch}/{filepath}#L{startLine}-L{endLine})
 
 ## Configuration Options
 
@@ -347,6 +375,7 @@ Every generated document MUST follow this structure:
 ```{language}
 {Usage example}
 ```
+> Source: [filename](https://github.com/{org}/{repo}/blob/{branch}/{filepath}#L{startLine}-L{endLine})
 
 ## Related Links
 
@@ -361,11 +390,32 @@ Every generated document MUST follow this structure:
 | Title (H1) | ✅ Yes | Must match catalog title |
 | Brief Description | ✅ Yes | 1-2 sentence summary |
 | Overview | ✅ Yes | Detailed explanation of purpose |
+| Architecture | ✅ Yes | Mermaid diagram showing component structure |
 | Main Content | ✅ Yes | At least one content section |
-| Usage Examples | ✅ Yes | At least one code example |
+| Core Flow | ⚠️ If applicable | Mermaid sequence/flow diagram for processes |
+| Usage Examples | ✅ Yes | At least one code example with source attribution |
 | Configuration | ⚠️ If applicable | Table format for options |
 | API Reference | ⚠️ If applicable | Method signatures with details |
 | Related Links | ✅ Yes | Links to related documentation |
+
+### 6.2.1 Mermaid Diagram Requirements
+
+| Requirement | Description |
+|-------------|-------------|
+| Minimum Count | At least 1 diagram per document |
+| Architecture Topics | Must include `graph TD` or `flowchart TD` diagram |
+| Process Topics | Must include `sequenceDiagram` or `flowchart` |
+| Data Model Topics | Must include `classDiagram` or `erDiagram` |
+| Diagram Complexity | 5-15 nodes recommended, avoid overly complex diagrams |
+
+### 6.2.2 Code Source Attribution Requirements
+
+| Requirement | Description |
+|-------------|-------------|
+| Every Code Block | Must have source attribution link |
+| Link Format | `[filename](https://github.com/{org}/{repo}/blob/{branch}/{path}#L{start}-L{end})` |
+| Line Numbers | Include specific line range when possible |
+| Multiple Sources | List all source files if code is combined |
 
 ### 6.3 Code Block Requirements
 
@@ -378,6 +428,7 @@ Every generated document MUST follow this structure:
 ```json         // For JSON
 ```yaml         // For YAML
 ```bash         // For shell commands
+```mermaid      // For diagrams
 ```
 
 **Code Example Guidelines:**
@@ -388,7 +439,127 @@ Every generated document MUST follow this structure:
 - ❌ Do not fabricate code examples
 - ❌ Do not include irrelevant boilerplate
 
-### 6.4 Table Formatting
+### 6.4 Code Source Attribution (REQUIRED)
+
+**Every code example MUST include a source attribution link** using the following format:
+
+```markdown
+> Source: [filename](https://github.com/{org}/{repo}/blob/{branch}/{filepath}#L{startLine}-L{endLine})
+```
+
+**Example:**
+```csharp
+public async Task<AuthResult> AuthenticateAsync(string username, string password)
+{
+    var user = await _userRepository.FindByUsernameAsync(username);
+    if (user == null) return AuthResult.Failed("User not found");
+    // ... implementation
+}
+```
+> Source: [AuthService.cs](https://github.com/AIDotNet/OpenDeepWiki/blob/main/src/OpenDeepWiki/Services/Auth/AuthService.cs#L45-L52)
+
+**Attribution Rules:**
+| Rule | Description |
+|------|-------------|
+| File Link | Use GitHub blob URL format with branch name |
+| Line Numbers | Include `#L{start}-L{end}` for specific line ranges |
+| Placement | Place attribution immediately after the code block |
+| Multiple Sources | If code is combined from multiple files, list all sources |
+
+**Format for Multiple Sources:**
+```markdown
+> Sources:
+> - [AuthService.cs](https://github.com/{org}/{repo}/blob/{branch}/src/Services/AuthService.cs#L45-L52)
+> - [IAuthService.cs](https://github.com/{org}/{repo}/blob/{branch}/src/Services/IAuthService.cs#L12-L15)
+```
+
+### 6.5 Mermaid Diagrams (REQUIRED for Architecture/Flow Documentation)
+
+**Every document MUST include at least one Mermaid diagram** when the topic involves:
+- Architecture or system design
+- Data flow or processing pipelines
+- Component relationships
+- State machines or workflows
+- Class hierarchies or dependencies
+
+**Required Diagram Types by Topic:**
+
+| Topic Type | Required Diagram | Mermaid Type |
+|------------|------------------|--------------|
+| Service/Component | Architecture diagram | `graph TD` or `flowchart TD` |
+| API/Endpoint | Request flow diagram | `sequenceDiagram` |
+| Data Model | Entity relationships | `erDiagram` or `classDiagram` |
+| Workflow/Process | Flow diagram | `flowchart TD` |
+| State Management | State diagram | `stateDiagram-v2` |
+
+**Mermaid Diagram Examples:**
+
+**Architecture Diagram:**
+```mermaid
+graph TD
+    A[Client] --> B[API Gateway]
+    B --> C[AuthService]
+    B --> D[WikiService]
+    C --> E[(Database)]
+    D --> E
+    D --> F[AI Agent]
+```
+
+**Sequence Diagram:**
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant A as API
+    participant S as Service
+    participant D as Database
+    
+    C->>A: POST /api/login
+    A->>S: AuthenticateAsync()
+    S->>D: Query User
+    D-->>S: User Data
+    S-->>A: AuthResult
+    A-->>C: JWT Token
+```
+
+**Class Diagram:**
+```mermaid
+classDiagram
+    class IWikiGenerator {
+        <<interface>>
+        +GenerateCatalogAsync()
+        +GenerateDocumentsAsync()
+        +IncrementalUpdateAsync()
+    }
+    class WikiGenerator {
+        -AgentFactory _agentFactory
+        -IPromptPlugin _promptPlugin
+        +GenerateCatalogAsync()
+        +GenerateDocumentsAsync()
+    }
+    IWikiGenerator <|.. WikiGenerator
+```
+
+**Flowchart:**
+```mermaid
+flowchart TD
+    A[Start] --> B{Check Auth}
+    B -->|Valid| C[Process Request]
+    B -->|Invalid| D[Return 401]
+    C --> E{Success?}
+    E -->|Yes| F[Return 200]
+    E -->|No| G[Return 500]
+```
+
+**Diagram Guidelines:**
+- ✅ Use clear, descriptive node labels
+- ✅ Show key components and their relationships
+- ✅ Include data flow direction with arrows
+- ✅ Keep diagrams focused (5-15 nodes recommended)
+- ✅ Add subgraphs for grouping related components
+- ❌ Do not create overly complex diagrams
+- ❌ Do not include implementation details in diagrams
+
+### 6.6 Table Formatting
 
 **Configuration Options Table:**
 ```markdown
@@ -479,6 +650,7 @@ Start
 
 - [ ] Document has H1 title matching catalog title
 - [ ] Overview section exists and explains purpose
+- [ ] Architecture section with Mermaid diagram exists
 - [ ] At least one main content section exists
 - [ ] Usage examples section with code blocks
 - [ ] Related links section at the end
@@ -497,15 +669,26 @@ Start
 - [ ] Examples are working and tested (from actual source)
 - [ ] Complex parts have explanatory comments
 - [ ] Both basic and advanced usage shown when appropriate
+- [ ] **Every code block has source attribution link**
+- [ ] Source links use correct GitHub URL format with line numbers
 
-### 8.4 Formatting
+### 8.4 Mermaid Diagrams
+
+- [ ] **At least one Mermaid diagram is included**
+- [ ] Architecture diagram shows component relationships
+- [ ] Flow/sequence diagram for process documentation
+- [ ] Diagrams are clear and not overly complex (5-15 nodes)
+- [ ] Diagram nodes have descriptive labels
+- [ ] Diagram is explained in surrounding text
+
+### 8.5 Formatting
 
 - [ ] Tables are properly formatted with headers
 - [ ] Configuration options include Type and Default columns
 - [ ] API methods include parameters, returns, and throws
 - [ ] Consistent heading hierarchy (H1 → H2 → H3)
 
-### 8.5 Language Compliance
+### 8.6 Language Compliance
 
 - [ ] Content is in the correct target language ({{language}})
 - [ ] Code identifiers remain in original language (not translated)

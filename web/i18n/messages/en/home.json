@@ -51,7 +51,15 @@
       "pending": "Pending",
       "processing": "Processing",
       "completed": "Completed",
-      "failed": "Failed"
+      "failed": "Failed",
+      "pendingDescription": "Repository submitted, waiting in the processing queue...",
+      "processingDescription": "AI is analyzing the repository and generating Wiki documentation, please wait...",
+      "completedDescription": "Wiki documentation has been generated",
+      "failedDescription": "An error occurred during Wiki generation, please retry",
+      "autoRefreshHint": "Page will auto-refresh to get the latest status",
+      "retry": "Regenerate",
+      "notFound": "Repository not found",
+      "notFoundDescription": "The repository was not found, please check the URL"
     },
     "viewWiki": "View Wiki",
     "retry": "Retry",

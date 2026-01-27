@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
@@ -42,6 +43,10 @@ public class WikiGenerator : IWikiGenerator
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        _logger.LogDebug(
+            "WikiGenerator initialized. CatalogModel: {CatalogModel}, ContentModel: {ContentModel}, MaxRetryAttempts: {MaxRetry}",
+            _options.CatalogModel, _options.ContentModel, _options.MaxRetryAttempts);
     }
 
     /// <inheritdoc />
@@ -50,29 +55,37 @@ public class WikiGenerator : IWikiGenerator
         BranchLanguage branchLanguage,
         CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
         _logger.LogInformation(
-            "Generating catalog for {Org}/{Repo} branch {Branch} language {Language}",
+            "Starting catalog generation. Repository: {Org}/{Repo}, Branch: {Branch}, Language: {Language}, BranchLanguageId: {BranchLanguageId}",
             workspace.Organization, workspace.RepositoryName,
-            workspace.BranchName, branchLanguage.LanguageCode);
+            workspace.BranchName, branchLanguage.LanguageCode, branchLanguage.Id);
 
-        var prompt = await _promptPlugin.LoadPromptAsync(
-            "catalog-generator",
-            new Dictionary<string, string>
-            {
-                ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
-                ["language"] = branchLanguage.LanguageCode
-            },
-            cancellationToken);
+        try
+        {
+            _logger.LogDebug("Loading catalog-generator prompt template");
+            var prompt = await _promptPlugin.LoadPromptAsync(
+                "catalog-generator",
+                new Dictionary<string, string>
+                {
+                    ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
+                    ["language"] = branchLanguage.LanguageCode
+                },
+                cancellationToken);
+            _logger.LogDebug("Prompt template loaded. Length: {PromptLength} chars", prompt.Length);
 
-        var gitTool = new GitTool(workspace.WorkingDirectory);
-        var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
-        var catalogTool = new CatalogTool(catalogStorage);
+            _logger.LogDebug("Initializing tools for catalog generation");
+            var gitTool = new GitTool(workspace.WorkingDirectory);
+            var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
+            var catalogTool = new CatalogTool(catalogStorage);
 
-        var tools = gitTool.GetTools()
-            .Concat(catalogTool.GetTools())
-            .ToArray();
+            var tools = gitTool.GetTools()
+                .Concat(catalogTool.GetTools())
+                .ToArray();
+            _logger.LogDebug("Tools initialized. ToolCount: {ToolCount}, Tools: {ToolNames}",
+                tools.Length, string.Join(", ", tools.Select(t => t.Name)));
 
-        var userMessage = $@"Please generate a Wiki catalog structure for repository {workspace.Organization}/{workspace.RepositoryName}.
+            var userMessage = $@"Please generate a Wiki catalog structure for repository {workspace.Organization}/{workspace.RepositoryName}.
 
 ## Task Requirements
 
@@ -102,16 +115,28 @@ public class WikiGenerator : IWikiGenerator
 
 Please start executing the task.";
 
-        await ExecuteAgentWithRetryAsync(
-            _options.CatalogModel,
-            _options.GetCatalogRequestOptions(),
-            prompt,
-            userMessage,
-            tools,
-            cancellationToken);
+            await ExecuteAgentWithRetryAsync(
+                _options.CatalogModel,
+                _options.GetCatalogRequestOptions(),
+                prompt,
+                userMessage,
+                tools,
+                "CatalogGeneration",
+                cancellationToken);
 
-        _logger.LogInformation("Catalog generation completed for {Org}/{Repo}",
-            workspace.Organization, workspace.RepositoryName);
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Catalog generation completed successfully. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, stopwatch.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex,
+                "Catalog generation failed. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, stopwatch.ElapsedMilliseconds);
+            throw;
+        }
     }
 
 
@@ -121,8 +146,9 @@ Please start executing the task.";
         BranchLanguage branchLanguage,
         CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
         _logger.LogInformation(
-            "Generating documents for {Org}/{Repo} branch {Branch} language {Language}",
+            "Starting document generation. Repository: {Org}/{Repo}, Branch: {Branch}, Language: {Language}",
             workspace.Organization, workspace.RepositoryName,
             workspace.BranchName, branchLanguage.LanguageCode);
 
@@ -131,18 +157,44 @@ Please start executing the task.";
         var catalogJson = await catalogStorage.GetCatalogJsonAsync(cancellationToken);
         var catalogItems = GetAllCatalogPaths(catalogJson);
 
-        _logger.LogInformation("Found {Count} catalog items to generate content for", catalogItems.Count);
+        _logger.LogInformation(
+            "Found {Count} catalog items to generate content for. Repository: {Org}/{Repo}",
+            catalogItems.Count, workspace.Organization, workspace.RepositoryName);
+
+        if (catalogItems.Count > 0)
+        {
+            _logger.LogDebug("Catalog items to process: {Items}",
+                string.Join(", ", catalogItems.Select(i => $"{i.Path}:{i.Title}")));
+        }
+
+        var successCount = 0;
+        var failCount = 0;
 
         foreach (var (path, title) in catalogItems)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            await GenerateDocumentContentAsync(
-                workspace, branchLanguage, path, title, cancellationToken);
+            try
+            {
+                await GenerateDocumentContentAsync(
+                    workspace, branchLanguage, path, title, cancellationToken);
+                successCount++;
+            }
+            catch (Exception ex)
+            {
+                failCount++;
+                _logger.LogError(ex,
+                    "Failed to generate document. Path: {Path}, Title: {Title}, Repository: {Org}/{Repo}",
+                    path, title, workspace.Organization, workspace.RepositoryName);
+                // Continue with other documents
+            }
         }
 
-        _logger.LogInformation("Document generation completed for {Org}/{Repo}",
-            workspace.Organization, workspace.RepositoryName);
+        stopwatch.Stop();
+        _logger.LogInformation(
+            "Document generation completed. Repository: {Org}/{Repo}, Language: {Language}, Success: {SuccessCount}, Failed: {FailCount}, Duration: {Duration}ms",
+            workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode,
+            successCount, failCount, stopwatch.ElapsedMilliseconds);
     }
 
     /// <inheritdoc />
@@ -154,37 +206,53 @@ Please start executing the task.";
     {
         if (changedFiles.Length == 0)
         {
-            _logger.LogInformation("No changed files, skipping incremental update");
+            _logger.LogInformation(
+                "No changed files, skipping incremental update. Repository: {Org}/{Repo}, Language: {Language}",
+                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode);
             return;
         }
 
+        var stopwatch = Stopwatch.StartNew();
         _logger.LogInformation(
-            "Performing incremental update for {Org}/{Repo} with {Count} changed files",
-            workspace.Organization, workspace.RepositoryName, changedFiles.Length);
+            "Starting incremental update. Repository: {Org}/{Repo}, Language: {Language}, ChangedFileCount: {Count}",
+            workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, changedFiles.Length);
 
-        var prompt = await _promptPlugin.LoadPromptAsync(
-            "incremental-updater",
-            new Dictionary<string, string>
-            {
-                ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
-                ["language"] = branchLanguage.LanguageCode,
-                ["previous_commit"] = workspace.PreviousCommitId ?? "initial",
-                ["current_commit"] = workspace.CommitId,
-                ["changed_files"] = string.Join("\n", changedFiles.Select(f => $"- {f}"))
-            },
-            cancellationToken);
+        if (changedFiles.Length <= 50)
+        {
+            _logger.LogDebug("Changed files: {ChangedFiles}", string.Join(", ", changedFiles));
+        }
+        else
+        {
+            _logger.LogDebug("Changed files (first 50): {ChangedFiles}... and {More} more",
+                string.Join(", ", changedFiles.Take(50)), changedFiles.Length - 50);
+        }
 
-        var gitTool = new GitTool(workspace.WorkingDirectory);
-        var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
-        var catalogTool = new CatalogTool(catalogStorage);
-        var docTool = new DocTool(_context, branchLanguage.Id);
+        try
+        {
+            var prompt = await _promptPlugin.LoadPromptAsync(
+                "incremental-updater",
+                new Dictionary<string, string>
+                {
+                    ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
+                    ["language"] = branchLanguage.LanguageCode,
+                    ["previous_commit"] = workspace.PreviousCommitId ?? "initial",
+                    ["current_commit"] = workspace.CommitId,
+                    ["changed_files"] = string.Join("\n", changedFiles.Select(f => $"- {f}"))
+                },
+                cancellationToken);
 
-        var tools = gitTool.GetTools()
-            .Concat(catalogTool.GetTools())
-            .Concat(docTool.GetTools())
-            .ToArray();
+            _logger.LogDebug("Initializing tools for incremental update");
+            var gitTool = new GitTool(workspace.WorkingDirectory);
+            var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
+            var catalogTool = new CatalogTool(catalogStorage);
+            var docTool = new DocTool(_context, branchLanguage.Id);
 
-        var userMessage = $@"Please analyze code changes in repository {workspace.Organization}/{workspace.RepositoryName} and update relevant Wiki documentation.
+            var tools = gitTool.GetTools()
+                .Concat(catalogTool.GetTools())
+                .Concat(docTool.GetTools())
+                .ToArray();
+
+            var userMessage = $@"Please analyze code changes in repository {workspace.Organization}/{workspace.RepositoryName} and update relevant Wiki documentation.
 
 ## Change Information
 
@@ -224,16 +292,28 @@ Please start executing the task.";
 
 Please start executing the task.";
 
-        await ExecuteAgentWithRetryAsync(
-            _options.ContentModel,
-            _options.GetContentRequestOptions(),
-            prompt,
-            userMessage,
-            tools,
-            cancellationToken);
+            await ExecuteAgentWithRetryAsync(
+                _options.ContentModel,
+                _options.GetContentRequestOptions(),
+                prompt,
+                userMessage,
+                tools,
+                "IncrementalUpdate",
+                cancellationToken);
 
-        _logger.LogInformation("Incremental update completed for {Org}/{Repo}",
-            workspace.Organization, workspace.RepositoryName);
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Incremental update completed successfully. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, stopwatch.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex,
+                "Incremental update failed. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, stopwatch.ElapsedMilliseconds);
+            throw;
+        }
     }
 
     /// <summary>
@@ -246,27 +326,32 @@ Please start executing the task.";
         string catalogTitle,
         CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Generating content for catalog item: {Path} - {Title}", catalogPath, catalogTitle);
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation(
+            "Starting document content generation. Path: {Path}, Title: {Title}, Language: {Language}",
+            catalogPath, catalogTitle, branchLanguage.LanguageCode);
 
-        var prompt = await _promptPlugin.LoadPromptAsync(
-            "content-generator",
-            new Dictionary<string, string>
-            {
-                ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
-                ["language"] = branchLanguage.LanguageCode,
-                ["catalog_path"] = catalogPath,
-                ["catalog_title"] = catalogTitle
-            },
-            cancellationToken);
+        try
+        {
+            var prompt = await _promptPlugin.LoadPromptAsync(
+                "content-generator",
+                new Dictionary<string, string>
+                {
+                    ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
+                    ["language"] = branchLanguage.LanguageCode,
+                    ["catalog_path"] = catalogPath,
+                    ["catalog_title"] = catalogTitle
+                },
+                cancellationToken);
 
-        var gitTool = new GitTool(workspace.WorkingDirectory);
-        var docTool = new DocTool(_context, branchLanguage.Id);
+            var gitTool = new GitTool(workspace.WorkingDirectory);
+            var docTool = new DocTool(_context, branchLanguage.Id);
 
-        var tools = gitTool.GetTools()
-            .Concat(docTool.GetTools())
-            .ToArray();
+            var tools = gitTool.GetTools()
+                .Concat(docTool.GetTools())
+                .ToArray();
 
-        var userMessage = $@"Please generate Wiki document content for catalog item ""{catalogTitle}"" (path: {catalogPath}).
+            var userMessage = $@"Please generate Wiki document content for catalog item ""{catalogTitle}"" (path: {catalogPath}).
 
 ## Repository Information
 
@@ -310,13 +395,28 @@ Please start executing the task.";
 
 Please start executing the task.";
 
-        await ExecuteAgentWithRetryAsync(
-            _options.ContentModel,
-            _options.GetContentRequestOptions(),
-            prompt,
-            userMessage,
-            tools,
-            cancellationToken);
+            await ExecuteAgentWithRetryAsync(
+                _options.ContentModel,
+                _options.GetContentRequestOptions(),
+                prompt,
+                userMessage,
+                tools,
+                $"DocumentContent:{catalogPath}",
+                cancellationToken);
+
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Document content generation completed. Path: {Path}, Title: {Title}, Duration: {Duration}ms",
+                catalogPath, catalogTitle, stopwatch.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex,
+                "Document content generation failed. Path: {Path}, Title: {Title}, Duration: {Duration}ms",
+                catalogPath, catalogTitle, stopwatch.ElapsedMilliseconds);
+            throw;
+        }
     }
 
 
@@ -329,17 +429,27 @@ Please start executing the task.";
         string systemPrompt,
         string userMessage,
         AITool[] tools,
+        string operationName,
         CancellationToken cancellationToken)
     {
         var retryCount = 0;
         Exception? lastException = null;
 
+        _logger.LogDebug(
+            "Starting AI agent execution. Operation: {Operation}, Model: {Model}, ToolCount: {ToolCount}",
+            operationName, model, tools.Length);
+
         while (retryCount < _options.MaxRetryAttempts)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            var attemptStopwatch = Stopwatch.StartNew();
 
             try
             {
+                _logger.LogDebug(
+                    "AI agent attempt {Attempt}/{MaxAttempts}. Operation: {Operation}, Model: {Model}",
+                    retryCount + 1, _options.MaxRetryAttempts, operationName, model);
+
                 // Create chat options with the tools
                 var chatOptions = new ChatClientAgentOptions
                 {
@@ -381,8 +491,9 @@ Please start executing the task.";
                 // Use streaming response for real-time output
                 var contentBuilder = new System.Text.StringBuilder();
                 UsageDetails? usageDetails = null;
+                var toolCallCount = 0;
 
-                _logger.LogInformation("Starting streaming response for: {Message}", userMessage);
+                _logger.LogDebug("Starting streaming response. Operation: {Operation}", operationName);
 
                 var thread = await chatClient.GetNewThreadAsync(cancellationToken);
 
@@ -402,8 +513,12 @@ Please start executing the task.";
                         {
                             if (!string.IsNullOrEmpty(tool.FunctionName))
                             {
+                                toolCallCount++;
                                 Console.WriteLine();
                                 Console.Write("Call Function:" + tool.FunctionName);
+                                _logger.LogDebug(
+                                    "Tool call #{CallNumber}: {FunctionName}. Operation: {Operation}",
+                                    toolCallCount, tool.FunctionName, operationName);
                             }
                             else
                             {
@@ -424,39 +539,62 @@ Please start executing the task.";
                 // Print newline after streaming completes
                 Console.WriteLine();
 
+                attemptStopwatch.Stop();
+
                 // Log usage statistics
                 if (usageDetails != null)
                 {
                     _logger.LogInformation(
-                        "Usage - Input tokens: {InputTokens}, Output tokens: {OutputTokens}, Total tokens: {TotalTokens}",
+                        "AI agent completed. Operation: {Operation}, Model: {Model}, InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}, ToolCalls: {ToolCalls}, Duration: {Duration}ms",
+                        operationName, model,
                         usageDetails.InputTokenCount,
                         usageDetails.OutputTokenCount,
-                        usageDetails.TotalTokenCount);
+                        usageDetails.TotalTokenCount,
+                        toolCallCount,
+                        attemptStopwatch.ElapsedMilliseconds);
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "AI agent completed. Operation: {Operation}, Model: {Model}, ToolCalls: {ToolCalls}, Duration: {Duration}ms (no usage data)",
+                        operationName, model, toolCallCount, attemptStopwatch.ElapsedMilliseconds);
                 }
 
-                _logger.LogDebug("Streaming response completed. Total content length: {Length}", contentBuilder.Length);
+                _logger.LogDebug(
+                    "Streaming response completed. Operation: {Operation}, ContentLength: {Length}",
+                    operationName, contentBuilder.Length);
 
                 return;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
+                attemptStopwatch.Stop();
                 lastException = ex;
                 retryCount++;
 
+                _logger.LogWarning(
+                    ex,
+                    "AI agent attempt {Attempt}/{MaxAttempts} failed. Operation: {Operation}, Model: {Model}, Duration: {Duration}ms, ErrorType: {ErrorType}",
+                    retryCount, _options.MaxRetryAttempts, operationName, model, attemptStopwatch.ElapsedMilliseconds, ex.GetType().Name);
+
                 if (retryCount < _options.MaxRetryAttempts)
                 {
-                    _logger.LogWarning(
-                        ex,
-                        "Agent execution attempt {Attempt} failed, retrying in {Delay}ms",
-                        retryCount, _options.RetryDelayMs);
+                    _logger.LogInformation(
+                        "Retrying AI agent in {Delay}ms. Operation: {Operation}, Attempt: {NextAttempt}/{MaxAttempts}",
+                        _options.RetryDelayMs, operationName, retryCount + 1, _options.MaxRetryAttempts);
 
                     await Task.Delay(_options.RetryDelayMs, cancellationToken);
                 }
             }
         }
 
+        _logger.LogError(
+            lastException,
+            "AI agent execution failed after all retry attempts. Operation: {Operation}, Model: {Model}, Attempts: {Attempts}",
+            operationName, model, _options.MaxRetryAttempts);
+
         throw new InvalidOperationException(
-            $"AI agent execution failed after {_options.MaxRetryAttempts} attempts",
+            $"AI agent execution failed after {_options.MaxRetryAttempts} attempts for operation '{operationName}'",
             lastException);
     }
 

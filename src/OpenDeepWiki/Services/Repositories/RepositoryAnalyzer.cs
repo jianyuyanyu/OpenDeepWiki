@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using LibGit2Sharp;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -49,6 +50,10 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
     {
         _options = options.Value;
         _logger = logger;
+
+        _logger.LogDebug(
+            "RepositoryAnalyzer initialized. RepositoriesDirectory: {RepoDir}, CleanupAfterProcessing: {Cleanup}, MaxRetryAttempts: {MaxRetry}",
+            _options.RepositoriesDirectory, _options.CleanupAfterProcessing, _options.MaxRetryAttempts);
     }
 
     /// <inheritdoc />
@@ -58,6 +63,7 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
         string? previousCommitId = null,
         CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
         var workspace = new RepositoryWorkspace
         {
             Organization = repository.OrgName,
@@ -69,38 +75,47 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
         };
 
         _logger.LogInformation(
-            "Preparing workspace for {Org}/{Repo} branch {Branch} at {Path}",
-            workspace.Organization, workspace.RepositoryName, branchName, workspace.WorkingDirectory);
+            "Preparing workspace. Repository: {Org}/{Repo}, Branch: {Branch}, WorkingDirectory: {Path}, PreviousCommit: {PreviousCommit}",
+            workspace.Organization, workspace.RepositoryName, branchName, 
+            workspace.WorkingDirectory, previousCommitId ?? "none");
 
         // Ensure the parent directory exists
         var parentDir = Path.GetDirectoryName(workspace.WorkingDirectory);
         if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
         {
+            _logger.LogDebug("Creating parent directory: {ParentDir}", parentDir);
             Directory.CreateDirectory(parentDir);
         }
 
         // Build credentials if provided
         var credentials = BuildCredentials(repository);
+        var hasCredentials = credentials != null;
+        _logger.LogDebug("Credentials configured: {HasCredentials}", hasCredentials);
 
         // Clone or pull the repository
-        if (Directory.Exists(workspace.WorkingDirectory) && 
-            Directory.Exists(Path.Combine(workspace.WorkingDirectory, ".git")))
+        var repoExists = Directory.Exists(workspace.WorkingDirectory) && 
+                         Directory.Exists(Path.Combine(workspace.WorkingDirectory, ".git"));
+
+        if (repoExists)
         {
-            // Repository exists, pull latest changes
+            _logger.LogDebug("Repository exists locally, pulling latest changes");
             await PullRepositoryAsync(workspace, credentials, cancellationToken);
         }
         else
         {
-            // Clone the repository
+            _logger.LogDebug("Repository does not exist locally, cloning");
             await CloneRepositoryAsync(workspace, credentials, cancellationToken);
         }
 
         // Get the current HEAD commit ID
         workspace.CommitId = GetHeadCommitId(workspace.WorkingDirectory);
 
+        stopwatch.Stop();
         _logger.LogInformation(
-            "Workspace prepared. Current commit: {CommitId}, Previous commit: {PreviousCommitId}",
-            workspace.CommitId, workspace.PreviousCommitId ?? "none");
+            "Workspace prepared successfully. Repository: {Org}/{Repo}, CurrentCommit: {CommitId}, PreviousCommit: {PreviousCommitId}, IsIncremental: {IsIncremental}, Duration: {Duration}ms",
+            workspace.Organization, workspace.RepositoryName,
+            workspace.CommitId, workspace.PreviousCommitId ?? "none",
+            workspace.IsIncremental, stopwatch.ElapsedMilliseconds);
 
         return workspace;
     }
@@ -111,23 +126,40 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
     {
         if (!_options.CleanupAfterProcessing)
         {
-            _logger.LogDebug("Cleanup disabled, keeping workspace at {Path}", workspace.WorkingDirectory);
+            _logger.LogDebug(
+                "Cleanup disabled, keeping workspace. Path: {Path}, Repository: {Org}/{Repo}",
+                workspace.WorkingDirectory, workspace.Organization, workspace.RepositoryName);
             return Task.CompletedTask;
         }
 
         if (Directory.Exists(workspace.WorkingDirectory))
         {
-            _logger.LogInformation("Cleaning up workspace at {Path}", workspace.WorkingDirectory);
+            _logger.LogInformation(
+                "Cleaning up workspace. Path: {Path}, Repository: {Org}/{Repo}",
+                workspace.WorkingDirectory, workspace.Organization, workspace.RepositoryName);
             
+            var stopwatch = Stopwatch.StartNew();
             try
             {
                 // Force delete all files including read-only ones (common in .git folder)
                 DeleteDirectoryRecursive(workspace.WorkingDirectory);
+                stopwatch.Stop();
+                _logger.LogInformation(
+                    "Workspace cleanup completed. Path: {Path}, Duration: {Duration}ms",
+                    workspace.WorkingDirectory, stopwatch.ElapsedMilliseconds);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to cleanup workspace at {Path}", workspace.WorkingDirectory);
+                stopwatch.Stop();
+                _logger.LogWarning(ex, 
+                    "Failed to cleanup workspace. Path: {Path}, Duration: {Duration}ms",
+                    workspace.WorkingDirectory, stopwatch.ElapsedMilliseconds);
             }
+        }
+        else
+        {
+            _logger.LogDebug("Workspace directory does not exist, nothing to cleanup. Path: {Path}", 
+                workspace.WorkingDirectory);
         }
 
         return Task.CompletedTask;
@@ -140,23 +172,39 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
         string toCommitId,
         CancellationToken cancellationToken = default)
     {
+        var stopwatch = Stopwatch.StartNew();
+
         if (string.IsNullOrEmpty(fromCommitId))
         {
-            // Initial processing - return all files
-            _logger.LogInformation("No previous commit, returning all files");
-            return Task.FromResult(GetAllTrackedFiles(workspace.WorkingDirectory));
+            _logger.LogInformation(
+                "No previous commit specified, returning all tracked files. Repository: {Org}/{Repo}",
+                workspace.Organization, workspace.RepositoryName);
+            var allFiles = GetAllTrackedFiles(workspace.WorkingDirectory);
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Retrieved all tracked files. Count: {Count}, Duration: {Duration}ms",
+                allFiles.Length, stopwatch.ElapsedMilliseconds);
+            return Task.FromResult(allFiles);
         }
 
         _logger.LogInformation(
-            "Getting changed files between {FromCommit} and {ToCommit}",
-            fromCommitId, toCommitId);
+            "Getting changed files. Repository: {Org}/{Repo}, FromCommit: {FromCommit}, ToCommit: {ToCommit}",
+            workspace.Organization, workspace.RepositoryName, fromCommitId, toCommitId);
 
         var changedFiles = GetChangedFilesBetweenCommits(
             workspace.WorkingDirectory, 
             fromCommitId, 
             toCommitId);
 
-        _logger.LogInformation("Found {Count} changed files", changedFiles.Length);
+        stopwatch.Stop();
+        _logger.LogInformation(
+            "Changed files retrieved. Count: {Count}, Duration: {Duration}ms",
+            changedFiles.Length, stopwatch.ElapsedMilliseconds);
+
+        if (changedFiles.Length > 0 && changedFiles.Length <= 20)
+        {
+            _logger.LogDebug("Changed files: {Files}", string.Join(", ", changedFiles));
+        }
 
         return Task.FromResult(changedFiles);
     }
@@ -226,11 +274,15 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
         Credentials? credentials,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Cloning repository {Url} to {Path}", workspace.GitUrl, workspace.WorkingDirectory);
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation(
+            "Starting repository clone. GitUrl: {Url}, Branch: {Branch}, TargetPath: {Path}",
+            workspace.GitUrl, workspace.BranchName, workspace.WorkingDirectory);
 
         // Clean up any existing partial clone
         if (Directory.Exists(workspace.WorkingDirectory))
         {
+            _logger.LogDebug("Removing existing partial clone at {Path}", workspace.WorkingDirectory);
             DeleteDirectoryRecursive(workspace.WorkingDirectory);
         }
 
@@ -254,12 +306,19 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
 
             try
             {
+                _logger.LogDebug(
+                    "Clone attempt {Attempt}/{MaxAttempts}. GitUrl: {Url}",
+                    retryCount + 1, _options.MaxRetryAttempts, workspace.GitUrl);
+
                 await Task.Run(() =>
                 {
                     GitRepository.Clone(workspace.GitUrl, workspace.WorkingDirectory, cloneOptions);
                 }, cancellationToken);
 
-                _logger.LogInformation("Repository cloned successfully");
+                stopwatch.Stop();
+                _logger.LogInformation(
+                    "Repository cloned successfully. GitUrl: {Url}, TargetPath: {Path}, Duration: {Duration}ms",
+                    workspace.GitUrl, workspace.WorkingDirectory, stopwatch.ElapsedMilliseconds);
                 return;
             }
             catch (LibGit2SharpException ex)
@@ -267,17 +326,27 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
                 lastException = ex;
                 retryCount++;
 
+                _logger.LogWarning(
+                    ex,
+                    "Clone attempt {Attempt}/{MaxAttempts} failed. GitUrl: {Url}, ErrorMessage: {ErrorMessage}",
+                    retryCount, _options.MaxRetryAttempts, workspace.GitUrl, ex.Message);
+
                 if (retryCount < _options.MaxRetryAttempts)
                 {
-                    _logger.LogWarning(
-                        ex,
-                        "Clone attempt {Attempt} failed, retrying in {Delay}ms",
-                        retryCount, _options.RetryDelayMs);
+                    _logger.LogInformation(
+                        "Retrying clone in {Delay}ms. GitUrl: {Url}",
+                        _options.RetryDelayMs, workspace.GitUrl);
 
                     await Task.Delay(_options.RetryDelayMs, cancellationToken);
                 }
             }
         }
+
+        stopwatch.Stop();
+        _logger.LogError(
+            lastException,
+            "Repository clone failed after all retry attempts. GitUrl: {Url}, Attempts: {Attempts}, Duration: {Duration}ms",
+            workspace.GitUrl, _options.MaxRetryAttempts, stopwatch.ElapsedMilliseconds);
 
         throw new InvalidOperationException(
             $"Failed to clone repository after {_options.MaxRetryAttempts} attempts: {workspace.GitUrl}",
@@ -292,7 +361,10 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
         Credentials? credentials,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Pulling latest changes for {Path}", workspace.WorkingDirectory);
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation(
+            "Starting repository pull. Path: {Path}, Branch: {Branch}",
+            workspace.WorkingDirectory, workspace.BranchName);
 
         var retryCount = 0;
         Exception? lastException = null;
@@ -303,6 +375,10 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
 
             try
             {
+                _logger.LogDebug(
+                    "Pull attempt {Attempt}/{MaxAttempts}. Path: {Path}",
+                    retryCount + 1, _options.MaxRetryAttempts, workspace.WorkingDirectory);
+
                 await Task.Run(() =>
                 {
                     using var repo = new GitRepository(workspace.WorkingDirectory);
@@ -317,6 +393,7 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
                         fetchOptions.CredentialsProvider = (_, _, _) => credentials;
                     }
 
+                    _logger.LogDebug("Fetching from remote 'origin'");
                     Commands.Fetch(repo, remote.Name, refSpecs, fetchOptions, null);
 
                     // Checkout the target branch
@@ -328,18 +405,23 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
                         throw new InvalidOperationException($"Branch '{workspace.BranchName}' not found");
                     }
 
+                    _logger.LogDebug("Found branch: {BranchName}, IsRemote: {IsRemote}", 
+                        branch.FriendlyName, branch.IsRemote);
+
                     // If it's a remote tracking branch, create a local branch
                     if (branch.IsRemote)
                     {
                         var localBranch = repo.Branches[workspace.BranchName];
                         if (localBranch == null)
                         {
+                            _logger.LogDebug("Creating local branch from remote tracking branch");
                             localBranch = repo.CreateBranch(workspace.BranchName, branch.Tip);
                             repo.Branches.Update(localBranch, b => b.TrackedBranch = branch.CanonicalName);
                         }
                         branch = localBranch;
                     }
 
+                    _logger.LogDebug("Checking out branch: {BranchName}", branch.FriendlyName);
                     Commands.Checkout(repo, branch);
 
                     // Pull (merge) changes
@@ -353,11 +435,15 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
                     };
 
                     var signature = new Signature("OpenDeepWiki", "wiki@opendeepwiki.local", DateTimeOffset.Now);
+                    _logger.LogDebug("Pulling changes");
                     Commands.Pull(repo, signature, pullOptions);
 
                 }, cancellationToken);
 
-                _logger.LogInformation("Repository pulled successfully");
+                stopwatch.Stop();
+                _logger.LogInformation(
+                    "Repository pulled successfully. Path: {Path}, Branch: {Branch}, Duration: {Duration}ms",
+                    workspace.WorkingDirectory, workspace.BranchName, stopwatch.ElapsedMilliseconds);
                 return;
             }
             catch (LibGit2SharpException ex)
@@ -365,17 +451,27 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
                 lastException = ex;
                 retryCount++;
 
+                _logger.LogWarning(
+                    ex,
+                    "Pull attempt {Attempt}/{MaxAttempts} failed. Path: {Path}, ErrorMessage: {ErrorMessage}",
+                    retryCount, _options.MaxRetryAttempts, workspace.WorkingDirectory, ex.Message);
+
                 if (retryCount < _options.MaxRetryAttempts)
                 {
-                    _logger.LogWarning(
-                        ex,
-                        "Pull attempt {Attempt} failed, retrying in {Delay}ms",
-                        retryCount, _options.RetryDelayMs);
+                    _logger.LogInformation(
+                        "Retrying pull in {Delay}ms. Path: {Path}",
+                        _options.RetryDelayMs, workspace.WorkingDirectory);
 
                     await Task.Delay(_options.RetryDelayMs, cancellationToken);
                 }
             }
         }
+
+        stopwatch.Stop();
+        _logger.LogError(
+            lastException,
+            "Repository pull failed after all retry attempts. Path: {Path}, Attempts: {Attempts}, Duration: {Duration}ms",
+            workspace.WorkingDirectory, _options.MaxRetryAttempts, stopwatch.ElapsedMilliseconds);
 
         throw new InvalidOperationException(
             $"Failed to pull repository after {_options.MaxRetryAttempts} attempts",

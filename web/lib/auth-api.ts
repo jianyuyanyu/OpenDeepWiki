@@ -1,12 +1,15 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+function getApiBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_API_URL ?? "";
+}
 
 function buildApiUrl(path: string) {
-  if (!API_BASE_URL) {
+  const baseUrl = getApiBaseUrl();
+  if (!baseUrl) {
     return path;
   }
-  const trimmedBase = API_BASE_URL.endsWith("/")
-    ? API_BASE_URL.slice(0, -1)
-    : API_BASE_URL;
+  const trimmedBase = baseUrl.endsWith("/")
+    ? baseUrl.slice(0, -1)
+    : baseUrl;
   return `${trimmedBase}${path}`;
 }
 

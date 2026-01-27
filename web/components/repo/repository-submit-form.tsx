@@ -22,7 +22,7 @@ interface RepositorySubmitFormProps {
   onSuccess?: () => void;
 }
 
-const GIT_URL_REGEX = /^(https?:\/\/|git@)[\w.-]+[/:].+\.git$/i;
+const GIT_URL_REGEX = /^(https?:\/\/|git@)[\w.-]+[/:].+?(\.git)?$/i;
 
 const SUPPORTED_LANGUAGES = [
   { code: "en", label: "languages.en" },

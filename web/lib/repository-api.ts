@@ -8,7 +8,7 @@ import type {
   UpdateVisibilityResponse
 } from "@/types/repository";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 function buildApiUrl(path: string) {
   if (!API_BASE_URL) {

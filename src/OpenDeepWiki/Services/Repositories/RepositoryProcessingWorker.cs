@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Services.Wiki;
+using System.Diagnostics;
 
 namespace OpenDeepWiki.Services.Repositories;
 
@@ -20,19 +21,29 @@ public class RepositoryProcessingWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        logger.LogInformation("Repository processing worker started. Polling interval: {PollingInterval}s", 
+            PollingInterval.TotalSeconds);
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 await ProcessPendingAsync(stoppingToken);
             }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                logger.LogInformation("Repository processing worker is shutting down");
+                break;
+            }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Repository processing loop failed.");
+                logger.LogError(ex, "Repository processing loop failed unexpectedly");
             }
 
             await Task.Delay(PollingInterval, stoppingToken);
         }
+
+        logger.LogInformation("Repository processing worker stopped");
     }
 
     private async Task ProcessPendingAsync(CancellationToken stoppingToken)
@@ -44,19 +55,19 @@ public class RepositoryProcessingWorker(
 
         if (context is null)
         {
-            logger.LogWarning("IContext is not registered, skip repository processing.");
+            logger.LogWarning("IContext is not registered, skip repository processing");
             return;
         }
 
         if (repositoryAnalyzer is null)
         {
-            logger.LogWarning("IRepositoryAnalyzer is not registered, skip repository processing.");
+            logger.LogWarning("IRepositoryAnalyzer is not registered, skip repository processing");
             return;
         }
 
         if (wikiGenerator is null)
         {
-            logger.LogWarning("IWikiGenerator is not registered, skip repository processing.");
+            logger.LogWarning("IWikiGenerator is not registered, skip repository processing");
             return;
         }
 
@@ -69,6 +80,7 @@ public class RepositoryProcessingWorker(
 
             if (repository is null)
             {
+                logger.LogDebug("No pending repositories found");
                 break;
             }
 
@@ -78,9 +90,10 @@ public class RepositoryProcessingWorker(
             context.Repositories.Update(repository);
             await context.SaveChangesAsync(stoppingToken);
 
+            var stopwatch = Stopwatch.StartNew();
             logger.LogInformation(
-                "Processing repository {RepositoryId}: {Org}/{Repo}",
-                repository.Id, repository.OrgName, repository.RepoName);
+                "Starting repository processing. RepositoryId: {RepositoryId}, Repository: {Org}/{Repo}, GitUrl: {GitUrl}",
+                repository.Id, repository.OrgName, repository.RepoName, repository.GitUrl);
 
             try
             {
@@ -91,19 +104,30 @@ public class RepositoryProcessingWorker(
                     wikiGenerator, 
                     stoppingToken);
 
+                stopwatch.Stop();
                 // Transition to Completed status
                 repository.Status = RepositoryStatus.Completed;
                 logger.LogInformation(
-                    "Repository processing completed for {RepositoryId}",
-                    repository.Id);
+                    "Repository processing completed successfully. RepositoryId: {RepositoryId}, Repository: {Org}/{Repo}, Duration: {Duration}ms",
+                    repository.Id, repository.OrgName, repository.RepoName, stopwatch.ElapsedMilliseconds);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                stopwatch.Stop();
+                repository.Status = RepositoryStatus.Pending; // Reset to pending for retry
+                logger.LogWarning(
+                    "Repository processing cancelled. RepositoryId: {RepositoryId}, Repository: {Org}/{Repo}, Duration: {Duration}ms",
+                    repository.Id, repository.OrgName, repository.RepoName, stopwatch.ElapsedMilliseconds);
+                throw;
             }
             catch (Exception ex)
             {
+                stopwatch.Stop();
                 // Transition to Failed status
                 repository.Status = RepositoryStatus.Failed;
                 logger.LogError(ex, 
-                    "Repository processing failed for {RepositoryId}: {Org}/{Repo}",
-                    repository.Id, repository.OrgName, repository.RepoName);
+                    "Repository processing failed. RepositoryId: {RepositoryId}, Repository: {Org}/{Repo}, Duration: {Duration}ms, ErrorType: {ErrorType}",
+                    repository.Id, repository.OrgName, repository.RepoName, stopwatch.ElapsedMilliseconds, ex.GetType().Name);
             }
 
             repository.UpdateTimestamp();
@@ -129,10 +153,14 @@ public class RepositoryProcessingWorker(
         if (branches.Count == 0)
         {
             logger.LogWarning(
-                "No branches found for repository {RepositoryId}, skipping",
-                repository.Id);
+                "No branches found for repository. RepositoryId: {RepositoryId}, Repository: {Org}/{Repo}",
+                repository.Id, repository.OrgName, repository.RepoName);
             return;
         }
+
+        logger.LogInformation(
+            "Found {BranchCount} branches to process for repository {Org}/{Repo}",
+            branches.Count, repository.OrgName, repository.RepoName);
 
         foreach (var branch in branches)
         {
@@ -159,9 +187,10 @@ public class RepositoryProcessingWorker(
         IWikiGenerator wikiGenerator,
         CancellationToken stoppingToken)
     {
+        var branchStopwatch = Stopwatch.StartNew();
         logger.LogInformation(
-            "Processing branch {BranchName} for repository {Org}/{Repo}",
-            branch.BranchName, repository.OrgName, repository.RepoName);
+            "Starting branch processing. BranchId: {BranchId}, Branch: {BranchName}, Repository: {Org}/{Repo}, LastCommitId: {LastCommitId}",
+            branch.Id, branch.BranchName, repository.OrgName, repository.RepoName, branch.LastCommitId ?? "none");
 
         // Prepare workspace with previous commit ID for incremental updates
         var workspace = await repositoryAnalyzer.PrepareWorkspaceAsync(
@@ -169,6 +198,10 @@ public class RepositoryProcessingWorker(
             branch.BranchName,
             branch.LastCommitId,
             stoppingToken);
+
+        logger.LogDebug(
+            "Workspace prepared. WorkingDirectory: {WorkingDirectory}, CurrentCommit: {CurrentCommit}, PreviousCommit: {PreviousCommit}, IsIncremental: {IsIncremental}",
+            workspace.WorkingDirectory, workspace.CommitId, workspace.PreviousCommitId ?? "none", workspace.IsIncremental);
 
         try
         {
@@ -180,10 +213,14 @@ public class RepositoryProcessingWorker(
             if (languages.Count == 0)
             {
                 logger.LogWarning(
-                    "No languages found for branch {BranchId}, skipping",
-                    branch.Id);
+                    "No languages found for branch. BranchId: {BranchId}, Branch: {BranchName}",
+                    branch.Id, branch.BranchName);
                 return;
             }
+
+            logger.LogInformation(
+                "Found {LanguageCount} languages to process for branch {BranchName}: {Languages}",
+                languages.Count, branch.BranchName, string.Join(", ", languages.Select(l => l.LanguageCode)));
 
             // Check if this is an incremental update
             var isIncremental = workspace.IsIncremental && 
@@ -199,10 +236,15 @@ public class RepositoryProcessingWorker(
                     stoppingToken);
 
                 logger.LogInformation(
-                    "Incremental update: {Count} files changed between {OldCommit} and {NewCommit}",
+                    "Incremental update detected. ChangedFileCount: {Count}, OldCommit: {OldCommit}, NewCommit: {NewCommit}",
                     changedFiles.Length,
                     workspace.PreviousCommitId,
                     workspace.CommitId);
+
+                if (changedFiles.Length > 0 && changedFiles.Length <= 20)
+                {
+                    logger.LogDebug("Changed files: {ChangedFiles}", string.Join(", ", changedFiles));
+                }
             }
 
             foreach (var language in languages)
@@ -224,13 +266,15 @@ public class RepositoryProcessingWorker(
             context.RepositoryBranches.Update(branch);
             await context.SaveChangesAsync(stoppingToken);
 
+            branchStopwatch.Stop();
             logger.LogInformation(
-                "Branch {BranchName} processed successfully. Commit ID: {CommitId}",
-                branch.BranchName, workspace.CommitId);
+                "Branch processing completed. BranchId: {BranchId}, Branch: {BranchName}, CommitId: {CommitId}, Duration: {Duration}ms",
+                branch.Id, branch.BranchName, workspace.CommitId, branchStopwatch.ElapsedMilliseconds);
         }
         finally
         {
             // Cleanup workspace
+            logger.LogDebug("Cleaning up workspace at {WorkingDirectory}", workspace.WorkingDirectory);
             await repositoryAnalyzer.CleanupWorkspaceAsync(workspace, stoppingToken);
         }
     }
@@ -246,28 +290,50 @@ public class RepositoryProcessingWorker(
         string[]? changedFiles,
         CancellationToken stoppingToken)
     {
+        var languageStopwatch = Stopwatch.StartNew();
         logger.LogInformation(
-            "Processing language {LanguageCode} for {Org}/{Repo}",
-            language.LanguageCode, workspace.Organization, workspace.RepositoryName);
+            "Starting language processing. LanguageId: {LanguageId}, Language: {LanguageCode}, Repository: {Org}/{Repo}, Mode: {Mode}",
+            language.Id, language.LanguageCode, workspace.Organization, workspace.RepositoryName,
+            isIncremental ? "Incremental" : "Full");
 
-        if (isIncremental && changedFiles != null && changedFiles.Length > 0)
+        try
         {
-            // Incremental update: only update affected documents
-            await wikiGenerator.IncrementalUpdateAsync(
-                workspace,
-                language,
-                changedFiles,
-                stoppingToken);
-        }
-        else
-        {
-            // Full generation: generate catalog and all documents
-            await wikiGenerator.GenerateCatalogAsync(workspace, language, stoppingToken);
-            await wikiGenerator.GenerateDocumentsAsync(workspace, language, stoppingToken);
-        }
+            if (isIncremental && changedFiles != null && changedFiles.Length > 0)
+            {
+                // Incremental update: only update affected documents
+                logger.LogDebug("Performing incremental update for {LanguageCode} with {FileCount} changed files",
+                    language.LanguageCode, changedFiles.Length);
+                    
+                await wikiGenerator.IncrementalUpdateAsync(
+                    workspace,
+                    language,
+                    changedFiles,
+                    stoppingToken);
+            }
+            else
+            {
+                // Full generation: generate catalog and all documents
+                logger.LogDebug("Performing full wiki generation for {LanguageCode}", language.LanguageCode);
+                
+                logger.LogInformation("Generating catalog for {LanguageCode}", language.LanguageCode);
+                await wikiGenerator.GenerateCatalogAsync(workspace, language, stoppingToken);
+                
+                logger.LogInformation("Generating documents for {LanguageCode}", language.LanguageCode);
+                await wikiGenerator.GenerateDocumentsAsync(workspace, language, stoppingToken);
+            }
 
-        logger.LogInformation(
-            "Language {LanguageCode} processing completed",
-            language.LanguageCode);
+            languageStopwatch.Stop();
+            logger.LogInformation(
+                "Language processing completed. LanguageId: {LanguageId}, Language: {LanguageCode}, Duration: {Duration}ms",
+                language.Id, language.LanguageCode, languageStopwatch.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            languageStopwatch.Stop();
+            logger.LogError(ex,
+                "Language processing failed. LanguageId: {LanguageId}, Language: {LanguageCode}, Duration: {Duration}ms",
+                language.Id, language.LanguageCode, languageStopwatch.ElapsedMilliseconds);
+            throw;
+        }
     }
 }

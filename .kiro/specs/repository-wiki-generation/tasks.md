@@ -123,15 +123,15 @@
 - [x] 9. Checkpoint - 确保后端核心功能完成
   - 确保所有测试通过，如有问题请询问用户
 
-- [-] 10. 实现 Wiki API
+- [x] 10. 实现 Wiki API
   - [x] 10.1 创建 WikiService API 端点
     - GET /api/v1/wiki/{org}/{repo}/catalog: 获取目录结构
     - GET /api/v1/wiki/{org}/{repo}/doc/{path}: 获取文档内容
     - _Requirements: 8.1, 8.2, 8.4_
-  - [-] 10.2 编写 API 404 响应属性测试
+  - [x] 10.2 编写 API 404 响应属性测试
     - **Property 12: API 404 for Non-Existent Paths**
     - **Validates: Requirements 8.3**
-  - [ ] 10.3 更新 RepositoryService
+  - [x] 10.3 更新 RepositoryService
     - 添加获取仓库列表 API（含状态）
     - _Requirements: 9.1_
 

@@ -15,7 +15,50 @@ public class RepositoryDocsService(IContext context)
     [HttpGet("/{owner}/{repo}/tree")]
     public async Task<RepositoryTreeResponse> GetTreeAsync(string owner, string repo)
     {
-        var repository = await GetRepositoryAsync(owner, repo);
+        var repository = await context.Repositories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.OrgName == owner && item.RepoName == repo);
+
+        // 仓库不存在
+        if (repository is null)
+        {
+            return new RepositoryTreeResponse
+            {
+                Owner = owner,
+                Repo = repo,
+                Exists = false,
+                Status = RepositoryStatus.Pending,
+                Nodes = []
+            };
+        }
+
+        // 仓库正在处理中或等待处理
+        if (repository.Status == RepositoryStatus.Pending || repository.Status == RepositoryStatus.Processing)
+        {
+            return new RepositoryTreeResponse
+            {
+                Owner = repository.OrgName,
+                Repo = repository.RepoName,
+                Exists = true,
+                Status = repository.Status,
+                Nodes = []
+            };
+        }
+
+        // 仓库处理失败
+        if (repository.Status == RepositoryStatus.Failed)
+        {
+            return new RepositoryTreeResponse
+            {
+                Owner = repository.OrgName,
+                Repo = repository.RepoName,
+                Exists = true,
+                Status = repository.Status,
+                Nodes = []
+            };
+        }
+
+        // 仓库处理完成，获取文档目录
         var branch = await GetDefaultBranchAsync(repository.Id);
         var language = await GetDefaultLanguageAsync(branch.Id);
 
@@ -27,7 +70,15 @@ public class RepositoryDocsService(IContext context)
 
         if (directories.Count == 0)
         {
-            throw new InvalidOperationException("未找到文档目录");
+            // 仓库已完成但没有文档，可能是空仓库
+            return new RepositoryTreeResponse
+            {
+                Owner = repository.OrgName,
+                Repo = repository.RepoName,
+                Exists = true,
+                Status = repository.Status,
+                Nodes = []
+            };
         }
 
         var rootNodes = new List<RepositoryTreeNodeResponse>();
@@ -76,7 +127,9 @@ public class RepositoryDocsService(IContext context)
             Owner = repository.OrgName,
             Repo = repository.RepoName,
             DefaultSlug = defaultSlug,
-            Nodes = rootNodes
+            Nodes = rootNodes,
+            Exists = true,
+            Status = repository.Status
         };
     }
 
