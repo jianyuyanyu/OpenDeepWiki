@@ -41,4 +41,14 @@ public class RepositoryTreeResponse
     /// 仓库是否存在
     /// </summary>
     public bool Exists { get; set; } = true;
+
+    /// <summary>
+    /// 当前分支
+    /// </summary>
+    public string CurrentBranch { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 当前语言
+    /// </summary>
+    public string CurrentLanguage { get; set; } = string.Empty;
 }

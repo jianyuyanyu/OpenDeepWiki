@@ -51,11 +51,14 @@
 - `LanguageCode`
 - `UpdateSummary`（语言更新总结）
 
-### DocDirectory
+### DocCatalog
 - `Id`
 - `BranchLanguageId`
+- `ParentId`（父目录ID，null 表示根节点）
+- `Title`（目录标题）
 - `Path`（目录路径）
-- `DocFileId`
+- `Order`（排序顺序）
+- `DocFileId`（可为空）
 
 ### DocFile
 - `Id`
@@ -67,14 +70,15 @@
 - `User 1 - N Repository`
 - `Repository 1 - N RepositoryBranch`
 - `RepositoryBranch 1 - N BranchLanguage`
-- `BranchLanguage 1 - N DocDirectory`
-- `DocDirectory 1 - 1 DocFile`
+- `BranchLanguage 1 - N DocCatalog`
+- `DocCatalog 0..1 - 1 DocFile`
+- `DocCatalog 1 - N DocCatalog`（树形结构）
 
 建议唯一约束：
 - `Repository(OwnerUserId, OrgName, RepoName)` 唯一
 - `RepositoryBranch(RepositoryId, BranchName)` 唯一
 - `BranchLanguage(RepositoryBranchId, LanguageCode)` 唯一
-- `DocDirectory(BranchLanguageId, Path)` 唯一
+- `DocCatalog(BranchLanguageId, Path)` 唯一
 
 ## 权限与业务规则
 

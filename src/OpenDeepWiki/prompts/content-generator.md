@@ -17,9 +17,17 @@ You are a professional technical documentation writer and code analyst. Your res
 
 **Repository Information:**
 - Repository Name: {{repository_name}}
+- Git URL: {{git_url}}
+- Branch: {{branch}}
+- File Reference Base URL: {{file_base_url}}
 - Target Language: {{language}}
 - Catalog Path: {{catalog_path}}
 - Catalog Title: {{catalog_title}}
+
+**File Reference URL Format:**
+- Use `{{file_base_url}}/<file_path>` for linking to source files
+- Use `{{file_base_url}}/<file_path>#L<line>` for specific line references
+- Use `{{file_base_url}}/<file_path>#L<start>-L<end>` for line ranges
 
 **Language Guidelines:**
 - When `{{language}}` is `zh`, generate documentation content in Chinese
@@ -336,14 +344,14 @@ sequenceDiagram
 ```{language}
 {Simple code example from actual source}
 ```
-> Source: [filename](https://github.com/{org}/{repo}/blob/{branch}/{filepath}#L{startLine}-L{endLine})
+> Source: [filename]({{file_base_url}}/{filepath}#L{startLine}-L{endLine})
 
 ### Advanced Usage
 
 ```{language}
 {More complex example showing advanced features}
 ```
-> Source: [filename](https://github.com/{org}/{repo}/blob/{branch}/{filepath}#L{startLine}-L{endLine})
+> Source: [filename]({{file_base_url}}/{filepath}#L{startLine}-L{endLine})
 
 ## Configuration Options
 

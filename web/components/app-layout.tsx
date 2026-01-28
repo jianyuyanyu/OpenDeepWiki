@@ -31,8 +31,8 @@ export function AppLayout({ children, activeItem, onItemClick, searchBox }: AppL
   const currentWeekday = t(`common.weekdays.${weekdayKey}`);
 
   return (
-    <SidebarProvider>
-      <AppSidebar activeItem={defaultActiveItem} onItemClick={onItemClick} />
+    <SidebarProvider defaultOpen={true}>
+      <AppSidebar activeItem={defaultActiveItem} onItemClick={onItemClick} className="!flex" />
       <SidebarInset>
         <Header
           title={defaultActiveItem}

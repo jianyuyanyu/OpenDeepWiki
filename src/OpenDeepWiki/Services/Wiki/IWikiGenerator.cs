@@ -46,4 +46,19 @@ public interface IWikiGenerator
         BranchLanguage branchLanguage,
         string[] changedFiles,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Translates wiki content from source language to target language.
+    /// Creates new BranchLanguage, translates catalog structure and all documents.
+    /// </summary>
+    /// <param name="workspace">The prepared repository workspace.</param>
+    /// <param name="sourceBranchLanguage">The source branch language to translate from.</param>
+    /// <param name="targetLanguageCode">The target language code to translate to.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The newly created BranchLanguage for the target language.</returns>
+    Task<BranchLanguage> TranslateWikiAsync(
+        RepositoryWorkspace workspace,
+        BranchLanguage sourceBranchLanguage,
+        string targetLanguageCode,
+        CancellationToken cancellationToken = default);
 }

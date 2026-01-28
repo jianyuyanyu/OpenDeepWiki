@@ -17,12 +17,12 @@ public interface IContext
     DbSet<Repository> Repositories { get; set; }
     DbSet<RepositoryBranch> RepositoryBranches { get; set; }
     DbSet<BranchLanguage> BranchLanguages { get; set; }
-    DbSet<DocDirectory> DocDirectories { get; set; }
     DbSet<DocFile> DocFiles { get; set; }
     DbSet<DocCatalog> DocCatalogs { get; set; }
     DbSet<RepositoryAssignment> RepositoryAssignments { get; set; }
     DbSet<UserBookmark> UserBookmarks { get; set; }
     DbSet<UserSubscription> UserSubscriptions { get; set; }
+    DbSet<RepositoryProcessingLog> RepositoryProcessingLogs { get; set; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
@@ -44,12 +44,12 @@ public abstract class MasterDbContext : DbContext, IContext
     public DbSet<Repository> Repositories { get; set; } = null!;
     public DbSet<RepositoryBranch> RepositoryBranches { get; set; } = null!;
     public DbSet<BranchLanguage> BranchLanguages { get; set; } = null!;
-    public DbSet<DocDirectory> DocDirectories { get; set; } = null!;
     public DbSet<DocFile> DocFiles { get; set; } = null!;
     public DbSet<DocCatalog> DocCatalogs { get; set; } = null!;
     public DbSet<RepositoryAssignment> RepositoryAssignments { get; set; } = null!;
     public DbSet<UserBookmark> UserBookmarks { get; set; } = null!;
     public DbSet<UserSubscription> UserSubscriptions { get; set; } = null!;
+    public DbSet<RepositoryProcessingLog> RepositoryProcessingLogs { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -71,15 +71,6 @@ public abstract class MasterDbContext : DbContext, IContext
         modelBuilder.Entity<BranchLanguage>()
             .HasIndex(language => new { language.RepositoryBranchId, language.LanguageCode })
             .IsUnique();
-
-        modelBuilder.Entity<DocDirectory>()
-            .HasIndex(directory => new { directory.BranchLanguageId, directory.Path })
-            .IsUnique();
-
-        modelBuilder.Entity<DocDirectory>()
-            .HasOne(directory => directory.DocFile)
-            .WithOne()
-            .HasForeignKey<DocDirectory>(directory => directory.DocFileId);
 
         // DocCatalog 树形结构配置
         modelBuilder.Entity<DocCatalog>()
@@ -109,5 +100,9 @@ public abstract class MasterDbContext : DbContext, IContext
         modelBuilder.Entity<UserSubscription>()
             .HasIndex(s => new { s.UserId, s.RepositoryId })
             .IsUnique();
+
+        // RepositoryProcessingLog 索引（按仓库ID和创建时间查询）
+        modelBuilder.Entity<RepositoryProcessingLog>()
+            .HasIndex(log => new { log.RepositoryId, log.CreatedAt });
     }
 }

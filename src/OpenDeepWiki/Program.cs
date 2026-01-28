@@ -175,6 +175,13 @@ try
             {
                 options.ContentApiKey = contentApiKey;
             }
+
+            // 多语言配置，逗号分割的语言代码列表，如 "en,zh,ja,ko"
+            var languages = Environment.GetEnvironmentVariable("WIKI_LANGUAGES");
+            if (!string.IsNullOrWhiteSpace(languages))
+            {
+                options.Languages = languages;
+            }
         });
 
     // 注册 Prompt Plugin
@@ -194,6 +201,9 @@ try
 
     // 注册 Wiki Generator
     builder.Services.AddScoped<IWikiGenerator, WikiGenerator>();
+
+    // 注册处理日志服务（使用 Singleton，因为它内部使用 IServiceScopeFactory 创建独立 scope）
+    builder.Services.AddSingleton<IProcessingLogService, ProcessingLogService>();
 
     builder.Services.AddHostedService<RepositoryProcessingWorker>();
 
@@ -223,6 +233,7 @@ try
     app.MapOAuthEndpoints();
     app.MapBookmarkEndpoints();
     app.MapSubscriptionEndpoints();
+    app.MapProcessingLogEndpoints();
 
     app.Run();
 }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using Microsoft.Agents.AI;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -17,6 +18,36 @@ using ChatMessage = Microsoft.Extensions.AI.ChatMessage;
 namespace OpenDeepWiki.Services.Wiki;
 
 /// <summary>
+/// Token usage statistics for tracking AI model consumption.
+/// </summary>
+public class TokenUsageStats
+{
+    public int InputTokens { get; private set; }
+    public int OutputTokens { get; private set; }
+    public int TotalTokens => InputTokens + OutputTokens;
+    public int ToolCallCount { get; private set; }
+
+    public void Add(int inputTokens, int outputTokens, int toolCalls = 0)
+    {
+        InputTokens += inputTokens;
+        OutputTokens += outputTokens;
+        ToolCallCount += toolCalls;
+    }
+
+    public void Reset()
+    {
+        InputTokens = 0;
+        OutputTokens = 0;
+        ToolCallCount = 0;
+    }
+
+    public override string ToString()
+    {
+        return $"InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}, ToolCalls: {ToolCallCount}";
+    }
+}
+
+/// <summary>
 /// Implementation of IWikiGenerator using AI agents.
 /// Generates wiki catalog structures and document content using configured AI models.
 /// </summary>
@@ -27,6 +58,10 @@ public class WikiGenerator : IWikiGenerator
     private readonly WikiGeneratorOptions _options;
     private readonly IContext _context;
     private readonly ILogger<WikiGenerator> _logger;
+    private readonly IProcessingLogService _processingLogService;
+
+    // 当前处理的仓库ID（用于记录日志）
+    private string? _currentRepositoryId;
 
     /// <summary>
     /// Initializes a new instance of WikiGenerator.
@@ -36,17 +71,27 @@ public class WikiGenerator : IWikiGenerator
         IPromptPlugin promptPlugin,
         IOptions<WikiGeneratorOptions> options,
         IContext context,
-        ILogger<WikiGenerator> logger)
+        ILogger<WikiGenerator> logger,
+        IProcessingLogService processingLogService)
     {
         _agentFactory = agentFactory ?? throw new ArgumentNullException(nameof(agentFactory));
         _promptPlugin = promptPlugin ?? throw new ArgumentNullException(nameof(promptPlugin));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _processingLogService = processingLogService ?? throw new ArgumentNullException(nameof(processingLogService));
 
         _logger.LogDebug(
             "WikiGenerator initialized. CatalogModel: {CatalogModel}, ContentModel: {ContentModel}, MaxRetryAttempts: {MaxRetry}",
             _options.CatalogModel, _options.ContentModel, _options.MaxRetryAttempts);
+    }
+
+    /// <summary>
+    /// 设置当前处理的仓库ID
+    /// </summary>
+    public void SetCurrentRepository(string repositoryId)
+    {
+        _currentRepositoryId = repositoryId;
     }
 
     /// <inheritdoc />
@@ -60,6 +105,9 @@ public class WikiGenerator : IWikiGenerator
             "Starting catalog generation. Repository: {Org}/{Repo}, Branch: {Branch}, Language: {Language}, BranchLanguageId: {BranchLanguageId}",
             workspace.Organization, workspace.RepositoryName,
             workspace.BranchName, branchLanguage.LanguageCode, branchLanguage.Id);
+
+        // 记录开始生成目录
+        await LogProcessingAsync(ProcessingStep.Catalog, $"开始生成目录结构 ({branchLanguage.LanguageCode})", cancellationToken);
 
         try
         {
@@ -115,19 +163,24 @@ public class WikiGenerator : IWikiGenerator
 
 Please start executing the task.";
 
-            await ExecuteAgentWithRetryAsync(
+            var tokenStats = await ExecuteAgentWithRetryAsync(
                 _options.CatalogModel,
                 _options.GetCatalogRequestOptions(),
                 prompt,
                 userMessage,
                 tools,
                 "CatalogGeneration",
+                ProcessingStep.Catalog,
                 cancellationToken);
 
             stopwatch.Stop();
             _logger.LogInformation(
-                "Catalog generation completed successfully. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms",
-                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, stopwatch.ElapsedMilliseconds);
+                "Catalog generation completed successfully. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms, {TokenStats}",
+                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, stopwatch.ElapsedMilliseconds, tokenStats);
+
+            await LogProcessingAsync(ProcessingStep.Catalog, 
+                $"目录结构生成完成，耗时 {stopwatch.ElapsedMilliseconds}ms，输入Token: {tokenStats.InputTokens}，输出Token: {tokenStats.OutputTokens}，总Token: {tokenStats.TotalTokens}", 
+   
         }
         catch (Exception ex)
         {
@@ -152,14 +205,20 @@ Please start executing the task.";
             workspace.Organization, workspace.RepositoryName,
             workspace.BranchName, branchLanguage.LanguageCode);
 
+        // 记录开始生成文档
+        await LogProcessingAsync(ProcessingStep.Content, $"开始生成文档内容 ({branchLanguage.LanguageCode})", cancellationToken);
+
         // Get all catalog items that need content generation
         var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
         var catalogJson = await catalogStorage.GetCatalogJsonAsync(cancellationToken);
         var catalogItems = GetAllCatalogPaths(catalogJson);
 
+        var parallelCount = _options.ParallelCount;
         _logger.LogInformation(
-            "Found {Count} catalog items to generate content for. Repository: {Org}/{Repo}",
-            catalogItems.Count, workspace.Organization, workspace.RepositoryName);
+            "Found {Count} catalog items to generate content for. Repository: {Org}/{Repo}, ParallelCount: {ParallelCount}",
+            catalogItems.Count, workspace.Organization, workspace.RepositoryName, parallelCount);
+
+        await LogProcessingAsync(ProcessingStep.Content, $"发现 {catalogItems.Count} 个文档需要生成，并行数: {parallelCount}", cancellationToken);
 
         if (catalogItems.Count > 0)
         {
@@ -169,32 +228,48 @@ Please start executing the task.";
 
         var successCount = 0;
         var failCount = 0;
+        var processedCount = 0;
+        var lockObj = new object();
 
-        foreach (var (path, title) in catalogItems)
+        // Use SemaphoreSlim to control parallel execution
+        using var semaphore = new SemaphoreSlim(parallelCount, parallelCount);
+        var tasks = catalogItems.Select(async item =>
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
+            await semaphore.WaitAsync(cancellationToken);
             try
             {
+                var currentIndex = Interlocked.Increment(ref processedCount);
+                await LogProcessingAsync(ProcessingStep.Content, $"正在生成文档 ({currentIndex}/{catalogItems.Count}): {item.Title}", cancellationToken);
+
                 await GenerateDocumentContentAsync(
-                    workspace, branchLanguage, path, title, cancellationToken);
-                successCount++;
+                    workspace, branchLanguage, item.Path, item.Title, cancellationToken);
+                
+                lock (lockObj) { successCount++; }
             }
             catch (Exception ex)
             {
-                failCount++;
+                lock (lockObj) { failCount++; }
                 _logger.LogError(ex,
                     "Failed to generate document. Path: {Path}, Title: {Title}, Repository: {Org}/{Repo}",
-                    path, title, workspace.Organization, workspace.RepositoryName);
+                    item.Path, item.Title, workspace.Organization, workspace.RepositoryName);
+                await LogProcessingAsync(ProcessingStep.Content, $"文档生成失败: {item.Title} - {ex.Message}", cancellationToken);
                 // Continue with other documents
             }
-        }
+            finally
+            {
+                semaphore.Release();
+            }
+        }).ToList();
+
+        await Task.WhenAll(tasks);
 
         stopwatch.Stop();
         _logger.LogInformation(
             "Document generation completed. Repository: {Org}/{Repo}, Language: {Language}, Success: {SuccessCount}, Failed: {FailCount}, Duration: {Duration}ms",
             workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode,
             successCount, failCount, stopwatch.ElapsedMilliseconds);
+
+        await LogProcessingAsync(ProcessingStep.Content, $"文档生成完成，成功: {successCount}，失败: {failCount}，耗时: {stopwatch.ElapsedMilliseconds}ms", cancellationToken);
     }
 
     /// <inheritdoc />
@@ -245,11 +320,9 @@ Please start executing the task.";
             var gitTool = new GitTool(workspace.WorkingDirectory);
             var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
             var catalogTool = new CatalogTool(catalogStorage);
-            var docTool = new DocTool(_context, branchLanguage.Id);
 
             var tools = gitTool.GetTools()
                 .Concat(catalogTool.GetTools())
-                .Concat(docTool.GetTools())
                 .ToArray();
 
             var userMessage = $@"Please analyze code changes in repository {workspace.Organization}/{workspace.RepositoryName} and update relevant Wiki documentation.
@@ -299,6 +372,7 @@ Please start executing the task.";
                 userMessage,
                 tools,
                 "IncrementalUpdate",
+                ProcessingStep.Content,
                 cancellationToken);
 
             stopwatch.Stop();
@@ -333,6 +407,9 @@ Please start executing the task.";
 
         try
         {
+            // 构建文件引用的基础URL
+            var gitBaseUrl = BuildGitFileBaseUrl(workspace.GitUrl, workspace.BranchName);
+
             var prompt = await _promptPlugin.LoadPromptAsync(
                 "content-generator",
                 new Dictionary<string, string>
@@ -345,7 +422,7 @@ Please start executing the task.";
                 cancellationToken);
 
             var gitTool = new GitTool(workspace.WorkingDirectory);
-            var docTool = new DocTool(_context, branchLanguage.Id);
+            var docTool = new DocTool(_context, branchLanguage.Id, catalogPath);
 
             var tools = gitTool.GetTools()
                 .Concat(docTool.GetTools())
@@ -356,6 +433,9 @@ Please start executing the task.";
 ## Repository Information
 
 - Repository: {workspace.Organization}/{workspace.RepositoryName}
+- Git URL: {workspace.GitUrl}
+- Branch: {workspace.BranchName}
+- File Reference Base URL: {gitBaseUrl}
 - Target Language: {branchLanguage.LanguageCode}
 
 ## Task Requirements
@@ -368,30 +448,62 @@ Please start executing the task.";
 2. **Document Structure** (Must Include)
    - Title (H1): Must match catalog title
    - Overview: Explain purpose and use cases
+   - Architecture Diagram: Use Mermaid to illustrate component relationships, data flow, or system architecture
    - Main Content: Detailed explanation of implementation, architecture, or usage
    - Usage Examples: Code examples extracted from actual source code
    - Configuration Options (if applicable): List options in table format
    - API Reference (if applicable): Method signatures, parameters, return values
-   - Related Links: Links to related documentation
+   - Related Links: Links to related documentation and source files
 
-3. **Content Quality Requirements**
+3. **File Reference Links** (IMPORTANT)
+   - When referencing source files, use the full URL format: {gitBaseUrl}/<file_path>
+   - Example: [{gitBaseUrl}/src/Example.cs]({gitBaseUrl}/src/Example.cs)
+   - For specific line references: {gitBaseUrl}/<file_path>#L<line_number>
+   - Always provide clickable links to source files mentioned in the document
+
+4. **Mermaid Diagram Requirements** (IMPORTANT)
+   - Include at least one architecture or flow diagram using Mermaid
+   - Use appropriate diagram types:
+     * `flowchart TD` or `flowchart LR` for process flows and component relationships
+     * `classDiagram` for class structures and inheritance
+     * `sequenceDiagram` for interaction sequences
+     * `erDiagram` for data models and relationships
+     * `stateDiagram-v2` for state machines
+   - Mermaid syntax rules:
+     * Node IDs must not contain special characters (use letters, numbers, underscores only)
+     * Use quotes for labels with special characters: `A[""Label with (parentheses)""]`
+     * Escape special characters in labels properly
+     * Keep diagrams focused and readable (max 15-20 nodes per diagram)
+     * Use subgraph for grouping related components
+   - Example valid Mermaid syntax:
+     ```mermaid
+     flowchart TD
+         subgraph Core[""Core Components""]
+             A[Service Layer] --> B[Repository]
+             B --> C[(Database)]
+         end
+         D[API Controller] --> A
+     ```
+
+5. **Content Quality Requirements**
    - All information must be based on actual source code, do not fabricate
    - Code examples must be extracted from repository with syntax highlighting
    - Explain design intent (WHY), not just description (WHAT)
    - Write document content in {branchLanguage.LanguageCode} language
    - Keep code identifiers in original form, do not translate
 
-4. **Output Requirements**
+6. **Output Requirements**
    - Use WriteDoc tool to write the document
-   - catalogPath parameter: {catalogPath}
 
 ## Execution Steps
 
 1. Analyze catalog title to determine document scope
 2. Use ListFiles and Grep to find related source files
 3. Read key files, extract information and code examples
-4. Organize content following document structure template
-5. Call WriteDoc(""{catalogPath}"", content) to write document
+4. Design appropriate Mermaid diagrams to illustrate architecture/flow
+5. Organize content following document structure template
+6. Ensure all file references use the correct URL format with branch
+7. Call WriteDoc(content) to write document
 
 Please start executing the task.";
 
@@ -402,6 +514,7 @@ Please start executing the task.";
                 userMessage,
                 tools,
                 $"DocumentContent:{catalogPath}",
+                ProcessingStep.Content,
                 cancellationToken);
 
             stopwatch.Stop();
@@ -430,6 +543,7 @@ Please start executing the task.";
         string userMessage,
         AITool[] tools,
         string operationName,
+        ProcessingStep step,
         CancellationToken cancellationToken)
     {
         var retryCount = 0;
@@ -504,6 +618,12 @@ Please start executing the task.";
                     {
                         Console.Write(update.Text);
                         contentBuilder.Append(update.Text);
+
+                        // 记录AI输出（每100个字符记录一次，避免过于频繁）
+                        if (contentBuilder.Length % 200 < update.Text.Length)
+                        {
+                            await LogProcessingAsync(step, update.Text, true, null, cancellationToken);
+                        }
                     }
 
                     if (update.RawRepresentation is StreamingChatCompletionUpdate chatCompletionUpdate &&
@@ -519,6 +639,9 @@ Please start executing the task.";
                                 _logger.LogDebug(
                                     "Tool call #{CallNumber}: {FunctionName}. Operation: {Operation}",
                                     toolCallCount, tool.FunctionName, operationName);
+
+                                // 记录工具调用
+                                await LogProcessingAsync(step, $"调用工具: {tool.FunctionName}", false, tool.FunctionName, cancellationToken);
                             }
                             else
                             {
@@ -629,6 +752,7 @@ Please start executing the task.";
 
     /// <summary>
     /// Recursively collects catalog paths and titles.
+    /// Only collects leaf nodes (nodes without children) as parent nodes are just for categorization.
     /// </summary>
     private static void CollectCatalogPaths(
         List<CatalogItem> items,
@@ -636,12 +760,390 @@ Please start executing the task.";
     {
         foreach (var item in items)
         {
-            result.Add((item.Path, item.Title));
-
             if (item.Children.Count > 0)
             {
+                // Parent node - only for categorization, recurse into children
                 CollectCatalogPaths(item.Children, result);
             }
+            else
+            {
+                // Leaf node - needs document generation
+                result.Add((item.Path, item.Title));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 记录处理日志
+    /// </summary>
+    private async Task LogProcessingAsync(
+        ProcessingStep step,
+        string message,
+        bool isAiOutput = false,
+        string? toolName = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(_currentRepositoryId))
+        {
+            return;
+        }
+
+        try
+        {
+            await _processingLogService.LogAsync(
+                _currentRepositoryId,
+                step,
+                message,
+                isAiOutput,
+                toolName,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to log processing step");
+        }
+    }
+
+    /// <summary>
+    /// 记录处理日志（简化版本）
+    /// </summary>
+    private Task LogProcessingAsync(ProcessingStep step, string message, CancellationToken cancellationToken)
+    {
+        return LogProcessingAsync(step, message, false, null, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<BranchLanguage> TranslateWikiAsync(
+        RepositoryWorkspace workspace,
+        BranchLanguage sourceBranchLanguage,
+        string targetLanguageCode,
+        CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation(
+            "Starting wiki translation. Repository: {Org}/{Repo}, SourceLanguage: {SourceLang}, TargetLanguage: {TargetLang}",
+            workspace.Organization, workspace.RepositoryName,
+            sourceBranchLanguage.LanguageCode, targetLanguageCode);
+
+        await LogProcessingAsync(ProcessingStep.Translation, 
+            $"开始翻译 Wiki: {sourceBranchLanguage.LanguageCode} -> {targetLanguageCode}", cancellationToken);
+
+        try
+        {
+            // 1. 创建目标语言的BranchLanguage
+            var targetBranchLanguage = new BranchLanguage
+            {
+                Id = Guid.NewGuid().ToString(),
+                RepositoryBranchId = sourceBranchLanguage.RepositoryBranchId,
+                LanguageCode = targetLanguageCode.ToLowerInvariant()
+            };
+            _context.BranchLanguages.Add(targetBranchLanguage);
+            await _context.SaveChangesAsync(cancellationToken);
+
+            _logger.LogDebug("Created target BranchLanguage. Id: {Id}, LanguageCode: {LanguageCode}",
+                targetBranchLanguage.Id, targetBranchLanguage.LanguageCode);
+
+            // 2. 获取源语言的目录结构
+            var sourceCatalogStorage = new CatalogStorage(_context, sourceBranchLanguage.Id);
+            var sourceCatalogJson = await sourceCatalogStorage.GetCatalogJsonAsync(cancellationToken);
+
+            // 3. 翻译目录结构
+            await LogProcessingAsync(ProcessingStep.Translation, 
+                $"正在翻译目录结构 -> {targetLanguageCode}", cancellationToken);
+
+            var translatedCatalogJson = await TranslateCatalogAsync(
+                sourceCatalogJson,
+                sourceBranchLanguage.LanguageCode,
+                targetLanguageCode,
+                cancellationToken);
+
+            // 4. 保存翻译后的目录
+            var targetCatalogStorage = new CatalogStorage(_context, targetBranchLanguage.Id);
+            await targetCatalogStorage.SetCatalogAsync(translatedCatalogJson, cancellationToken);
+
+            _logger.LogInformation("Catalog translated and saved for {TargetLang}", targetLanguageCode);
+
+            // 5. 获取所有需要翻译的文档
+            var catalogItems = GetAllCatalogPaths(sourceCatalogJson);
+            var totalDocs = catalogItems.Count;
+            var translatedCount = 0;
+            var failedCount = 0;
+
+            await LogProcessingAsync(ProcessingStep.Translation, 
+                $"发现 {totalDocs} 个文档需要翻译 -> {targetLanguageCode}", cancellationToken);
+
+            // 6. 并行翻译所有文档
+            using var semaphore = new SemaphoreSlim(_options.ParallelCount, _options.ParallelCount);
+            var tasks = catalogItems.Select(async item =>
+            {
+                await semaphore.WaitAsync(cancellationToken);
+                try
+                {
+                    var currentIndex = Interlocked.Increment(ref translatedCount);
+                    await LogProcessingAsync(ProcessingStep.Translation, 
+                        $"正在翻译文档 ({currentIndex}/{totalDocs}): {item.Title} -> {targetLanguageCode}", cancellationToken);
+
+                    await TranslateDocumentAsync(
+                        sourceBranchLanguage.Id,
+                        targetBranchLanguage.Id,
+                        item.Path,
+                        sourceBranchLanguage.LanguageCode,
+                        targetLanguageCode,
+                        cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    Interlocked.Increment(ref failedCount);
+                    _logger.LogError(ex, "Failed to translate document. Path: {Path}, TargetLang: {TargetLang}",
+                        item.Path, targetLanguageCode);
+                }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }).ToList();
+
+            await Task.WhenAll(tasks);
+
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Wiki translation completed. Repository: {Org}/{Repo}, TargetLanguage: {TargetLang}, Success: {Success}, Failed: {Failed}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, targetLanguageCode,
+                translatedCount - failedCount, failedCount, stopwatch.ElapsedMilliseconds);
+
+            await LogProcessingAsync(ProcessingStep.Translation, 
+                $"翻译完成 -> {targetLanguageCode}，成功: {translatedCount - failedCount}，失败: {failedCount}，耗时: {stopwatch.ElapsedMilliseconds}ms", 
+                cancellationToken);
+
+            return targetBranchLanguage;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex,
+                "Wiki translation failed. Repository: {Org}/{Repo}, TargetLanguage: {TargetLang}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, targetLanguageCode, stopwatch.ElapsedMilliseconds);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Translates catalog JSON from source language to target language using AI.
+    /// </summary>
+    private async Task<string> TranslateCatalogAsync(
+        string sourceCatalogJson,
+        string sourceLanguage,
+        string targetLanguage,
+        CancellationToken cancellationToken)
+    {
+        var prompt = $@"You are a professional translator. Translate the following JSON catalog structure from {sourceLanguage} to {targetLanguage}.
+
+IMPORTANT RULES:
+1. Only translate the 'title' field values
+2. Keep 'path', 'order', and 'children' structure unchanged
+3. Keep the path values in English (lowercase with hyphens)
+4. Return valid JSON only, no explanations
+5. Maintain the exact same JSON structure
+
+Source catalog JSON:
+{sourceCatalogJson}
+
+Return the translated JSON:";
+
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, prompt)
+        };
+
+        var chatOptions = new ChatOptions
+        {
+            MaxOutputTokens = 16000
+        };
+
+        var chatClient = _agentFactory.CreateChatClient(_options.ContentModel, _options.GetContentRequestOptions());
+        var response = await chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
+
+        var translatedJson = response.Text?.Trim() ?? sourceCatalogJson;
+        
+        // 清理可能的markdown代码块标记
+        if (translatedJson.StartsWith("```"))
+        {
+            var lines = translatedJson.Split('\n');
+            translatedJson = string.Join('\n', lines.Skip(1).Take(lines.Length - 2));
+        }
+
+        return translatedJson;
+    }
+
+    /// <summary>
+    /// Translates a single document from source language to target language.
+    /// </summary>
+    private async Task TranslateDocumentAsync(
+        string sourceBranchLanguageId,
+        string targetBranchLanguageId,
+        string catalogPath,
+        string sourceLanguage,
+        string targetLanguage,
+        CancellationToken cancellationToken)
+    {
+        // 获取源文档内容
+        var sourceCatalog = await _context.DocCatalogs
+            .FirstOrDefaultAsync(c => c.BranchLanguageId == sourceBranchLanguageId && 
+                                      c.Path == catalogPath && 
+                                      !c.IsDeleted, cancellationToken);
+
+        if (sourceCatalog == null || string.IsNullOrEmpty(sourceCatalog.DocFileId))
+        {
+            _logger.LogWarning("Source document not found for path: {Path}", catalogPath);
+            return;
+        }
+
+        var sourceDocFile = await _context.DocFiles
+            .FirstOrDefaultAsync(d => d.Id == sourceCatalog.DocFileId && !d.IsDeleted, cancellationToken);
+
+        if (sourceDocFile == null || string.IsNullOrEmpty(sourceDocFile.Content))
+        {
+            _logger.LogWarning("Source document content not found for path: {Path}", catalogPath);
+            return;
+        }
+
+        // 翻译文档内容
+        var translatedContent = await TranslateContentAsync(
+            sourceDocFile.Content,
+            sourceLanguage,
+            targetLanguage,
+            cancellationToken);
+
+        // 获取目标目录项
+        var targetCatalog = await _context.DocCatalogs
+            .FirstOrDefaultAsync(c => c.BranchLanguageId == targetBranchLanguageId && 
+                                      c.Path == catalogPath && 
+                                      !c.IsDeleted, cancellationToken);
+
+        if (targetCatalog == null)
+        {
+            _logger.LogWarning("Target catalog not found for path: {Path}", catalogPath);
+            return;
+        }
+
+        // 创建翻译后的文档
+        var targetDocFile = new DocFile
+        {
+            Id = Guid.NewGuid().ToString(),
+            BranchLanguageId = targetBranchLanguageId,
+            Content = translatedContent
+        };
+
+        _context.DocFiles.Add(targetDocFile);
+        targetCatalog.DocFileId = targetDocFile.Id;
+        targetCatalog.UpdateTimestamp();
+
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Translates markdown content from source language to target language using AI.
+    /// </summary>
+    private async Task<string> TranslateContentAsync(
+        string sourceContent,
+        string sourceLanguage,
+        string targetLanguage,
+        CancellationToken cancellationToken)
+    {
+        var prompt = $@"You are a professional technical documentation translator. Translate the following Markdown document from {sourceLanguage} to {targetLanguage}.
+
+IMPORTANT RULES:
+1. Translate all text content to {targetLanguage}
+2. Keep all code blocks, code snippets, and technical identifiers unchanged
+3. Keep all URLs, file paths, and variable names unchanged
+4. Maintain the exact Markdown formatting (headers, lists, tables, etc.)
+5. Keep inline code (`code`) unchanged
+6. Translate comments inside code blocks if they are in {sourceLanguage}
+7. Return only the translated Markdown, no explanations
+
+Source document:
+{sourceContent}
+
+Translated document:";
+
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, prompt)
+        };
+
+        var chatOptions = new ChatOptions
+        {
+            MaxOutputTokens = 32000
+        };
+
+        var chatClient = _agentFactory.CreateChatClient(_options.ContentModel, _options.GetContentRequestOptions());
+        var response = await chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
+
+        return response.Text?.Trim() ?? sourceContent;
+    }
+
+    /// <summary>
+    /// Builds the base URL for file references in the repository.
+    /// Supports GitHub, GitLab, Gitee, Bitbucket, and Azure DevOps URL formats.
+    /// </summary>
+    /// <param name="gitUrl">The Git repository URL (can be HTTPS or SSH format)</param>
+    /// <param name="branchName">The branch name</param>
+    /// <returns>The base URL for file references</returns>
+    private static string BuildGitFileBaseUrl(string gitUrl, string branchName)
+    {
+        if (string.IsNullOrEmpty(gitUrl))
+        {
+            return string.Empty;
+        }
+
+        // Normalize the URL - remove .git suffix and convert SSH to HTTPS format
+        var normalizedUrl = gitUrl
+            .Replace(".git", "")
+            .Trim();
+
+        // Convert SSH format to HTTPS format
+        // git@github.com:owner/repo -> https://github.com/owner/repo
+        if (normalizedUrl.StartsWith("git@"))
+        {
+            normalizedUrl = normalizedUrl
+                .Replace("git@", "https://")
+                .Replace(":", "/");
+        }
+
+        // Remove trailing slash if present
+        normalizedUrl = normalizedUrl.TrimEnd('/');
+
+        // Determine the platform and build appropriate URL
+        if (normalizedUrl.Contains("github.com"))
+        {
+            // GitHub: https://github.com/owner/repo/blob/branch/path
+            return $"{normalizedUrl}/blob/{branchName}";
+        }
+        else if (normalizedUrl.Contains("gitlab.com") || normalizedUrl.Contains("gitlab"))
+        {
+            // GitLab: https://gitlab.com/owner/repo/-/blob/branch/path
+            return $"{normalizedUrl}/-/blob/{branchName}";
+        }
+        else if (normalizedUrl.Contains("gitee.com"))
+        {
+            // Gitee: https://gitee.com/owner/repo/blob/branch/path
+            return $"{normalizedUrl}/blob/{branchName}";
+        }
+        else if (normalizedUrl.Contains("bitbucket.org"))
+        {
+            // Bitbucket: https://bitbucket.org/owner/repo/src/branch/path
+            return $"{normalizedUrl}/src/{branchName}";
+        }
+        else if (normalizedUrl.Contains("dev.azure.com") || normalizedUrl.Contains("visualstudio.com"))
+        {
+            // Azure DevOps: https://dev.azure.com/org/project/_git/repo?path=/path&version=GBbranch
+            // Simplified format for file links
+            return $"{normalizedUrl}?version=GB{branchName}&path=";
+        }
+        else
+        {
+            // Default: assume GitHub-like format
+            return $"{normalizedUrl}/blob/{branchName}";
         }
     }
 }

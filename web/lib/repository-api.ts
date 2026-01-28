@@ -1,11 +1,13 @@
 import type { 
   RepoDocResponse, 
   RepoTreeResponse, 
+  RepoBranchesResponse,
   RepositorySubmitRequest, 
   RepositoryListResponse,
   RepositoryItemResponse,
   UpdateVisibilityRequest,
-  UpdateVisibilityResponse
+  UpdateVisibilityResponse,
+  ProcessingLogResponse
 } from "@/types/repository";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -29,9 +31,28 @@ function encodePathSegments(path: string) {
     .join("/");
 }
 
-export async function fetchRepoTree(owner: string, repo: string) {
+export async function fetchRepoBranches(owner: string, repo: string) {
   const url = buildApiUrl(
-    `/api/v1/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/tree`,
+    `/api/v1/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches`,
+  );
+
+  const response = await fetch(url, { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch repository branches");
+  }
+
+  return (await response.json()) as RepoBranchesResponse;
+}
+
+export async function fetchRepoTree(owner: string, repo: string, branch?: string, lang?: string) {
+  const params = new URLSearchParams();
+  if (branch) params.set("branch", branch);
+  if (lang) params.set("lang", lang);
+  
+  const queryString = params.toString();
+  const url = buildApiUrl(
+    `/api/v1/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/tree${queryString ? `?${queryString}` : ""}`,
   );
 
   const response = await fetch(url, { cache: "no-store" });
@@ -43,10 +64,15 @@ export async function fetchRepoTree(owner: string, repo: string) {
   return (await response.json()) as RepoTreeResponse;
 }
 
-export async function fetchRepoDoc(owner: string, repo: string, slug: string) {
+export async function fetchRepoDoc(owner: string, repo: string, slug: string, branch?: string, lang?: string) {
   const encodedSlug = encodePathSegments(slug);
+  const params = new URLSearchParams();
+  if (branch) params.set("branch", branch);
+  if (lang) params.set("lang", lang);
+  
+  const queryString = params.toString();
   const url = buildApiUrl(
-    `/api/v1/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/docs/${encodedSlug}`,
+    `/api/v1/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/docs/${encodedSlug}${queryString ? `?${queryString}` : ""}`,
   );
 
   const response = await fetch(url, { cache: "no-store" });
@@ -143,4 +169,51 @@ export async function updateRepositoryVisibility(
   }
 
   return await response.json();
+}
+
+/**
+ * Fetch repository status (client-side polling)
+ */
+export async function fetchRepoStatus(owner: string, repo: string): Promise<RepoTreeResponse> {
+  const url = buildApiUrl(
+    `/api/v1/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/tree`,
+  );
+
+  const response = await fetch(url, { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch repository status");
+  }
+
+  return (await response.json()) as RepoTreeResponse;
+}
+
+
+/**
+ * Fetch repository processing logs
+ */
+export async function fetchProcessingLogs(
+  owner: string,
+  repo: string,
+  since?: Date,
+  limit: number = 100
+): Promise<ProcessingLogResponse> {
+  const params = new URLSearchParams();
+  if (since) {
+    params.set("since", since.toISOString());
+  }
+  params.set("limit", limit.toString());
+
+  const queryString = params.toString();
+  const url = buildApiUrl(
+    `/api/v1/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/processing-logs${queryString ? `?${queryString}` : ""}`
+  );
+
+  const response = await fetch(url, { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch processing logs");
+  }
+
+  return (await response.json()) as ProcessingLogResponse;
 }

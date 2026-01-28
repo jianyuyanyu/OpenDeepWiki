@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Services.Wiki;
@@ -15,9 +16,11 @@ namespace OpenDeepWiki.Services.Repositories;
 /// </summary>
 public class RepositoryProcessingWorker(
     IServiceScopeFactory scopeFactory,
-    ILogger<RepositoryProcessingWorker> logger) : BackgroundService
+    ILogger<RepositoryProcessingWorker> logger,
+    IOptions<WikiGeneratorOptions> wikiOptions) : BackgroundService
 {
     private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(30);
+    private readonly WikiGeneratorOptions _wikiOptions = wikiOptions.Value;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -52,6 +55,7 @@ public class RepositoryProcessingWorker(
         var context = scope.ServiceProvider.GetService<IContext>();
         var repositoryAnalyzer = scope.ServiceProvider.GetService<IRepositoryAnalyzer>();
         var wikiGenerator = scope.ServiceProvider.GetService<IWikiGenerator>();
+        var processingLogService = scope.ServiceProvider.GetService<IProcessingLogService>();
 
         if (context is null)
         {
@@ -84,11 +88,30 @@ public class RepositoryProcessingWorker(
                 break;
             }
 
+            // 清除旧的处理日志
+            if (processingLogService != null)
+            {
+                await processingLogService.ClearLogsAsync(repository.Id, stoppingToken);
+            }
+
+            // 设置当前仓库ID到WikiGenerator
+            if (wikiGenerator is WikiGenerator generator)
+            {
+                generator.SetCurrentRepository(repository.Id);
+            }
+
             // Transition to Processing status
             repository.Status = RepositoryStatus.Processing;
             repository.UpdateTimestamp();
             context.Repositories.Update(repository);
             await context.SaveChangesAsync(stoppingToken);
+
+            // 记录开始处理
+            if (processingLogService != null)
+            {
+                await processingLogService.LogAsync(repository.Id, ProcessingStep.Workspace, 
+                    $"开始处理仓库 {repository.OrgName}/{repository.RepoName}", cancellationToken: stoppingToken);
+            }
 
             var stopwatch = Stopwatch.StartNew();
             logger.LogInformation(
@@ -101,7 +124,8 @@ public class RepositoryProcessingWorker(
                     repository, 
                     context, 
                     repositoryAnalyzer, 
-                    wikiGenerator, 
+                    wikiGenerator,
+                    processingLogService,
                     stoppingToken);
 
                 stopwatch.Stop();
@@ -110,6 +134,13 @@ public class RepositoryProcessingWorker(
                 logger.LogInformation(
                     "Repository processing completed successfully. RepositoryId: {RepositoryId}, Repository: {Org}/{Repo}, Duration: {Duration}ms",
                     repository.Id, repository.OrgName, repository.RepoName, stopwatch.ElapsedMilliseconds);
+
+                // 记录完成
+                if (processingLogService != null)
+                {
+                    await processingLogService.LogAsync(repository.Id, ProcessingStep.Complete, 
+                        $"仓库处理完成，总耗时 {stopwatch.ElapsedMilliseconds}ms", cancellationToken: stoppingToken);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -128,6 +159,13 @@ public class RepositoryProcessingWorker(
                 logger.LogError(ex, 
                     "Repository processing failed. RepositoryId: {RepositoryId}, Repository: {Org}/{Repo}, Duration: {Duration}ms, ErrorType: {ErrorType}",
                     repository.Id, repository.OrgName, repository.RepoName, stopwatch.ElapsedMilliseconds, ex.GetType().Name);
+
+                // 记录失败
+                if (processingLogService != null)
+                {
+                    await processingLogService.LogAsync(repository.Id, ProcessingStep.Content, 
+                        $"处理失败: {ex.Message}", cancellationToken: stoppingToken);
+                }
             }
 
             repository.UpdateTimestamp();
@@ -143,6 +181,7 @@ public class RepositoryProcessingWorker(
         IContext context,
         IRepositoryAnalyzer repositoryAnalyzer,
         IWikiGenerator wikiGenerator,
+        IProcessingLogService? processingLogService,
         CancellationToken stoppingToken)
     {
         // Get all branches for this repository
@@ -172,6 +211,7 @@ public class RepositoryProcessingWorker(
                 context,
                 repositoryAnalyzer,
                 wikiGenerator,
+                processingLogService,
                 stoppingToken);
         }
     }
@@ -185,12 +225,20 @@ public class RepositoryProcessingWorker(
         IContext context,
         IRepositoryAnalyzer repositoryAnalyzer,
         IWikiGenerator wikiGenerator,
+        IProcessingLogService? processingLogService,
         CancellationToken stoppingToken)
     {
         var branchStopwatch = Stopwatch.StartNew();
         logger.LogInformation(
             "Starting branch processing. BranchId: {BranchId}, Branch: {BranchName}, Repository: {Org}/{Repo}, LastCommitId: {LastCommitId}",
             branch.Id, branch.BranchName, repository.OrgName, repository.RepoName, branch.LastCommitId ?? "none");
+
+        // 记录准备工作区
+        if (processingLogService != null)
+        {
+            await processingLogService.LogAsync(repository.Id, ProcessingStep.Workspace, 
+                $"正在准备工作区，分支: {branch.BranchName}", cancellationToken: stoppingToken);
+        }
 
         // Prepare workspace with previous commit ID for incremental updates
         var workspace = await repositoryAnalyzer.PrepareWorkspaceAsync(
@@ -202,6 +250,13 @@ public class RepositoryProcessingWorker(
         logger.LogDebug(
             "Workspace prepared. WorkingDirectory: {WorkingDirectory}, CurrentCommit: {CurrentCommit}, PreviousCommit: {PreviousCommit}, IsIncremental: {IsIncremental}",
             workspace.WorkingDirectory, workspace.CommitId, workspace.PreviousCommitId ?? "none", workspace.IsIncremental);
+
+        // 记录工作区准备完成
+        if (processingLogService != null)
+        {
+            await processingLogService.LogAsync(repository.Id, ProcessingStep.Workspace, 
+                $"工作区准备完成，Commit: {workspace.CommitId[..Math.Min(7, workspace.CommitId.Length)]}", cancellationToken: stoppingToken);
+        }
 
         try
         {
@@ -255,6 +310,7 @@ public class RepositoryProcessingWorker(
                     workspace,
                     language,
                     wikiGenerator,
+                    context,
                     isIncremental,
                     changedFiles,
                     stoppingToken);
@@ -286,6 +342,7 @@ public class RepositoryProcessingWorker(
         RepositoryWorkspace workspace,
         BranchLanguage language,
         IWikiGenerator wikiGenerator,
+        IContext context,
         bool isIncremental,
         string[]? changedFiles,
         CancellationToken stoppingToken)
@@ -320,6 +377,43 @@ public class RepositoryProcessingWorker(
                 
                 logger.LogInformation("Generating documents for {LanguageCode}", language.LanguageCode);
                 await wikiGenerator.GenerateDocumentsAsync(workspace, language, stoppingToken);
+            }
+
+            // 获取需要翻译的目标语言列表
+            var translationLanguages = _wikiOptions.GetTranslationLanguages(language.LanguageCode);
+            
+            if (translationLanguages.Count > 0)
+            {
+                logger.LogInformation(
+                    "Starting multi-language translation. SourceLanguage: {SourceLang}, TargetLanguages: {TargetLangs}",
+                    language.LanguageCode, string.Join(", ", translationLanguages));
+
+                foreach (var targetLang in translationLanguages)
+                {
+                    stoppingToken.ThrowIfCancellationRequested();
+
+                    try
+                    {
+                        // 检查目标语言是否已存在
+                        var existingLang = await context.BranchLanguages
+                            .FirstOrDefaultAsync(l => l.RepositoryBranchId == language.RepositoryBranchId && 
+                                                      l.LanguageCode == targetLang, stoppingToken);
+
+                        if (existingLang != null)
+                        {
+                            logger.LogDebug("Target language {TargetLang} already exists, skipping translation", targetLang);
+                            continue;
+                        }
+
+                        logger.LogInformation("Translating wiki to {TargetLang}", targetLang);
+                        await wikiGenerator.TranslateWikiAsync(workspace, language, targetLang, stoppingToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Failed to translate wiki to {TargetLang}", targetLang);
+                        // 继续翻译其他语言，不中断整个流程
+                    }
+                }
             }
 
             languageStopwatch.Stop();

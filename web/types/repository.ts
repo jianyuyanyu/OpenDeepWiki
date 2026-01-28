@@ -12,6 +12,20 @@ export interface RepoTreeResponse {
   status: number;
   statusName: RepositoryStatus;
   exists: boolean;
+  currentBranch: string;
+  currentLanguage: string;
+}
+
+export interface RepoBranchesResponse {
+  branches: BranchItem[];
+  languages: string[];
+  defaultBranch: string;
+  defaultLanguage: string;
+}
+
+export interface BranchItem {
+  name: string;
+  languages: string[];
 }
 
 export interface RepoDocResponse {
@@ -70,4 +84,36 @@ export interface UpdateVisibilityResponse {
   isPublic: boolean;
   success: boolean;
   errorMessage?: string;
+}
+
+// Processing log types
+export type ProcessingStep = "Workspace" | "Catalog" | "Content" | "Complete";
+
+// 步骤数字到字符串的映射
+export const ProcessingStepMap: Record<number, ProcessingStep> = {
+  0: "Workspace",
+  1: "Catalog",
+  2: "Content",
+  3: "Complete",
+};
+
+export interface ProcessingLogItem {
+  id: string;
+  step: number;
+  stepName: ProcessingStep;
+  message: string;
+  isAiOutput: boolean;
+  toolName?: string;
+  createdAt: string;
+}
+
+export interface ProcessingLogResponse {
+  status: number;
+  statusName: RepositoryStatus;
+  currentStep: number;
+  currentStepName: ProcessingStep;
+  totalDocuments: number;
+  completedDocuments: number;
+  startedAt: string | null;
+  logs: ProcessingLogItem[];
 }

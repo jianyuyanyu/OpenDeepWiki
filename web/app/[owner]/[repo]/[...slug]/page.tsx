@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { fetchRepoDoc } from "@/lib/repository-api";
 import { extractHeadings } from "@/lib/markdown";
 import { MarkdownRenderer } from "@/components/repo/markdown-renderer";
-import { RepoToc } from "@/components/repo/repo-toc";
+import { DocsPage, DocsBody } from "fumadocs-ui/page";
+import type { TOCItemType } from "fumadocs-core/toc";
 
 interface RepoDocPageProps {
   params: Promise<{
@@ -34,14 +35,18 @@ export default async function RepoDocPage({ params }: RepoDocPageProps) {
 
   const { doc, headings } = data;
 
+  // 转换 headings 为 fumadocs TOC 格式
+  const toc: TOCItemType[] = headings.map((h) => ({
+    title: h.text,
+    url: `#${h.id}`,
+    depth: h.level,
+  }));
+
   return (
-    <div className="flex gap-8 p-6">
-      <div className="min-w-0 flex-1">
+    <DocsPage toc={toc}>
+      <DocsBody>
         <MarkdownRenderer content={doc.content} />
-      </div>
-      <aside className="hidden w-64 shrink-0 xl:block">
-        <RepoToc headings={headings} />
-      </aside>
-    </div>
+      </DocsBody>
+    </DocsPage>
   );
 }
