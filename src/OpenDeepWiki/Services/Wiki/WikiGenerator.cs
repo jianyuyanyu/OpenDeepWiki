@@ -163,7 +163,7 @@ public class WikiGenerator : IWikiGenerator
 
 Please start executing the task.";
 
-            var tokenStats = await ExecuteAgentWithRetryAsync(
+            await ExecuteAgentWithRetryAsync(
                 _options.CatalogModel,
                 _options.GetCatalogRequestOptions(),
                 prompt,
@@ -175,12 +175,12 @@ Please start executing the task.";
 
             stopwatch.Stop();
             _logger.LogInformation(
-                "Catalog generation completed successfully. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms, {TokenStats}",
-                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, stopwatch.ElapsedMilliseconds, tokenStats);
+                "Catalog generation completed successfully. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, stopwatch.ElapsedMilliseconds);
 
             await LogProcessingAsync(ProcessingStep.Catalog, 
-                $"目录结构生成完成，耗时 {stopwatch.ElapsedMilliseconds}ms，输入Token: {tokenStats.InputTokens}，输出Token: {tokenStats.OutputTokens}，总Token: {tokenStats.TotalTokens}", 
-   
+                $"目录结构生成完成，耗时 {stopwatch.ElapsedMilliseconds}ms", 
+                cancellationToken);
         }
         catch (Exception ex)
         {
@@ -955,15 +955,19 @@ Return the translated JSON:";
             new(ChatRole.User, prompt)
         };
 
-        var chatOptions = new ChatOptions
+        var chatClient = _agentFactory.CreateSimpleChatClient(_options.ContentModel, _options.GetContentRequestOptions());
+        var thread = await chatClient.GetNewThreadAsync(cancellationToken);
+        
+        var contentBuilder = new StringBuilder();
+        await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
         {
-            MaxOutputTokens = 16000
-        };
+            if (!string.IsNullOrEmpty(update.Text))
+            {
+                contentBuilder.Append(update.Text);
+            }
+        }
 
-        var chatClient = _agentFactory.CreateChatClient(_options.ContentModel, _options.GetContentRequestOptions());
-        var response = await chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
-
-        var translatedJson = response.Text?.Trim() ?? sourceCatalogJson;
+        var translatedJson = contentBuilder.ToString().Trim();
         
         // 清理可能的markdown代码块标记
         if (translatedJson.StartsWith("```"))
@@ -1071,15 +1075,19 @@ Translated document:";
             new(ChatRole.User, prompt)
         };
 
-        var chatOptions = new ChatOptions
+        var chatClient = _agentFactory.CreateSimpleChatClient(_options.ContentModel, _options.GetContentRequestOptions());
+        var thread = await chatClient.GetNewThreadAsync(cancellationToken);
+        
+        var contentBuilder = new StringBuilder();
+        await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
         {
-            MaxOutputTokens = 32000
-        };
+            if (!string.IsNullOrEmpty(update.Text))
+            {
+                contentBuilder.Append(update.Text);
+            }
+        }
 
-        var chatClient = _agentFactory.CreateChatClient(_options.ContentModel, _options.GetContentRequestOptions());
-        var response = await chatClient.GetResponseAsync(messages, chatOptions, cancellationToken);
-
-        return response.Text?.Trim() ?? sourceContent;
+        return contentBuilder.ToString().Trim();
     }
 
     /// <summary>

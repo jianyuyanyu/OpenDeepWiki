@@ -184,5 +184,24 @@ namespace OpenDeepWiki.Agents
 
             return (agent, tools);
         }
+
+        /// <summary>
+        /// Creates a simple ChatClientAgent without tools for translation tasks.
+        /// </summary>
+        /// <param name="model">The model name to use.</param>
+        /// <param name="requestOptions">Optional request options override.</param>
+        /// <returns>The ChatClientAgent.</returns>
+        public ChatClientAgent CreateSimpleChatClient(
+            string model,
+            AiRequestOptions? requestOptions = null)
+        {
+            var option = ResolveOptions(requestOptions ?? _options, true);
+            var clientAgentOptions = new ChatClientAgentOptions
+            {
+                ChatOptions = new ChatOptions()
+            };
+
+            return CreateAgentInternal(model, clientAgentOptions, option);
+        }
     }
 }
