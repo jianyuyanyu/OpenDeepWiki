@@ -55,7 +55,6 @@ export interface RepoHeading {
 export type RepositoryStatus = "Pending" | "Processing" | "Completed" | "Failed";
 
 export interface RepositorySubmitRequest {
-  ownerUserId: string;
   gitUrl: string;
   repoName: string;
   orgName: string;
@@ -88,7 +87,6 @@ export interface RepositoryListResponse {
 export interface UpdateVisibilityRequest {
   repositoryId: string;
   isPublic: boolean;
-  ownerUserId: string;
 }
 
 export interface UpdateVisibilityResponse {
@@ -128,4 +126,17 @@ export interface ProcessingLogResponse {
   completedDocuments: number;
   startedAt: string | null;
   logs: ProcessingLogItem[];
+}
+
+// GitHub repo check response
+export interface GitRepoCheckResponse {
+  exists: boolean;
+  name: string | null;
+  description: string | null;
+  defaultBranch: string | null;
+  starCount: number;
+  forkCount: number;
+  language: string | null;
+  avatarUrl: string | null;
+  gitUrl: string | null;
 }

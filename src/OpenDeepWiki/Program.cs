@@ -75,9 +75,11 @@ try
     builder.Services.AddAuthorization();
 
     // 注册认证服务
+    builder.Services.AddHttpContextAccessor();
     builder.Services.AddScoped<IJwtService, JwtService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<IOAuthService, OAuthService>();
+    builder.Services.AddScoped<IUserContext, UserContext>();
 
     // 添加HttpClient
     builder.Services.AddHttpClient();

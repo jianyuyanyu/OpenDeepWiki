@@ -8,7 +8,7 @@ namespace OpenDeepWiki.Services.Repositories;
 
 [MiniApi(Route = "/api/v1/repos")]
 [Tags("仓库文档")]
-public class RepositoryDocsService(IContext context)
+public class RepositoryDocsService(IContext context, IGitPlatformService gitPlatformService)
 {
     private const string DefaultLanguageCode = "zh";
 
@@ -35,30 +35,36 @@ public class RepositoryDocsService(IContext context)
 
         foreach (var branch in branches)
         {
-            var languages = await context.BranchLanguages
+            // 获取该分支下有实际文档内容的语言
+            var languagesWithContent = await context.BranchLanguages
                 .AsNoTracking()
                 .Where(item => item.RepositoryBranchId == branch.Id)
+                .Where(item => context.DocCatalogs.Any(c => c.BranchLanguageId == item.Id && !c.IsDeleted))
                 .Select(item => item.LanguageCode)
                 .ToListAsync();
 
-            branchItems.Add(new BranchItem
+            // 只有当分支有内容时才添加
+            if (languagesWithContent.Count > 0)
             {
-                Name = branch.BranchName,
-                Languages = languages
-            });
+                branchItems.Add(new BranchItem
+                {
+                    Name = branch.BranchName,
+                    Languages = languagesWithContent
+                });
 
-            foreach (var lang in languages)
-            {
-                allLanguages.Add(lang);
+                foreach (var lang in languagesWithContent)
+                {
+                    allLanguages.Add(lang);
+                }
             }
         }
 
-        // 确定默认分支
-        var defaultBranch = branches.FirstOrDefault(b => 
-            string.Equals(b.BranchName, "main", StringComparison.OrdinalIgnoreCase))?.BranchName
-            ?? branches.FirstOrDefault(b => 
-                string.Equals(b.BranchName, "master", StringComparison.OrdinalIgnoreCase))?.BranchName
-            ?? branches.FirstOrDefault()?.BranchName
+        // 确定默认分支（只从有内容的分支中选择）
+        var defaultBranch = branchItems.FirstOrDefault(b => 
+            string.Equals(b.Name, "main", StringComparison.OrdinalIgnoreCase))?.Name
+            ?? branchItems.FirstOrDefault(b => 
+                string.Equals(b.Name, "master", StringComparison.OrdinalIgnoreCase))?.Name
+            ?? branchItems.FirstOrDefault()?.Name
             ?? "";
 
         return new RepositoryBranchesResponse
@@ -148,11 +154,8 @@ public class RepositoryDocsService(IContext context)
             rootNodes.Add(BuildTreeNode(catalog, catalogMap));
         }
 
-        var defaultSlug = catalogs
-            .Where(c => c.ParentId == null)
-            .OrderBy(c => c.Order)
-            .Select(c => NormalizePath(c.Path))
-            .FirstOrDefault() ?? string.Empty;
+        // 递归查找第一个有实际内容的文档
+        var defaultSlug = FindFirstContentSlug(catalogs, null) ?? string.Empty;
 
         return new RepositoryTreeResponse
         {
@@ -202,6 +205,28 @@ public class RepositoryDocsService(IContext context)
         {
             Slug = normalizedSlug,
             Content = docFile.Content
+        };
+    }
+
+    /// <summary>
+    /// 检查GitHub仓库是否存在
+    /// </summary>
+    [HttpGet("/{owner}/{repo}/check")]
+    public async Task<GitRepoCheckResponse> CheckRepoAsync(string owner, string repo)
+    {
+        var repoInfo = await gitPlatformService.CheckRepoExistsAsync(owner, repo);
+        
+        return new GitRepoCheckResponse
+        {
+            Exists = repoInfo.Exists,
+            Name = repoInfo.Name,
+            Description = repoInfo.Description,
+            DefaultBranch = repoInfo.DefaultBranch,
+            StarCount = repoInfo.StarCount,
+            ForkCount = repoInfo.ForkCount,
+            Language = repoInfo.Language,
+            AvatarUrl = repoInfo.AvatarUrl,
+            GitUrl = $"https://github.com/{owner}/{repo}"
         };
     }
 
@@ -289,6 +314,35 @@ public class RepositoryDocsService(IContext context)
     private static string NormalizePath(string path)
     {
         return path.Trim().Trim('/');
+    }
+
+    /// <summary>
+    /// 递归查找第一个有实际内容的文档路径
+    /// </summary>
+    private static string? FindFirstContentSlug(List<DocCatalog> catalogs, string? parentId)
+    {
+        var children = catalogs
+            .Where(c => c.ParentId == parentId)
+            .OrderBy(c => c.Order)
+            .ToList();
+
+        foreach (var child in children)
+        {
+            // 如果当前节点有内容，返回它的路径
+            if (!string.IsNullOrEmpty(child.DocFileId))
+            {
+                return NormalizePath(child.Path);
+            }
+
+            // 否则递归查找子节点
+            var childSlug = FindFirstContentSlug(catalogs, child.Id);
+            if (childSlug != null)
+            {
+                return childSlug;
+            }
+        }
+
+        return null;
     }
 
     private static RepositoryTreeNodeResponse BuildTreeNode(DocCatalog catalog, Dictionary<string, DocCatalog> catalogMap)

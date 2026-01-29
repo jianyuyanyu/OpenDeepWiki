@@ -1,17 +1,21 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useSearchParams, usePathname } from "next/navigation";
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import type * as PageTree from "fumadocs-core/page-tree";
 import type { RepoTreeNode, RepoBranchesResponse } from "@/types/repository";
 import { BranchLanguageSelector } from "./branch-language-selector";
+import { fetchRepoTree, fetchRepoBranches } from "@/lib/repository-api";
 
 interface RepoShellProps {
   owner: string;
   repo: string;
-  nodes: RepoTreeNode[];
+  initialNodes: RepoTreeNode[];
   children: React.ReactNode;
-  branches?: RepoBranchesResponse;
-  currentBranch?: string;
-  currentLanguage?: string;
+  initialBranches?: RepoBranchesResponse;
+  initialBranch?: string;
+  initialLanguage?: string;
 }
 
 /**
@@ -20,16 +24,20 @@ interface RepoShellProps {
 function convertToPageTreeNode(
   node: RepoTreeNode,
   owner: string,
-  repo: string
+  repo: string,
+  queryString: string
 ): PageTree.Node {
-  const url = `/${owner}/${repo}/${node.slug}`;
+  const baseUrl = `/${owner}/${repo}/${node.slug}`;
+  // fumadocs 使用 pathname 匹配，不需要带查询参数
+  const url = baseUrl;
 
   if (node.children && node.children.length > 0) {
     return {
       type: "folder",
       name: node.title,
+      url,
       children: node.children.map((child) =>
-        convertToPageTreeNode(child, owner, repo)
+        convertToPageTreeNode(child, owner, repo, queryString)
       ),
     } as PageTree.Folder;
   }
@@ -47,24 +55,83 @@ function convertToPageTreeNode(
 function convertToPageTree(
   nodes: RepoTreeNode[],
   owner: string,
-  repo: string
+  repo: string,
+  queryString: string
 ): PageTree.Root {
   return {
     name: `${owner}/${repo}`,
-    children: nodes.map((node) => convertToPageTreeNode(node, owner, repo)),
+    children: nodes.map((node) => convertToPageTreeNode(node, owner, repo, queryString)),
   };
 }
 
 export function RepoShell({ 
   owner, 
   repo, 
-  nodes, 
+  initialNodes, 
   children,
-  branches,
-  currentBranch,
-  currentLanguage,
+  initialBranches,
+  initialBranch,
+  initialLanguage,
 }: RepoShellProps) {
-  const tree = convertToPageTree(nodes, owner, repo);
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const urlBranch = searchParams.get("branch");
+  const urlLang = searchParams.get("lang");
+  
+  const [nodes, setNodes] = useState<RepoTreeNode[]>(initialNodes);
+  const [branches, setBranches] = useState<RepoBranchesResponse | undefined>(initialBranches);
+  const [currentBranch, setCurrentBranch] = useState(initialBranch || "");
+  const [currentLanguage, setCurrentLanguage] = useState(initialLanguage || "");
+  const [isLoading, setIsLoading] = useState(false);
+
+  // 当 URL 参数变化时，重新获取数据
+  useEffect(() => {
+    const branch = urlBranch || undefined;
+    const lang = urlLang || undefined;
+    
+    // 如果没有指定参数，使用初始值
+    if (!branch && !lang) {
+      return;
+    }
+
+    // 如果参数和当前状态相同，不需要重新获取
+    if (branch === currentBranch && lang === currentLanguage) {
+      return;
+    }
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const [treeData, branchesData] = await Promise.all([
+          fetchRepoTree(owner, repo, branch, lang),
+          fetchRepoBranches(owner, repo),
+        ]);
+        
+        if (treeData.nodes.length > 0) {
+          setNodes(treeData.nodes);
+          setCurrentBranch(treeData.currentBranch || "");
+          setCurrentLanguage(treeData.currentLanguage || "");
+        }
+        if (branchesData) {
+          setBranches(branchesData);
+        }
+      } catch (error) {
+        console.error("Failed to fetch tree data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [urlBranch, urlLang, owner, repo, currentBranch, currentLanguage]);
+
+  // 构建查询字符串（不包含空值）
+  const params = new URLSearchParams();
+  if (currentBranch) params.set("branch", currentBranch);
+  if (currentLanguage) params.set("lang", currentLanguage);
+  const queryString = params.toString();
+
+  const tree = convertToPageTree(nodes, owner, repo, queryString);
   const title = `${owner}/${repo}`;
 
   // 构建侧边栏顶部的选择器
@@ -73,8 +140,8 @@ export function RepoShell({
       owner={owner}
       repo={repo}
       branches={branches}
-      currentBranch={currentBranch || ""}
-      currentLanguage={currentLanguage || ""}
+      currentBranch={currentBranch}
+      currentLanguage={currentLanguage}
     />
   ) : undefined;
 
@@ -90,7 +157,13 @@ export function RepoShell({
         banner: sidebarBanner,
       }}
     >
-      {children}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      ) : (
+        children
+      )}
     </DocsLayout>
   );
 }

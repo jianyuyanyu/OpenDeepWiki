@@ -3,16 +3,23 @@ using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Models;
+using OpenDeepWiki.Services.Auth;
 
 namespace OpenDeepWiki.Services.Repositories;
 
 [MiniApi(Route = "/api/v1/repositories")]
 [Tags("仓库")]
-public class RepositoryService(IContext context, IGitPlatformService gitPlatformService)
+public class RepositoryService(IContext context, IGitPlatformService gitPlatformService, IUserContext userContext)
 {
     [HttpPost("/submit")]
     public async Task<Repository> SubmitAsync([FromBody] RepositorySubmitRequest request)
     {
+        var currentUserId = userContext.UserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            throw new UnauthorizedAccessException("用户未登录");
+        }
+
         if (!request.IsPublic && string.IsNullOrWhiteSpace(request.AuthAccount) && string.IsNullOrWhiteSpace(request.AuthPassword))
         {
             throw new InvalidOperationException("仓库凭据为空时不允许设置为私有");
@@ -36,7 +43,7 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
         var repository = new Repository
         {
             Id = repositoryId,
-            OwnerUserId = request.OwnerUserId,
+            OwnerUserId = currentUserId,
             GitUrl = request.GitUrl,
             RepoName = request.RepoName,
             OrgName = request.OrgName,
@@ -153,6 +160,18 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
     {
         try
         {
+            var currentUserId = userContext.UserId;
+            if (string.IsNullOrWhiteSpace(currentUserId))
+            {
+                return Results.Json(new UpdateVisibilityResponse
+                {
+                    Id = request.RepositoryId,
+                    IsPublic = request.IsPublic,
+                    Success = false,
+                    ErrorMessage = "用户未登录"
+                }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+
             // 查找仓库
             var repository = await context.Repositories
                 .FirstOrDefaultAsync(item => item.Id == request.RepositoryId);
@@ -170,7 +189,7 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
             }
 
             // 验证所有权
-            if (repository.OwnerUserId != request.OwnerUserId)
+            if (repository.OwnerUserId != currentUserId)
             {
                 return Results.Json(new UpdateVisibilityResponse
                 {

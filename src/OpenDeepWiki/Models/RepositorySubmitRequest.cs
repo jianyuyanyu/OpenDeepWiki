@@ -8,13 +8,6 @@ namespace OpenDeepWiki.Models;
 public class RepositorySubmitRequest
 {
     /// <summary>
-    /// 所属用户ID
-    /// </summary>
-    [Required]
-    [StringLength(36)]
-    public string OwnerUserId { get; set; } = string.Empty;
-
-    /// <summary>
     /// Git地址
     /// </summary>
     [Required]

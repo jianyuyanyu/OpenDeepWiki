@@ -1,9 +1,12 @@
 import React from "react";
-import { notFound } from "next/navigation";
-import { fetchRepoTree, fetchRepoBranches } from "@/lib/repository-api";
+import { fetchRepoTree, fetchRepoBranches, checkGitHubRepo } from "@/lib/repository-api";
 import { RepoShell } from "@/components/repo/repo-shell";
 import { RepositoryProcessingStatus } from "@/components/repo/repository-processing-status";
+import { RepositoryNotFound } from "@/components/repo/repository-not-found";
 import { RootProvider } from "fumadocs-ui/provider/next";
+
+// 禁用缓存
+export const dynamic = "force-dynamic";
 
 interface RepoLayoutProps {
   children: React.ReactNode;
@@ -11,15 +14,11 @@ interface RepoLayoutProps {
     owner: string;
     repo: string;
   }>;
-  searchParams: Promise<{
-    branch?: string;
-    lang?: string;
-  }>;
 }
 
-async function getTreeData(owner: string, repo: string, branch?: string, lang?: string) {
+async function getTreeData(owner: string, repo: string) {
   try {
-    const tree = await fetchRepoTree(owner, repo, branch, lang);
+    const tree = await fetchRepoTree(owner, repo);
     return tree;
   } catch {
     return null;
@@ -35,22 +34,23 @@ async function getBranchesData(owner: string, repo: string) {
   }
 }
 
-export default async function RepoLayout({ children, params, searchParams }: RepoLayoutProps) {
-  const { owner, repo } = await params;
-  const resolvedSearchParams = await searchParams;
-  const branch = resolvedSearchParams?.branch;
-  const lang = resolvedSearchParams?.lang;
-  
-  const tree = await getTreeData(owner, repo, branch, lang);
-  
-  // API请求失败
-  if (!tree) {
-    notFound();
+async function getGitHubInfo(owner: string, repo: string) {
+  try {
+    return await checkGitHubRepo(owner, repo);
+  } catch {
+    return null;
   }
+}
 
-  // 仓库不存在
-  if (!tree.exists) {
-    notFound();
+export default async function RepoLayout({ children, params }: RepoLayoutProps) {
+  const { owner, repo } = await params;
+  
+  const tree = await getTreeData(owner, repo);
+  
+  // API请求失败或仓库不存在，检查GitHub
+  if (!tree || !tree.exists) {
+    const gitHubInfo = await getGitHubInfo(owner, repo);
+    return <RepositoryNotFound owner={owner} repo={repo} gitHubInfo={gitHubInfo} />;
   }
 
   // 仓库正在处理中或等待处理
@@ -83,10 +83,10 @@ export default async function RepoLayout({ children, params, searchParams }: Rep
       <RepoShell 
         owner={owner} 
         repo={repo} 
-        nodes={tree.nodes}
-        branches={branches ?? undefined}
-        currentBranch={tree.currentBranch}
-        currentLanguage={tree.currentLanguage}
+        initialNodes={tree.nodes}
+        initialBranches={branches ?? undefined}
+        initialBranch={tree.currentBranch}
+        initialLanguage={tree.currentLanguage}
       >
         {children}
       </RepoShell>

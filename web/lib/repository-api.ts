@@ -8,7 +8,8 @@ import type {
   RepositoryItemResponse,
   UpdateVisibilityRequest,
   UpdateVisibilityResponse,
-  ProcessingLogResponse
+  ProcessingLogResponse,
+  GitRepoCheckResponse
 } from "@/types/repository";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
@@ -106,19 +107,33 @@ export async function fetchRepoDoc(owner: string, repo: string, slug: string, br
 
 /**
  * Submit a repository for wiki generation
+ * @param request - The repository submission request
+ * @param token - Optional auth token for authenticated requests
  */
-export async function submitRepository(request: RepositorySubmitRequest): Promise<RepositoryItemResponse> {
+export async function submitRepository(
+  request: RepositorySubmitRequest,
+  token?: string
+): Promise<RepositoryItemResponse> {
   const url = buildApiUrl("/api/v1/repositories/submit");
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
 
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify(request),
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("请先登录");
+    }
     const errorText = await response.text();
     throw new Error(errorText || "Failed to submit repository");
   }
@@ -235,4 +250,35 @@ export async function fetchProcessingLogs(
   }
 
   return (await response.json()) as ProcessingLogResponse;
+}
+
+
+/**
+ * Check if a GitHub repository exists
+ */
+export async function checkGitHubRepo(
+  owner: string,
+  repo: string
+): Promise<GitRepoCheckResponse> {
+  const url = buildApiUrl(
+    `/api/v1/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/check`
+  );
+
+  const response = await fetch(url, { cache: "no-store" });
+
+  if (!response.ok) {
+    return {
+      exists: false,
+      name: null,
+      description: null,
+      defaultBranch: null,
+      starCount: 0,
+      forkCount: 0,
+      language: null,
+      avatarUrl: null,
+      gitUrl: null,
+    };
+  }
+
+  return (await response.json()) as GitRepoCheckResponse;
 }

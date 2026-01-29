@@ -313,4 +313,52 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
             return new GitBranchesResult([], null, true);
         }
     }
+
+    public async Task<GitRepoInfo> CheckRepoExistsAsync(string owner, string repo)
+    {
+        // 默认检查GitHub
+        return await CheckGitHubRepoAsync(owner, repo);
+    }
+
+    private async Task<GitRepoInfo> CheckGitHubRepoAsync(string owner, string repo)
+    {
+        try
+        {
+            var client = httpClientFactory.CreateClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "OpenDeepWiki");
+            client.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
+
+            var response = await client.GetAsync($"https://api.github.com/repos/{owner}/{repo}");
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                return new GitRepoInfo(false, null, null, null, 0, 0, null, null);
+            }
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var name = root.GetProperty("name").GetString();
+            var description = root.TryGetProperty("description", out var descProp) && descProp.ValueKind != JsonValueKind.Null 
+                ? descProp.GetString() 
+                : null;
+            var defaultBranch = root.GetProperty("default_branch").GetString();
+            var starCount = root.GetProperty("stargazers_count").GetInt32();
+            var forkCount = root.GetProperty("forks_count").GetInt32();
+            var language = root.TryGetProperty("language", out var langProp) && langProp.ValueKind != JsonValueKind.Null 
+                ? langProp.GetString() 
+                : null;
+            var avatarUrl = root.TryGetProperty("owner", out var ownerProp) 
+                ? ownerProp.GetProperty("avatar_url").GetString() 
+                : null;
+
+            return new GitRepoInfo(true, name, description, defaultBranch, starCount, forkCount, language, avatarUrl);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "检查GitHub仓库异常: {Owner}/{Repo}", owner, repo);
+            return new GitRepoInfo(false, null, null, null, 0, 0, null, null);
+        }
+    }
 }

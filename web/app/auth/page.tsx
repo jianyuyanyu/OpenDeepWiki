@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Github, Mail, BookOpen, Sparkles, Zap, ArrowLeft, Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 
@@ -13,6 +13,8 @@ type AuthMode = "login" | "register";
 
 export default function AuthPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnUrl = searchParams.get("returnUrl");
   const { login, register } = useAuth();
   const [mode, setMode] = useState<AuthMode>("login");
   const [isLoading, setIsLoading] = useState(false);
@@ -26,6 +28,14 @@ export default function AuthPage() {
   const [name, setName] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  const redirectAfterAuth = () => {
+    if (returnUrl) {
+      router.push(decodeURIComponent(returnUrl));
+    } else {
+      router.push("/");
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -33,7 +43,7 @@ export default function AuthPage() {
 
     try {
       await login({ email, password });
-      router.push("/");
+      redirectAfterAuth();
     } catch (err) {
       setError(err instanceof Error ? err.message : "登录失败");
     } finally {
@@ -59,7 +69,7 @@ export default function AuthPage() {
 
     try {
       await register({ name, email, password, confirmPassword });
-      router.push("/");
+      redirectAfterAuth();
     } catch (err) {
       setError(err instanceof Error ? err.message : "注册失败");
     } finally {

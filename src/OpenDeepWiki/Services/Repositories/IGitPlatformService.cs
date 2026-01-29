@@ -16,6 +16,20 @@ public record GitBranchInfo(string Name, bool IsDefault);
 public record GitBranchesResult(List<GitBranchInfo> Branches, string? DefaultBranch, bool IsSupported);
 
 /// <summary>
+/// Git仓库基本信息
+/// </summary>
+public record GitRepoInfo(
+    bool Exists,
+    string? Name,
+    string? Description,
+    string? DefaultBranch,
+    int StarCount,
+    int ForkCount,
+    string? Language,
+    string? AvatarUrl
+);
+
+/// <summary>
 /// Git平台服务接口
 /// </summary>
 public interface IGitPlatformService
@@ -33,4 +47,12 @@ public interface IGitPlatformService
     /// <param name="gitUrl">Git仓库地址</param>
     /// <returns>分支列表结果</returns>
     Task<GitBranchesResult> GetBranchesAsync(string gitUrl);
+
+    /// <summary>
+    /// 检查仓库是否存在并获取基本信息
+    /// </summary>
+    /// <param name="owner">仓库所有者</param>
+    /// <param name="repo">仓库名称</param>
+    /// <returns>仓库信息</returns>
+    Task<GitRepoInfo> CheckRepoExistsAsync(string owner, string repo);
 }

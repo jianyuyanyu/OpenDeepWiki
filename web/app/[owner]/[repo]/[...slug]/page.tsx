@@ -1,7 +1,7 @@
-import { notFound } from "next/navigation";
 import { fetchRepoDoc } from "@/lib/repository-api";
 import { extractHeadings } from "@/lib/markdown";
 import { MarkdownRenderer } from "@/components/repo/markdown-renderer";
+import { DocNotFound } from "@/components/repo/doc-not-found";
 import { DocsPage, DocsBody } from "fumadocs-ui/page";
 import type { TOCItemType } from "fumadocs-core/toc";
 
@@ -11,11 +11,15 @@ interface RepoDocPageProps {
     repo: string;
     slug: string[];
   }>;
+  searchParams: Promise<{
+    branch?: string;
+    lang?: string;
+  }>;
 }
 
-async function getDocData(owner: string, repo: string, slug: string) {
+async function getDocData(owner: string, repo: string, slug: string, branch?: string, lang?: string) {
   try {
-    const doc = await fetchRepoDoc(owner, repo, slug);
+    const doc = await fetchRepoDoc(owner, repo, slug, branch, lang);
     const headings = extractHeadings(doc.content, 3);
     return { doc, headings };
   } catch {
@@ -23,14 +27,24 @@ async function getDocData(owner: string, repo: string, slug: string) {
   }
 }
 
-export default async function RepoDocPage({ params }: RepoDocPageProps) {
+export default async function RepoDocPage({ params, searchParams }: RepoDocPageProps) {
   const { owner, repo, slug: slugParts } = await params;
+  const resolvedSearchParams = await searchParams;
+  const branch = resolvedSearchParams?.branch;
+  const lang = resolvedSearchParams?.lang;
   const slug = slugParts.join("/");
 
-  const data = await getDocData(owner, repo, slug);
+  const data = await getDocData(owner, repo, slug, branch, lang);
   
+  // 文档不存在，但保留侧边栏（由layout提供）
   if (!data) {
-    notFound();
+    return (
+      <DocsPage toc={[]}>
+        <DocsBody>
+          <DocNotFound slug={slug} />
+        </DocsBody>
+      </DocsPage>
+    );
   }
 
   const { doc, headings } = data;
