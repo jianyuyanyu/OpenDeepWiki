@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,9 +12,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useTranslations } from "@/hooks/use-translations";
-import { submitRepository } from "@/lib/repository-api";
-import type { RepositorySubmitRequest } from "@/types/repository";
-import { Loader2, GitBranch, Globe, Lock, Link2, FolderGit2 } from "lucide-react";
+import { submitRepository, fetchGitBranches } from "@/lib/repository-api";
+import type { RepositorySubmitRequest, GitBranchItem } from "@/types/repository";
+import { Loader2, GitBranch, Globe, Lock, Link2, FolderGit2, Search, Edit3 } from "lucide-react";
 import { toast } from "sonner";
 
 interface RepositorySubmitFormProps {
@@ -56,6 +56,73 @@ export function RepositorySubmitForm({ ownerUserId, onSuccess }: RepositorySubmi
   const [authPassword, setAuthPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Branch selection states
+  const [branches, setBranches] = useState<GitBranchItem[]>([]);
+  const [isLoadingBranches, setIsLoadingBranches] = useState(false);
+  const [isSupported, setIsSupported] = useState(true);
+  const [isManualInput, setIsManualInput] = useState(false);
+  const [branchSearch, setBranchSearch] = useState("");
+  const lastFetchedUrl = useRef<string>("");
+
+  // Debounced branch fetching
+  const fetchBranchesDebounced = useCallback(async (url: string) => {
+    if (!url.trim() || !GIT_URL_REGEX.test(url.trim())) {
+      setBranches([]);
+      setIsSupported(true);
+      return;
+    }
+
+    // Avoid duplicate fetches
+    if (lastFetchedUrl.current === url.trim()) {
+      return;
+    }
+    lastFetchedUrl.current = url.trim();
+
+    setIsLoadingBranches(true);
+    try {
+      const result = await fetchGitBranches(url.trim());
+      setBranches(result.branches);
+      setIsSupported(result.isSupported);
+      
+      // Set default branch if available
+      if (result.defaultBranch) {
+        setBranchName(result.defaultBranch);
+      } else if (result.branches.length > 0) {
+        const defaultBranch = result.branches.find(b => b.isDefault);
+        if (defaultBranch) {
+          setBranchName(defaultBranch.name);
+        }
+      }
+      
+      // If not supported, switch to manual input
+      if (!result.isSupported) {
+        setIsManualInput(true);
+      }
+    } catch (error) {
+      console.error("Failed to fetch branches:", error);
+      setIsSupported(false);
+      setIsManualInput(true);
+    } finally {
+      setIsLoadingBranches(false);
+    }
+  }, []);
+
+  // Fetch branches when git URL changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (gitUrl.trim() && GIT_URL_REGEX.test(gitUrl.trim())) {
+        fetchBranchesDebounced(gitUrl);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [gitUrl, fetchBranchesDebounced]);
+
+  // Filter branches by search
+  const filteredBranches = branches.filter(b => 
+    b.name.toLowerCase().includes(branchSearch.toLowerCase())
+  );
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -117,6 +184,10 @@ export function RepositorySubmitForm({ ownerUserId, onSuccess }: RepositorySubmi
       setAuthAccount("");
       setAuthPassword("");
       setErrors({});
+      setBranches([]);
+      setIsManualInput(false);
+      setBranchSearch("");
+      lastFetchedUrl.current = "";
       
       onSuccess?.();
     } catch (error) {
@@ -160,17 +231,104 @@ export function RepositorySubmitForm({ ownerUserId, onSuccess }: RepositorySubmi
 
       {/* Branch Name */}
       <div className="space-y-2">
-        <label className="text-sm font-medium flex items-center gap-2">
-          <GitBranch className="h-4 w-4 text-muted-foreground" />
-          {t("home.repository.branchName")}
-        </label>
-        <Input
-          value={branchName}
-          onChange={(e) => setBranchName(e.target.value)}
-          placeholder={t("home.repository.branchNamePlaceholder")}
-          aria-invalid={!!errors.branchName}
-          className="h-11 bg-secondary/50 border-transparent focus:border-primary/50 transition-colors"
-        />
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium flex items-center gap-2">
+            <GitBranch className="h-4 w-4 text-muted-foreground" />
+            {t("home.repository.branchName")}
+          </label>
+          {branches.length > 0 && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={() => setIsManualInput(!isManualInput)}
+            >
+              <Edit3 className="h-3 w-3 mr-1" />
+              {isManualInput ? t("home.repository.selectBranch") : t("home.repository.manualInput")}
+            </Button>
+          )}
+        </div>
+        
+        {isLoadingBranches ? (
+          <div className="flex items-center gap-2 h-11 px-3 bg-secondary/50 rounded-md">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">{t("home.repository.loadingBranches")}</span>
+          </div>
+        ) : isManualInput || !isSupported || branches.length === 0 ? (
+          <Input
+            value={branchName}
+            onChange={(e) => setBranchName(e.target.value)}
+            placeholder={t("home.repository.branchNamePlaceholder")}
+            aria-invalid={!!errors.branchName}
+            className="h-11 bg-secondary/50 border-transparent focus:border-primary/50 transition-colors"
+          />
+        ) : (
+          <Select value={branchName} onValueChange={setBranchName}>
+            <SelectTrigger className="w-full h-11 bg-secondary/50 border-transparent focus:border-primary/50 transition-colors">
+              <SelectValue placeholder={t("home.repository.selectBranchPlaceholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              {branches.length > 10 && (
+                <div className="px-2 pb-2">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={branchSearch}
+                      onChange={(e) => setBranchSearch(e.target.value)}
+                      placeholder={t("home.repository.searchBranch")}
+                      className="h-8 pl-8 text-sm"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="max-h-[200px] overflow-y-auto">
+                {filteredBranches.length === 0 ? (
+                  <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                    {t("home.repository.noBranchFound")}
+                  </div>
+                ) : (
+                  filteredBranches.map((branch) => (
+                    <SelectItem key={branch.name} value={branch.name}>
+                      <span className="flex items-center gap-2">
+                        {branch.name}
+                        {branch.isDefault && (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                            default
+                          </span>
+                        )}
+                      </span>
+                    </SelectItem>
+                  ))
+                )}
+              </div>
+              {filteredBranches.length > 0 && branchSearch && !filteredBranches.find(b => b.name === branchSearch) && (
+                <div className="border-t px-2 py-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start text-sm"
+                    onClick={() => {
+                      setBranchName(branchSearch);
+                      setIsManualInput(true);
+                    }}
+                  >
+                    <Edit3 className="h-3 w-3 mr-2" />
+                    {t("home.repository.useCustomBranch")}: {branchSearch}
+                  </Button>
+                </div>
+              )}
+            </SelectContent>
+          </Select>
+        )}
+        
+        {!isSupported && gitUrl && GIT_URL_REGEX.test(gitUrl) && (
+          <p className="text-xs text-muted-foreground">
+            {t("home.repository.branchNotSupported")}
+          </p>
+        )}
         {errors.branchName && (
           <p className="text-sm text-destructive">{errors.branchName}</p>
         )}

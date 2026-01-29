@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 using Microsoft.Agents.AI;
@@ -872,30 +873,84 @@ Please start executing the task.";
             await LogProcessingAsync(ProcessingStep.Translation, 
                 $"发现 {totalDocs} 个文档需要翻译 -> {targetLanguageCode}", cancellationToken);
 
-            // 6. 并行翻译所有文档
+            // 6. 预加载所有需要的数据（单线程 EF Core 操作）
+            var translationTasks = new List<((string Path, string Title) Item, string SourceContent, DocCatalog TargetCatalog)>();
+            foreach (var item in catalogItems)
+            {
+                var sourceCatalog = await _context.DocCatalogs
+                    .FirstOrDefaultAsync(c => c.BranchLanguageId == sourceBranchLanguage.Id && 
+                                              c.Path == item.Path && 
+                                              !c.IsDeleted, cancellationToken);
+
+                if (sourceCatalog == null || string.IsNullOrEmpty(sourceCatalog.DocFileId))
+                {
+                    _logger.LogWarning("Source document not found for path: {Path}", item.Path);
+                    continue;
+                }
+
+                var sourceDocFile = await _context.DocFiles
+                    .FirstOrDefaultAsync(d => d.Id == sourceCatalog.DocFileId && !d.IsDeleted, cancellationToken);
+
+                if (sourceDocFile == null || string.IsNullOrEmpty(sourceDocFile.Content))
+                {
+                    _logger.LogWarning("Source document content not found for path: {Path}", item.Path);
+                    continue;
+                }
+
+                var targetCatalog = await _context.DocCatalogs
+                    .FirstOrDefaultAsync(c => c.BranchLanguageId == targetBranchLanguage.Id && 
+                                              c.Path == item.Path && 
+                                              !c.IsDeleted, cancellationToken);
+
+                if (targetCatalog == null)
+                {
+                    _logger.LogWarning("Target catalog not found for path: {Path}", item.Path);
+                    continue;
+                }
+
+                translationTasks.Add((item, sourceDocFile.Content, targetCatalog));
+            }
+
+            // 7. 并行执行 AI 翻译（IO 密集型操作）
+            var translationResults = new ConcurrentBag<(DocCatalog TargetCatalog, DocFile NewDocFile)?>();
             using var semaphore = new SemaphoreSlim(_options.ParallelCount, _options.ParallelCount);
-            var tasks = catalogItems.Select(async item =>
+            var tasks = translationTasks.Select(async task =>
             {
                 await semaphore.WaitAsync(cancellationToken);
                 try
                 {
                     var currentIndex = Interlocked.Increment(ref translatedCount);
                     await LogProcessingAsync(ProcessingStep.Translation, 
-                        $"正在翻译文档 ({currentIndex}/{totalDocs}): {item.Title} -> {targetLanguageCode}", cancellationToken);
+                        $"正在翻译文档 ({currentIndex}/{totalDocs}): {task.Item.Title} -> {targetLanguageCode}", cancellationToken);
 
-                    await TranslateDocumentAsync(
-                        sourceBranchLanguage.Id,
-                        targetBranchLanguage.Id,
-                        item.Path,
+                    var translatedContent = await TranslateContentAsync(
+                        task.SourceContent!,
                         sourceBranchLanguage.LanguageCode,
                         targetLanguageCode,
                         cancellationToken);
+
+                    // 清理 <think> 标签
+                    translatedContent = System.Text.RegularExpressions.Regex.Replace(
+                        translatedContent,
+                        @"<think>[\s\S]*?</think>",
+                        string.Empty,
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                    var newDocFile = new DocFile
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        BranchLanguageId = targetBranchLanguage.Id,
+                        Content = translatedContent
+                    };
+
+                    translationResults.Add((task.TargetCatalog!, newDocFile));
                 }
                 catch (Exception ex)
                 {
                     Interlocked.Increment(ref failedCount);
                     _logger.LogError(ex, "Failed to translate document. Path: {Path}, TargetLang: {TargetLang}",
-                        item.Path, targetLanguageCode);
+                        task.Item.Path, targetLanguageCode);
+                    translationResults.Add(null);
                 }
                 finally
                 {
@@ -904,6 +959,16 @@ Please start executing the task.";
             }).ToList();
 
             await Task.WhenAll(tasks);
+
+            // 8. 批量保存翻译结果（单线程 EF Core 操作）
+            foreach (var result in translationResults.Where(r => r != null))
+            {
+                _context.DocFiles.Add(result!.Value.NewDocFile);
+                result.Value.TargetCatalog.DocFileId = result.Value.NewDocFile.Id;
+                result.Value.TargetCatalog.UpdateTimestamp();
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
 
             stopwatch.Stop();
             _logger.LogInformation(
@@ -969,13 +1034,20 @@ Return the translated JSON:";
 
         var translatedJson = contentBuilder.ToString().Trim();
         
+        // 清理可能的<think>标签及其内容
+        translatedJson = System.Text.RegularExpressions.Regex.Replace(
+            translatedJson, 
+            @"<think>[\s\S]*?</think>", 
+            string.Empty, 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
         // 清理可能的markdown代码块标记
         if (translatedJson.StartsWith("```"))
         {
             var lines = translatedJson.Split('\n');
             translatedJson = string.Join('\n', lines.Skip(1).Take(lines.Length - 2));
         }
-
+        
         return translatedJson;
     }
 
@@ -1029,6 +1101,12 @@ Return the translated JSON:";
             _logger.LogWarning("Target catalog not found for path: {Path}", catalogPath);
             return;
         }
+
+        translatedContent = System.Text.RegularExpressions.Regex.Replace(
+            translatedContent,
+            @"<think>[\s\S]*?</think>",
+            string.Empty,
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
         // 创建翻译后的文档
         var targetDocFile = new DocFile

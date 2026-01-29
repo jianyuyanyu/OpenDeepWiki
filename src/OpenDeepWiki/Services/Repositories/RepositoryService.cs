@@ -226,11 +226,41 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
         {
             var uri = new Uri(gitUrl);
             var host = uri.Host.ToLowerInvariant();
-            return host is "github.com" or "gitee.com";
+            return host is "github.com" or "gitee.com" or "gitlab.com";
         }
         catch
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// 获取仓库分支列表（从Git平台API获取）
+    /// </summary>
+    [HttpGet("/branches")]
+    public async Task<GitBranchesResponse> GetBranchesAsync([FromQuery] string gitUrl)
+    {
+        if (string.IsNullOrWhiteSpace(gitUrl))
+        {
+            return new GitBranchesResponse
+            {
+                Branches = [],
+                DefaultBranch = null,
+                IsSupported = false
+            };
+        }
+
+        var result = await gitPlatformService.GetBranchesAsync(gitUrl);
+        
+        return new GitBranchesResponse
+        {
+            Branches = result.Branches.Select(b => new GitBranchItem
+            {
+                Name = b.Name,
+                IsDefault = b.IsDefault
+            }).ToList(),
+            DefaultBranch = result.DefaultBranch,
+            IsSupported = result.IsSupported
+        };
     }
 }

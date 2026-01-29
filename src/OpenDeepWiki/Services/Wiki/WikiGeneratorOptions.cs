@@ -76,7 +76,7 @@ public class WikiGeneratorOptions
     /// Example: "en,zh,ja,ko". Can be configured via WIKI_LANGUAGES environment variable.
     /// The primary language selected by user will be generated first, then translated to other languages.
     /// </summary>
-    public string? Languages { get; set; }
+    public string? Languages { get; set; } = "en,zh,ja,ko";
 
     /// <summary>
     /// Gets the list of target languages for translation (excluding the primary language).
@@ -108,7 +108,8 @@ public class WikiGeneratorOptions
         {
             return count;
         }
-        return 3; // Default value
+
+        return 5; // Default value
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/app-layout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,6 @@ import { RepositorySubmitForm } from "@/components/repo/repository-submit-form";
 import {
   Dialog,
   DialogContent,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/auth-context";
 import { useScrollPosition } from "@/hooks/use-scroll-position";
@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 
 export default function Home() {
   const t = useTranslations();
+  const router = useRouter();
   const { user } = useAuth();
   const [activeItem, setActiveItem] = useState(t("sidebar.explore"));
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -29,7 +30,13 @@ export default function Home() {
     setIsFormOpen(false);
   }, []);
 
-  const ownerUserId = user?.id ?? "anonymous";
+  const handleAddRepoClick = useCallback(() => {
+    if (!user) {
+      router.push("/auth");
+      return;
+    }
+    setIsFormOpen(true);
+  }, [user, router]);
 
   return (
     <AppLayout
@@ -71,17 +78,21 @@ export default function Home() {
 
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="secondary" className="gap-2 rounded-full h-10 px-6 bg-teal-500/10 text-teal-500 hover:bg-teal-500/20 hover:text-teal-400 border border-teal-500/20">
-                    <Plus className="h-4 w-4" />
-                    {t("home.addPrivateRepo")}
-                  </Button>
-                </DialogTrigger>
+                <Button
+                  variant="secondary"
+                  className="gap-2 rounded-full h-10 px-6 bg-teal-500/10 text-teal-500 hover:bg-teal-500/20 hover:text-teal-400 border border-teal-500/20"
+                  onClick={handleAddRepoClick}
+                >
+                  <Plus className="h-4 w-4" />
+                  {t("home.addPrivateRepo")}
+                </Button>
                 <DialogContent className="sm:max-w-md">
-                  <RepositorySubmitForm
-                    ownerUserId={ownerUserId}
-                    onSuccess={handleSubmitSuccess}
-                  />
+                  {user && (
+                    <RepositorySubmitForm
+                      ownerUserId={user.id}
+                      onSuccess={handleSubmitSuccess}
+                    />
+                  )}
                 </DialogContent>
               </Dialog>
               <Button variant="secondary" className="gap-2 rounded-full h-10 px-6 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 hover:text-blue-400 border border-blue-500/20">

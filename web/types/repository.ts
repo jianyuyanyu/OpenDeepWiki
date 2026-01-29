@@ -28,6 +28,18 @@ export interface BranchItem {
   languages: string[];
 }
 
+// Git platform branches response (from GitHub/Gitee/GitLab API)
+export interface GitBranchesResponse {
+  branches: GitBranchItem[];
+  defaultBranch: string | null;
+  isSupported: boolean;
+}
+
+export interface GitBranchItem {
+  name: string;
+  isDefault: boolean;
+}
+
 export interface RepoDocResponse {
   slug: string;
   content: string;

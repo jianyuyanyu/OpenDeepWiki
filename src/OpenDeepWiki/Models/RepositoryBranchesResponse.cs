@@ -1,7 +1,7 @@
 namespace OpenDeepWiki.Models;
 
 /// <summary>
-/// 仓库分支和语言响应
+/// 仓库分支和语言响应（从数据库获取）
 /// </summary>
 public class RepositoryBranchesResponse
 {
@@ -40,4 +40,41 @@ public class BranchItem
     /// 该分支支持的语言列表
     /// </summary>
     public List<string> Languages { get; set; } = [];
+}
+
+/// <summary>
+/// Git平台分支列表响应（从远程API获取）
+/// </summary>
+public class GitBranchesResponse
+{
+    /// <summary>
+    /// 分支列表
+    /// </summary>
+    public List<GitBranchItem> Branches { get; set; } = [];
+
+    /// <summary>
+    /// 默认分支
+    /// </summary>
+    public string? DefaultBranch { get; set; }
+
+    /// <summary>
+    /// 是否支持获取分支（平台是否支持）
+    /// </summary>
+    public bool IsSupported { get; set; }
+}
+
+/// <summary>
+/// Git分支项
+/// </summary>
+public class GitBranchItem
+{
+    /// <summary>
+    /// 分支名称
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 是否为默认分支
+    /// </summary>
+    public bool IsDefault { get; set; }
 }

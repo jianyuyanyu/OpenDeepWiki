@@ -2,6 +2,7 @@ import type {
   RepoDocResponse, 
   RepoTreeResponse, 
   RepoBranchesResponse,
+  GitBranchesResponse,
   RepositorySubmitRequest, 
   RepositoryListResponse,
   RepositoryItemResponse,
@@ -43,6 +44,24 @@ export async function fetchRepoBranches(owner: string, repo: string) {
   }
 
   return (await response.json()) as RepoBranchesResponse;
+}
+
+/**
+ * Fetch branches from Git platform API (GitHub/Gitee/GitLab)
+ */
+export async function fetchGitBranches(gitUrl: string): Promise<GitBranchesResponse> {
+  const params = new URLSearchParams();
+  params.set("gitUrl", gitUrl);
+  
+  const url = buildApiUrl(`/api/v1/repositories/branches?${params.toString()}`);
+
+  const response = await fetch(url, { cache: "no-store" });
+
+  if (!response.ok) {
+    return { branches: [], defaultBranch: null, isSupported: false };
+  }
+
+  return (await response.json()) as GitBranchesResponse;
 }
 
 export async function fetchRepoTree(owner: string, repo: string, branch?: string, lang?: string) {
