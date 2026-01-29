@@ -11,6 +11,7 @@ import {
 import { Globe, Lock, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { updateRepositoryVisibility } from "@/lib/repository-api";
+import { getToken } from "@/lib/auth-api";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
 
@@ -19,7 +20,6 @@ export interface VisibilityToggleProps {
   isPublic: boolean;
   hasPassword: boolean;
   onVisibilityChange: (newIsPublic: boolean) => void;
-  ownerUserId: string;
   disabled?: boolean;
 }
 
@@ -28,7 +28,6 @@ export function VisibilityToggle({
   isPublic,
   hasPassword,
   onVisibilityChange,
-  ownerUserId,
   disabled = false,
 }: VisibilityToggleProps) {
   const t = useTranslations();
@@ -63,11 +62,11 @@ export function VisibilityToggle({
     setIsLoading(true);
 
     try {
+      const token = getToken();
       const response = await updateRepositoryVisibility({
         repositoryId,
         isPublic: newIsPublic,
-        ownerUserId,
-      });
+      }, token ?? undefined);
 
       if (response.success) {
         setCurrentIsPublic(response.isPublic);

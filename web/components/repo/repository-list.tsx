@@ -80,11 +80,9 @@ function StatusBadge({ status }: { status: RepositoryStatus }) {
 
 function RepositoryCard({ 
   repo, 
-  ownerUserId,
   onVisibilityChange 
 }: { 
   repo: RepositoryItemResponse;
-  ownerUserId: string;
   onVisibilityChange: (repoId: string, newIsPublic: boolean) => void;
 }) {
   const t = useTranslations();
@@ -123,7 +121,6 @@ function RepositoryCard({
               isPublic={repo.isPublic}
               hasPassword={repo.hasPassword}
               onVisibilityChange={handleVisibilityChange}
-              ownerUserId={ownerUserId}
             />
             {repo.statusName === "Completed" && (
               <Button variant="outline" size="sm" asChild>
@@ -285,7 +282,6 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
               <RepositoryCard 
                 key={repo.id} 
                 repo={repo} 
-                ownerUserId={ownerId || ""}
                 onVisibilityChange={handleVisibilityChange}
               />
             ))}

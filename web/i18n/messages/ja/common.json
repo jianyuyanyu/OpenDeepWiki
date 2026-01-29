@@ -15,6 +15,10 @@
   "error": "エラー",
   "success": "成功",
   "user": "ユーザー",
+  "backToHome": "ホームに戻る",
+  "submitting": "送信中...",
+  "submitFailed": "送信に失敗しました",
+  "pleaseLogin": "ログインしてください",
   "weekdays": {
     "sunday": "日曜日",
     "monday": "月曜日",
@@ -23,5 +27,14 @@
     "thursday": "木曜日",
     "friday": "金曜日",
     "saturday": "土曜日"
+  },
+  "repository": {
+    "notFound": {
+      "title": "リポジトリが見つかりません",
+      "description": "リポジトリ {owner}/{repo} が見つかりません",
+      "privateOrNotExist": "このリポジトリはGitHubに存在しないか、プライベートリポジトリです。",
+      "existsButNoDoc": "このリポジトリはGitHubに存在しますが、まだドキュメントが生成されていません。下のボタンをクリックしてWikiドキュメントを生成してください。",
+      "generateWiki": "Wiki を生成"
+    }
   }
 }

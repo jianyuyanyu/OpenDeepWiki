@@ -15,6 +15,10 @@
   "error": "Error",
   "success": "Success",
   "user": "User",
+  "backToHome": "Back to Home",
+  "submitting": "Submitting...",
+  "submitFailed": "Submit failed",
+  "pleaseLogin": "Please login first",
   "weekdays": {
     "sunday": "Sunday",
     "monday": "Monday",
@@ -23,5 +27,14 @@
     "thursday": "Thursday",
     "friday": "Friday",
     "saturday": "Saturday"
+  },
+  "repository": {
+    "notFound": {
+      "title": "Repository Not Found",
+      "description": "Repository {owner}/{repo} not found",
+      "privateOrNotExist": "This repository does not exist on GitHub, or it is a private repository.",
+      "existsButNoDoc": "This repository exists on GitHub but has no documentation yet. Click the button below to generate Wiki documentation.",
+      "generateWiki": "Generate Wiki"
+    }
   }
 }

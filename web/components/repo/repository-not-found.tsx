@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { GitBranch, Star, GitFork, Code, Plus, Loader2, ExternalLink } from "lucide-react";
+import { GitBranch, Star, GitFork, Code, Plus, Loader2, ExternalLink, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { submitRepository } from "@/lib/repository-api";
 import { useAuth } from "@/contexts/auth-context";
 import { getToken } from "@/lib/auth-api";
+import { useTranslations } from "@/hooks/use-translations";
 import type { GitRepoCheckResponse } from "@/types/repository";
 
 interface RepositoryNotFoundProps {
@@ -18,7 +19,8 @@ interface RepositoryNotFoundProps {
 export function RepositoryNotFound({ owner, repo, gitHubInfo }: RepositoryNotFoundProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const t = useTranslations();
+  const { isAuthenticated } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +52,7 @@ export function RepositoryNotFound({ owner, repo, gitHubInfo }: RepositoryNotFou
       // 刷新页面以显示处理状态
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "提交失败");
+      setError(err instanceof Error ? err.message : t("common.submitFailed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -64,15 +66,16 @@ export function RepositoryNotFound({ owner, repo, gitHubInfo }: RepositoryNotFou
           <div className="rounded-full bg-muted/50 p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
             <GitBranch className="h-10 w-10 text-muted-foreground" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">仓库不存在</h1>
+          <h1 className="text-2xl font-bold mb-2">{t("common.repository.notFound.title")}</h1>
           <p className="text-muted-foreground mb-6">
-            未找到 <span className="font-mono text-foreground">{owner}/{repo}</span> 仓库
+            {t("common.repository.notFound.description").replace("{owner}", owner).replace("{repo}", repo)}
           </p>
           <p className="text-sm text-muted-foreground mb-6">
-            该仓库在 GitHub 上不存在，或者是私有仓库。
+            {t("common.repository.notFound.privateOrNotExist")}
           </p>
           <Button variant="outline" onClick={() => router.push("/")}>
-            返回首页
+            <Home className="h-4 w-4 mr-2" />
+            {t("common.backToHome")}
           </Button>
         </div>
       </div>
@@ -132,7 +135,7 @@ export function RepositoryNotFound({ owner, repo, gitHubInfo }: RepositoryNotFou
           {/* 提示信息 */}
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-6">
             <p className="text-sm text-blue-600 dark:text-blue-400">
-              该仓库在 GitHub 上存在，但尚未生成文档。点击下方按钮开始生成 Wiki 文档。
+              {t("common.repository.notFound.existsButNoDoc")}
             </p>
           </div>
 
@@ -153,12 +156,12 @@ export function RepositoryNotFound({ owner, repo, gitHubInfo }: RepositoryNotFou
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  提交中...
+                  {t("common.submitting")}
                 </>
               ) : (
                 <>
                   <Plus className="h-4 w-4 mr-2" />
-                  生成 Wiki 文档
+                  {t("common.repository.notFound.generateWiki")}
                 </>
               )}
             </Button>
@@ -168,6 +171,18 @@ export function RepositoryNotFound({ owner, repo, gitHubInfo }: RepositoryNotFou
             >
               <ExternalLink className="h-4 w-4 mr-2" />
               GitHub
+            </Button>
+          </div>
+
+          {/* 返回首页按钮 */}
+          <div className="mt-4 pt-4 border-t">
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => router.push("/")}
+            >
+              <Home className="h-4 w-4 mr-2" />
+              {t("common.backToHome")}
             </Button>
           </div>
         </div>

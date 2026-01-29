@@ -15,6 +15,10 @@
   "error": "오류",
   "success": "성공",
   "user": "사용자",
+  "backToHome": "홈으로 돌아가기",
+  "submitting": "제출 중...",
+  "submitFailed": "제출 실패",
+  "pleaseLogin": "먼저 로그인해 주세요",
   "weekdays": {
     "sunday": "일요일",
     "monday": "월요일",
@@ -23,5 +27,14 @@
     "thursday": "목요일",
     "friday": "금요일",
     "saturday": "토요일"
+  },
+  "repository": {
+    "notFound": {
+      "title": "저장소를 찾을 수 없습니다",
+      "description": "저장소 {owner}/{repo}를 찾을 수 없습니다",
+      "privateOrNotExist": "이 저장소는 GitHub에 존재하지 않거나 비공개 저장소입니다.",
+      "existsButNoDoc": "이 저장소는 GitHub에 존재하지만 아직 문서가 생성되지 않았습니다. 아래 버튼을 클릭하여 Wiki 문서를 생성하세요.",
+      "generateWiki": "Wiki 생성"
+    }
   }
 }

@@ -181,23 +181,34 @@ export async function fetchRepositoryList(params?: {
 
 /**
  * Update repository visibility (public/private)
- * @param request - The visibility update request containing repositoryId, isPublic, and ownerUserId
+ * @param request - The visibility update request containing repositoryId and isPublic
+ * @param token - Optional auth token for authenticated requests
  * @returns The update result with success status and updated visibility
  */
 export async function updateRepositoryVisibility(
-  request: UpdateVisibilityRequest
+  request: UpdateVisibilityRequest,
+  token?: string
 ): Promise<UpdateVisibilityResponse> {
   const url = buildApiUrl("/api/v1/repositories/visibility");
 
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify(request),
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("请先登录");
+    }
     const errorText = await response.text();
     throw new Error(errorText || "Failed to update repository visibility");
   }
