@@ -19,7 +19,7 @@ import { LanguageToggle } from "@/components/language-toggle";
 import { HeaderSearchBox } from "@/components/header-search-box";
 import { useTranslations } from "@/hooks/use-translations";
 import { useAuth } from "@/contexts/auth-context";
-import { Loader2 } from "lucide-react";
+import { Loader2, Settings } from "lucide-react";
 
 interface HeaderSearchBoxProps {
   value: string;
@@ -38,6 +38,8 @@ export function Header({ title, currentWeekday, searchBox }: HeaderProps) {
   const t = useTranslations();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
 
+  const isAdmin = user?.roles?.includes("Admin") ?? false;
+
   const handleLogin = () => {
     router.push("/auth");
   };
@@ -45,6 +47,10 @@ export function Header({ title, currentWeekday, searchBox }: HeaderProps) {
   const handleLogout = () => {
     logout();
     router.refresh();
+  };
+
+  const handleAdminPanel = () => {
+    router.push("/admin");
   };
 
   return (
@@ -101,6 +107,15 @@ export function Header({ title, currentWeekday, searchBox }: HeaderProps) {
               <DropdownMenuSeparator />
               <DropdownMenuItem>{t("common.profile")}</DropdownMenuItem>
               <DropdownMenuItem>{t("common.settings")}</DropdownMenuItem>
+              {isAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleAdminPanel}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    {t("common.adminPanel") || "Admin Panel"}
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 {t("common.logout")}

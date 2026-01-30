@@ -23,6 +23,11 @@ public interface IContext
     DbSet<UserBookmark> UserBookmarks { get; set; }
     DbSet<UserSubscription> UserSubscriptions { get; set; }
     DbSet<RepositoryProcessingLog> RepositoryProcessingLogs { get; set; }
+    DbSet<TokenUsage> TokenUsages { get; set; }
+    DbSet<SystemSetting> SystemSettings { get; set; }
+    DbSet<McpConfig> McpConfigs { get; set; }
+    DbSet<SkillConfig> SkillConfigs { get; set; }
+    DbSet<ModelConfig> ModelConfigs { get; set; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
@@ -50,6 +55,11 @@ public abstract class MasterDbContext : DbContext, IContext
     public DbSet<UserBookmark> UserBookmarks { get; set; } = null!;
     public DbSet<UserSubscription> UserSubscriptions { get; set; } = null!;
     public DbSet<RepositoryProcessingLog> RepositoryProcessingLogs { get; set; } = null!;
+    public DbSet<TokenUsage> TokenUsages { get; set; } = null!;
+    public DbSet<SystemSetting> SystemSettings { get; set; } = null!;
+    public DbSet<McpConfig> McpConfigs { get; set; } = null!;
+    public DbSet<SkillConfig> SkillConfigs { get; set; } = null!;
+    public DbSet<ModelConfig> ModelConfigs { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -104,5 +114,29 @@ public abstract class MasterDbContext : DbContext, IContext
         // RepositoryProcessingLog 索引（按仓库ID和创建时间查询）
         modelBuilder.Entity<RepositoryProcessingLog>()
             .HasIndex(log => new { log.RepositoryId, log.CreatedAt });
+
+        // TokenUsage 索引（按记录时间查询统计）
+        modelBuilder.Entity<TokenUsage>()
+            .HasIndex(t => t.RecordedAt);
+
+        // SystemSetting 唯一键索引
+        modelBuilder.Entity<SystemSetting>()
+            .HasIndex(s => s.Key)
+            .IsUnique();
+
+        // McpConfig 名称唯一索引
+        modelBuilder.Entity<McpConfig>()
+            .HasIndex(m => m.Name)
+            .IsUnique();
+
+        // SkillConfig 名称唯一索引
+        modelBuilder.Entity<SkillConfig>()
+            .HasIndex(s => s.Name)
+            .IsUnique();
+
+        // ModelConfig 名称唯一索引
+        modelBuilder.Entity<ModelConfig>()
+            .HasIndex(m => m.Name)
+            .IsUnique();
     }
 }

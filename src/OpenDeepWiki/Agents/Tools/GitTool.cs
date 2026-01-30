@@ -13,6 +13,7 @@ namespace OpenDeepWiki.Agents.Tools;
 public class GitTool
 {
     private readonly string _workingDirectory;
+    private readonly List<GitIgnoreRule> _gitIgnoreRules;
 
     /// <summary>
     /// Default maximum number of lines to read from a file.
@@ -46,11 +47,15 @@ public class GitTool
         {
             throw new DirectoryNotFoundException($"Working directory does not exist: {_workingDirectory}");
         }
+
+        // 解析 .gitignore 文件
+        _gitIgnoreRules = ParseGitIgnore(_workingDirectory);
     }
 
     /// <summary>
     /// Enumerates files matching a glob pattern.
     /// Supports *, **, and ? wildcards.
+    /// Automatically filters out files matching .gitignore rules.
     /// </summary>
     /// <param name="glob">Glob pattern (e.g., "*.cs", "**/*.json", "src/**/*.ts")</param>
     /// <returns>Enumerable of matching file paths (full paths)</returns>
@@ -58,10 +63,14 @@ public class GitTool
     {
         if (string.IsNullOrWhiteSpace(glob))
         {
-            // No pattern - return all files
+            // No pattern - return all files (filtered by gitignore)
             foreach (var file in Directory.EnumerateFiles(_workingDirectory, "*", SearchOption.AllDirectories))
             {
-                yield return file;
+                var relativePath = GetRelativePath(file);
+                if (!IsIgnoredByGitIgnore(relativePath))
+                {
+                    yield return file;
+                }
             }
 
             yield break;
@@ -73,7 +82,7 @@ public class GitTool
         foreach (var file in Directory.EnumerateFiles(_workingDirectory, "*", SearchOption.AllDirectories))
         {
             var relativePath = GetRelativePath(file);
-            if (globRegex.IsMatch(relativePath))
+            if (!IsIgnoredByGitIgnore(relativePath) && globRegex.IsMatch(relativePath))
             {
                 yield return file;
             }
@@ -484,6 +493,202 @@ Glob Examples:
         return parts.Any(p => p.StartsWith('.') && p != ".");
     }
 
+    /// <summary>
+    /// Checks if a relative path should be ignored based on .gitignore rules.
+    /// </summary>
+    /// <param name="relativePath">The relative path to check.</param>
+    /// <returns>True if the path should be ignored, false otherwise.</returns>
+    private bool IsIgnoredByGitIgnore(string relativePath)
+    {
+        if (_gitIgnoreRules.Count == 0)
+        {
+            return false;
+        }
+
+        // Normalize path separators
+        var normalizedPath = relativePath.Replace('\\', '/');
+
+        // Check each rule in order (later rules can override earlier ones)
+        var isIgnored = false;
+        foreach (var rule in _gitIgnoreRules)
+        {
+            if (rule.Pattern.IsMatch(normalizedPath))
+            {
+                isIgnored = !rule.IsNegation;
+            }
+        }
+
+        return isIgnored;
+    }
+
+    /// <summary>
+    /// Parses .gitignore file and returns a list of ignore rules.
+    /// </summary>
+    /// <param name="workingDirectory">The repository root directory.</param>
+    /// <returns>List of parsed gitignore rules.</returns>
+    private static List<GitIgnoreRule> ParseGitIgnore(string workingDirectory)
+    {
+        var rules = new List<GitIgnoreRule>();
+        var gitignorePath = Path.Combine(workingDirectory, ".gitignore");
+
+        if (!File.Exists(gitignorePath))
+        {
+            return rules;
+        }
+
+        try
+        {
+            var lines = File.ReadAllLines(gitignorePath);
+            foreach (var line in lines)
+            {
+                var trimmedLine = line.Trim();
+
+                // Skip empty lines and comments
+                if (string.IsNullOrEmpty(trimmedLine) || trimmedLine.StartsWith('#'))
+                {
+                    continue;
+                }
+
+                var rule = ParseGitIgnorePattern(trimmedLine);
+                if (rule != null)
+                {
+                    rules.Add(rule);
+                }
+            }
+        }
+        catch
+        {
+            // If we can't read the file, return empty rules
+        }
+
+        return rules;
+    }
+
+    /// <summary>
+    /// Parses a single gitignore pattern into a rule.
+    /// </summary>
+    /// <param name="pattern">The gitignore pattern string.</param>
+    /// <returns>A GitIgnoreRule or null if the pattern is invalid.</returns>
+    private static GitIgnoreRule? ParseGitIgnorePattern(string pattern)
+    {
+        var rule = new GitIgnoreRule
+        {
+            OriginalPattern = pattern,
+            IsNegation = false,
+            DirectoryOnly = false
+        };
+
+        var workingPattern = pattern;
+
+        // Check for negation
+        if (workingPattern.StartsWith('!'))
+        {
+            rule.IsNegation = true;
+            workingPattern = workingPattern[1..];
+        }
+
+        // Check for directory-only pattern
+        if (workingPattern.EndsWith('/'))
+        {
+            rule.DirectoryOnly = true;
+            workingPattern = workingPattern.TrimEnd('/');
+        }
+
+        // Remove leading slash (anchors to root)
+        var anchoredToRoot = workingPattern.StartsWith('/');
+        if (anchoredToRoot)
+        {
+            workingPattern = workingPattern[1..];
+        }
+
+        // Convert gitignore pattern to regex
+        var regexPattern = GitIgnorePatternToRegex(workingPattern, anchoredToRoot);
+
+        try
+        {
+            rule.Pattern = new Regex(regexPattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            return rule;
+        }
+        catch
+        {
+            // Invalid regex pattern
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Converts a gitignore pattern to a regex pattern.
+    /// </summary>
+    private static string GitIgnorePatternToRegex(string pattern, bool anchoredToRoot)
+    {
+        var sb = new StringBuilder();
+
+        // If pattern contains /, it's relative to root; otherwise match anywhere
+        var containsSlash = pattern.Contains('/');
+
+        if (anchoredToRoot || containsSlash)
+        {
+            sb.Append('^');
+        }
+        else
+        {
+            sb.Append("(^|/)");
+        }
+
+        for (int i = 0; i < pattern.Length; i++)
+        {
+            var c = pattern[i];
+            switch (c)
+            {
+                case '*':
+                    if (i + 1 < pattern.Length && pattern[i + 1] == '*')
+                    {
+                        // ** matches everything including /
+                        if (i + 2 < pattern.Length && pattern[i + 2] == '/')
+                        {
+                            // **/ matches zero or more directories
+                            sb.Append("(.*/)?");
+                            i += 2;
+                        }
+                        else
+                        {
+                            sb.Append(".*");
+                            i++;
+                        }
+                    }
+                    else
+                    {
+                        // * matches everything except /
+                        sb.Append("[^/]*");
+                    }
+                    break;
+                case '?':
+                    sb.Append("[^/]");
+                    break;
+                case '.':
+                case '(':
+                case ')':
+                case '[':
+                case ']':
+                case '{':
+                case '}':
+                case '+':
+                case '^':
+                case '$':
+                case '|':
+                case '\\':
+                    sb.Append('\\').Append(c);
+                    break;
+                default:
+                    sb.Append(c);
+                    break;
+            }
+        }
+
+        sb.Append("(/.*)?$");
+        return sb.ToString();
+    }
+
     public List<AITool> GetTools()
     {
         return new List<AITool>
@@ -528,4 +733,30 @@ public class GrepResult
     /// The context around the match including surrounding lines.
     /// </summary>
     public string Context { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Represents a single .gitignore rule with its pattern and properties.
+/// </summary>
+public class GitIgnoreRule
+{
+    /// <summary>
+    /// The compiled regex pattern for matching.
+    /// </summary>
+    public Regex Pattern { get; set; } = null!;
+
+    /// <summary>
+    /// Whether this is a negation rule (starts with !).
+    /// </summary>
+    public bool IsNegation { get; set; }
+
+    /// <summary>
+    /// Whether this rule only matches directories (ends with /).
+    /// </summary>
+    public bool DirectoryOnly { get; set; }
+
+    /// <summary>
+    /// The original pattern string for debugging.
+    /// </summary>
+    public string OriginalPattern { get; set; } = string.Empty;
 }

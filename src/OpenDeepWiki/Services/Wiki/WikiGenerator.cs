@@ -112,13 +112,19 @@ public class WikiGenerator : IWikiGenerator
 
         try
         {
+            // 预先获取文件树结构
+            _logger.LogDebug("Pre-collecting repository file tree");
+            var fileTree = await CollectFileTreeAsync(workspace.WorkingDirectory, cancellationToken);
+            _logger.LogDebug("File tree collected. Length: {Length} chars", fileTree.Length);
+
             _logger.LogDebug("Loading catalog-generator prompt template");
             var prompt = await _promptPlugin.LoadPromptAsync(
                 "catalog-generator",
                 new Dictionary<string, string>
                 {
                     ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
-                    ["language"] = branchLanguage.LanguageCode
+                    ["language"] = branchLanguage.LanguageCode,
+                    ["file_tree"] = fileTree
                 },
                 cancellationToken);
             _logger.LogDebug("Prompt template loaded. Length: {PromptLength} chars", prompt.Length);
@@ -1166,6 +1172,113 @@ Translated document:";
         }
 
         return contentBuilder.ToString().Trim();
+    }
+
+    /// <summary>
+    /// Collects the repository file tree structure as a formatted string.
+    /// This provides the AI with a complete view of the repository structure upfront,
+    /// reducing the need for ListFiles tool calls and improving catalog accuracy.
+    /// </summary>
+    /// <param name="workingDirectory">The repository working directory path.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A formatted file tree string.</returns>
+    private async Task<string> CollectFileTreeAsync(string workingDirectory, CancellationToken cancellationToken)
+    {
+        return await Task.Run(() =>
+        {
+            var sb = new StringBuilder();
+            var rootDir = new DirectoryInfo(workingDirectory);
+            
+            // 收集所有文件和目录，排除隐藏目录和常见的忽略目录
+            var excludedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "node_modules", "bin", "obj", "dist", "build", ".git", ".svn", ".hg",
+                ".idea", ".vscode", ".vs", "__pycache__", ".cache", "coverage",
+                "packages", "vendor", ".next", ".nuxt", "target"
+            };
+
+            var tree = new Dictionary<string, object>();
+            CollectDirectoryTree(rootDir, tree, excludedDirs, maxDepth: 6, currentDepth: 0);
+            
+            // 格式化输出
+            sb.AppendLine("```");
+            FormatFileTree(tree, sb, "", isLast: true);
+            sb.AppendLine("```");
+            
+            return sb.ToString();
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Recursively collects directory tree structure.
+    /// </summary>
+    private void CollectDirectoryTree(
+        DirectoryInfo dir, 
+        Dictionary<string, object> tree, 
+        HashSet<string> excludedDirs,
+        int maxDepth,
+        int currentDepth)
+    {
+        if (currentDepth > maxDepth) return;
+
+        try
+        {
+            // 获取子目录
+            foreach (var subDir in dir.GetDirectories().OrderBy(d => d.Name))
+            {
+                // 跳过隐藏目录和排除的目录
+                if (subDir.Name.StartsWith('.') || excludedDirs.Contains(subDir.Name))
+                    continue;
+
+                var subTree = new Dictionary<string, object>();
+                tree[subDir.Name + "/"] = subTree;
+                CollectDirectoryTree(subDir, subTree, excludedDirs, maxDepth, currentDepth + 1);
+            }
+
+            // 获取文件
+            foreach (var file in dir.GetFiles().OrderBy(f => f.Name))
+            {
+                // 跳过隐藏文件
+                if (file.Name.StartsWith('.')) continue;
+                
+                tree[file.Name] = file.Length;
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // 忽略无权限访问的目录
+        }
+        catch (DirectoryNotFoundException)
+        {
+            // 忽略不存在的目录
+        }
+    }
+
+    /// <summary>
+    /// Formats the file tree dictionary into a readable tree string.
+    /// </summary>
+    private void FormatFileTree(Dictionary<string, object> tree, StringBuilder sb, string prefix, bool isLast)
+    {
+        var entries = tree.ToList();
+        for (int i = 0; i < entries.Count; i++)
+        {
+            var entry = entries[i];
+            var isLastEntry = i == entries.Count - 1;
+            var connector = isLastEntry ? "└── " : "├── ";
+            var childPrefix = prefix + (isLastEntry ? "    " : "│   ");
+
+            if (entry.Value is Dictionary<string, object> subTree)
+            {
+                // 目录
+                sb.AppendLine($"{prefix}{connector}{entry.Key}");
+                FormatFileTree(subTree, sb, childPrefix, isLastEntry);
+            }
+            else
+            {
+                // 文件
+                sb.AppendLine($"{prefix}{connector}{entry.Key}");
+            }
+        }
     }
 
     /// <summary>
