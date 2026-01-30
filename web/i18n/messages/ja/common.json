@@ -19,6 +19,23 @@
   "submitting": "送信中...",
   "submitFailed": "送信に失敗しました",
   "pleaseLogin": "ログインしてください",
+  "adminPanel": "管理パネル",
+  "admin": {
+    "dashboard": "ダッシュボード",
+    "repositories": "リポジトリ管理",
+    "tools": "ツール設定",
+    "mcps": "MCPs 管理",
+    "skills": "Skills 管理",
+    "models": "モデル設定",
+    "roles": "ロール管理",
+    "users": "ユーザー管理",
+    "settings": "システム設定",
+    "refresh": "更新",
+    "create": "新規作成",
+    "total": "{count} 件",
+    "confirmDelete": "削除の確認",
+    "deleteWarning": "この操作は取り消せません。続行しますか？"
+  },
   "weekdays": {
     "sunday": "日曜日",
     "monday": "月曜日",

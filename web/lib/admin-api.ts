@@ -34,7 +34,8 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
   return response.json();
 }
 
-// Statistics API
+// ==================== Statistics API ====================
+
 export interface DailyRepositoryStatistic {
   date: string;
   processedCount: number;
@@ -77,7 +78,8 @@ export async function getTokenUsageStatistics(days: number = 7): Promise<TokenUs
   return result.data;
 }
 
-// Repository API
+// ==================== Repository API ====================
+
 export interface AdminRepository {
   id: string;
   gitUrl: string;
@@ -121,6 +123,24 @@ export async function getRepositories(
   return result.data;
 }
 
+export async function getRepository(id: string): Promise<AdminRepository> {
+  const url = buildApiUrl(`/api/admin/repositories/${id}`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function updateRepository(id: string, data: {
+  isPublic?: boolean;
+  authAccount?: string;
+  authPassword?: string;
+}): Promise<void> {
+  const url = buildApiUrl(`/api/admin/repositories/${id}`);
+  await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function deleteRepository(id: string): Promise<void> {
   const url = buildApiUrl(`/api/admin/repositories/${id}`);
   await fetchWithAuth(url, { method: "DELETE" });
@@ -131,5 +151,405 @@ export async function updateRepositoryStatus(id: string, status: number): Promis
   await fetchWithAuth(url, {
     method: "PUT",
     body: JSON.stringify({ status }),
+  });
+}
+
+// ==================== User API ====================
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email?: string;
+  avatar?: string;
+  status: number;
+  roles: string[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface UserListResponse {
+  items: AdminUser[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export async function getUsers(
+  page: number = 1,
+  pageSize: number = 20,
+  search?: string,
+  roleId?: string
+): Promise<UserListResponse> {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    pageSize: pageSize.toString(),
+  });
+  if (search) params.append("search", search);
+  if (roleId) params.append("roleId", roleId);
+
+  const url = buildApiUrl(`/api/admin/users?${params}`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function getUser(id: string): Promise<AdminUser> {
+  const url = buildApiUrl(`/api/admin/users/${id}`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function createUser(data: {
+  name: string;
+  email: string;
+  password: string;
+  roleIds?: string[];
+}): Promise<AdminUser> {
+  const url = buildApiUrl("/api/admin/users");
+  const result = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return result.data;
+}
+
+export async function updateUser(id: string, data: {
+  name?: string;
+  email?: string;
+  avatar?: string;
+}): Promise<void> {
+  const url = buildApiUrl(`/api/admin/users/${id}`);
+  await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  const url = buildApiUrl(`/api/admin/users/${id}`);
+  await fetchWithAuth(url, { method: "DELETE" });
+}
+
+export async function updateUserStatus(id: string, status: number): Promise<void> {
+  const url = buildApiUrl(`/api/admin/users/${id}/status`);
+  await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function updateUserRoles(id: string, roleIds: string[]): Promise<void> {
+  const url = buildApiUrl(`/api/admin/users/${id}/roles`);
+  await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify({ roleIds }),
+  });
+}
+
+export async function resetUserPassword(id: string, newPassword: string): Promise<void> {
+  const url = buildApiUrl(`/api/admin/users/${id}/reset-password`);
+  await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify({ newPassword }),
+  });
+}
+
+// ==================== Role API ====================
+
+export interface AdminRole {
+  id: string;
+  name: string;
+  description?: string;
+  isSystem: boolean;
+  userCount: number;
+  createdAt: string;
+}
+
+export async function getRoles(): Promise<AdminRole[]> {
+  const url = buildApiUrl("/api/admin/roles");
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function getRole(id: string): Promise<AdminRole> {
+  const url = buildApiUrl(`/api/admin/roles/${id}`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function createRole(data: {
+  name: string;
+  description?: string;
+}): Promise<AdminRole> {
+  const url = buildApiUrl("/api/admin/roles");
+  const result = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return result.data;
+}
+
+export async function updateRole(id: string, data: {
+  name?: string;
+  description?: string;
+}): Promise<void> {
+  const url = buildApiUrl(`/api/admin/roles/${id}`);
+  await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteRole(id: string): Promise<void> {
+  const url = buildApiUrl(`/api/admin/roles/${id}`);
+  await fetchWithAuth(url, { method: "DELETE" });
+}
+
+// ==================== Tools API - MCP ====================
+
+export interface McpConfig {
+  id: string;
+  name: string;
+  description?: string;
+  serverUrl: string;
+  apiKey?: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export async function getMcpConfigs(): Promise<McpConfig[]> {
+  const url = buildApiUrl("/api/admin/tools/mcps");
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function createMcpConfig(data: {
+  name: string;
+  description?: string;
+  serverUrl: string;
+  apiKey?: string;
+  isActive?: boolean;
+  sortOrder?: number;
+}): Promise<McpConfig> {
+  const url = buildApiUrl("/api/admin/tools/mcps");
+  const result = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return result.data;
+}
+
+export async function updateMcpConfig(id: string, data: {
+  name?: string;
+  description?: string;
+  serverUrl?: string;
+  apiKey?: string;
+  isActive?: boolean;
+  sortOrder?: number;
+}): Promise<void> {
+  const url = buildApiUrl(`/api/admin/tools/mcps/${id}`);
+  await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteMcpConfig(id: string): Promise<void> {
+  const url = buildApiUrl(`/api/admin/tools/mcps/${id}`);
+  await fetchWithAuth(url, { method: "DELETE" });
+}
+
+// ==================== Tools API - Skill (Agent Skills 标准) ====================
+
+export interface SkillFileInfo {
+  fileName: string;
+  relativePath: string;
+  size: number;
+  lastModified: string;
+}
+
+export interface SkillConfig {
+  id: string;
+  name: string;
+  description: string;
+  license?: string;
+  compatibility?: string;
+  allowedTools?: string;
+  folderPath: string;
+  isActive: boolean;
+  sortOrder: number;
+  author?: string;
+  version: string;
+  source: string;
+  sourceUrl?: string;
+  hasScripts: boolean;
+  hasReferences: boolean;
+  hasAssets: boolean;
+  skillMdSize: number;
+  totalSize: number;
+  createdAt: string;
+}
+
+export interface SkillDetail extends SkillConfig {
+  skillMdContent: string;
+  scripts: SkillFileInfo[];
+  references: SkillFileInfo[];
+  assets: SkillFileInfo[];
+}
+
+export async function getSkillConfigs(): Promise<SkillConfig[]> {
+  const url = buildApiUrl("/api/admin/tools/skills");
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function getSkillDetail(id: string): Promise<SkillDetail> {
+  const url = buildApiUrl(`/api/admin/tools/skills/${id}`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function uploadSkill(file: File): Promise<SkillConfig> {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const url = buildApiUrl("/api/admin/tools/skills/upload");
+  const headers: HeadersInit = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || `上传失败: ${response.status}`);
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+export async function updateSkillConfig(id: string, data: {
+  isActive?: boolean;
+  sortOrder?: number;
+}): Promise<void> {
+  const url = buildApiUrl(`/api/admin/tools/skills/${id}`);
+  await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteSkillConfig(id: string): Promise<void> {
+  const url = buildApiUrl(`/api/admin/tools/skills/${id}`);
+  await fetchWithAuth(url, { method: "DELETE" });
+}
+
+export async function getSkillFileContent(id: string, filePath: string): Promise<string> {
+  const url = buildApiUrl(`/api/admin/tools/skills/${id}/files/${filePath}`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function refreshSkills(): Promise<void> {
+  const url = buildApiUrl("/api/admin/tools/skills/refresh");
+  await fetchWithAuth(url, { method: "POST" });
+}
+
+// ==================== Tools API - Model ====================
+
+export interface ModelConfig {
+  id: string;
+  name: string;
+  provider: string;
+  modelId: string;
+  endpoint?: string;
+  apiKey?: string;
+  isDefault: boolean;
+  isActive: boolean;
+  description?: string;
+  createdAt: string;
+}
+
+export async function getModelConfigs(): Promise<ModelConfig[]> {
+  const url = buildApiUrl("/api/admin/tools/models");
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function createModelConfig(data: {
+  name: string;
+  provider: string;
+  modelId: string;
+  endpoint?: string;
+  apiKey?: string;
+  isDefault?: boolean;
+  isActive?: boolean;
+  description?: string;
+}): Promise<ModelConfig> {
+  const url = buildApiUrl("/api/admin/tools/models");
+  const result = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return result.data;
+}
+
+export async function updateModelConfig(id: string, data: {
+  name?: string;
+  provider?: string;
+  modelId?: string;
+  endpoint?: string;
+  apiKey?: string;
+  isDefault?: boolean;
+  isActive?: boolean;
+  description?: string;
+}): Promise<void> {
+  const url = buildApiUrl(`/api/admin/tools/models/${id}`);
+  await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteModelConfig(id: string): Promise<void> {
+  const url = buildApiUrl(`/api/admin/tools/models/${id}`);
+  await fetchWithAuth(url, { method: "DELETE" });
+}
+
+// ==================== Settings API ====================
+
+export interface SystemSetting {
+  id: string;
+  key: string;
+  value?: string;
+  description?: string;
+  category: string;
+}
+
+export async function getSettings(category?: string): Promise<SystemSetting[]> {
+  const params = category ? `?category=${category}` : "";
+  const url = buildApiUrl(`/api/admin/settings${params}`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function getSetting(key: string): Promise<SystemSetting> {
+  const url = buildApiUrl(`/api/admin/settings/${key}`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function updateSettings(settings: { key: string; value: string }[]): Promise<void> {
+  const url = buildApiUrl("/api/admin/settings");
+  await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify(settings),
   });
 }

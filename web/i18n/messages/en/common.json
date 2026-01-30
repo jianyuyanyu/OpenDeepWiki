@@ -19,6 +19,23 @@
   "submitting": "Submitting...",
   "submitFailed": "Submit failed",
   "pleaseLogin": "Please login first",
+  "adminPanel": "Admin Panel",
+  "admin": {
+    "dashboard": "Dashboard",
+    "repositories": "Repositories",
+    "tools": "Tools",
+    "mcps": "MCPs",
+    "skills": "Skills",
+    "models": "Models",
+    "roles": "Roles",
+    "users": "Users",
+    "settings": "Settings",
+    "refresh": "Refresh",
+    "create": "Create",
+    "total": "{count} records",
+    "confirmDelete": "Confirm Delete",
+    "deleteWarning": "This action cannot be undone. Are you sure?"
+  },
   "weekdays": {
     "sunday": "Sunday",
     "monday": "Monday",

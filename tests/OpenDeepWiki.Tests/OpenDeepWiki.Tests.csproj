@@ -28,7 +28,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\OpenDeepWiki.Entities\OpenDeepWiki.Entities.csproj" />
     <ProjectReference Include="..\..\src\OpenDeepWiki.EFCore\OpenDeepWiki.EFCore.csproj" />
-    <ProjectReference Include="..\..\src\OpenDeepWiki\OpenDeepWiki.csproj" />
+    <ProjectReference Include="..\..\src\OpenDeepWiki\OpenDeepWiki.csproj">
+      <ExcludeAssets>analyzers</ExcludeAssets>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>

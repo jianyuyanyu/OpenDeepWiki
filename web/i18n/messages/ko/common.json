@@ -19,6 +19,23 @@
   "submitting": "제출 중...",
   "submitFailed": "제출 실패",
   "pleaseLogin": "먼저 로그인해 주세요",
+  "adminPanel": "관리자 패널",
+  "admin": {
+    "dashboard": "대시보드",
+    "repositories": "저장소 관리",
+    "tools": "도구 설정",
+    "mcps": "MCPs 관리",
+    "skills": "Skills 관리",
+    "models": "모델 설정",
+    "roles": "역할 관리",
+    "users": "사용자 관리",
+    "settings": "시스템 설정",
+    "refresh": "새로고침",
+    "create": "생성",
+    "total": "{count}개 레코드",
+    "confirmDelete": "삭제 확인",
+    "deleteWarning": "이 작업은 취소할 수 없습니다. 계속하시겠습니까?"
+  },
   "weekdays": {
     "sunday": "일요일",
     "monday": "월요일",

@@ -29,29 +29,75 @@ public class McpConfigDto
 }
 
 /// <summary>
-/// Skill 配置请求
-/// </summary>
-public class SkillConfigRequest
-{
-    public string Name { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public string? PromptTemplate { get; set; }
-    public bool IsActive { get; set; } = true;
-    public int SortOrder { get; set; }
-}
-
-/// <summary>
-/// Skill 配置 DTO
+/// Skill 配置 DTO（遵循 Agent Skills 标准）
 /// </summary>
 public class SkillConfigDto
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public string? PromptTemplate { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public string? License { get; set; }
+    public string? Compatibility { get; set; }
+    public string? AllowedTools { get; set; }
+    public string FolderPath { get; set; } = string.Empty;
     public bool IsActive { get; set; }
     public int SortOrder { get; set; }
+    public string? Author { get; set; }
+    public string Version { get; set; } = "1.0.0";
+    public string Source { get; set; } = "local";
+    public string? SourceUrl { get; set; }
+    public bool HasScripts { get; set; }
+    public bool HasReferences { get; set; }
+    public bool HasAssets { get; set; }
+    public long SkillMdSize { get; set; }
+    public long TotalSize { get; set; }
     public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Skill 详情 DTO（包含 SKILL.md 内容）
+/// </summary>
+public class SkillDetailDto : SkillConfigDto
+{
+    /// <summary>
+    /// SKILL.md 完整内容
+    /// </summary>
+    public string SkillMdContent { get; set; } = string.Empty;
+
+    /// <summary>
+    /// scripts 目录下的文件列表
+    /// </summary>
+    public List<SkillFileInfo> Scripts { get; set; } = new();
+
+    /// <summary>
+    /// references 目录下的文件列表
+    /// </summary>
+    public List<SkillFileInfo> References { get; set; } = new();
+
+    /// <summary>
+    /// assets 目录下的文件列表
+    /// </summary>
+    public List<SkillFileInfo> Assets { get; set; } = new();
+}
+
+/// <summary>
+/// Skill 文件信息
+/// </summary>
+public class SkillFileInfo
+{
+    public string FileName { get; set; } = string.Empty;
+    public string RelativePath { get; set; } = string.Empty;
+    public long Size { get; set; }
+    public DateTime LastModified { get; set; }
+}
+
+/// <summary>
+/// Skill 更新请求（仅更新管理字段）
+/// </summary>
+public class SkillUpdateRequest
+{
+    public bool? IsActive { get; set; }
+    public int? SortOrder { get; set; }
 }
 
 /// <summary>

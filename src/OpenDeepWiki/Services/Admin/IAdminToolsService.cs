@@ -13,11 +13,14 @@ public interface IAdminToolsService
     Task<bool> UpdateMcpConfigAsync(string id, McpConfigRequest request);
     Task<bool> DeleteMcpConfigAsync(string id);
 
-    // Skill 配置
+    // Skill 配置（遵循 Agent Skills 标准）
     Task<List<SkillConfigDto>> GetSkillConfigsAsync();
-    Task<SkillConfigDto> CreateSkillConfigAsync(SkillConfigRequest request);
-    Task<bool> UpdateSkillConfigAsync(string id, SkillConfigRequest request);
-    Task<bool> DeleteSkillConfigAsync(string id);
+    Task<SkillDetailDto?> GetSkillDetailAsync(string id);
+    Task<SkillConfigDto> UploadSkillAsync(Stream zipStream, string fileName);
+    Task<bool> UpdateSkillAsync(string id, SkillUpdateRequest request);
+    Task<bool> DeleteSkillAsync(string id);
+    Task<string?> GetSkillFileContentAsync(string id, string filePath);
+    Task RefreshSkillsFromDiskAsync();
 
     // 模型配置
     Task<List<ModelConfigDto>> GetModelConfigsAsync();

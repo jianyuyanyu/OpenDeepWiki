@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using OpenDeepWiki.Agents;
+using OpenDeepWiki.Chat;
 using OpenDeepWiki.Endpoints;
 using OpenDeepWiki.Endpoints.Admin;
 using OpenDeepWiki.Infrastructure;
@@ -98,17 +99,17 @@ try
         {
             if (string.IsNullOrWhiteSpace(options.ApiKey))
             {
-                options.ApiKey = Environment.GetEnvironmentVariable("CHAT_API_KEY");
+                options.ApiKey = builder.Configuration["CHAT_API_KEY"];
             }
 
             if (string.IsNullOrWhiteSpace(options.Endpoint))
             {
-                options.Endpoint = Environment.GetEnvironmentVariable("ENDPOINT");
+                options.Endpoint = builder.Configuration["ENDPOINT"];
             }
 
             if (!options.RequestType.HasValue)
             {
-                var modelProvider = Environment.GetEnvironmentVariable("MODEL_PROVIDER");
+                var modelProvider = builder.Configuration["MODEL_PROVIDER"];
                 if (Enum.TryParse<AiRequestType>(modelProvider, true, out var parsed))
                 {
                     options.RequestType = parsed;
@@ -221,6 +222,10 @@ try
     builder.Services.AddScoped<IAdminSettingsService, AdminSettingsService>();
 
     builder.Services.AddHostedService<RepositoryProcessingWorker>();
+
+    // 注册 Chat 系统服务
+    // Requirements: 2.2, 2.4 - 通过依赖注入自动发现并加载 Provider
+    builder.Services.AddChatServices(builder.Configuration);
 
     var app = builder.Build();
 

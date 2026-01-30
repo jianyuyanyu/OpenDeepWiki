@@ -2,6 +2,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Entities.Tools;
 
 namespace OpenDeepWiki.EFCore;
 
@@ -28,6 +29,10 @@ public interface IContext
     DbSet<McpConfig> McpConfigs { get; set; }
     DbSet<SkillConfig> SkillConfigs { get; set; }
     DbSet<ModelConfig> ModelConfigs { get; set; }
+    DbSet<ChatSession> ChatSessions { get; set; }
+    DbSet<ChatMessageHistory> ChatMessageHistories { get; set; }
+    DbSet<ChatProviderConfig> ChatProviderConfigs { get; set; }
+    DbSet<ChatMessageQueue> ChatMessageQueues { get; set; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
@@ -60,6 +65,10 @@ public abstract class MasterDbContext : DbContext, IContext
     public DbSet<McpConfig> McpConfigs { get; set; } = null!;
     public DbSet<SkillConfig> SkillConfigs { get; set; } = null!;
     public DbSet<ModelConfig> ModelConfigs { get; set; } = null!;
+    public DbSet<ChatSession> ChatSessions { get; set; } = null!;
+    public DbSet<ChatMessageHistory> ChatMessageHistories { get; set; } = null!;
+    public DbSet<ChatProviderConfig> ChatProviderConfigs { get; set; } = null!;
+    public DbSet<ChatMessageQueue> ChatMessageQueues { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -138,5 +147,38 @@ public abstract class MasterDbContext : DbContext, IContext
         modelBuilder.Entity<ModelConfig>()
             .HasIndex(m => m.Name)
             .IsUnique();
+
+        // ChatSession 用户和平台组合唯一索引
+        modelBuilder.Entity<ChatSession>()
+            .HasIndex(s => new { s.UserId, s.Platform })
+            .IsUnique();
+
+        // ChatSession 状态索引（用于查询活跃会话）
+        modelBuilder.Entity<ChatSession>()
+            .HasIndex(s => s.State);
+
+        // ChatMessageHistory 与 ChatSession 关联
+        modelBuilder.Entity<ChatMessageHistory>()
+            .HasOne(m => m.Session)
+            .WithMany(s => s.Messages)
+            .HasForeignKey(m => m.SessionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // ChatMessageHistory 会话ID和时间戳索引（用于按时间查询消息）
+        modelBuilder.Entity<ChatMessageHistory>()
+            .HasIndex(m => new { m.SessionId, m.MessageTimestamp });
+
+        // ChatProviderConfig 平台唯一索引
+        modelBuilder.Entity<ChatProviderConfig>()
+            .HasIndex(c => c.Platform)
+            .IsUnique();
+
+        // ChatMessageQueue 状态和计划时间索引（用于出队处理）
+        modelBuilder.Entity<ChatMessageQueue>()
+            .HasIndex(q => new { q.Status, q.ScheduledAt });
+
+        // ChatMessageQueue 平台和目标用户索引（用于按用户查询队列）
+        modelBuilder.Entity<ChatMessageQueue>()
+            .HasIndex(q => new { q.Platform, q.TargetUserId });
     }
 }
