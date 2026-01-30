@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using OpenDeepWiki.Agents;
 using OpenDeepWiki.Endpoints;
+using OpenDeepWiki.Endpoints.Admin;
 using OpenDeepWiki.Infrastructure;
+using OpenDeepWiki.Services.Admin;
 using OpenDeepWiki.Services.Auth;
 using OpenDeepWiki.Services.OAuth;
 using OpenDeepWiki.Services.Prompts;
@@ -72,7 +74,10 @@ try
             };
         });
 
-    builder.Services.AddAuthorization();
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+    });
 
     // 注册认证服务
     builder.Services.AddHttpContextAccessor();
@@ -207,6 +212,14 @@ try
     // 注册处理日志服务（使用 Singleton，因为它内部使用 IServiceScopeFactory 创建独立 scope）
     builder.Services.AddSingleton<IProcessingLogService, ProcessingLogService>();
 
+    // 注册管理端服务
+    builder.Services.AddScoped<IAdminStatisticsService, AdminStatisticsService>();
+    builder.Services.AddScoped<IAdminRepositoryService, AdminRepositoryService>();
+    builder.Services.AddScoped<IAdminUserService, AdminUserService>();
+    builder.Services.AddScoped<IAdminRoleService, AdminRoleService>();
+    builder.Services.AddScoped<IAdminToolsService, AdminToolsService>();
+    builder.Services.AddScoped<IAdminSettingsService, AdminSettingsService>();
+
     builder.Services.AddHostedService<RepositoryProcessingWorker>();
 
     var app = builder.Build();
@@ -236,6 +249,7 @@ try
     app.MapBookmarkEndpoints();
     app.MapSubscriptionEndpoints();
     app.MapProcessingLogEndpoints();
+    app.MapAdminEndpoints();
 
     app.Run();
 }
