@@ -39,6 +39,10 @@ public class TestConfigDbContext : DbContext, IContext
     public DbSet<ChatMessageHistory> ChatMessageHistories { get; set; } = null!;
     public DbSet<ChatProviderConfig> ChatProviderConfigs { get; set; } = null!;
     public DbSet<ChatMessageQueue> ChatMessageQueues { get; set; } = null!;
+    public DbSet<UserDepartment> UserDepartments { get; set; } = null!;
+    public DbSet<UserActivity> UserActivities { get; set; } = null!;
+    public DbSet<UserPreferenceCache> UserPreferenceCaches { get; set; } = null!;
+    public DbSet<UserDislike> UserDislikes { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

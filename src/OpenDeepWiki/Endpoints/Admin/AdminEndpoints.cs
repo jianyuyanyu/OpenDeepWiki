@@ -16,6 +16,7 @@ public static class AdminEndpoints
         adminGroup.MapAdminRepositoryEndpoints();
         adminGroup.MapAdminUserEndpoints();
         adminGroup.MapAdminRoleEndpoints();
+        adminGroup.MapAdminDepartmentEndpoints();
         adminGroup.MapAdminToolsEndpoints();
         adminGroup.MapAdminSettingsEndpoints();
 

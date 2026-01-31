@@ -26,6 +26,25 @@ export interface SubscriptionStatusResponse {
   subscribedAt?: string;
 }
 
+export interface SubscriptionItemResponse {
+  subscriptionId: string;
+  repositoryId: string;
+  repoName: string;
+  orgName: string;
+  description?: string;
+  starCount: number;
+  forkCount: number;
+  subscriptionCount: number;
+  subscribedAt: string;
+}
+
+export interface SubscriptionListResponse {
+  items: SubscriptionItemResponse[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 /**
  * Add a subscription for a repository
  */
@@ -71,6 +90,31 @@ export async function getSubscriptionStatus(
 
   if (!response.ok) {
     throw new Error("Failed to fetch subscription status");
+  }
+
+  return await response.json();
+}
+
+/**
+ * Get user's subscription list with pagination
+ */
+export async function getUserSubscriptions(
+  userId: string,
+  page: number = 1,
+  pageSize: number = 20
+): Promise<SubscriptionListResponse> {
+  const params = new URLSearchParams({
+    userId,
+    page: page.toString(),
+    pageSize: pageSize.toString(),
+  });
+
+  const url = buildApiUrl(`/api/v1/subscriptions?${params.toString()}`);
+
+  const response = await fetch(url, { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch subscriptions");
   }
 
   return await response.json();

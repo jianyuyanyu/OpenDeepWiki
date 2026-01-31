@@ -43,6 +43,7 @@ export interface GitBranchItem {
 export interface RepoDocResponse {
   slug: string;
   content: string;
+  sourceFiles: string[];
 }
 
 export interface RepoHeading {
@@ -76,6 +77,9 @@ export interface RepositoryItemResponse {
   hasPassword: boolean;  // 新增：是否设置了密码，用于判断是否可设为私有
   createdAt: string;
   updatedAt?: string;
+  starCount?: number;
+  forkCount?: number;
+  primaryLanguage?: string;
 }
 
 export interface RepositoryListResponse {

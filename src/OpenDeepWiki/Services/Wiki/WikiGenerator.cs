@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using AIDotNet.Toon;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -112,10 +113,11 @@ public class WikiGenerator : IWikiGenerator
 
         try
         {
-            // 预先获取文件树结构
-            _logger.LogDebug("Pre-collecting repository file tree");
-            var fileTree = await CollectFileTreeAsync(workspace.WorkingDirectory, cancellationToken);
-            _logger.LogDebug("File tree collected. Length: {Length} chars", fileTree.Length);
+            // 收集仓库上下文（目录结构、项目类型、README等）
+            _logger.LogDebug("Pre-collecting repository context");
+            var repoContext = await CollectRepositoryContextAsync(workspace.WorkingDirectory, cancellationToken);
+            _logger.LogDebug("Repository context collected. ProjectType: {ProjectType}, EntryPoints: {EntryPoints}", 
+                repoContext.ProjectType, string.Join(", ", repoContext.EntryPoints));
 
             _logger.LogDebug("Loading catalog-generator prompt template");
             var prompt = await _promptPlugin.LoadPromptAsync(
@@ -124,7 +126,11 @@ public class WikiGenerator : IWikiGenerator
                 {
                     ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
                     ["language"] = branchLanguage.LanguageCode,
-                    ["file_tree"] = fileTree
+                    ["project_type"] = repoContext.ProjectType,
+                    ["file_tree"] = repoContext.DirectoryTree,
+                    ["readme_content"] = repoContext.ReadmeContent,
+                    ["key_files"] = string.Join(", ", repoContext.KeyFiles),
+                    ["entry_points"] = string.Join("\n", repoContext.EntryPoints.Select(e => $"- {e}"))
                 },
                 cancellationToken);
             _logger.LogDebug("Prompt template loaded. Length: {PromptLength} chars", prompt.Length);
@@ -140,35 +146,12 @@ public class WikiGenerator : IWikiGenerator
             _logger.LogDebug("Tools initialized. ToolCount: {ToolCount}, Tools: {ToolNames}",
                 tools.Length, string.Join(", ", tools.Select(t => t.Name)));
 
-            var userMessage = $@"Please generate a Wiki catalog structure for repository {workspace.Organization}/{workspace.RepositoryName}.
+            var userMessage = $@"Generate Wiki catalog for: {workspace.Organization}/{workspace.RepositoryName}
 
-## Task Requirements
+Project Type: {repoContext.ProjectType}
+Entry Points: {string.Join(", ", repoContext.EntryPoints.Take(5))}
 
-1. **Analyze Repository Structure**
-   - Use ListFiles to get file list and understand overall project structure
-   - Prioritize reading README.md, package.json, *.csproj and other key files
-   - Identify project type (frontend/backend/fullstack/library/tool, etc.)
-
-2. **Design Catalog Structure**
-   - Organize content from user's learning and usage perspective
-   - Maximum 3 levels of nesting, avoid overly deep structures
-   - Follow logical order: Overview → Getting Started → Architecture → Core Modules → API → Configuration → FAQ
-
-3. **Output Requirements**
-   - Catalog titles should be in {branchLanguage.LanguageCode} language
-   - Path field must use lowercase English with hyphens (e.g., getting-started)
-   - Each node must contain title, path, order, children fields
-   - Use WriteCatalog tool to write the final catalog structure
-
-## Execution Steps
-
-1. Call ListFiles() to get file overview
-2. Read key files (README, config files, entry files)
-3. Use Grep to search for key patterns (class definitions, interfaces, API endpoints, etc.)
-4. Design catalog structure that fits the project characteristics
-5. Call WriteCatalog to write the catalog
-
-Please start executing the task.";
+Execute the workflow now. Read entry point files to understand the architecture, then generate a comprehensive catalog in {branchLanguage.LanguageCode}.";
 
             await ExecuteAgentWithRetryAsync(
                 _options.CatalogModel,
@@ -429,7 +412,7 @@ Please start executing the task.";
                 cancellationToken);
 
             var gitTool = new GitTool(workspace.WorkingDirectory);
-            var docTool = new DocTool(_context, branchLanguage.Id, catalogPath);
+            var docTool = new DocTool(_context, branchLanguage.Id, catalogPath, gitTool);
 
             var tools = gitTool.GetTools()
                 .Concat(docTool.GetTools())
@@ -501,6 +484,7 @@ Please start executing the task.";
 
 6. **Output Requirements**
    - Use WriteDoc tool to write the document
+   - Source files are automatically tracked from files you read
 
 ## Execution Steps
 
@@ -616,7 +600,7 @@ Please start executing the task.";
 
                 _logger.LogDebug("Starting streaming response. Operation: {Operation}", operationName);
 
-                var thread = await chatClient.GetNewThreadAsync(cancellationToken);
+                var thread = await chatClient.GetNewSessionAsync(cancellationToken);
 
                 await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
                 {
@@ -1000,6 +984,7 @@ Please start executing the task.";
 
     /// <summary>
     /// Translates catalog JSON from source language to target language using AI.
+    /// Uses item-by-item translation for better reliability.
     /// </summary>
     private async Task<string> TranslateCatalogAsync(
         string sourceCatalogJson,
@@ -1007,126 +992,92 @@ Please start executing the task.";
         string targetLanguage,
         CancellationToken cancellationToken)
     {
-        var prompt = $@"You are a professional translator. Translate the following JSON catalog structure from {sourceLanguage} to {targetLanguage}.
+        // 解析源目录结构
+        var root = System.Text.Json.JsonSerializer.Deserialize<CatalogRoot>(sourceCatalogJson, new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+        });
 
-IMPORTANT RULES:
-1. Only translate the 'title' field values
-2. Keep 'path', 'order', and 'children' structure unchanged
-3. Keep the path values in English (lowercase with hyphens)
-4. Return valid JSON only, no explanations
-5. Maintain the exact same JSON structure
+        if (root?.Items == null || root.Items.Count == 0)
+        {
+            return sourceCatalogJson;
+        }
 
-Source catalog JSON:
-{sourceCatalogJson}
+        // 逐个翻译标题
+        await TranslateCatalogItemsAsync(root.Items, sourceLanguage, targetLanguage, cancellationToken);
 
-Return the translated JSON:";
+        // 序列化回 JSON
+        return System.Text.Json.JsonSerializer.Serialize(root, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+        });
+    }
+
+    /// <summary>
+    /// Recursively translates catalog item titles one by one.
+    /// </summary>
+    private async Task TranslateCatalogItemsAsync(
+        List<CatalogItem> items,
+        string sourceLanguage,
+        string targetLanguage,
+        CancellationToken cancellationToken)
+    {
+        foreach (var item in items)
+        {
+            // 翻译当前项的标题
+            item.Title = await TranslateSingleTitleAsync(item.Title, sourceLanguage, targetLanguage, cancellationToken);
+
+            // 递归翻译子项
+            if (item.Children.Count > 0)
+            {
+                await TranslateCatalogItemsAsync(item.Children, sourceLanguage, targetLanguage, cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Translates a single title string using AI (synchronous request).
+    /// </summary>
+    private async Task<string> TranslateSingleTitleAsync(
+        string title,
+        string sourceLanguage,
+        string targetLanguage,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            return title;
+        }
+
+        var prompt = $@"Translate the following title from {sourceLanguage} to {targetLanguage}. Return ONLY the translated text, nothing else.
+
+Title: {title}
+
+Translation:";
 
         var messages = new List<ChatMessage>
         {
             new(ChatRole.User, prompt)
         };
 
-        var chatClient = _agentFactory.CreateSimpleChatClient(_options.ContentModel, _options.GetContentRequestOptions());
-        var thread = await chatClient.GetNewThreadAsync(cancellationToken);
+        var chatClient = _agentFactory.CreateSimpleChatClient(
+            _options.GetTranslationModel(), 
+            32000, 
+            _options.GetTranslationRequestOptions());
+        var response = await chatClient.RunAsync(messages, cancellationToken: cancellationToken);
         
-        var contentBuilder = new StringBuilder();
-        await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
-        {
-            if (!string.IsNullOrEmpty(update.Text))
-            {
-                contentBuilder.Append(update.Text);
-            }
-        }
-
-        var translatedJson = contentBuilder.ToString().Trim();
+        var translatedTitle = response.Text?.Trim() ?? string.Empty;
         
         // 清理可能的<think>标签及其内容
-        translatedJson = System.Text.RegularExpressions.Regex.Replace(
-            translatedJson, 
+        translatedTitle = System.Text.RegularExpressions.Regex.Replace(
+            translatedTitle, 
             @"<think>[\s\S]*?</think>", 
             string.Empty, 
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
 
-        // 清理可能的markdown代码块标记
-        if (translatedJson.StartsWith("```"))
-        {
-            var lines = translatedJson.Split('\n');
-            translatedJson = string.Join('\n', lines.Skip(1).Take(lines.Length - 2));
-        }
-        
-        return translatedJson;
-    }
-
-    /// <summary>
-    /// Translates a single document from source language to target language.
-    /// </summary>
-    private async Task TranslateDocumentAsync(
-        string sourceBranchLanguageId,
-        string targetBranchLanguageId,
-        string catalogPath,
-        string sourceLanguage,
-        string targetLanguage,
-        CancellationToken cancellationToken)
-    {
-        // 获取源文档内容
-        var sourceCatalog = await _context.DocCatalogs
-            .FirstOrDefaultAsync(c => c.BranchLanguageId == sourceBranchLanguageId && 
-                                      c.Path == catalogPath && 
-                                      !c.IsDeleted, cancellationToken);
-
-        if (sourceCatalog == null || string.IsNullOrEmpty(sourceCatalog.DocFileId))
-        {
-            _logger.LogWarning("Source document not found for path: {Path}", catalogPath);
-            return;
-        }
-
-        var sourceDocFile = await _context.DocFiles
-            .FirstOrDefaultAsync(d => d.Id == sourceCatalog.DocFileId && !d.IsDeleted, cancellationToken);
-
-        if (sourceDocFile == null || string.IsNullOrEmpty(sourceDocFile.Content))
-        {
-            _logger.LogWarning("Source document content not found for path: {Path}", catalogPath);
-            return;
-        }
-
-        // 翻译文档内容
-        var translatedContent = await TranslateContentAsync(
-            sourceDocFile.Content,
-            sourceLanguage,
-            targetLanguage,
-            cancellationToken);
-
-        // 获取目标目录项
-        var targetCatalog = await _context.DocCatalogs
-            .FirstOrDefaultAsync(c => c.BranchLanguageId == targetBranchLanguageId && 
-                                      c.Path == catalogPath && 
-                                      !c.IsDeleted, cancellationToken);
-
-        if (targetCatalog == null)
-        {
-            _logger.LogWarning("Target catalog not found for path: {Path}", catalogPath);
-            return;
-        }
-
-        translatedContent = System.Text.RegularExpressions.Regex.Replace(
-            translatedContent,
-            @"<think>[\s\S]*?</think>",
-            string.Empty,
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-        // 创建翻译后的文档
-        var targetDocFile = new DocFile
-        {
-            Id = Guid.NewGuid().ToString(),
-            BranchLanguageId = targetBranchLanguageId,
-            Content = translatedContent
-        };
-
-        _context.DocFiles.Add(targetDocFile);
-        targetCatalog.DocFileId = targetDocFile.Id;
-        targetCatalog.UpdateTimestamp();
-
-        await _context.SaveChangesAsync(cancellationToken);
+        // 如果翻译失败或返回空，保留原标题
+        return string.IsNullOrWhiteSpace(translatedTitle) ? title : translatedTitle;
     }
 
     /// <summary>
@@ -1159,8 +1110,11 @@ Translated document:";
             new(ChatRole.User, prompt)
         };
 
-        var chatClient = _agentFactory.CreateSimpleChatClient(_options.ContentModel, _options.GetContentRequestOptions());
-        var thread = await chatClient.GetNewThreadAsync(cancellationToken);
+        var chatClient = _agentFactory.CreateSimpleChatClient(
+            _options.GetTranslationModel(), 
+            32000, 
+            _options.GetTranslationRequestOptions());
+        var thread = await chatClient.GetNewSessionAsync(cancellationToken);
         
         var contentBuilder = new StringBuilder();
         await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
@@ -1175,6 +1129,296 @@ Translated document:";
     }
 
     /// <summary>
+    /// Collects comprehensive repository context including directory structure, 
+    /// project type detection, and README content.
+    /// </summary>
+    private async Task<RepositoryContext> CollectRepositoryContextAsync(string workingDirectory, CancellationToken cancellationToken)
+    {
+        return await Task.Run(() =>
+        {
+            var context = new RepositoryContext();
+            var rootDir = new DirectoryInfo(workingDirectory);
+            
+            var excludedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "node_modules", "bin", "obj", "dist", "build", ".git", ".svn", ".hg",
+                ".idea", ".vscode", ".vs", "__pycache__", ".cache", "coverage",
+                "packages", "vendor", ".next", ".nuxt", "target", "out", ".output"
+            };
+
+            // 1. Detect project type
+            context.ProjectType = DetectProjectType(rootDir);
+            
+            // 2. Collect directory structure as tree data and serialize with Toon
+            var treeData = CollectDirectoryTreeData(rootDir, excludedDirs, maxDepth: 2, currentDepth: 0);
+            context.DirectoryTree = ToonSerializer.Serialize(treeData);
+            
+            // 3. Read README content (truncated if too long)
+            context.ReadmeContent = ReadReadmeContent(rootDir);
+            
+            // 4. Collect key configuration files
+            context.KeyFiles = CollectKeyFiles(rootDir, context.ProjectType);
+            
+            // 5. Identify entry points based on project type
+            context.EntryPoints = IdentifyEntryPoints(rootDir, context.ProjectType);
+            
+            return context;
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Detects the project type based on configuration files present.
+    /// </summary>
+    private static string DetectProjectType(DirectoryInfo rootDir)
+    {
+        var types = new List<string>();
+        
+        // Check for various project types
+        if (rootDir.GetFiles("*.csproj", SearchOption.AllDirectories).Any() ||
+            rootDir.GetFiles("*.sln").Any())
+            types.Add("dotnet");
+            
+        if (File.Exists(Path.Combine(rootDir.FullName, "package.json")))
+        {
+            var packageJson = File.ReadAllText(Path.Combine(rootDir.FullName, "package.json"));
+            if (packageJson.Contains("\"next\"") || packageJson.Contains("\"react\"") || 
+                packageJson.Contains("\"vue\"") || packageJson.Contains("\"angular\""))
+                types.Add("frontend");
+            else
+                types.Add("nodejs");
+        }
+        
+        if (File.Exists(Path.Combine(rootDir.FullName, "pom.xml")) ||
+            rootDir.GetFiles("build.gradle*").Any())
+            types.Add("java");
+            
+        if (File.Exists(Path.Combine(rootDir.FullName, "go.mod")))
+            types.Add("go");
+            
+        if (File.Exists(Path.Combine(rootDir.FullName, "Cargo.toml")))
+            types.Add("rust");
+            
+        if (File.Exists(Path.Combine(rootDir.FullName, "requirements.txt")) ||
+            File.Exists(Path.Combine(rootDir.FullName, "pyproject.toml")) ||
+            File.Exists(Path.Combine(rootDir.FullName, "setup.py")))
+            types.Add("python");
+
+        if (types.Count == 0)
+            return "unknown";
+        if (types.Count > 1)
+            return "fullstack:" + string.Join("+", types);
+        return types[0];
+    }
+
+    /// <summary>
+    /// Collects directory tree structure as a data object for Toon serialization.
+    /// </summary>
+    private static List<FileTreeNode> CollectDirectoryTreeData(
+        DirectoryInfo dir,
+        HashSet<string> excludedDirs,
+        int maxDepth,
+        int currentDepth)
+    {
+        var result = new List<FileTreeNode>();
+        if (currentDepth > maxDepth) return result;
+
+        try
+        {
+            // Get directories
+            foreach (var subDir in dir.GetDirectories().OrderBy(d => d.Name))
+            {
+                if (subDir.Name.StartsWith('.') || excludedDirs.Contains(subDir.Name))
+                    continue;
+
+                var node = new FileTreeNode
+                {
+                    Name = subDir.Name,
+                    Type = "dir"
+                };
+
+                if (currentDepth < maxDepth)
+                {
+                    node.Children = CollectDirectoryTreeData(subDir, excludedDirs, maxDepth, currentDepth + 1);
+                }
+
+                result.Add(node);
+            }
+
+            // Get files (only at depth 0 and 1 to reduce noise)
+            if (currentDepth <= 1)
+            {
+                foreach (var file in dir.GetFiles().OrderBy(f => f.Name))
+                {
+                    if (file.Name.StartsWith('.'))
+                        continue;
+
+                    result.Add(new FileTreeNode
+                    {
+                        Name = file.Name,
+                        Type = "file"
+                    });
+                }
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Skip inaccessible directories
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Represents a node in the file tree structure.
+    /// </summary>
+    private class FileTreeNode
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "file"; // "file" or "dir"
+        public List<FileTreeNode>? Children { get; set; }
+    }
+
+    /// <summary>
+    /// Reads README content, truncated if too long.
+    /// </summary>
+    private static string ReadReadmeContent(DirectoryInfo rootDir)
+    {
+        var readmeNames = new[] { "README.md", "README.MD", "readme.md", "README.rst", "README.txt", "README" };
+        
+        foreach (var name in readmeNames)
+        {
+            var path = Path.Combine(rootDir.FullName, name);
+            if (File.Exists(path))
+            {
+                try
+                {
+                    var content = File.ReadAllText(path);
+                    // Truncate if too long (keep first 4000 chars)
+                    if (content.Length > 4000)
+                    {
+                        content = content[..4000] + "\n\n[... README truncated for brevity ...]";
+                    }
+                    return content;
+                }
+                catch
+                {
+                    return "[Unable to read README]";
+                }
+            }
+        }
+        return "[No README found]";
+    }
+
+    /// <summary>
+    /// Collects key configuration files based on project type.
+    /// </summary>
+    private static List<string> CollectKeyFiles(DirectoryInfo rootDir, string projectType)
+    {
+        var keyFiles = new List<string>();
+        var commonFiles = new[] 
+        { 
+            "package.json", "tsconfig.json", "docker-compose.yml", "Dockerfile",
+            "Makefile", ".env.example", "appsettings.json"
+        };
+        
+        foreach (var file in commonFiles)
+        {
+            if (File.Exists(Path.Combine(rootDir.FullName, file)))
+                keyFiles.Add(file);
+        }
+        
+        // Add project-specific files
+        if (projectType.Contains("dotnet"))
+        {
+            keyFiles.AddRange(rootDir.GetFiles("*.sln").Select(f => f.Name));
+            keyFiles.AddRange(rootDir.GetFiles("*.csproj", SearchOption.TopDirectoryOnly).Select(f => f.Name));
+        }
+        
+        if (projectType.Contains("java"))
+        {
+            if (File.Exists(Path.Combine(rootDir.FullName, "pom.xml")))
+                keyFiles.Add("pom.xml");
+        }
+        
+        if (projectType.Contains("go"))
+        {
+            keyFiles.Add("go.mod");
+        }
+        
+        if (projectType.Contains("python"))
+        {
+            var pyFiles = new[] { "requirements.txt", "pyproject.toml", "setup.py" };
+            keyFiles.AddRange(pyFiles.Where(f => File.Exists(Path.Combine(rootDir.FullName, f))));
+        }
+        
+        return keyFiles.Distinct().ToList();
+    }
+
+    /// <summary>
+    /// Identifies likely entry point files based on project type.
+    /// </summary>
+    private static List<string> IdentifyEntryPoints(DirectoryInfo rootDir, string projectType)
+    {
+        var entryPoints = new List<string>();
+        
+        if (projectType.Contains("dotnet"))
+        {
+            // Find Program.cs, Startup.cs
+            var dotnetEntries = new[] { "Program.cs", "Startup.cs" };
+            foreach (var entry in dotnetEntries)
+            {
+                var files = rootDir.GetFiles(entry, SearchOption.AllDirectories)
+                    .Where(f => !f.FullName.Contains("bin") && !f.FullName.Contains("obj"))
+                    .Take(3);
+                entryPoints.AddRange(files.Select(f => Path.GetRelativePath(rootDir.FullName, f.FullName).Replace('\\', '/')));
+            }
+        }
+        
+        if (projectType.Contains("frontend") || projectType.Contains("nodejs"))
+        {
+            // Find index.tsx, App.tsx, main.ts, etc.
+            var frontendEntries = new[] { "index.tsx", "index.ts", "App.tsx", "App.vue", "main.ts", "main.tsx" };
+            foreach (var entry in frontendEntries)
+            {
+                var files = rootDir.GetFiles(entry, SearchOption.AllDirectories)
+                    .Where(f => !f.FullName.Contains("node_modules"))
+                    .Take(2);
+                entryPoints.AddRange(files.Select(f => Path.GetRelativePath(rootDir.FullName, f.FullName).Replace('\\', '/')));
+            }
+        }
+        
+        if (projectType.Contains("python"))
+        {
+            var pyEntries = new[] { "main.py", "app.py", "manage.py", "__main__.py" };
+            foreach (var entry in pyEntries)
+            {
+                var files = rootDir.GetFiles(entry, SearchOption.AllDirectories).Take(2);
+                entryPoints.AddRange(files.Select(f => Path.GetRelativePath(rootDir.FullName, f.FullName).Replace('\\', '/')));
+            }
+        }
+        
+        if (projectType.Contains("go"))
+        {
+            var files = rootDir.GetFiles("main.go", SearchOption.AllDirectories).Take(3);
+            entryPoints.AddRange(files.Select(f => Path.GetRelativePath(rootDir.FullName, f.FullName).Replace('\\', '/')));
+        }
+        
+        return entryPoints.Distinct().Take(10).ToList();
+    }
+
+    /// <summary>
+    /// Repository context information for catalog generation.
+    /// </summary>
+    private class RepositoryContext
+    {
+        public string ProjectType { get; set; } = "unknown";
+        public string DirectoryTree { get; set; } = "";
+        public string ReadmeContent { get; set; } = "";
+        public List<string> KeyFiles { get; set; } = new();
+        public List<string> EntryPoints { get; set; } = new();
+    }
+
+    /// <summary>
     /// Collects the repository file tree structure as a formatted string.
     /// This provides the AI with a complete view of the repository structure upfront,
     /// reducing the need for ListFiles tool calls and improving catalog accuracy.
@@ -1182,6 +1426,7 @@ Translated document:";
     /// <param name="workingDirectory">The repository working directory path.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A formatted file tree string.</returns>
+    [Obsolete("Use CollectTopLevelStructureAsync instead to reduce token consumption")]
     private async Task<string> CollectFileTreeAsync(string workingDirectory, CancellationToken cancellationToken)
     {
         return await Task.Run(() =>

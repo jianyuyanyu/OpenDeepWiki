@@ -1,5 +1,26 @@
 {
   "title": "무엇을 알고 싶으신가요?",
+  "bookmarks": {
+    "pageTitle": "북마크",
+    "pageDescription": "저장한 저장소에 빠르게 접근",
+    "loginRequired": "북마크를 보려면 로그인하세요",
+    "loginHint": "로그인하여 좋아하는 저장소를 저장하고 관리하세요",
+    "empty": "북마크가 없습니다",
+    "emptyHint": "저장소를 북마크하면 여기에 표시됩니다",
+    "noDescription": "설명 없음",
+    "removeError": "북마크 삭제에 실패했습니다",
+    "loadError": "북마크를 불러오는데 실패했습니다",
+    "previous": "이전",
+    "next": "다음",
+    "pageInfo": "{current} / {total} 페이지",
+    "time": {
+      "today": "오늘",
+      "yesterday": "어제",
+      "daysAgo": "{count}일 전",
+      "weeksAgo": "{count}주 전",
+      "monthsAgo": "{count}개월 전"
+    }
+  },
   "searchPlaceholder": "GitHub 저장소 링크를 붙여넣거나 키워드로 검색",
   "addPrivateRepo": "비공개 저장소 추가",
   "exploreTrending": "이번 주 인기 저장소 탐색",

@@ -11,20 +11,7 @@ import type {
   ProcessingLogResponse,
   GitRepoCheckResponse
 } from "@/types/repository";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
-
-function buildApiUrl(path: string) {
-  if (!API_BASE_URL) {
-    return path;
-  }
-
-  const trimmedBase = API_BASE_URL.endsWith("/")
-    ? API_BASE_URL.slice(0, -1)
-    : API_BASE_URL;
-
-  return `${trimmedBase}${path}`;
-}
+import { api, buildApiUrl } from "./api-client";
 
 function encodePathSegments(path: string) {
   return path
@@ -107,38 +94,12 @@ export async function fetchRepoDoc(owner: string, repo: string, slug: string, br
 
 /**
  * Submit a repository for wiki generation
- * @param request - The repository submission request
- * @param token - Optional auth token for authenticated requests
+ * 自动携带用户 token 进行认证
  */
 export async function submitRepository(
-  request: RepositorySubmitRequest,
-  token?: string
+  request: RepositorySubmitRequest
 ): Promise<RepositoryItemResponse> {
-  const url = buildApiUrl("/api/v1/repositories/submit");
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(request),
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error("请先登录");
-    }
-    const errorText = await response.text();
-    throw new Error(errorText || "Failed to submit repository");
-  }
-
-  return await response.json();
+  return api.post<RepositoryItemResponse>("/api/v1/repositories/submit", request);
 }
 
 /**
@@ -150,6 +111,7 @@ export async function fetchRepositoryList(params?: {
   ownerId?: string;
   status?: number;
   keyword?: string;
+  language?: string;
   sortBy?: 'createdAt' | 'updatedAt';
   sortOrder?: 'asc' | 'desc';
   isPublic?: boolean;
@@ -162,6 +124,7 @@ export async function fetchRepositoryList(params?: {
   if (params?.ownerId) searchParams.set("ownerId", params.ownerId);
   if (params?.status !== undefined) searchParams.set("status", params.status.toString());
   if (params?.keyword) searchParams.set("keyword", params.keyword);
+  if (params?.language) searchParams.set("language", params.language);
   if (params?.sortBy) searchParams.set("sortBy", params.sortBy);
   if (params?.sortOrder) searchParams.set("sortOrder", params.sortOrder);
   if (params?.isPublic !== undefined) searchParams.set("isPublic", params.isPublic.toString());
@@ -181,39 +144,12 @@ export async function fetchRepositoryList(params?: {
 
 /**
  * Update repository visibility (public/private)
- * @param request - The visibility update request containing repositoryId and isPublic
- * @param token - Optional auth token for authenticated requests
- * @returns The update result with success status and updated visibility
+ * 自动携带用户 token 进行认证
  */
 export async function updateRepositoryVisibility(
-  request: UpdateVisibilityRequest,
-  token?: string
+  request: UpdateVisibilityRequest
 ): Promise<UpdateVisibilityResponse> {
-  const url = buildApiUrl("/api/v1/repositories/visibility");
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(request),
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error("请先登录");
-    }
-    const errorText = await response.text();
-    throw new Error(errorText || "Failed to update repository visibility");
-  }
-
-  return await response.json();
+  return api.post<UpdateVisibilityResponse>("/api/v1/repositories/visibility", request);
 }
 
 /**
@@ -292,4 +228,18 @@ export async function checkGitHubRepo(
   }
 
   return (await response.json()) as GitRepoCheckResponse;
+}
+
+/**
+ * Regenerate repository documentation
+ * 重新生成仓库文档
+ */
+export async function regenerateRepository(
+  owner: string,
+  repo: string
+): Promise<{ success: boolean; errorMessage?: string }> {
+  return api.post<{ success: boolean; errorMessage?: string }>(
+    "/api/v1/repositories/regenerate",
+    { owner, repo }
+  );
 }

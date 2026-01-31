@@ -553,3 +553,136 @@ export async function updateSettings(settings: { key: string; value: string }[])
     body: JSON.stringify(settings),
   });
 }
+
+
+// ==================== Department API ====================
+
+export interface AdminDepartment {
+  id: string;
+  name: string;
+  parentId?: string;
+  parentName?: string;
+  description?: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  children?: AdminDepartment[];
+}
+
+export async function getDepartments(): Promise<AdminDepartment[]> {
+  const url = buildApiUrl("/api/admin/departments");
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function getDepartmentTree(): Promise<AdminDepartment[]> {
+  const url = buildApiUrl("/api/admin/departments/tree");
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function getDepartment(id: string): Promise<AdminDepartment> {
+  const url = buildApiUrl(`/api/admin/departments/${id}`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function createDepartment(data: {
+  name: string;
+  parentId?: string;
+  description?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+}): Promise<AdminDepartment> {
+  const url = buildApiUrl("/api/admin/departments");
+  const result = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return result.data;
+}
+
+export async function updateDepartment(id: string, data: {
+  name?: string;
+  parentId?: string;
+  description?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+}): Promise<void> {
+  const url = buildApiUrl(`/api/admin/departments/${id}`);
+  await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteDepartment(id: string): Promise<void> {
+  const url = buildApiUrl(`/api/admin/departments/${id}`);
+  await fetchWithAuth(url, { method: "DELETE" });
+}
+
+
+// ==================== Department Users & Repositories API ====================
+
+export interface DepartmentUser {
+  id: string;
+  userId: string;
+  userName: string;
+  email?: string;
+  avatar?: string;
+  isManager: boolean;
+  createdAt: string;
+}
+
+export interface DepartmentRepository {
+  id: string;
+  repositoryId: string;
+  repoName: string;
+  orgName: string;
+  gitUrl?: string;
+  status: number;
+  assigneeUserName?: string;
+  createdAt: string;
+}
+
+export async function getDepartmentUsers(departmentId: string): Promise<DepartmentUser[]> {
+  const url = buildApiUrl(`/api/admin/departments/${departmentId}/users`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function addUserToDepartment(departmentId: string, userId: string, isManager: boolean = false): Promise<void> {
+  const url = buildApiUrl(`/api/admin/departments/${departmentId}/users`);
+  await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify({ userId, isManager }),
+  });
+}
+
+export async function removeUserFromDepartment(departmentId: string, userId: string): Promise<void> {
+  const url = buildApiUrl(`/api/admin/departments/${departmentId}/users/${userId}`);
+  await fetchWithAuth(url, { method: "DELETE" });
+}
+
+export async function getDepartmentRepositories(departmentId: string): Promise<DepartmentRepository[]> {
+  const url = buildApiUrl(`/api/admin/departments/${departmentId}/repositories`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function assignRepositoryToDepartment(
+  departmentId: string,
+  repositoryId: string,
+  assigneeUserId: string
+): Promise<void> {
+  const url = buildApiUrl(`/api/admin/departments/${departmentId}/repositories`);
+  await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify({ repositoryId, assigneeUserId }),
+  });
+}
+
+export async function removeRepositoryFromDepartment(departmentId: string, repositoryId: string): Promise<void> {
+  const url = buildApiUrl(`/api/admin/departments/${departmentId}/repositories/${repositoryId}`);
+  await fetchWithAuth(url, { method: "DELETE" });
+}

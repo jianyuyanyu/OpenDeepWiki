@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { AppLayout } from "@/components/app-layout";
 import { useTranslations } from "@/hooks/use-translations";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +32,7 @@ export default function BookmarksPage() {
       setBookmarks(response.items);
       setTotal(response.total);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load bookmarks");
+      setError(err instanceof Error ? err.message : t("home.bookmarks.loadError"));
     } finally {
       setIsLoading(false);
     }
@@ -55,10 +56,10 @@ export default function BookmarksPage() {
         setBookmarks(prev => prev.filter(b => b.repositoryId !== repositoryId));
         setTotal(prev => prev - 1);
       } else {
-        setError(response.errorMessage || "Failed to remove bookmark");
+        setError(response.errorMessage || t("home.bookmarks.removeError"));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove bookmark");
+      setError(err instanceof Error ? err.message : t("home.bookmarks.removeError"));
     } finally {
       setRemovingId(null);
     }
@@ -70,11 +71,11 @@ export default function BookmarksPage() {
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
-    return `${Math.floor(diffDays / 30)} months ago`;
+    if (diffDays === 0) return t("home.bookmarks.time.today");
+    if (diffDays === 1) return t("home.bookmarks.time.yesterday");
+    if (diffDays < 7) return t("home.bookmarks.time.daysAgo", { count: diffDays });
+    if (diffDays < 30) return t("home.bookmarks.time.weeksAgo", { count: Math.floor(diffDays / 7) });
+    return t("home.bookmarks.time.monthsAgo", { count: Math.floor(diffDays / 30) });
   };
 
   const formatNumber = (num: number) => {
@@ -88,8 +89,8 @@ export default function BookmarksPage() {
       <AppLayout activeItem={activeItem} onItemClick={setActiveItem}>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4 md:p-6">
           <Bookmark className="h-16 w-16 text-muted-foreground" />
-          <h2 className="text-xl font-semibold">Please log in to view your bookmarks</h2>
-          <p className="text-muted-foreground">Sign in to save and manage your favorite repositories</p>
+          <h2 className="text-xl font-semibold">{t("home.bookmarks.loginRequired")}</h2>
+          <p className="text-muted-foreground">{t("home.bookmarks.loginHint")}</p>
         </div>
       </AppLayout>
     );
@@ -99,9 +100,9 @@ export default function BookmarksPage() {
     <AppLayout activeItem={activeItem} onItemClick={setActiveItem}>
       <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">{t("sidebar.bookmarks")}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("home.bookmarks.pageTitle")}</h1>
           <p className="text-muted-foreground">
-            Your saved repositories for quick access
+            {t("home.bookmarks.pageDescription")}
           </p>
         </div>
 
@@ -118,57 +119,67 @@ export default function BookmarksPage() {
         ) : bookmarks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-4">
             <Bookmark className="h-16 w-16 text-muted-foreground" />
-            <h2 className="text-xl font-semibold">No bookmarks yet</h2>
-            <p className="text-muted-foreground">Start bookmarking repositories to see them here</p>
+            <h2 className="text-xl font-semibold">{t("home.bookmarks.empty")}</h2>
+            <p className="text-muted-foreground">{t("home.bookmarks.emptyHint")}</p>
           </div>
         ) : (
           <>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {bookmarks.map((repo) => (
-                <Card key={repo.bookmarkId} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                          <CardTitle className="text-lg">{repo.repoName}</CardTitle>
+                <Link 
+                  key={repo.bookmarkId} 
+                  href={`/${encodeURIComponent(repo.orgName)}/${encodeURIComponent(repo.repoName)}`}
+                  className="block"
+                >
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Bookmark className="h-4 w-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                            <CardTitle className="text-lg truncate">{repo.repoName}</CardTitle>
+                          </div>
+                          <CardDescription className="text-sm text-muted-foreground mt-1 truncate">
+                            {repo.orgName}
+                          </CardDescription>
                         </div>
-                        <CardDescription className="text-sm text-muted-foreground mt-1">
-                          {repo.orgName}
-                        </CardDescription>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive flex-shrink-0"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleRemoveBookmark(repo.repositoryId);
+                          }}
+                          disabled={removingId === repo.repositoryId}
+                        >
+                          {removingId === repo.repositoryId ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleRemoveBookmark(repo.repositoryId)}
-                        disabled={removingId === repo.repositoryId}
-                      >
-                        {removingId === repo.repositoryId ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm mb-3 line-clamp-2">{repo.description || "No description"}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Star className="h-3 w-3" />
-                          <span>{formatNumber(repo.starCount)}</span>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm mb-3 line-clamp-2">{repo.description || t("home.bookmarks.noDescription")}</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Star className="h-3 w-3" />
+                            <span>{formatNumber(repo.starCount)}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <GitFork className="h-3 w-3" />
+                            <span>{formatNumber(repo.forkCount)}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <GitFork className="h-3 w-3" />
-                          <span>{formatNumber(repo.forkCount)}</span>
-                        </div>
+                        <span className="text-xs text-muted-foreground">{formatDate(repo.bookmarkedAt)}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground">{formatDate(repo.bookmarkedAt)}</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
             </div>
 
@@ -181,10 +192,10 @@ export default function BookmarksPage() {
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
                 >
-                  Previous
+                  {t("home.bookmarks.previous")}
                 </Button>
                 <span className="text-sm text-muted-foreground">
-                  Page {page} of {Math.ceil(total / pageSize)}
+                  {t("home.bookmarks.pageInfo", { current: page, total: Math.ceil(total / pageSize) })}
                 </span>
                 <Button
                   variant="outline"
@@ -192,7 +203,7 @@ export default function BookmarksPage() {
                   onClick={() => setPage(p => p + 1)}
                   disabled={page >= Math.ceil(total / pageSize)}
                 >
-                  Next
+                  {t("home.bookmarks.next")}
                 </Button>
               </div>
             )}

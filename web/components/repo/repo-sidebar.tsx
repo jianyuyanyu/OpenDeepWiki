@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   Sidebar,
   SidebarContent,
@@ -32,9 +32,17 @@ function encodeSlug(slug: string) {
 
 export function RepoSidebar({ owner, repo, nodes }: RepoSidebarProps) {
   const params = useParams<{ slug?: string | string[] }>();
+  const searchParams = useSearchParams();
   const slugParam = params?.slug;
   const activeSlug = Array.isArray(slugParam) ? slugParam.join("/") : slugParam ?? "";
   const basePath = `/${owner}/${repo}`;
+
+  // 构建带查询参数的链接
+  const buildHref = (slug: string) => {
+    const path = `${basePath}/${encodeSlug(slug)}`;
+    const queryString = searchParams.toString();
+    return queryString ? `${path}?${queryString}` : path;
+  };
 
   const renderNodes = (items: RepoTreeNode[], depth = 0) => {
     return items.map((node) => (
@@ -45,7 +53,7 @@ export function RepoSidebar({ owner, repo, nodes }: RepoSidebarProps) {
           tooltip={node.title}
         >
           <Link
-            href={`${basePath}/${encodeSlug(node.slug)}`}
+            href={buildHref(node.slug)}
             className="flex w-full items-center gap-2"
             style={{ paddingLeft: 8 + depth * 12 }}
           >

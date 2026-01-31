@@ -42,6 +42,16 @@ public interface IRepositoryAnalyzer
         string? fromCommitId,
         string toCommitId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Detects the primary programming language of the repository.
+    /// </summary>
+    /// <param name="workspace">The repository workspace.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The detected primary language name, or null if unable to detect.</returns>
+    Task<string?> DetectPrimaryLanguageAsync(
+        RepositoryWorkspace workspace,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

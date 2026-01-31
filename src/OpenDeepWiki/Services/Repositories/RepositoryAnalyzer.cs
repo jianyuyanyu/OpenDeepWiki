@@ -574,6 +574,150 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
         return changedFiles.ToArray();
     }
 
+    /// <inheritdoc />
+    public Task<string?> DetectPrimaryLanguageAsync(
+        RepositoryWorkspace workspace,
+        CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation(
+            "Detecting primary language. Repository: {Org}/{Repo}, Path: {Path}",
+            workspace.Organization, workspace.RepositoryName, workspace.WorkingDirectory);
+
+        var languageStats = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var files = Directory.GetFiles(workspace.WorkingDirectory, "*", SearchOption.AllDirectories);
+
+            foreach (var file in files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // 跳过隐藏目录和常见的非代码目录
+                var relativePath = Path.GetRelativePath(workspace.WorkingDirectory, file);
+                if (ShouldSkipPath(relativePath))
+                    continue;
+
+                var extension = Path.GetExtension(file).ToLowerInvariant();
+                var language = GetLanguageFromExtension(extension);
+
+                if (language != null)
+                {
+                    var fileInfo = new FileInfo(file);
+                    if (languageStats.ContainsKey(language))
+                        languageStats[language] += fileInfo.Length;
+                    else
+                        languageStats[language] = fileInfo.Length;
+                }
+            }
+
+            string? primaryLanguage = null;
+            if (languageStats.Count > 0)
+            {
+                primaryLanguage = languageStats.OrderByDescending(kv => kv.Value).First().Key;
+            }
+
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Primary language detected. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, primaryLanguage ?? "unknown", stopwatch.ElapsedMilliseconds);
+
+            if (languageStats.Count > 0)
+            {
+                var topLanguages = languageStats.OrderByDescending(kv => kv.Value).Take(5)
+                    .Select(kv => $"{kv.Key}:{kv.Value / 1024}KB");
+                _logger.LogDebug("Language statistics: {Stats}", string.Join(", ", topLanguages));
+            }
+
+            return Task.FromResult(primaryLanguage);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogWarning(ex,
+                "Failed to detect primary language. Repository: {Org}/{Repo}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, stopwatch.ElapsedMilliseconds);
+            return Task.FromResult<string?>(null);
+        }
+    }
+
+    /// <summary>
+    /// Determines if a path should be skipped during language detection.
+    /// </summary>
+    private static bool ShouldSkipPath(string relativePath)
+    {
+        var skipPatterns = new[]
+        {
+            ".git", "node_modules", "vendor", "bin", "obj", "dist", "build",
+            ".vs", ".idea", ".vscode", "__pycache__", ".next", "packages"
+        };
+
+        var parts = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return parts.Any(part => skipPatterns.Contains(part, StringComparer.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Maps file extensions to programming language names.
+    /// </summary>
+    private static string? GetLanguageFromExtension(string extension)
+    {
+        return extension switch
+        {
+            ".cs" => "C#",
+            ".java" => "Java",
+            ".py" => "Python",
+            ".js" => "JavaScript",
+            ".ts" => "TypeScript",
+            ".tsx" => "TypeScript",
+            ".jsx" => "JavaScript",
+            ".go" => "Go",
+            ".rs" => "Rust",
+            ".rb" => "Ruby",
+            ".php" => "PHP",
+            ".swift" => "Swift",
+            ".kt" => "Kotlin",
+            ".kts" => "Kotlin",
+            ".scala" => "Scala",
+            ".c" => "C",
+            ".h" => "C",
+            ".cpp" => "C++",
+            ".cc" => "C++",
+            ".cxx" => "C++",
+            ".hpp" => "C++",
+            ".m" => "Objective-C",
+            ".mm" => "Objective-C",
+            ".lua" => "Lua",
+            ".pl" => "Perl",
+            ".pm" => "Perl",
+            ".r" => "R",
+            ".dart" => "Dart",
+            ".ex" => "Elixir",
+            ".exs" => "Elixir",
+            ".erl" => "Erlang",
+            ".hrl" => "Erlang",
+            ".hs" => "Haskell",
+            ".fs" => "F#",
+            ".fsx" => "F#",
+            ".clj" => "Clojure",
+            ".cljs" => "Clojure",
+            ".vue" => "Vue",
+            ".svelte" => "Svelte",
+            ".sh" => "Shell",
+            ".bash" => "Shell",
+            ".zsh" => "Shell",
+            ".ps1" => "PowerShell",
+            ".sql" => "SQL",
+            ".groovy" => "Groovy",
+            ".gradle" => "Groovy",
+            ".zig" => "Zig",
+            ".nim" => "Nim",
+            ".v" => "V",
+            ".jl" => "Julia",
+            _ => null
+        };
+    }
+
     /// <summary>
     /// Recursively deletes a directory, handling read-only files.
     /// </summary>

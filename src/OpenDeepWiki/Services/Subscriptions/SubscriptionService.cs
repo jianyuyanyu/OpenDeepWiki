@@ -208,4 +208,56 @@ public class SubscriptionService(IContext context)
             SubscribedAt = subscription?.CreatedAt
         };
     }
+
+    /// <summary>
+    /// 获取用户订阅列表
+    /// </summary>
+    [HttpGet]
+    public async Task<SubscriptionListResponse> GetUserSubscriptionsAsync(
+        [FromQuery] string userId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 20;
+        if (pageSize > 100) pageSize = 100;
+
+        var total = await context.UserSubscriptions
+            .AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .CountAsync();
+
+        var subscriptions = await context.UserSubscriptions
+            .AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .OrderByDescending(s => s.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Include(s => s.Repository)
+            .ToListAsync();
+
+        var items = subscriptions
+            .Where(s => s.Repository is not null)
+            .Select(s => new SubscriptionItemResponse
+            {
+                SubscriptionId = s.Id,
+                RepositoryId = s.RepositoryId,
+                RepoName = s.Repository!.RepoName,
+                OrgName = s.Repository.OrgName,
+                Description = null,
+                StarCount = s.Repository.StarCount,
+                ForkCount = s.Repository.ForkCount,
+                SubscriptionCount = s.Repository.SubscriptionCount,
+                SubscribedAt = s.CreatedAt
+            })
+            .ToList();
+
+        return new SubscriptionListResponse
+        {
+            Items = items,
+            Total = total,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
 }

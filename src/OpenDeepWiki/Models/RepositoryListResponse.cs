@@ -72,4 +72,19 @@ public class RepositoryItemResponse
     /// 更新时间
     /// </summary>
     public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Star数量
+    /// </summary>
+    public int StarCount { get; set; }
+
+    /// <summary>
+    /// Fork数量
+    /// </summary>
+    public int ForkCount { get; set; }
+
+    /// <summary>
+    /// 主要编程语言
+    /// </summary>
+    public string? PrimaryLanguage { get; set; }
 }

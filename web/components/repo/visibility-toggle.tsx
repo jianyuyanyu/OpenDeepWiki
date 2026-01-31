@@ -11,7 +11,6 @@ import {
 import { Globe, Lock, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { updateRepositoryVisibility } from "@/lib/repository-api";
-import { getToken } from "@/lib/auth-api";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
 
@@ -62,11 +61,10 @@ export function VisibilityToggle({
     setIsLoading(true);
 
     try {
-      const token = getToken();
       const response = await updateRepositoryVisibility({
         repositoryId,
         isPublic: newIsPublic,
-      }, token ?? undefined);
+      });
 
       if (response.success) {
         setCurrentIsPublic(response.isPublic);

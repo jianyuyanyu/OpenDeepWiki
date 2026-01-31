@@ -29,6 +29,11 @@ public class BranchLanguage : AggregateRoot<string>
     public string? UpdateSummary { get; set; }
 
     /// <summary>
+    /// 是否为默认语言
+    /// </summary>
+    public bool IsDefault { get; set; }
+
+    /// <summary>
     /// 仓库分支导航属性
     /// </summary>
     [ForeignKey("RepositoryBranchId")]

@@ -16,7 +16,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useTranslations } from "@/hooks/use-translations";
-import { fetchRepoStatus, fetchProcessingLogs } from "@/lib/repository-api";
+import { fetchRepoStatus, fetchProcessingLogs, regenerateRepository } from "@/lib/repository-api";
 import type { RepositoryStatus, ProcessingStep, ProcessingLogItem } from "@/types/repository";
 
 // 虚拟化列表项类型
@@ -87,6 +87,7 @@ export function RepositoryProcessingStatus({
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPolling, setIsPolling] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [isRegenerating, setIsRegenerating] = useState(false);
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const logIdsRef = useRef<Set<string>>(new Set());
   const shouldScrollRef = useRef(false);
@@ -279,11 +280,29 @@ export function RepositoryProcessingStatus({
     return date.toLocaleTimeString();
   };
 
-  const handleRetry = () => {
-    if (onRefresh) {
-      onRefresh();
-    } else {
-      window.location.reload();
+  const handleRetry = async () => {
+    setIsRegenerating(true);
+    try {
+      const result = await regenerateRepository(owner, repo);
+      if (result.success) {
+        // 重置状态，重新开始轮询
+        setStatus("Pending");
+        setLogs([]);
+        logIdsRef.current.clear();
+        setCurrentStep("Workspace");
+        setTotalDocuments(0);
+        setCompletedDocuments(0);
+        setStartedAt(null);
+        setElapsedTime(0);
+        setIsPolling(true);
+      } else {
+        console.error("Regenerate failed:", result.errorMessage);
+        // 可以在这里显示错误提示
+      }
+    } catch (error) {
+      console.error("Failed to regenerate:", error);
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -593,10 +612,17 @@ export function RepositoryProcessingStatus({
             )}
             <button
               onClick={handleRetry}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
+              disabled={isRegenerating}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <RefreshCw className="h-4 w-4" />
-              {t("home.repository.status.retry")}
+              {isRegenerating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {isRegenerating 
+                ? (t("home.repository.status.regenerating") || "Regenerating...")
+                : t("home.repository.status.retry")}
             </button>
           </div>
         )}

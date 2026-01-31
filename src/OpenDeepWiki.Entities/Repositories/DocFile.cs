@@ -21,6 +21,12 @@ public class DocFile : AggregateRoot<string>
     public string Content { get; set; } = string.Empty;
 
     /// <summary>
+    /// 来源文件列表（JSON 数组格式存储）
+    /// 记录生成此文档时读取的源代码文件路径
+    /// </summary>
+    public string? SourceFiles { get; set; }
+
+    /// <summary>
     /// 分支语言导航属性
     /// </summary>
     [ForeignKey("BranchLanguageId")]

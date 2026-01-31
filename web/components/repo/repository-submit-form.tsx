@@ -18,7 +18,6 @@ import { Loader2, GitBranch, Globe, Lock, Link2, FolderGit2, Search, Edit3 } fro
 import { toast } from "sonner";
 
 interface RepositorySubmitFormProps {
-  ownerUserId: string;
   onSuccess?: () => void;
 }
 
@@ -45,7 +44,7 @@ function parseGitUrl(url: string): { orgName: string; repoName: string } | null 
   return null;
 }
 
-export function RepositorySubmitForm({ ownerUserId, onSuccess }: RepositorySubmitFormProps) {
+export function RepositorySubmitForm({ onSuccess }: RepositorySubmitFormProps) {
   const t = useTranslations();
   
   const [gitUrl, setGitUrl] = useState("");
@@ -163,7 +162,6 @@ export function RepositorySubmitForm({ ownerUserId, onSuccess }: RepositorySubmi
       const effectiveIsPublic = !authPassword;
 
       const request: RepositorySubmitRequest = {
-        ownerUserId,
         gitUrl: gitUrl.trim(),
         repoName: parsed.repoName,
         orgName: parsed.orgName,

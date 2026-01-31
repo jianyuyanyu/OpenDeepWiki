@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using OpenDeepWiki.EFCore;
@@ -15,6 +16,7 @@ public class DocTool
     private readonly IContext _context;
     private readonly string _branchLanguageId;
     private readonly string _catalogPath;
+    private readonly GitTool? _gitTool;
 
     /// <summary>
     /// Initializes a new instance of DocTool with the specified context, branch language, and catalog path.
@@ -22,16 +24,19 @@ public class DocTool
     /// <param name="context">The database context.</param>
     /// <param name="branchLanguageId">The branch language ID to operate on.</param>
     /// <param name="catalogPath">The catalog item path this tool operates on.</param>
-    public DocTool(IContext context, string branchLanguageId, string catalogPath)
+    /// <param name="gitTool">Optional GitTool instance to track read files.</param>
+    public DocTool(IContext context, string branchLanguageId, string catalogPath, GitTool? gitTool = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _branchLanguageId = branchLanguageId ?? throw new ArgumentNullException(nameof(branchLanguageId));
         _catalogPath = catalogPath ?? throw new ArgumentNullException(nameof(catalogPath));
+        _gitTool = gitTool;
     }
 
     /// <summary>
     /// Writes document content for the catalog path specified in constructor.
     /// Creates a new document and associates it with the catalog item.
+    /// Automatically records source files from GitTool if available.
     /// </summary>
     /// <param name="content">The Markdown content for the document.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -41,6 +46,7 @@ Usage:
 - Creates a new document or updates existing one
 - Content should be in Markdown format
 - The catalog item must exist before writing content
+- Source files are automatically tracked from files you read
 
 Example:
 content: '# Overview\n\nThis is the overview section...'")]
@@ -65,6 +71,17 @@ content: '# Overview\n\nThis is the overview section...'")]
             throw new InvalidOperationException($"Catalog item with path '{_catalogPath}' not found.");
         }
 
+        // 从 GitTool 获取读取的文件列表
+        string? sourceFilesJson = null;
+        if (_gitTool != null)
+        {
+            var readFiles = _gitTool.GetReadFiles();
+            if (readFiles.Count > 0)
+            {
+                sourceFilesJson = JsonSerializer.Serialize(readFiles);
+            }
+        }
+
         // Check if document already exists
         if (!string.IsNullOrEmpty(catalog.DocFileId))
         {
@@ -75,6 +92,7 @@ content: '# Overview\n\nThis is the overview section...'")]
             {
                 // Update existing document
                 existingDoc.Content = content;
+                existingDoc.SourceFiles = sourceFilesJson;
                 existingDoc.UpdateTimestamp();
                 await _context.SaveChangesAsync(cancellationToken);
                 return;
@@ -86,7 +104,8 @@ content: '# Overview\n\nThis is the overview section...'")]
         {
             Id = Guid.NewGuid().ToString(),
             BranchLanguageId = _branchLanguageId,
-            Content = content
+            Content = content,
+            SourceFiles = sourceFilesJson
         };
 
         _context.DocFiles.Add(docFile);

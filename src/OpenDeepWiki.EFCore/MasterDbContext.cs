@@ -33,6 +33,10 @@ public interface IContext
     DbSet<ChatMessageHistory> ChatMessageHistories { get; set; }
     DbSet<ChatProviderConfig> ChatProviderConfigs { get; set; }
     DbSet<ChatMessageQueue> ChatMessageQueues { get; set; }
+    DbSet<UserDepartment> UserDepartments { get; set; }
+    DbSet<UserActivity> UserActivities { get; set; }
+    DbSet<UserPreferenceCache> UserPreferenceCaches { get; set; }
+    DbSet<UserDislike> UserDislikes { get; set; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
@@ -69,6 +73,10 @@ public abstract class MasterDbContext : DbContext, IContext
     public DbSet<ChatMessageHistory> ChatMessageHistories { get; set; } = null!;
     public DbSet<ChatProviderConfig> ChatProviderConfigs { get; set; } = null!;
     public DbSet<ChatMessageQueue> ChatMessageQueues { get; set; } = null!;
+    public DbSet<UserDepartment> UserDepartments { get; set; } = null!;
+    public DbSet<UserActivity> UserActivities { get; set; } = null!;
+    public DbSet<UserPreferenceCache> UserPreferenceCaches { get; set; } = null!;
+    public DbSet<UserDislike> UserDislikes { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -180,5 +188,28 @@ public abstract class MasterDbContext : DbContext, IContext
         // ChatMessageQueue 平台和目标用户索引（用于按用户查询队列）
         modelBuilder.Entity<ChatMessageQueue>()
             .HasIndex(q => new { q.Platform, q.TargetUserId });
+
+        // UserDepartment 唯一索引（同一用户在同一部门只能有一条记录）
+        modelBuilder.Entity<UserDepartment>()
+            .HasIndex(ud => new { ud.UserId, ud.DepartmentId })
+            .IsUnique();
+
+        // UserActivity 索引（按用户ID和时间查询）
+        modelBuilder.Entity<UserActivity>()
+            .HasIndex(a => new { a.UserId, a.CreatedAt });
+
+        // UserActivity 索引（按仓库ID查询）
+        modelBuilder.Entity<UserActivity>()
+            .HasIndex(a => a.RepositoryId);
+
+        // UserPreferenceCache 用户ID唯一索引
+        modelBuilder.Entity<UserPreferenceCache>()
+            .HasIndex(p => p.UserId)
+            .IsUnique();
+
+        // UserDislike 唯一索引（同一用户对同一仓库只能标记一次不感兴趣）
+        modelBuilder.Entity<UserDislike>()
+            .HasIndex(d => new { d.UserId, d.RepositoryId })
+            .IsUnique();
     }
 }

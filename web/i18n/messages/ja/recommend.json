@@ -1,0 +1,32 @@
+{
+  "title": "おすすめ",
+  "subtitle": "トレンドとおすすめのリポジトリを発見",
+  "subtitleWithCount": "{count}個のリポジトリから厳選",
+  "refresh": "更新",
+  "allLanguages": "すべての言語",
+  "strategies": {
+    "default": "おすすめ",
+    "popular": "人気",
+    "personalized": "パーソナライズ",
+    "explore": "探索"
+  },
+  "reasons": {
+    "popular": "人気プロジェクト",
+    "highSubscription": "高い購読数",
+    "recentlyActive": "最近アクティブ",
+    "matchPreference": "好みに合致",
+    "matchTechStack": "技術スタックに合致",
+    "similarUsers": "類似ユーザーのおすすめ",
+    "comprehensive": "おすすめ"
+  },
+  "actions": {
+    "notInterested": "興味なし"
+  },
+  "empty": {
+    "title": "おすすめがありません",
+    "description": "リポジトリを追加するとパーソナライズされたおすすめが表示されます"
+  },
+  "score": {
+    "label": "おすすめ度"
+  }
+}

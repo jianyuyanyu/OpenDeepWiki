@@ -258,6 +258,28 @@ public class RepositoryProcessingWorker(
                 $"工作区准备完成，Commit: {workspace.CommitId[..Math.Min(7, workspace.CommitId.Length)]}", cancellationToken: stoppingToken);
         }
 
+        // 检测并更新仓库主要编程语言（仅在首次处理或语言为空时）
+        if (string.IsNullOrEmpty(repository.PrimaryLanguage))
+        {
+            var detectedLanguage = await repositoryAnalyzer.DetectPrimaryLanguageAsync(workspace, stoppingToken);
+            if (!string.IsNullOrEmpty(detectedLanguage))
+            {
+                repository.PrimaryLanguage = detectedLanguage;
+                context.Repositories.Update(repository);
+                await context.SaveChangesAsync(stoppingToken);
+
+                logger.LogInformation(
+                    "Repository primary language updated. RepositoryId: {RepositoryId}, Language: {Language}",
+                    repository.Id, detectedLanguage);
+
+                if (processingLogService != null)
+                {
+                    await processingLogService.LogAsync(repository.Id, ProcessingStep.Workspace,
+                        $"检测到主要编程语言: {detectedLanguage}", cancellationToken: stoppingToken);
+                }
+            }
+        }
+
         try
         {
             // Get all languages for this branch

@@ -7,10 +7,13 @@ using OpenDeepWiki.Endpoints;
 using OpenDeepWiki.Endpoints.Admin;
 using OpenDeepWiki.Infrastructure;
 using OpenDeepWiki.Services.Admin;
+using OpenDeepWiki.Services.Organizations;
 using OpenDeepWiki.Services.Auth;
 using OpenDeepWiki.Services.OAuth;
 using OpenDeepWiki.Services.Prompts;
 using OpenDeepWiki.Services.Repositories;
+using OpenDeepWiki.Services.Recommendation;
+using OpenDeepWiki.Services.UserProfile;
 using OpenDeepWiki.Services.Wiki;
 using Scalar.AspNetCore;
 using Serilog;
@@ -23,6 +26,26 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
+    // ASCII Art Banner
+    var banner = """
+    
+     ██████╗ ██████╗ ███████╗███╗   ██╗██████╗ ███████╗███████╗██████╗ ██╗    ██╗██╗██╗  ██╗██╗
+    ██╔═══██╗██╔══██╗██╔════╝████╗  ██║██╔══██╗██╔════╝██╔════╝██╔══██╗██║    ██║██║██║ ██╔╝██║
+    ██║   ██║██████╔╝█████╗  ██╔██╗ ██║██║  ██║█████╗  █████╗  ██████╔╝██║ █╗ ██║██║█████╔╝ ██║
+    ██║   ██║██╔═══╝ ██╔══╝  ██║╚██╗██║██║  ██║██╔══╝  ██╔══╝  ██╔═══╝ ██║███╗██║██║██╔═██╗ ██║
+    ╚██████╔╝██║     ███████╗██║ ╚████║██████╔╝███████╗███████╗██║     ╚███╔███╔╝██║██║  ██╗██║
+     ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚══════╝╚═╝      ╚══╝╚══╝ ╚═╝╚═╝  ╚═╝╚═╝
+                                                                                    
+                             ██████╗  ██████╗ ██╗
+                            ██╔════╝ ██╔═══██╗██║
+                            ██║  ███╗██║   ██║██║
+                            ██║   ██║██║   ██║╚═╝
+                            ╚██████╔╝╚██████╔╝██╗
+                             ╚═════╝  ╚═════╝ ╚═╝
+    
+    """;
+    Console.WriteLine(banner);
+    
     Log.Information("Starting OpenDeepWiki application");
 
     var builder = WebApplication.CreateBuilder(args);
@@ -45,7 +68,7 @@ try
         {
             if (string.IsNullOrWhiteSpace(options.SecretKey))
             {
-                options.SecretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+                options.SecretKey = builder.Configuration["JWT_SECRET_KEY"]
                     ?? throw new InvalidOperationException("JWT密钥未配置");
             }
         });
@@ -55,7 +78,7 @@ try
     var secretKey = jwtOptions.SecretKey;
     if (string.IsNullOrWhiteSpace(secretKey))
     {
-        secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+        secretKey = builder.Configuration["JWT_SECRET_KEY"]
             ?? "OpenDeepWiki-Default-Secret-Key-Please-Change-In-Production-Environment-2024";
     }
 
@@ -109,8 +132,8 @@ try
 
             if (!options.RequestType.HasValue)
             {
-                var modelProvider = builder.Configuration["MODEL_PROVIDER"];
-                if (Enum.TryParse<AiRequestType>(modelProvider, true, out var parsed))
+                var requestType = builder.Configuration["CHAT_REQUEST_TYPE"];
+                if (Enum.TryParse<AiRequestType>(requestType, true, out var parsed))
                 {
                     options.RequestType = parsed;
                 }
@@ -134,7 +157,7 @@ try
         .Bind(builder.Configuration.GetSection("RepositoryAnalyzer"))
         .PostConfigure(options =>
         {
-            var repoDir = Environment.GetEnvironmentVariable("REPOSITORIES_DIRECTORY");
+            var repoDir = builder.Configuration["REPOSITORIES_DIRECTORY"];
             if (!string.IsNullOrWhiteSpace(repoDir))
             {
                 options.RepositoriesDirectory = repoDir;
@@ -147,45 +170,83 @@ try
         .Bind(builder.Configuration.GetSection(WikiGeneratorOptions.SectionName))
         .PostConfigure(options =>
         {
-            // Allow environment variable overrides
-            var catalogModel = Environment.GetEnvironmentVariable("WIKI_CATALOG_MODEL");
+            // Catalog 配置
+            var catalogModel = builder.Configuration["WIKI_CATALOG_MODEL"];
             if (!string.IsNullOrWhiteSpace(catalogModel))
             {
                 options.CatalogModel = catalogModel;
             }
 
-            var contentModel = Environment.GetEnvironmentVariable("WIKI_CONTENT_MODEL");
-            if (!string.IsNullOrWhiteSpace(contentModel))
-            {
-                options.ContentModel = contentModel;
-            }
-
-            var catalogEndpoint = Environment.GetEnvironmentVariable("WIKI_CATALOG_ENDPOINT");
+            var catalogEndpoint = builder.Configuration["WIKI_CATALOG_ENDPOINT"];
             if (!string.IsNullOrWhiteSpace(catalogEndpoint))
             {
                 options.CatalogEndpoint = catalogEndpoint;
             }
 
-            var contentEndpoint = Environment.GetEnvironmentVariable("WIKI_CONTENT_ENDPOINT");
-            if (!string.IsNullOrWhiteSpace(contentEndpoint))
-            {
-                options.ContentEndpoint = contentEndpoint;
-            }
-
-            var catalogApiKey = Environment.GetEnvironmentVariable("WIKI_CATALOG_API_KEY");
+            var catalogApiKey = builder.Configuration["WIKI_CATALOG_API_KEY"];
             if (!string.IsNullOrWhiteSpace(catalogApiKey))
             {
                 options.CatalogApiKey = catalogApiKey;
             }
 
-            var contentApiKey = Environment.GetEnvironmentVariable("WIKI_CONTENT_API_KEY");
+            var catalogRequestType = builder.Configuration["WIKI_CATALOG_REQUEST_TYPE"];
+            if (Enum.TryParse<AiRequestType>(catalogRequestType, true, out var catalogParsed))
+            {
+                options.CatalogRequestType = catalogParsed;
+            }
+
+            // Content 配置
+            var contentModel = builder.Configuration["WIKI_CONTENT_MODEL"];
+            if (!string.IsNullOrWhiteSpace(contentModel))
+            {
+                options.ContentModel = contentModel;
+            }
+
+            var contentEndpoint = builder.Configuration["WIKI_CONTENT_ENDPOINT"];
+            if (!string.IsNullOrWhiteSpace(contentEndpoint))
+            {
+                options.ContentEndpoint = contentEndpoint;
+            }
+
+            var contentApiKey = builder.Configuration["WIKI_CONTENT_API_KEY"];
             if (!string.IsNullOrWhiteSpace(contentApiKey))
             {
                 options.ContentApiKey = contentApiKey;
             }
 
-            // 多语言配置，逗号分割的语言代码列表，如 "en,zh,ja,ko"
-            var languages = Environment.GetEnvironmentVariable("WIKI_LANGUAGES");
+            var contentRequestType = builder.Configuration["WIKI_CONTENT_REQUEST_TYPE"];
+            if (Enum.TryParse<AiRequestType>(contentRequestType, true, out var contentParsed))
+            {
+                options.ContentRequestType = contentParsed;
+            }
+
+            // Translation 配置（可选，不配置则使用 Content 配置）
+            var translationModel = builder.Configuration["WIKI_TRANSLATION_MODEL"];
+            if (!string.IsNullOrWhiteSpace(translationModel))
+            {
+                options.TranslationModel = translationModel;
+            }
+
+            var translationEndpoint = builder.Configuration["WIKI_TRANSLATION_ENDPOINT"];
+            if (!string.IsNullOrWhiteSpace(translationEndpoint))
+            {
+                options.TranslationEndpoint = translationEndpoint;
+            }
+
+            var translationApiKey = builder.Configuration["WIKI_TRANSLATION_API_KEY"];
+            if (!string.IsNullOrWhiteSpace(translationApiKey))
+            {
+                options.TranslationApiKey = translationApiKey;
+            }
+
+            var translationRequestType = builder.Configuration["WIKI_TRANSLATION_REQUEST_TYPE"];
+            if (Enum.TryParse<AiRequestType>(translationRequestType, true, out var translationParsed))
+            {
+                options.TranslationRequestType = translationParsed;
+            }
+
+            // 多语言配置
+            var languages = builder.Configuration["WIKI_LANGUAGES"];
             if (!string.IsNullOrWhiteSpace(languages))
             {
                 options.Languages = languages;
@@ -218,8 +279,16 @@ try
     builder.Services.AddScoped<IAdminRepositoryService, AdminRepositoryService>();
     builder.Services.AddScoped<IAdminUserService, AdminUserService>();
     builder.Services.AddScoped<IAdminRoleService, AdminRoleService>();
+    builder.Services.AddScoped<IAdminDepartmentService, AdminDepartmentService>();
     builder.Services.AddScoped<IAdminToolsService, AdminToolsService>();
     builder.Services.AddScoped<IAdminSettingsService, AdminSettingsService>();
+    builder.Services.AddScoped<IOrganizationService, OrganizationService>();
+
+    // 注册推荐服务
+    builder.Services.AddScoped<RecommendationService>();
+
+    // 注册用户资料服务
+    builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 
     builder.Services.AddHostedService<RepositoryProcessingWorker>();
 
@@ -255,6 +324,9 @@ try
     app.MapSubscriptionEndpoints();
     app.MapProcessingLogEndpoints();
     app.MapAdminEndpoints();
+    app.MapOrganizationEndpoints();
+    app.MapRecommendationEndpoints();
+    app.MapUserProfileEndpoints();
 
     app.Run();
 }

@@ -1,3 +1,5 @@
+using OpenDeepWiki.Agents;
+
 namespace OpenDeepWiki.Services.Wiki;
 
 /// <summary>
@@ -79,6 +81,42 @@ public class WikiGeneratorOptions
     public string? Languages { get; set; } = "en,zh,ja,ko";
 
     /// <summary>
+    /// The request type for catalog generation (e.g., OpenAI, Azure, Claude).
+    /// If not set, uses the default request type.
+    /// </summary>
+    public AiRequestType? CatalogRequestType { get; set; }
+
+    /// <summary>
+    /// The request type for content generation (e.g., OpenAI, Azure, Claude).
+    /// If not set, uses the default request type.
+    /// </summary>
+    public AiRequestType? ContentRequestType { get; set; }
+
+    /// <summary>
+    /// The AI model to use for translation.
+    /// Default: uses ContentModel if not specified.
+    /// </summary>
+    public string? TranslationModel { get; set; }
+
+    /// <summary>
+    /// Optional custom endpoint for translation.
+    /// If not set, falls back to ContentEndpoint.
+    /// </summary>
+    public string? TranslationEndpoint { get; set; }
+
+    /// <summary>
+    /// Optional API key for translation.
+    /// If not set, falls back to ContentApiKey.
+    /// </summary>
+    public string? TranslationApiKey { get; set; }
+
+    /// <summary>
+    /// The request type for translation (e.g., OpenAI, Azure, Claude).
+    /// If not set, falls back to ContentRequestType.
+    /// </summary>
+    public AiRequestType? TranslationRequestType { get; set; }
+
+    /// <summary>
     /// Gets the list of target languages for translation (excluding the primary language).
     /// </summary>
     /// <param name="primaryLanguage">The primary language code to exclude.</param>
@@ -121,7 +159,8 @@ public class WikiGeneratorOptions
         return new Agents.AiRequestOptions
         {
             Endpoint = CatalogEndpoint,
-            ApiKey = CatalogApiKey
+            ApiKey = CatalogApiKey,
+            RequestType = CatalogRequestType
         };
     }
 
@@ -134,7 +173,32 @@ public class WikiGeneratorOptions
         return new Agents.AiRequestOptions
         {
             Endpoint = ContentEndpoint,
-            ApiKey = ContentApiKey
+            ApiKey = ContentApiKey,
+            RequestType = ContentRequestType
         };
+    }
+
+    /// <summary>
+    /// Gets the AiRequestOptions for translation.
+    /// Falls back to content options if translation-specific options are not set.
+    /// </summary>
+    /// <returns>AiRequestOptions configured for translation.</returns>
+    public Agents.AiRequestOptions GetTranslationRequestOptions()
+    {
+        return new Agents.AiRequestOptions
+        {
+            Endpoint = TranslationEndpoint ?? ContentEndpoint,
+            ApiKey = TranslationApiKey ?? ContentApiKey,
+            RequestType = TranslationRequestType ?? ContentRequestType
+        };
+    }
+
+    /// <summary>
+    /// Gets the model to use for translation.
+    /// Falls back to ContentModel if not specified.
+    /// </summary>
+    public string GetTranslationModel()
+    {
+        return string.IsNullOrWhiteSpace(TranslationModel) ? ContentModel : TranslationModel;
     }
 }

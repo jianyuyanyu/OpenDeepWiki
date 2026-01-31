@@ -95,6 +95,12 @@ public class Repository : AggregateRoot<string>
     public int ViewCount { get; set; } = 0;
 
     /// <summary>
+    /// 仓库主要编程语言
+    /// </summary>
+    [StringLength(50)]
+    public string? PrimaryLanguage { get; set; }
+
+    /// <summary>
     /// 所属用户导航属性
     /// </summary>
     [ForeignKey("OwnerUserId")]

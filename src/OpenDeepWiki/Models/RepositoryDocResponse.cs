@@ -14,4 +14,10 @@ public class RepositoryDocResponse
     /// Markdown 内容
     /// </summary>
     public string Content { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 来源文件列表
+    /// 记录生成此文档时读取的源代码文件路径
+    /// </summary>
+    public List<string> SourceFiles { get; set; } = [];
 }

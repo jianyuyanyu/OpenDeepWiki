@@ -10,7 +10,7 @@ namespace OpenDeepWiki.Services.Repositories;
 [Tags("仓库文档")]
 public class RepositoryDocsService(IContext context, IGitPlatformService gitPlatformService)
 {
-    private const string DefaultLanguageCode = "zh";
+    private const string FallbackLanguageCode = "zh"; // 当没有默认语言标记时的回退语言
 
     [HttpGet("/{owner}/{repo}/branches")]
     public async Task<RepositoryBranchesResponse> GetBranchesAsync(string owner, string repo)
@@ -32,6 +32,7 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
 
         var branchItems = new List<BranchItem>();
         var allLanguages = new HashSet<string>();
+        string? defaultLanguageCode = null;
 
         foreach (var branch in branches)
         {
@@ -40,7 +41,6 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
                 .AsNoTracking()
                 .Where(item => item.RepositoryBranchId == branch.Id)
                 .Where(item => context.DocCatalogs.Any(c => c.BranchLanguageId == item.Id && !c.IsDeleted))
-                .Select(item => item.LanguageCode)
                 .ToListAsync();
 
             // 只有当分支有内容时才添加
@@ -49,12 +49,17 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
                 branchItems.Add(new BranchItem
                 {
                     Name = branch.BranchName,
-                    Languages = languagesWithContent
+                    Languages = languagesWithContent.Select(l => l.LanguageCode).ToList()
                 });
 
                 foreach (var lang in languagesWithContent)
                 {
-                    allLanguages.Add(lang);
+                    allLanguages.Add(lang.LanguageCode);
+                    // 记录标记为默认的语言
+                    if (lang.IsDefault && defaultLanguageCode is null)
+                    {
+                        defaultLanguageCode = lang.LanguageCode;
+                    }
                 }
             }
         }
@@ -67,12 +72,16 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
             ?? branchItems.FirstOrDefault()?.Name
             ?? "";
 
+        // 确定默认语言：优先使用标记的默认语言，否则回退
+        var finalDefaultLanguage = defaultLanguageCode 
+            ?? (allLanguages.Contains(FallbackLanguageCode) ? FallbackLanguageCode : allLanguages.FirstOrDefault() ?? "");
+
         return new RepositoryBranchesResponse
         {
             Branches = branchItems,
             Languages = allLanguages.ToList(),
             DefaultBranch = defaultBranch,
-            DefaultLanguage = allLanguages.Contains(DefaultLanguageCode) ? DefaultLanguageCode : allLanguages.FirstOrDefault() ?? ""
+            DefaultLanguage = finalDefaultLanguage
         };
     }
 
@@ -201,10 +210,25 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
             throw new InvalidOperationException("文档不存在");
         }
 
+        // 解析来源文件列表
+        var sourceFiles = new List<string>();
+        if (!string.IsNullOrEmpty(docFile.SourceFiles))
+        {
+            try
+            {
+                sourceFiles = System.Text.Json.JsonSerializer.Deserialize<List<string>>(docFile.SourceFiles) ?? [];
+            }
+            catch
+            {
+                // 解析失败时返回空列表
+            }
+        }
+
         return new RepositoryDocResponse
         {
             Slug = normalizedSlug,
-            Content = docFile.Content
+            Content = docFile.Content,
+            SourceFiles = sourceFiles
         };
     }
 
@@ -296,8 +320,15 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
             }
         }
 
-        // 否则返回默认语言
-        return languages.FirstOrDefault(item => string.Equals(item.LanguageCode, DefaultLanguageCode, StringComparison.OrdinalIgnoreCase))
+        // 优先返回标记为默认的语言
+        var defaultLanguage = languages.FirstOrDefault(item => item.IsDefault);
+        if (defaultLanguage is not null)
+        {
+            return defaultLanguage;
+        }
+
+        // 回退：使用预设的回退语言代码
+        return languages.FirstOrDefault(item => string.Equals(item.LanguageCode, FallbackLanguageCode, StringComparison.OrdinalIgnoreCase))
                ?? languages.OrderBy(item => item.CreatedAt).First();
     }
 

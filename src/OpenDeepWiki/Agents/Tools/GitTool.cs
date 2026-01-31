@@ -14,6 +14,7 @@ public class GitTool
 {
     private readonly string _workingDirectory;
     private readonly List<GitIgnoreRule> _gitIgnoreRules;
+    private readonly HashSet<string> _readFiles = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Default maximum number of lines to read from a file.
@@ -50,6 +51,23 @@ public class GitTool
 
         // 解析 .gitignore 文件
         _gitIgnoreRules = ParseGitIgnore(_workingDirectory);
+    }
+
+    /// <summary>
+    /// Gets the list of files that have been read by this tool instance.
+    /// </summary>
+    /// <returns>A list of relative file paths that were read.</returns>
+    public List<string> GetReadFiles()
+    {
+        return _readFiles.OrderBy(f => f).ToList();
+    }
+
+    /// <summary>
+    /// Clears the list of tracked read files.
+    /// </summary>
+    public void ClearReadFiles()
+    {
+        _readFiles.Clear();
     }
 
     /// <summary>
@@ -199,6 +217,9 @@ Usage:
         var lines = await File.ReadAllLinesAsync(fullPath, cancellationToken);
         var startIndex = Math.Max(0, offset - 1);
         var endIndex = Math.Min(lines.Length, startIndex + limit);
+
+        // 记录读取的文件
+        _readFiles.Add(normalizedPath);
 
         var result = new StringBuilder();
         for (int i = startIndex; i < endIndex; i++)
@@ -419,8 +440,8 @@ Glob Examples:
     public async Task<string[]> ListFilesAsync(
         [Description("Glob pattern (e.g., '*.cs', 'src/**/*.ts', '**/*.json'). Default: all files")]
         string? glob = null,
-        [Description("Maximum number of files to return. Default: 20")]
-        int maxResults = 20,
+        [Description("Maximum number of files to return. Default: 50. Use higher values (100-200) for comprehensive discovery.")]
+        int maxResults = 50,
         CancellationToken cancellationToken = default)
     {
         return await Task.Run(() =>

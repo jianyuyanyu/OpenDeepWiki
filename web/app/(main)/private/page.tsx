@@ -49,7 +49,6 @@ export default function PrivatePage() {
             <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
               <div className="pt-6">
                 <RepositorySubmitForm
-                  ownerUserId={ownerUserId}
                   onSuccess={handleSubmitSuccess}
                 />
               </div>

@@ -6,7 +6,6 @@ import { GitBranch, Star, GitFork, Code, Plus, Loader2, ExternalLink, Home } fro
 import { Button } from "@/components/ui/button";
 import { submitRepository } from "@/lib/repository-api";
 import { useAuth } from "@/contexts/auth-context";
-import { getToken } from "@/lib/auth-api";
 import { useTranslations } from "@/hooks/use-translations";
 import type { GitRepoCheckResponse } from "@/types/repository";
 
@@ -39,7 +38,6 @@ export function RepositoryNotFound({ owner, repo, gitHubInfo }: RepositoryNotFou
     setError(null);
     
     try {
-      const token = getToken();
       await submitRepository({
         gitUrl: gitHubInfo.gitUrl,
         repoName: repo,
@@ -47,7 +45,7 @@ export function RepositoryNotFound({ owner, repo, gitHubInfo }: RepositoryNotFou
         branchName: gitHubInfo.defaultBranch,
         languageCode: "zh",
         isPublic: true,
-      }, token ?? undefined);
+      });
       
       // 刷新页面以显示处理状态
       router.refresh();

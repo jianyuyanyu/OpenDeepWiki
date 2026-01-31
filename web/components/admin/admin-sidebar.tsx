@@ -13,6 +13,7 @@ import {
   Cog,
   Wrench,
   ChevronLeft,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -40,6 +41,11 @@ const navItems = [
     href: "/admin/roles",
     icon: Shield,
     label: "角色管理",
+  },
+  {
+    href: "/admin/departments",
+    icon: Building2,
+    label: "部门管理",
   },
   {
     href: "/admin/users",

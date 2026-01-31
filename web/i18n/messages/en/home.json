@@ -1,5 +1,26 @@
 {
   "title": "What do you want to know?",
+  "bookmarks": {
+    "pageTitle": "Bookmarks",
+    "pageDescription": "Your saved repositories for quick access",
+    "loginRequired": "Please log in to view your bookmarks",
+    "loginHint": "Sign in to save and manage your favorite repositories",
+    "empty": "No bookmarks yet",
+    "emptyHint": "Start bookmarking repositories to see them here",
+    "noDescription": "No description",
+    "removeError": "Failed to remove bookmark",
+    "loadError": "Failed to load bookmarks",
+    "previous": "Previous",
+    "next": "Next",
+    "pageInfo": "Page {current} of {total}",
+    "time": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "daysAgo": "{count} days ago",
+      "weeksAgo": "{count} weeks ago",
+      "monthsAgo": "{count} months ago"
+    }
+  },
   "searchPlaceholder": "Paste a GitHub repository link or search by keywords",
   "addPrivateRepo": "Add Private Repository",
   "exploreTrending": "Explore This Week's Trending Repos",
@@ -20,6 +41,17 @@
     "empty": "No public repositories available",
     "noResults": "No repositories match your search",
     "loadError": "Failed to load repositories"
+  },
+  "actions": {
+    "bookmark": "Bookmark",
+    "bookmarked": "Bookmarked",
+    "subscribe": "Subscribe",
+    "subscribed": "Subscribed",
+    "bookmarkSuccess": "Bookmarked successfully",
+    "bookmarkRemoved": "Bookmark removed",
+    "subscribeSuccess": "Subscribed successfully",
+    "subscribeRemoved": "Subscription removed",
+    "actionError": "Action failed, please try again"
   },
   "repository": {
     "submitTitle": "Submit Repository",
@@ -66,6 +98,7 @@
       "failedDescription": "An error occurred during Wiki generation, please retry",
       "autoRefreshHint": "Auto-refreshing",
       "retry": "Regenerate",
+      "regenerating": "Regenerating...",
       "notFound": "Repository not found",
       "notFoundDescription": "The repository was not found, please check the URL",
       "elapsed": "Elapsed",

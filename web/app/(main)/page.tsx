@@ -89,7 +89,6 @@ export default function Home() {
                 <DialogContent className="sm:max-w-md">
                   {user && (
                     <RepositorySubmitForm
-                      ownerUserId={user.id}
                       onSuccess={handleSubmitSuccess}
                     />
                   )}

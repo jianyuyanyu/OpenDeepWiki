@@ -12,8 +12,7 @@ public static class AuthEndpoints
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/auth")
-            .WithTags("认证")
-            .WithOpenApi();
+            .WithTags("认证");
 
         // 用户登录
         group.MapPost("/login", async ([FromBody] LoginRequest request, [FromServices] IAuthService authService) =>

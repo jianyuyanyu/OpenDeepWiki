@@ -21,6 +21,11 @@ public static class SubscriptionEndpoints
             .WithName("AddSubscription")
             .WithSummary("添加订阅");
 
+        // 获取用户订阅列表
+        group.MapGet("/", GetUserSubscriptionsAsync)
+            .WithName("GetUserSubscriptions")
+            .WithSummary("获取用户订阅列表");
+
         // 取消订阅
         group.MapDelete("/{repositoryId}", RemoveSubscriptionAsync)
             .WithName("RemoveSubscription")
@@ -40,7 +45,6 @@ public static class SubscriptionEndpoints
     {
         try
         {
-            // 验证仓库是否存在
             var repository = await context.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.Id == request.RepositoryId);
@@ -54,7 +58,6 @@ public static class SubscriptionEndpoints
                 });
             }
 
-            // 验证用户是否存在
             var user = await context.Users
                 .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Id == request.UserId);
@@ -68,7 +71,6 @@ public static class SubscriptionEndpoints
                 });
             }
 
-            // 检查是否已订阅
             var existingSubscription = await context.UserSubscriptions
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.UserId == request.UserId && s.RepositoryId == request.RepositoryId);
@@ -82,7 +84,6 @@ public static class SubscriptionEndpoints
                 });
             }
 
-            // 使用事务确保原子性
             var dbContext = context as DbContext;
             if (dbContext is null)
             {
@@ -96,7 +97,6 @@ public static class SubscriptionEndpoints
             await using var transaction = await dbContext.Database.BeginTransactionAsync();
             try
             {
-                // 创建订阅记录
                 var subscription = new UserSubscription
                 {
                     Id = Guid.NewGuid().ToString(),
@@ -107,7 +107,6 @@ public static class SubscriptionEndpoints
                 context.UserSubscriptions.Add(subscription);
                 await context.SaveChangesAsync();
 
-                // 原子性增加订阅计数
                 await dbContext.Database.ExecuteSqlRawAsync(
                     "UPDATE Repositories SET SubscriptionCount = SubscriptionCount + 1 WHERE Id = {0}",
                     request.RepositoryId);
@@ -143,7 +142,6 @@ public static class SubscriptionEndpoints
     {
         try
         {
-            // 查找订阅记录
             var subscription = await context.UserSubscriptions
                 .FirstOrDefaultAsync(s => s.UserId == userId && s.RepositoryId == repositoryId);
 
@@ -156,7 +154,6 @@ public static class SubscriptionEndpoints
                 });
             }
 
-            // 使用事务确保原子性
             var dbContext = context as DbContext;
             if (dbContext is null)
             {
@@ -170,11 +167,9 @@ public static class SubscriptionEndpoints
             await using var transaction = await dbContext.Database.BeginTransactionAsync();
             try
             {
-                // 删除订阅记录
                 context.UserSubscriptions.Remove(subscription);
                 await context.SaveChangesAsync();
 
-                // 原子性减少订阅计数（确保不会变为负数）
                 await dbContext.Database.ExecuteSqlRawAsync(
                     "UPDATE Repositories SET SubscriptionCount = CASE WHEN SubscriptionCount > 0 THEN SubscriptionCount - 1 ELSE 0 END WHERE Id = {0}",
                     repositoryId);
@@ -203,12 +198,60 @@ public static class SubscriptionEndpoints
         }
     }
 
+    private static async Task<SubscriptionListResponse> GetUserSubscriptionsAsync(
+        [FromQuery] string userId,
+        [FromQuery] int page,
+        [FromQuery] int pageSize,
+        [FromServices] IContext context)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 20;
+        if (pageSize > 100) pageSize = 100;
+
+        var total = await context.UserSubscriptions
+            .AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .CountAsync();
+
+        var subscriptions = await context.UserSubscriptions
+            .AsNoTracking()
+            .Where(s => s.UserId == userId)
+            .OrderByDescending(s => s.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Include(s => s.Repository)
+            .ToListAsync();
+
+        var items = subscriptions
+            .Where(s => s.Repository is not null)
+            .Select(s => new SubscriptionItemResponse
+            {
+                SubscriptionId = s.Id,
+                RepositoryId = s.RepositoryId,
+                RepoName = s.Repository!.RepoName,
+                OrgName = s.Repository.OrgName,
+                Description = null,
+                StarCount = s.Repository.StarCount,
+                ForkCount = s.Repository.ForkCount,
+                SubscriptionCount = s.Repository.SubscriptionCount,
+                SubscribedAt = s.CreatedAt
+            })
+            .ToList();
+
+        return new SubscriptionListResponse
+        {
+            Items = items,
+            Total = total,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
     private static async Task<SubscriptionStatusResponse> GetSubscriptionStatusAsync(
         string repositoryId,
         [FromQuery] string userId,
         [FromServices] IContext context)
     {
-        // 如果用户ID为空，返回未订阅状态
         if (string.IsNullOrWhiteSpace(userId))
         {
             return new SubscriptionStatusResponse
@@ -218,7 +261,6 @@ public static class SubscriptionEndpoints
             };
         }
 
-        // 查询订阅记录
         var subscription = await context.UserSubscriptions
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.UserId == userId && s.RepositoryId == repositoryId);

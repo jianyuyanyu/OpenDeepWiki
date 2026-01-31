@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   getDashboardStatistics,
   getTokenUsageStatistics,
@@ -14,14 +14,58 @@ import {
   Bar,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  LineChart,
-  Line,
 } from "recharts";
 import { Loader2, GitBranch, Users, Coins, TrendingUp } from "lucide-react";
+
+// 自定义 Tooltip 组件
+interface TooltipPayload {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+}
+
+function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div className="rounded-xl border bg-background/95 backdrop-blur-sm p-4 shadow-xl">
+      <p className="text-sm font-medium text-muted-foreground mb-3">{label}</p>
+      <div className="space-y-2">
+        {payload.map((entry, index: number) => (
+          <div key={index} className="flex items-center justify-between gap-8">
+            <div className="flex items-center gap-2">
+              <span 
+                className="h-3 w-3 rounded-full" 
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-sm text-muted-foreground">{entry.name}</span>
+            </div>
+            <span className="text-sm font-semibold tabular-nums">
+              {(entry.value ?? 0).toLocaleString()}
+            </span>
+          </div>
+        ))}
+      </div>
+      {payload.length > 1 && (
+        <div className="mt-3 pt-3 border-t flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">合计</span>
+          <span className="text-sm font-bold tabular-nums">
+            {payload.reduce((sum: number, entry) => sum + (entry.value ?? 0), 0).toLocaleString()}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminDashboardPage() {
   const [dashboardStats, setDashboardStats] = useState<DashboardStatistics | null>(null);
@@ -144,14 +188,25 @@ export default function AdminDashboardPage() {
         <Card className="p-6">
           <h3 className="mb-4 text-lg font-semibold">仓库统计</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={repoChartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="提交数" fill="#3b82f6" />
-              <Bar dataKey="处理完成" fill="#22c55e" />
+            <BarChart data={repoChartData} barCategoryGap="20%">
+              <XAxis 
+                dataKey="date" 
+                axisLine={false} 
+                tickLine={false}
+                tick={{ fill: '#888', fontSize: 12 }}
+              />
+              <YAxis 
+                axisLine={false} 
+                tickLine={false}
+                tick={{ fill: '#888', fontSize: 12 }}
+              />
+              <Tooltip 
+                cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                content={<CustomTooltip />}
+              />
+              <Legend wrapperStyle={{ paddingTop: 16 }} />
+              <Bar dataKey="提交数" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="处理完成" fill="#22c55e" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -160,14 +215,25 @@ export default function AdminDashboardPage() {
         <Card className="p-6">
           <h3 className="mb-4 text-lg font-semibold">用户增长</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={userChartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="新增用户" stroke="#8b5cf6" strokeWidth={2} />
-            </LineChart>
+            <BarChart data={userChartData} barCategoryGap="30%">
+              <XAxis 
+                dataKey="date" 
+                axisLine={false} 
+                tickLine={false}
+                tick={{ fill: '#888', fontSize: 12 }}
+              />
+              <YAxis 
+                axisLine={false} 
+                tickLine={false}
+                tick={{ fill: '#888', fontSize: 12 }}
+              />
+              <Tooltip 
+                cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                content={<CustomTooltip />}
+              />
+              <Legend wrapperStyle={{ paddingTop: 16 }} />
+              <Bar dataKey="新增用户" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </Card>
 
@@ -175,14 +241,25 @@ export default function AdminDashboardPage() {
         <Card className="p-6 lg:col-span-2">
           <h3 className="mb-4 text-lg font-semibold">Token 消耗趋势</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={tokenChartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="输入Token" fill="#f97316" />
-              <Bar dataKey="输出Token" fill="#eab308" />
+            <BarChart data={tokenChartData} barCategoryGap="20%">
+              <XAxis 
+                dataKey="date" 
+                axisLine={false} 
+                tickLine={false}
+                tick={{ fill: '#888', fontSize: 12 }}
+              />
+              <YAxis 
+                axisLine={false} 
+                tickLine={false}
+                tick={{ fill: '#888', fontSize: 12 }}
+              />
+              <Tooltip 
+                cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                content={<CustomTooltip />}
+              />
+              <Legend wrapperStyle={{ paddingTop: 16 }} />
+              <Bar dataKey="输入Token" fill="#f97316" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="输出Token" fill="#eab308" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>

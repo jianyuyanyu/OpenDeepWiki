@@ -1,6 +1,4 @@
 "use client";
-
-import React from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/animate-ui/components/radix/sidebar";
@@ -105,8 +103,12 @@ export function Header({ title, currentWeekday, searchBox }: HeaderProps) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>{t("common.profile")}</DropdownMenuItem>
-              <DropdownMenuItem>{t("common.settings")}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/profile")}>
+                {t("common.profile")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/settings")}>
+                {t("common.settings")}
+              </DropdownMenuItem>
               {isAdmin && (
                 <>
                   <DropdownMenuSeparator />

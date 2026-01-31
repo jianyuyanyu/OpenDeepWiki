@@ -2,6 +2,7 @@ import { fetchRepoDoc } from "@/lib/repository-api";
 import { extractHeadings } from "@/lib/markdown";
 import { MarkdownRenderer } from "@/components/repo/markdown-renderer";
 import { DocNotFound } from "@/components/repo/doc-not-found";
+import { SourceFiles } from "@/components/repo/source-files";
 import { DocsPage, DocsBody } from "fumadocs-ui/page";
 import type { TOCItemType } from "fumadocs-core/toc";
 
@@ -60,6 +61,10 @@ export default async function RepoDocPage({ params, searchParams }: RepoDocPageP
     <DocsPage toc={toc}>
       <DocsBody>
         <MarkdownRenderer content={doc.content} />
+        <SourceFiles 
+          files={doc.sourceFiles || []} 
+          branch={branch}
+        />
       </DocsBody>
     </DocsPage>
   );

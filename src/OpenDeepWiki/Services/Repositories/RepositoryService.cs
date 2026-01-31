@@ -68,7 +68,8 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
             Id = Guid.NewGuid().ToString(),
             RepositoryBranchId = branchId,
             LanguageCode = request.LanguageCode,
-            UpdateSummary = string.Empty
+            UpdateSummary = string.Empty,
+            IsDefault = true // 提交时的第一个语言为默认语言
         };
 
         context.Repositories.Add(repository);
@@ -109,12 +110,17 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
     /// </summary>
     [HttpGet("/list")]
     public async Task<RepositoryListResponse> GetListAsync(
+        [FromQuery] bool? isPublic = null,
+        [FromQuery] string? keyword = null,
+        [FromQuery] string? language = null,
+        [FromQuery] string? ownerId = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
-        [FromQuery] string? ownerId = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortOrder = null,
         [FromQuery] RepositoryStatus? status = null)
     {
-        var query = context.Repositories.AsNoTracking();
+        var query = context.Repositories.AsNoTracking().Where(r => !r.IsDeleted);
 
         if (!string.IsNullOrWhiteSpace(ownerId))
         {
@@ -126,10 +132,40 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
             query = query.Where(r => r.Status == status.Value);
         }
 
+        if (isPublic.HasValue)
+        {
+            query = query.Where(r => r.IsPublic == isPublic.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var lowerKeyword = keyword.ToLower();
+            query = query.Where(r => 
+                r.OrgName.ToLower().Contains(lowerKeyword) || 
+                r.RepoName.ToLower().Contains(lowerKeyword));
+        }
+
+        if (!string.IsNullOrWhiteSpace(language))
+        {
+            query = query.Where(r => r.PrimaryLanguage == language);
+        }
+
         var total = await query.CountAsync();
 
-        var repositories = await query
-            .OrderByDescending(r => r.CreatedAt)
+        // 排序
+        IOrderedQueryable<Repository> orderedQuery;
+        var isDesc = string.IsNullOrWhiteSpace(sortOrder) || sortOrder.Equals("desc", StringComparison.OrdinalIgnoreCase);
+        
+        if (sortBy?.Equals("updatedAt", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            orderedQuery = isDesc ? query.OrderByDescending(r => r.UpdatedAt) : query.OrderBy(r => r.UpdatedAt);
+        }
+        else
+        {
+            orderedQuery = isDesc ? query.OrderByDescending(r => r.CreatedAt) : query.OrderBy(r => r.CreatedAt);
+        }
+
+        var repositories = await orderedQuery
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
@@ -147,7 +183,10 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
                 IsPublic = r.IsPublic,
                 HasPassword = !string.IsNullOrWhiteSpace(r.AuthPassword),
                 CreatedAt = r.CreatedAt,
-                UpdatedAt = r.UpdatedAt
+                UpdatedAt = r.UpdatedAt,
+                StarCount = r.StarCount,
+                ForkCount = r.ForkCount,
+                PrimaryLanguage = r.PrimaryLanguage
             }).ToList()
         };
     }
@@ -251,6 +290,111 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
         {
             return false;
         }
+    }
+
+    /// <summary>
+    /// 重新生成仓库文档
+    /// </summary>
+    [HttpPost("/regenerate")]
+    public async Task<RegenerateResponse> RegenerateAsync([FromBody] RegenerateRequest request)
+    {
+        var currentUserId = userContext.UserId;
+        if (string.IsNullOrWhiteSpace(currentUserId))
+        {
+            return new RegenerateResponse
+            {
+                Success = false,
+                ErrorMessage = "用户未登录"
+            };
+        }
+
+        var repository = await context.Repositories
+            .FirstOrDefaultAsync(item => item.OrgName == request.Owner && item.RepoName == request.Repo);
+
+        if (repository is null)
+        {
+            return new RegenerateResponse
+            {
+                Success = false,
+                ErrorMessage = "仓库不存在"
+            };
+        }
+
+        // 验证所有权
+        if (repository.OwnerUserId != currentUserId)
+        {
+            return new RegenerateResponse
+            {
+                Success = false,
+                ErrorMessage = "无权限操作此仓库"
+            };
+        }
+
+        // 只有失败或完成状态才能重新生成
+        if (repository.Status != RepositoryStatus.Failed && repository.Status != RepositoryStatus.Completed)
+        {
+            return new RegenerateResponse
+            {
+                Success = false,
+                ErrorMessage = "仓库正在处理中，无法重新生成"
+            };
+        }
+
+        // 获取该仓库的所有分支语言ID
+        var branchLanguageIds = await context.RepositoryBranches
+            .Where(b => b.RepositoryId == repository.Id)
+            .Join(context.BranchLanguages, b => b.Id, l => l.RepositoryBranchId, (b, l) => l.Id)
+            .ToListAsync();
+
+        // 清空之前生成的文档目录
+        var oldCatalogs = await context.DocCatalogs
+            .Where(c => branchLanguageIds.Contains(c.BranchLanguageId))
+            .ToListAsync();
+
+        // 收集关联的文档文件ID
+        var docFileIds = oldCatalogs
+            .Where(c => c.DocFileId != null)
+            .Select(c => c.DocFileId!)
+            .Distinct()
+            .ToList();
+
+        // 清空文档目录
+        if (oldCatalogs.Count > 0)
+        {
+            context.DocCatalogs.RemoveRange(oldCatalogs);
+        }
+
+        // 清空文档文件
+        if (docFileIds.Count > 0)
+        {
+            var oldDocFiles = await context.DocFiles
+                .Where(f => docFileIds.Contains(f.Id))
+                .ToListAsync();
+            
+            if (oldDocFiles.Count > 0)
+            {
+                context.DocFiles.RemoveRange(oldDocFiles);
+            }
+        }
+
+        // 清空之前的处理日志
+        var oldLogs = await context.RepositoryProcessingLogs
+            .Where(log => log.RepositoryId == repository.Id)
+            .ToListAsync();
+        
+        if (oldLogs.Count > 0)
+        {
+            context.RepositoryProcessingLogs.RemoveRange(oldLogs);
+        }
+
+        // 重置状态为 Pending，Worker 会自动拾取处理
+        repository.Status = RepositoryStatus.Pending;
+        await context.SaveChangesAsync();
+
+        return new RegenerateResponse
+        {
+            Success = true
+        };
     }
 
     /// <summary>
