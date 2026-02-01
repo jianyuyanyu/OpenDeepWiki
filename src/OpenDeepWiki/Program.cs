@@ -13,6 +13,9 @@ using OpenDeepWiki.Services.OAuth;
 using OpenDeepWiki.Services.Prompts;
 using OpenDeepWiki.Services.Repositories;
 using OpenDeepWiki.Services.Recommendation;
+using OpenDeepWiki.Services.Chat;
+using OpenDeepWiki.Services.Translation;
+using OpenDeepWiki.Services.MindMap;
 using OpenDeepWiki.Services.UserProfile;
 using OpenDeepWiki.Services.Wiki;
 using Scalar.AspNetCore;
@@ -49,6 +52,9 @@ try
     Log.Information("Starting OpenDeepWiki application");
 
     var builder = WebApplication.CreateBuilder(args);
+
+    // 加载 .env 文件到 Configuration
+    LoadEnvFile(builder.Configuration);
 
     // Add Serilog logging
     builder.AddSerilogLogging();
@@ -282,6 +288,7 @@ try
     builder.Services.AddScoped<IAdminDepartmentService, AdminDepartmentService>();
     builder.Services.AddScoped<IAdminToolsService, AdminToolsService>();
     builder.Services.AddScoped<IAdminSettingsService, AdminSettingsService>();
+    builder.Services.AddScoped<IAdminChatAssistantService, AdminChatAssistantService>();
     builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 
     // 注册推荐服务
@@ -290,11 +297,37 @@ try
     // 注册用户资料服务
     builder.Services.AddScoped<IUserProfileService, UserProfileService>();
 
+    // 注册翻译服务
+    builder.Services.AddScoped<ITranslationService, TranslationService>();
+
     builder.Services.AddHostedService<RepositoryProcessingWorker>();
+    builder.Services.AddHostedService<TranslationWorker>();
+    builder.Services.AddHostedService<MindMapWorker>();
 
     // 注册 Chat 系统服务
     // Requirements: 2.2, 2.4 - 通过依赖注入自动发现并加载 Provider
     builder.Services.AddChatServices(builder.Configuration);
+
+    // 注册对话助手服务
+    // Requirements: 2.4, 3.1, 9.1 - 对话助手API服务
+    builder.Services.AddScoped<IMcpToolConverter, McpToolConverter>();
+    builder.Services.AddScoped<IChatAssistantService, ChatAssistantService>();
+
+    // 注册用户应用管理服务
+    // Requirements: 12.2, 12.6, 12.7 - 用户应用CRUD和密钥管理
+    builder.Services.AddScoped<IChatAppService, ChatAppService>();
+
+    // 注册应用统计服务
+    // Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 15.7 - 统计数据记录和查询
+    builder.Services.AddScoped<IAppStatisticsService, AppStatisticsService>();
+
+    // 注册提问记录服务
+    // Requirements: 16.1, 16.2, 16.3, 16.4, 16.5 - 提问记录和查询
+    builder.Services.AddScoped<IChatLogService, ChatLogService>();
+
+    // 注册嵌入服务
+    // Requirements: 13.5, 13.6, 14.2, 14.7, 17.1, 17.2, 17.4 - 嵌入脚本验证和对话
+    builder.Services.AddScoped<IEmbedService, EmbedService>();
 
     var app = builder.Build();
 
@@ -320,14 +353,17 @@ try
     app.MapMiniApis();
     app.MapAuthEndpoints();
     app.MapOAuthEndpoints();
-    app.MapBookmarkEndpoints();
-    app.MapSubscriptionEndpoints();
-    app.MapProcessingLogEndpoints();
-    app.MapMindMapEndpoints();
+    // 以下 Endpoints 已通过 MiniApi 源生成器注册：
+    // - BookmarkService, SubscriptionService, WikiService
+    // - RepositoryService, RepositoryDocsService
+    // - ProcessingLogApiService, MindMapApiService
+    // - RecommendationApiService, UserProfileApiService
     app.MapAdminEndpoints();
     app.MapOrganizationEndpoints();
-    app.MapRecommendationEndpoints();
-    app.MapUserProfileEndpoints();
+    app.MapChatAssistantEndpoints();
+    app.MapChatAppEndpoints();
+    app.MapEmbedEndpoints();
+    app.MapSystemEndpoints();
 
     app.Run();
 }
@@ -338,4 +374,60 @@ catch (Exception ex)
 finally
 {
     await Log.CloseAndFlushAsync();
+}
+
+/// <summary>
+/// 加载 .env 文件到 Configuration
+/// 支持从当前目录或应用程序目录加载 .env 文件
+/// </summary>
+static void LoadEnvFile(IConfigurationBuilder configuration)
+{
+    // 尝试多个路径查找 .env 文件
+    var envPaths = new[]
+    {
+        Path.Combine(Directory.GetCurrentDirectory(), ".env"),
+        Path.Combine(AppContext.BaseDirectory, ".env")
+    };
+
+    foreach (var envPath in envPaths)
+    {
+        if (!File.Exists(envPath)) continue;
+        
+        Log.Information("Loading .env file from: {EnvPath}", envPath);
+        var envVars = new Dictionary<string, string?>();
+        
+        foreach (var line in File.ReadAllLines(envPath))
+        {
+            var trimmedLine = line.Trim();
+            
+            // 跳过空行和注释
+            if (string.IsNullOrEmpty(trimmedLine) || trimmedLine.StartsWith('#'))
+                continue;
+
+            var separatorIndex = trimmedLine.IndexOf('=');
+            if (separatorIndex <= 0) continue;
+            
+            var key = trimmedLine[..separatorIndex].Trim();
+            var value = trimmedLine[(separatorIndex + 1)..].Trim();
+            
+            // 移除引号
+            if ((value.StartsWith('"') && value.EndsWith('"')) ||
+                (value.StartsWith('\'') && value.EndsWith('\'')))
+            {
+                value = value[1..^1];
+            }
+            
+            envVars[key] = value;
+            
+            // 同时设置到环境变量，以便其他地方使用
+            Environment.SetEnvironmentVariable(key, value);
+        }
+        
+        // 添加到 Configuration
+        configuration.AddInMemoryCollection(envVars);
+        Log.Information("Loaded {Count} environment variables from .env file", envVars.Count);
+        return;
+    }
+    
+    Log.Information("No .env file found, using system environment variables only");
 }

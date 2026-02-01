@@ -29,9 +29,14 @@ public enum ProcessingStep
     Translation = 3,
     
     /// <summary>
+    /// 生成思维导图
+    /// </summary>
+    MindMap = 4,
+    
+    /// <summary>
     /// 完成
     /// </summary>
-    Complete = 4
+    Complete = 5
 }
 
 /// <summary>

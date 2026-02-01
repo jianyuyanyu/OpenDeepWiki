@@ -36,7 +36,7 @@ export default function PrivatePage() {
           <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">{t("sidebar.private")}</h1>
             <p className="text-muted-foreground">
-              Manage your private repositories
+              {t("common.privateRepos.description")}
             </p>
           </div>
           <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>

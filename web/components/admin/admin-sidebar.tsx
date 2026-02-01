@@ -14,6 +14,7 @@ import {
   Wrench,
   ChevronLeft,
   Building2,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -51,6 +52,11 @@ const navItems = [
     href: "/admin/users",
     icon: Users,
     label: "用户管理",
+  },
+  {
+    href: "/admin/chat-assistant",
+    icon: MessageCircle,
+    label: "对话助手",
   },
   {
     href: "/admin/settings",

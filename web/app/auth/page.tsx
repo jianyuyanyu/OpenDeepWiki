@@ -8,6 +8,7 @@ import { Github, Mail, BookOpen, Sparkles, Zap, ArrowLeft, Loader2 } from "lucid
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
+import { useTranslations } from "@/hooks/use-translations";
 
 type AuthMode = "login" | "register";
 
@@ -16,6 +17,7 @@ export default function AuthPage() {
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get("returnUrl");
   const { login, register } = useAuth();
+  const t = useTranslations();
   const [mode, setMode] = useState<AuthMode>("login");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -45,7 +47,7 @@ export default function AuthPage() {
       await login({ email, password });
       redirectAfterAuth();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "登录失败");
+      setError(err instanceof Error ? err.message : t("auth.errors.loginFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -56,12 +58,12 @@ export default function AuthPage() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError("两次密码输入不一致");
+      setError(t("auth.errors.passwordMismatch"));
       return;
     }
 
     if (password.length < 6) {
-      setError("密码长度至少6位");
+      setError(t("auth.errors.passwordTooShort"));
       return;
     }
 
@@ -71,7 +73,7 @@ export default function AuthPage() {
       await register({ name, email, password, confirmPassword });
       redirectAfterAuth();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "注册失败");
+      setError(err instanceof Error ? err.message : t("auth.errors.registerFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -100,7 +102,7 @@ export default function AuthPage() {
               className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               <ArrowLeft className="h-4 w-4" />
-              返回首页
+              {t("authUi.backToHome")}
             </Link>
           </div>
 
@@ -108,11 +110,11 @@ export default function AuthPage() {
             <div className="space-y-4">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
                 <Sparkles className="h-4 w-4" />
-                AI 驱动的知识库
+                {t("authUi.aiPowered")}
               </div>
-              <h1 className="text-5xl font-bold tracking-tight">OpenDeepWiki</h1>
+              <h1 className="text-5xl font-bold tracking-tight">{t("authUi.title")}</h1>
               <p className="text-xl text-muted-foreground max-w-md">
-                深度理解代码仓库，让知识触手可及
+                {t("authUi.subtitle")}
               </p>
             </div>
 
@@ -122,9 +124,9 @@ export default function AuthPage() {
                   <BookOpen className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold mb-1">智能文档生成</h3>
+                  <h3 className="font-semibold mb-1">{t("authUi.features.smartDocs")}</h3>
                   <p className="text-sm text-muted-foreground">
-                    自动分析代码结构，生成清晰易懂的文档
+                    {t("authUi.features.smartDocsDesc")}
                   </p>
                 </div>
               </div>
@@ -134,9 +136,9 @@ export default function AuthPage() {
                   <Zap className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold mb-1">快速搜索</h3>
+                  <h3 className="font-semibold mb-1">{t("authUi.fastSearch")}</h3>
                   <p className="text-sm text-muted-foreground">
-                    通过关键词或 GitHub 链接，瞬间找到你需要的信息
+                    {t("authUi.features.fastSearchDesc")}
                   </p>
                 </div>
               </div>
@@ -146,9 +148,9 @@ export default function AuthPage() {
                   <Github className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold mb-1">GitHub 集成</h3>
+                  <h3 className="font-semibold mb-1">{t("authUi.features.githubIntegration")}</h3>
                   <p className="text-sm text-muted-foreground">
-                    无缝连接你的 GitHub 仓库，管理私人项目
+                    {t("authUi.features.githubIntegrationDesc")}
                   </p>
                 </div>
               </div>
@@ -156,7 +158,7 @@ export default function AuthPage() {
           </div>
 
           <div className="text-sm text-muted-foreground">
-            © 2026 OpenDeepWiki. 开源知识库平台
+            {t("authUi.copyright")}
           </div>
         </div>
       </div>
@@ -166,19 +168,19 @@ export default function AuthPage() {
         <div className="w-full max-w-md space-y-8">
           {/* Mobile Header */}
           <div className="lg:hidden text-center space-y-2">
-            <h1 className="text-3xl font-bold">OpenDeepWiki</h1>
-            <p className="text-muted-foreground">深度理解代码仓库</p>
+            <h1 className="text-3xl font-bold">{t("authUi.title")}</h1>
+            <p className="text-muted-foreground">{t("authUi.mobileSubtitle")}</p>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-2 text-center lg:text-left">
               <h2 className="text-2xl font-bold tracking-tight">
-                {mode === "login" ? "欢迎回来" : "创建账号"}
+                {mode === "login" ? t("authUi.welcome") : t("authUi.createAccount")}
               </h2>
               <p className="text-muted-foreground">
                 {mode === "login"
-                  ? "登录以访问你的知识库和私人仓库"
-                  : "注册以开始使用 OpenDeepWiki"}
+                  ? t("authUi.loginDesc")
+                  : t("authUi.registerDesc")}
               </p>
             </div>
 
@@ -192,12 +194,12 @@ export default function AuthPage() {
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <label htmlFor="email" className="text-sm font-medium">
-                    邮箱地址
+                    {t("authUi.email")}
                   </label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="name@example.com"
+                    placeholder={t("authUi.emailPlaceholder")}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -208,16 +210,16 @@ export default function AuthPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label htmlFor="password" className="text-sm font-medium">
-                      密码
+                      {t("authUi.password")}
                     </label>
                     <Button variant="link" className="p-0 h-auto text-sm">
-                      忘记密码?
+                      {t("authUi.forgotPassword")}
                     </Button>
                   </div>
                   <Input
                     id="password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder={t("authUi.passwordPlaceholder")}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -229,10 +231,10 @@ export default function AuthPage() {
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      登录中...
+                      {t("authUi.signingIn")}
                     </>
                   ) : (
-                    "登录"
+                    t("authUi.signIn")
                   )}
                 </Button>
               </form>
@@ -240,12 +242,12 @@ export default function AuthPage() {
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="space-y-2">
                   <label htmlFor="name" className="text-sm font-medium">
-                    用户名
+                    {t("authUi.username")}
                   </label>
                   <Input
                     id="name"
                     type="text"
-                    placeholder="你的用户名"
+                    placeholder={t("authUi.usernamePlaceholder")}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
@@ -257,12 +259,12 @@ export default function AuthPage() {
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="reg-email" className="text-sm font-medium">
-                    邮箱地址
+                    {t("authUi.email")}
                   </label>
                   <Input
                     id="reg-email"
                     type="email"
-                    placeholder="name@example.com"
+                    placeholder={t("authUi.emailPlaceholder")}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -272,12 +274,12 @@ export default function AuthPage() {
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="reg-password" className="text-sm font-medium">
-                    密码
+                    {t("authUi.password")}
                   </label>
                   <Input
                     id="reg-password"
                     type="password"
-                    placeholder="至少6位字符"
+                    placeholder={t("authUi.passwordHint")}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -288,12 +290,12 @@ export default function AuthPage() {
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="confirm-password" className="text-sm font-medium">
-                    确认密码
+                    {t("authUi.confirmPassword")}
                   </label>
                   <Input
                     id="confirm-password"
                     type="password"
-                    placeholder="再次输入密码"
+                    placeholder={t("authUi.confirmPasswordPlaceholder")}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
@@ -305,10 +307,10 @@ export default function AuthPage() {
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      注册中...
+                      {t("authUi.signingUp")}
                     </>
                   ) : (
-                    "注册"
+                    t("authUi.signUp")
                   )}
                 </Button>
               </form>
@@ -320,7 +322,7 @@ export default function AuthPage() {
               </div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-background px-2 text-muted-foreground">
-                  或使用第三方登录
+                  {t("authUi.orThirdParty")}
                 </span>
               </div>
             </div>
@@ -347,20 +349,20 @@ export default function AuthPage() {
             </div>
 
             <div className="text-center text-sm text-muted-foreground">
-              {mode === "login" ? "还没有账号?" : "已有账号?"}{" "}
+              {mode === "login" ? t("authUi.noAccount") : t("authUi.hasAccount")}{" "}
               <Button
                 variant="link"
                 className="p-0 h-auto font-normal text-primary"
                 onClick={switchMode}
               >
-                {mode === "login" ? "立即注册" : "立即登录"}
+                {mode === "login" ? t("authUi.signUpNow") : t("authUi.signInNow")}
               </Button>
             </div>
 
             <div className="lg:hidden text-center">
               <Button variant="ghost" onClick={() => router.push("/")} className="gap-2">
                 <ArrowLeft className="h-4 w-4" />
-                返回首页
+                {t("authUi.backToHome")}
               </Button>
             </div>
           </div>

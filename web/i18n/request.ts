@@ -16,14 +16,28 @@ async function loadMessages(locale: Locale) {
   const theme = (await import(`./messages/${locale}/theme.json`)).default;
   const sidebar = (await import(`./messages/${locale}/sidebar.json`)).default;
   const auth = (await import(`./messages/${locale}/auth.json`)).default;
+  const authUi = (await import(`./messages/${locale}/auth-ui.json`)).default;
   const home = (await import(`./messages/${locale}/home.json`)).default;
+  const ui = (await import(`./messages/${locale}/ui.json`)).default;
+  const recommend = (await import(`./messages/${locale}/recommend.json`)).default;
+  const mindmap = (await import(`./messages/${locale}/mindmap.json`)).default;
+  const settings = (await import(`./messages/${locale}/settings.json`)).default;
+  const profile = (await import(`./messages/${locale}/profile.json`)).default;
+  const apps = (await import(`./messages/${locale}/apps.json`)).default;
 
   return {
     common,
     theme,
     sidebar,
     auth,
+    authUi,
     home,
+    ui,
+    recommend,
+    mindmap,
+    settings,
+    profile,
+    apps,
   };
 }
 

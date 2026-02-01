@@ -686,3 +686,57 @@ export async function removeRepositoryFromDepartment(departmentId: string, repos
   const url = buildApiUrl(`/api/admin/departments/${departmentId}/repositories/${repositoryId}`);
   await fetchWithAuth(url, { method: "DELETE" });
 }
+
+
+// ==================== Chat Assistant Config API ====================
+
+export interface SelectableItem {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  isSelected: boolean;
+}
+
+export interface ChatAssistantConfig {
+  id: string;
+  isEnabled: boolean;
+  enabledModelIds: string[];
+  enabledMcpIds: string[];
+  enabledSkillIds: string[];
+  defaultModelId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ChatAssistantConfigOptions {
+  config: ChatAssistantConfig;
+  availableModels: SelectableItem[];
+  availableMcps: SelectableItem[];
+  availableSkills: SelectableItem[];
+}
+
+export interface UpdateChatAssistantConfigRequest {
+  isEnabled: boolean;
+  enabledModelIds: string[];
+  enabledMcpIds: string[];
+  enabledSkillIds: string[];
+  defaultModelId?: string;
+}
+
+export async function getChatAssistantConfig(): Promise<ChatAssistantConfigOptions> {
+  const url = buildApiUrl("/api/admin/chat-assistant/config");
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function updateChatAssistantConfig(
+  data: UpdateChatAssistantConfigRequest
+): Promise<ChatAssistantConfig> {
+  const url = buildApiUrl("/api/admin/chat-assistant/config");
+  const result = await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+  return result.data;
+}

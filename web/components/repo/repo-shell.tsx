@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import type * as PageTree from "fumadocs-core/page-tree";
@@ -9,6 +9,7 @@ import type { RepoTreeNode, RepoBranchesResponse } from "@/types/repository";
 import { BranchLanguageSelector } from "./branch-language-selector";
 import { fetchRepoTree, fetchRepoBranches } from "@/lib/repository-api";
 import { Network } from "lucide-react";
+import { ChatAssistantEnhanced, buildCatalogMenuEnhanced } from "@/components/chat";
 
 interface RepoShellProps {
   owner: string;
@@ -76,6 +77,7 @@ export function RepoShell({
   initialLanguage,
 }: RepoShellProps) {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const urlBranch = searchParams.get("branch");
   const urlLang = searchParams.get("lang");
   
@@ -84,6 +86,16 @@ export function RepoShell({
   const [currentBranch, setCurrentBranch] = useState(initialBranch || "");
   const [currentLanguage, setCurrentLanguage] = useState(initialLanguage || "");
   const [isLoading, setIsLoading] = useState(false);
+
+  // 从pathname提取当前文档路径
+  const currentDocPath = React.useMemo(() => {
+    // pathname格式: /owner/repo/slug 或 /owner/repo/path/to/doc
+    const prefix = `/${owner}/${repo}/`;
+    if (pathname.startsWith(prefix)) {
+      return pathname.slice(prefix.length);
+    }
+    return "";
+  }, [pathname, owner, repo]);
 
   // 当 URL 参数变化时，重新获取数据
   useEffect(() => {
@@ -178,6 +190,21 @@ export function RepoShell({
       ) : (
         children
       )}
+      
+      {/* 文档对话助手悬浮球 - 增强版 */}
+      <ChatAssistantEnhanced
+        context={{
+          owner,
+          repo,
+          branch: currentBranch,
+          language: currentLanguage,
+          currentDocPath,
+          catalogMenu: buildCatalogMenuEnhanced(nodes),
+        }}
+        position="bottom-right"
+        panelMode="popup"
+        showPulse={true}
+      />
     </DocsLayout>
   );
 }

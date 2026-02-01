@@ -2,41 +2,29 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
-using OpenDeepWiki.Services.Repositories;
 
-namespace OpenDeepWiki.Endpoints;
+namespace OpenDeepWiki.Services.Repositories;
 
 /// <summary>
-/// 处理日志相关端点
+/// 处理日志API服务
 /// </summary>
-public static class ProcessingLogEndpoints
+[MiniApi(Route = "/api/v1/repos")]
+[Tags("处理日志")]
+public class ProcessingLogApiService(IContext context, IProcessingLogService processingLogService)
 {
-    public static IEndpointRouteBuilder MapProcessingLogEndpoints(this IEndpointRouteBuilder app)
-    {
-        var group = app.MapGroup("/api/v1/repos")
-            .WithTags("处理日志");
-
-        // 获取仓库处理日志
-        group.MapGet("/{owner}/{repo}/processing-logs", GetProcessingLogsAsync)
-            .WithName("GetProcessingLogs")
-            .WithSummary("获取仓库处理日志");
-
-        return app;
-    }
-
-    private static async Task<IResult> GetProcessingLogsAsync(
+    /// <summary>
+    /// 获取仓库处理日志
+    /// </summary>
+    [HttpGet("/{owner}/{repo}/processing-logs")]
+    public async Task<IResult> GetProcessingLogsAsync(
         string owner,
         string repo,
         [FromQuery] DateTime? since,
-        [FromQuery] int limit,
-        [FromServices] IContext context,
-        [FromServices] IProcessingLogService processingLogService)
+        [FromQuery] int limit = 100)
     {
-        // 参数验证
         if (limit <= 0) limit = 100;
         if (limit > 500) limit = 500;
 
-        // 查找仓库
         var repository = await context.Repositories
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.OrgName == owner && r.RepoName == repo);
@@ -46,11 +34,7 @@ public static class ProcessingLogEndpoints
             return Results.NotFound(new { error = "仓库不存在" });
         }
 
-        // 获取处理日志
-        var response = await processingLogService.GetLogsAsync(
-            repository.Id,
-            since,
-            limit);
+        var response = await processingLogService.GetLogsAsync(repository.Id, since, limit);
 
         return Results.Ok(new ProcessingLogApiResponse
         {

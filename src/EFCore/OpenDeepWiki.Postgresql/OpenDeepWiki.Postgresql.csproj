@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\OpenDeepWiki.EFCore\OpenDeepWiki.EFCore.csproj" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" />
   </ItemGroup>
 
 </Project>

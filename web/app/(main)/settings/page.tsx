@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTranslations } from "@/hooks/use-translations";
 import { useAuth } from "@/contexts/auth-context";
-import { getUserSettings, updateUserSettings, UserSettings } from "@/lib/profile-api";
+import { getUserSettings, updateUserSettings, UserSettings, getSystemVersion, SystemVersion } from "@/lib/profile-api";
 import { Loader2, Settings, Bell, Globe, Palette, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -21,7 +21,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { isLoading: authLoading, isAuthenticated } = useAuth();
   const { theme, setTheme } = useTheme();
-  const [activeItem, setActiveItem] = useState(t("common.settings"));
+  const [activeItem, setActiveItem] = useState(t("common.settings.title"));
 
   const [settings, setSettings] = useState<UserSettings>({
     theme: "system",
@@ -29,6 +29,7 @@ export default function SettingsPage() {
     emailNotifications: true,
     pushNotifications: false,
   });
+  const [systemVersion, setSystemVersion] = useState<SystemVersion | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -44,6 +45,10 @@ export default function SettingsPage() {
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    loadSystemVersion();
+  }, []);
+
   const loadSettings = async () => {
     try {
       const data = await getUserSettings();
@@ -52,6 +57,15 @@ export default function SettingsPage() {
       // 使用默认设置
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadSystemVersion = async () => {
+    try {
+      const data = await getSystemVersion();
+      setSystemVersion(data);
+    } catch {
+      // 使用默认版本
     }
   };
 
@@ -210,7 +224,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm text-muted-foreground">
-                <p>OpenDeepWiki v1.0.0</p>
+                <p>{systemVersion?.productName || "OpenDeepWiki"} v{systemVersion?.version || "1.0.0"}</p>
                 <p>{t("settings.aboutDescription") || "AI 驱动的代码知识库平台"}</p>
               </div>
             </CardContent>

@@ -19,6 +19,7 @@ public static class AdminEndpoints
         adminGroup.MapAdminDepartmentEndpoints();
         adminGroup.MapAdminToolsEndpoints();
         adminGroup.MapAdminSettingsEndpoints();
+        adminGroup.MapAdminChatAssistantEndpoints();
 
         return app;
     }

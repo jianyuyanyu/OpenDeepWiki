@@ -37,6 +37,11 @@ public interface IContext
     DbSet<UserActivity> UserActivities { get; set; }
     DbSet<UserPreferenceCache> UserPreferenceCaches { get; set; }
     DbSet<UserDislike> UserDislikes { get; set; }
+    DbSet<ChatAssistantConfig> ChatAssistantConfigs { get; set; }
+    DbSet<ChatApp> ChatApps { get; set; }
+    DbSet<AppStatistics> AppStatistics { get; set; }
+    DbSet<ChatLog> ChatLogs { get; set; }
+    DbSet<TranslationTask> TranslationTasks { get; set; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
@@ -77,6 +82,11 @@ public abstract class MasterDbContext : DbContext, IContext
     public DbSet<UserActivity> UserActivities { get; set; } = null!;
     public DbSet<UserPreferenceCache> UserPreferenceCaches { get; set; } = null!;
     public DbSet<UserDislike> UserDislikes { get; set; } = null!;
+    public DbSet<ChatAssistantConfig> ChatAssistantConfigs { get; set; } = null!;
+    public DbSet<ChatApp> ChatApps { get; set; } = null!;
+    public DbSet<AppStatistics> AppStatistics { get; set; } = null!;
+    public DbSet<ChatLog> ChatLogs { get; set; } = null!;
+    public DbSet<TranslationTask> TranslationTasks { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -210,6 +220,37 @@ public abstract class MasterDbContext : DbContext, IContext
         // UserDislike 唯一索引（同一用户对同一仓库只能标记一次不感兴趣）
         modelBuilder.Entity<UserDislike>()
             .HasIndex(d => new { d.UserId, d.RepositoryId })
+            .IsUnique();
+
+        // ChatApp AppId唯一索引
+        modelBuilder.Entity<ChatApp>()
+            .HasIndex(a => a.AppId)
+            .IsUnique();
+
+        // ChatApp 用户ID索引（用于查询用户的应用列表）
+        modelBuilder.Entity<ChatApp>()
+            .HasIndex(a => a.UserId);
+
+        // AppStatistics AppId和日期组合唯一索引
+        modelBuilder.Entity<AppStatistics>()
+            .HasIndex(s => new { s.AppId, s.Date })
+            .IsUnique();
+
+        // ChatLog AppId索引（用于按应用查询提问记录）
+        modelBuilder.Entity<ChatLog>()
+            .HasIndex(l => l.AppId);
+
+        // ChatLog 创建时间索引（用于按时间范围查询）
+        modelBuilder.Entity<ChatLog>()
+            .HasIndex(l => l.CreatedAt);
+
+        // TranslationTask 状态索引（用于查询待处理任务）
+        modelBuilder.Entity<TranslationTask>()
+            .HasIndex(t => t.Status);
+
+        // TranslationTask 仓库分支和目标语言组合唯一索引（避免重复任务）
+        modelBuilder.Entity<TranslationTask>()
+            .HasIndex(t => new { t.RepositoryBranchId, t.TargetLanguageCode })
             .IsUnique();
     }
 }

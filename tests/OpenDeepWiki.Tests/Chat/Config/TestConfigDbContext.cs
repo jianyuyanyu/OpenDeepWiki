@@ -43,6 +43,11 @@ public class TestConfigDbContext : DbContext, IContext
     public DbSet<UserActivity> UserActivities { get; set; } = null!;
     public DbSet<UserPreferenceCache> UserPreferenceCaches { get; set; } = null!;
     public DbSet<UserDislike> UserDislikes { get; set; } = null!;
+    public DbSet<ChatAssistantConfig> ChatAssistantConfigs { get; set; } = null!;
+    public DbSet<ChatApp> ChatApps { get; set; } = null!;
+    public DbSet<AppStatistics> AppStatistics { get; set; } = null!;
+    public DbSet<ChatLog> ChatLogs { get; set; } = null!;
+    public DbSet<TranslationTask> TranslationTasks { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -17,7 +17,7 @@ import { LanguageToggle } from "@/components/language-toggle";
 import { HeaderSearchBox } from "@/components/header-search-box";
 import { useTranslations } from "@/hooks/use-translations";
 import { useAuth } from "@/contexts/auth-context";
-import { Loader2, Settings } from "lucide-react";
+import { Loader2, Settings, User } from "lucide-react";
 
 interface HeaderSearchBoxProps {
   value: string;
@@ -104,10 +104,12 @@ export function Header({ title, currentWeekday, searchBox }: HeaderProps) {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => router.push("/profile")}>
-                {t("common.profile")}
+                <User className="mr-2 h-4 w-4" />
+                {t("common.profile.title")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push("/settings")}>
-                {t("common.settings")}
+                <Settings className="mr-2 h-4 w-4" />
+                {t("common.settings.title")}
               </DropdownMenuItem>
               {isAdmin && (
                 <>

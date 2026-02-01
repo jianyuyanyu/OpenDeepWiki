@@ -21,7 +21,7 @@
       - CHAT_REQUEST_TYPE=OpenAI
       
       # 仓库存储目录
-      - REPOSITORIES_DIRECTORY=/app/repositories
+      - REPOSITORIES_DIRECTORY=/data
       
       # Wiki 生成器配置 - 目录生成
       - WIKI_CATALOG_MODEL=gpt-4o
@@ -47,7 +47,6 @@
       # 多语言支持 (逗号分隔，如: en,zh,ja,ko)
       - WIKI_LANGUAGES=en,zh
     volumes:
-      - ./data:/app/repositories
       - ./data:/data
 
   web:

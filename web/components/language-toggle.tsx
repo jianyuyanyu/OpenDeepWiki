@@ -11,9 +11,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { locales, localeNames, type Locale } from "@/i18n/request";
 import { useLocale } from "next-intl";
+import { useTranslations } from "@/hooks/use-translations";
 
 export function LanguageToggle() {
   const locale = useLocale() as Locale;
+  const t = useTranslations();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -40,7 +42,7 @@ export function LanguageToggle() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="h-9 w-9">
           <Languages className="h-4 w-4" />
-          <span className="sr-only">切换语言</span>
+          <span className="sr-only">{t("ui.switchLanguage")}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">

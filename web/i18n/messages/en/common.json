@@ -80,6 +80,10 @@
     "saveSuccess": "Settings saved",
     "saveFailed": "Failed to save settings"
   },
+  "privateRepos": {
+    "title": "Private Repositories",
+    "description": "Manage your private repositories"
+  },
   "weekdays": {
     "sunday": "Sunday",
     "monday": "Monday",

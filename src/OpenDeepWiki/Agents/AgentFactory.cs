@@ -267,6 +267,9 @@ namespace OpenDeepWiki.Agents
             var clientAgentOptions = new ChatClientAgentOptions
             {
                 ChatOptions = new ChatOptions()
+                {
+                    MaxOutputTokens = maxToken,
+                },
             };
 
             return CreateAgentInternal(model, clientAgentOptions, option);

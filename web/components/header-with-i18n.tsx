@@ -83,8 +83,8 @@ export function HeaderWithI18n({ title, currentTime }: HeaderProps) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>{t("common.profile")}</DropdownMenuItem>
-              <DropdownMenuItem>{t("common.settings")}</DropdownMenuItem>
+              <DropdownMenuItem>{t("common.profile.title")}</DropdownMenuItem>
+              <DropdownMenuItem>{t("common.settings.title")}</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>{t("common.logout")}</DropdownMenuItem>
             </DropdownMenuContent>

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.Translation;
 using OpenDeepWiki.Services.Wiki;
 using System.Diagnostics;
 
@@ -169,6 +170,7 @@ public class RepositoryProcessingWorker(
             }
 
             repository.UpdateTimestamp();
+            context.Repositories.Update(repository);
             await context.SaveChangesAsync(stoppingToken);
         }
     }
@@ -391,65 +393,16 @@ public class RepositoryProcessingWorker(
             }
             else
             {
-                // Full generation: generate mind map, catalog and all documents
+                // Full generation: generate catalog and all documents
+                // 思维导图由 MindMapWorker 独立后台任务生成
+                // 翻译任务由 TranslationWorker 独立后台任务扫描并创建
                 logger.LogDebug("Performing full wiki generation for {LanguageCode}", language.LanguageCode);
-                
-                // 启动思维导图生成（独立scope，不阻塞主流程）
-                var mindMapTask = StartMindMapGenerationAsync(workspace, language.Id, stoppingToken);
                 
                 logger.LogInformation("Generating catalog for {LanguageCode}", language.LanguageCode);
                 await wikiGenerator.GenerateCatalogAsync(workspace, language, stoppingToken);
                 
                 logger.LogInformation("Generating documents for {LanguageCode}", language.LanguageCode);
                 await wikiGenerator.GenerateDocumentsAsync(workspace, language, stoppingToken);
-                
-                // 等待思维导图生成完成（可选，不影响主流程）
-                try
-                {
-                    await mindMapTask;
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Mind map generation failed for {LanguageCode}, but wiki generation continues", 
-                        language.LanguageCode);
-                }
-            }
-
-            // 获取需要翻译的目标语言列表
-            var translationLanguages = _wikiOptions.GetTranslationLanguages(language.LanguageCode);
-            
-            if (translationLanguages.Count > 0)
-            {
-                logger.LogInformation(
-                    "Starting multi-language translation. SourceLanguage: {SourceLang}, TargetLanguages: {TargetLangs}",
-                    language.LanguageCode, string.Join(", ", translationLanguages));
-
-                foreach (var targetLang in translationLanguages)
-                {
-                    stoppingToken.ThrowIfCancellationRequested();
-
-                    try
-                    {
-                        // 检查目标语言是否已存在
-                        var existingLang = await context.BranchLanguages
-                            .FirstOrDefaultAsync(l => l.RepositoryBranchId == language.RepositoryBranchId && 
-                                                      l.LanguageCode == targetLang, stoppingToken);
-
-                        if (existingLang != null)
-                        {
-                            logger.LogDebug("Target language {TargetLang} already exists, skipping translation", targetLang);
-                            continue;
-                        }
-
-                        logger.LogInformation("Translating wiki to {TargetLang}", targetLang);
-                        await wikiGenerator.TranslateWikiAsync(workspace, language, targetLang, stoppingToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "Failed to translate wiki to {TargetLang}", targetLang);
-                        // 继续翻译其他语言，不中断整个流程
-                    }
-                }
             }
 
             languageStopwatch.Stop();
@@ -465,50 +418,5 @@ public class RepositoryProcessingWorker(
                 language.Id, language.LanguageCode, languageStopwatch.ElapsedMilliseconds);
             throw;
         }
-    }
-
-    /// <summary>
-    /// Starts mind map generation in a separate scope to avoid DbContext concurrency issues.
-    /// This runs independently and does not block the main wiki generation flow.
-    /// </summary>
-    private Task StartMindMapGenerationAsync(
-        RepositoryWorkspace workspace,
-        string branchLanguageId,
-        CancellationToken stoppingToken)
-    {
-        return Task.Run(async () =>
-        {
-            using var scope = scopeFactory.CreateScope();
-            var context = scope.ServiceProvider.GetRequiredService<IContext>();
-            var wikiGenerator = scope.ServiceProvider.GetRequiredService<IWikiGenerator>();
-
-            // 获取 BranchLanguage 实体
-            var branchLanguage = await context.BranchLanguages
-                .FirstOrDefaultAsync(bl => bl.Id == branchLanguageId && !bl.IsDeleted, stoppingToken);
-
-            if (branchLanguage == null)
-            {
-                logger.LogWarning("BranchLanguage {BranchLanguageId} not found for mind map generation", branchLanguageId);
-                return;
-            }
-
-            // 设置当前仓库ID到WikiGenerator
-            if (wikiGenerator is WikiGenerator generator)
-            {
-                var repository = await context.RepositoryBranches
-                    .Where(rb => rb.Id == branchLanguage.RepositoryBranchId)
-                    .Select(rb => rb.RepositoryId)
-                    .FirstOrDefaultAsync(stoppingToken);
-                
-                if (!string.IsNullOrEmpty(repository))
-                {
-                    generator.SetCurrentRepository(repository);
-                }
-            }
-
-            logger.LogInformation("Starting mind map generation for BranchLanguage {BranchLanguageId}", branchLanguageId);
-            await wikiGenerator.GenerateMindMapAsync(workspace, branchLanguage, stoppingToken);
-            logger.LogInformation("Mind map generation completed for BranchLanguage {BranchLanguageId}", branchLanguageId);
-        }, stoppingToken);
     }
 }

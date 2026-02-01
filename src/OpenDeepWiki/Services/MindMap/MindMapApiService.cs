@@ -3,34 +3,25 @@ using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 
-namespace OpenDeepWiki.Endpoints;
+namespace OpenDeepWiki.Services.MindMap;
 
 /// <summary>
-/// 思维导图相关端点
+/// 思维导图API服务
 /// </summary>
-public static class MindMapEndpoints
+[MiniApi(Route = "/api/v1/repos")]
+[Tags("思维导图")]
+public class MindMapApiService(IContext context)
 {
-    public static IEndpointRouteBuilder MapMindMapEndpoints(this IEndpointRouteBuilder app)
-    {
-        var group = app.MapGroup("/api/v1/repos")
-            .WithTags("思维导图");
-
-        // 获取仓库思维导图
-        group.MapGet("/{owner}/{repo}/mindmap", GetMindMapAsync)
-            .WithName("GetMindMap")
-            .WithSummary("获取仓库项目架构思维导图");
-
-        return app;
-    }
-
-    private static async Task<IResult> GetMindMapAsync(
+    /// <summary>
+    /// 获取仓库项目架构思维导图
+    /// </summary>
+    [HttpGet("/{owner}/{repo}/mindmap")]
+    public async Task<IResult> GetMindMapAsync(
         string owner,
         string repo,
         [FromQuery] string? branch,
-        [FromQuery] string? lang,
-        [FromServices] IContext context)
+        [FromQuery] string? lang)
     {
-        // 查找仓库
         var repository = await context.Repositories
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.OrgName == owner && r.RepoName == repo);
@@ -40,7 +31,6 @@ public static class MindMapEndpoints
             return Results.NotFound(new { error = "仓库不存在" });
         }
 
-        // 查找分支
         var branchQuery = context.RepositoryBranches
             .AsNoTracking()
             .Where(b => b.RepositoryId == repository.Id);
@@ -56,7 +46,6 @@ public static class MindMapEndpoints
             return Results.NotFound(new { error = "分支不存在" });
         }
 
-        // 查找语言
         var languageQuery = context.BranchLanguages
             .AsNoTracking()
             .Where(l => l.RepositoryBranchId == repoBranch.Id && !l.IsDeleted);
@@ -67,7 +56,6 @@ public static class MindMapEndpoints
         }
         else
         {
-            // 优先选择默认语言
             languageQuery = languageQuery.OrderByDescending(l => l.IsDefault);
         }
 

@@ -1,8 +1,6 @@
 {
   "login": "登录",
   "logout": "退出登录",
-  "profile": "个人资料",
-  "settings": "设置",
   "theme": "主题",
   "language": "语言",
   "save": "保存",
@@ -79,6 +77,10 @@
     "aboutDescription": "AI 驱动的代码知识库平台",
     "saveSuccess": "设置已保存",
     "saveFailed": "保存失败"
+  },
+  "privateRepos": {
+    "title": "私有仓库",
+    "description": "管理你的私有仓库"
   },
   "weekdays": {
     "sunday": "星期日",

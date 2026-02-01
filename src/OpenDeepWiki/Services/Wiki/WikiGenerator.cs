@@ -1103,7 +1103,7 @@ Please start executing the task.";
 
     /// <summary>
     /// Translates catalog JSON from source language to target language using AI.
-    /// Uses item-by-item translation for better reliability.
+    /// Uses parallel translation for better performance.
     /// </summary>
     private async Task<string> TranslateCatalogAsync(
         string sourceCatalogJson,
@@ -1122,8 +1122,30 @@ Please start executing the task.";
             return sourceCatalogJson;
         }
 
-        // 逐个翻译标题
-        await TranslateCatalogItemsAsync(root.Items, sourceLanguage, targetLanguage, cancellationToken);
+        // 收集所有需要翻译的项（扁平化）
+        var allItems = new List<CatalogItem>();
+        CollectAllCatalogItems(root.Items, allItems);
+
+        _logger.LogDebug("Collected {Count} catalog items for parallel translation", allItems.Count);
+
+        // 并发翻译所有标题
+        using var semaphore = new SemaphoreSlim(_options.ParallelCount, _options.ParallelCount);
+        var translationTasks = allItems.Select(async item =>
+        {
+            await semaphore.WaitAsync(cancellationToken);
+            try
+            {
+                var translatedTitle = await TranslateSingleTitleAsync(
+                    item.Title, sourceLanguage, targetLanguage, cancellationToken);
+                item.Title = translatedTitle;
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }).ToList();
+
+        await Task.WhenAll(translationTasks);
 
         // 序列化回 JSON
         return System.Text.Json.JsonSerializer.Serialize(root, new System.Text.Json.JsonSerializerOptions
@@ -1134,23 +1156,16 @@ Please start executing the task.";
     }
 
     /// <summary>
-    /// Recursively translates catalog item titles one by one.
+    /// Recursively collects all catalog items into a flat list for parallel processing.
     /// </summary>
-    private async Task TranslateCatalogItemsAsync(
-        List<CatalogItem> items,
-        string sourceLanguage,
-        string targetLanguage,
-        CancellationToken cancellationToken)
+    private static void CollectAllCatalogItems(List<CatalogItem> items, List<CatalogItem> result)
     {
         foreach (var item in items)
         {
-            // 翻译当前项的标题
-            item.Title = await TranslateSingleTitleAsync(item.Title, sourceLanguage, targetLanguage, cancellationToken);
-
-            // 递归翻译子项
+            result.Add(item);
             if (item.Children.Count > 0)
             {
-                await TranslateCatalogItemsAsync(item.Children, sourceLanguage, targetLanguage, cancellationToken);
+                CollectAllCatalogItems(item.Children, result);
             }
         }
     }

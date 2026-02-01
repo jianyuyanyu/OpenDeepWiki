@@ -183,18 +183,18 @@ export default function RecommendPage() {
             <h1 className="text-3xl font-bold tracking-tight">{t("sidebar.recommend")}</h1>
             <p className="text-muted-foreground">
               {totalCandidates > 0 
-                ? `从 ${totalCandidates} 个仓库中为您精选推荐`
-                : "发现热门和推荐的仓库"}
+                ? t("recommend.subtitleWithCount", { count: totalCandidates })
+                : t("recommend.subtitle")}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
               <SelectTrigger className="w-[140px]">
                 <Code2 className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="所有语言" />
+                <SelectValue placeholder={t("recommend.allLanguages")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">所有语言</SelectItem>
+                <SelectItem value="all">{t("recommend.allLanguages")}</SelectItem>
                 {languages.map((lang) => (
                   <SelectItem key={lang.name} value={lang.name}>
                     {lang.name} ({lang.count})
@@ -209,7 +209,7 @@ export default function RecommendPage() {
               disabled={loading}
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              换一批
+              {t("recommend.refresh")}
             </Button>
           </div>
         </div>
@@ -218,21 +218,21 @@ export default function RecommendPage() {
           <TabsList>
             <TabsTrigger value="default" className="gap-2">
               <Star className="h-4 w-4" />
-              综合推荐
+              {t("recommend.strategies.default")}
             </TabsTrigger>
             <TabsTrigger value="popular" className="gap-2">
               <TrendingUp className="h-4 w-4" />
-              热门项目
+              {t("recommend.strategies.popular")}
             </TabsTrigger>
             {user && (
               <TabsTrigger value="personalized" className="gap-2">
                 <Sparkles className="h-4 w-4" />
-                个性化
+                {t("recommend.strategies.personalized")}
               </TabsTrigger>
             )}
             <TabsTrigger value="explore" className="gap-2">
               <Compass className="h-4 w-4" />
-              探索发现
+              {t("recommend.strategies.explore")}
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -246,8 +246,8 @@ export default function RecommendPage() {
         ) : repos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <Compass className="h-12 w-12 mb-4" />
-            <p>暂无推荐内容</p>
-            <p className="text-sm">添加更多仓库后将获得个性化推荐</p>
+            <p>{t("recommend.empty.title")}</p>
+            <p className="text-sm">{t("recommend.empty.description")}</p>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -293,7 +293,7 @@ export default function RecommendPage() {
                                 ) : (
                                   <ThumbsDown className="h-4 w-4 mr-2" />
                                 )}
-                                不感兴趣
+                                {t("recommend.actions.notInterested")}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -335,7 +335,7 @@ export default function RecommendPage() {
                     {repo.scoreBreakdown && (
                       <div className="pt-2 border-t">
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>推荐指数</span>
+                          <span>{t("recommend.score.label")}</span>
                           <span className="font-medium text-foreground">
                             {(repo.score * 100).toFixed(0)}%
                           </span>

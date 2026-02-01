@@ -139,3 +139,29 @@ export async function updateUserSettings(settings: UserSettings): Promise<UserSe
 
   return result.data;
 }
+
+export interface SystemVersion {
+  version: string;
+  assemblyVersion: string;
+  productName: string;
+}
+
+export async function getSystemVersion(): Promise<SystemVersion> {
+  const url = buildApiUrl("/api/system/version");
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    return {
+      version: "1.0.0",
+      assemblyVersion: "1.0.0.0",
+      productName: "OpenDeepWiki",
+    };
+  }
+
+  const result = (await response.json()) as ApiResponse<SystemVersion>;
+  return result.data || {
+    version: "1.0.0",
+    assemblyVersion: "1.0.0.0",
+    productName: "OpenDeepWiki",
+  };
+}
