@@ -1,7 +1,7 @@
 import { getToken, UserInfo, ApiResponse } from "./auth-api";
 
 function getApiBaseUrl(): string {
-  return process.env.NEXT_PUBLIC_API_URL ?? "";
+  return process.env.API_PROXY_URL ?? "";
 }
 
 function buildApiUrl(path: string) {

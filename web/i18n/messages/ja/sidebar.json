@@ -5,5 +5,7 @@
   "subscribe": "購読",
   "bookmarks": "ブックマーク",
   "organizations": "組織",
-  "github": "GitHub"
+  "github": "GitHub",
+  "feishu": "Feishu",
+  "scanQrCode": "QRコードをスキャンしてフォロー"
 }

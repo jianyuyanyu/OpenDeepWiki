@@ -323,6 +323,7 @@ try
     app.MapBookmarkEndpoints();
     app.MapSubscriptionEndpoints();
     app.MapProcessingLogEndpoints();
+    app.MapMindMapEndpoints();
     app.MapAdminEndpoints();
     app.MapOrganizationEndpoints();
     app.MapRecommendationEndpoints();

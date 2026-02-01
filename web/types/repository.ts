@@ -103,6 +103,36 @@ export interface UpdateVisibilityResponse {
 // Processing log types
 export type ProcessingStep = "Workspace" | "Catalog" | "Content" | "Complete";
 
+// 思维导图状态
+export type MindMapStatus = "Pending" | "Processing" | "Completed" | "Failed";
+
+// 思维导图状态数字到字符串的映射
+export const MindMapStatusMap: Record<number, MindMapStatus> = {
+  0: "Pending",
+  1: "Processing",
+  2: "Completed",
+  3: "Failed",
+};
+
+// 思维导图响应
+export interface MindMapResponse {
+  owner: string;
+  repo: string;
+  branch: string;
+  language: string;
+  status: number;
+  statusName: MindMapStatus;
+  content: string | null;
+}
+
+// 思维导图节点（解析后的结构）
+export interface MindMapNode {
+  title: string;
+  filePath?: string;
+  level: number;
+  children: MindMapNode[];
+}
+
 // 步骤数字到字符串的映射
 export const ProcessingStepMap: Record<number, ProcessingStep> = {
   0: "Workspace",

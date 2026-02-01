@@ -10,6 +10,19 @@ namespace OpenDeepWiki.Services.Wiki;
 public interface IWikiGenerator
 {
     /// <summary>
+    /// Generates the project architecture mind map for a repository.
+    /// Uses AI to analyze the repository and create a hierarchical mind map.
+    /// This should be called before GenerateCatalogAsync and runs independently.
+    /// </summary>
+    /// <param name="workspace">The prepared repository workspace.</param>
+    /// <param name="branchLanguage">The branch language to generate mind map for.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task GenerateMindMapAsync(
+        RepositoryWorkspace workspace,
+        BranchLanguage branchLanguage,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Generates the wiki catalog structure for a repository.
     /// Uses AI to analyze the repository and create a hierarchical catalog.
     /// </summary>

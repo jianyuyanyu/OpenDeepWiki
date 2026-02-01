@@ -97,6 +97,100 @@ public class WikiGenerator : IWikiGenerator
     }
 
     /// <inheritdoc />
+    public async Task GenerateMindMapAsync(
+        RepositoryWorkspace workspace,
+        BranchLanguage branchLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        _logger.LogInformation(
+            "Starting mind map generation. Repository: {Org}/{Repo}, Branch: {Branch}, Language: {Language}, BranchLanguageId: {BranchLanguageId}",
+            workspace.Organization, workspace.RepositoryName,
+            workspace.BranchName, branchLanguage.LanguageCode, branchLanguage.Id);
+
+        // 更新状态为处理中
+        branchLanguage.MindMapStatus = MindMapStatus.Processing;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        await LogProcessingAsync(ProcessingStep.Catalog, $"开始生成项目架构思维导图 ({branchLanguage.LanguageCode})", cancellationToken);
+
+        try
+        {
+            // 收集仓库上下文
+            _logger.LogDebug("Pre-collecting repository context for mind map");
+            var repoContext = await CollectRepositoryContextAsync(workspace.WorkingDirectory, cancellationToken);
+            _logger.LogDebug("Repository context collected. ProjectType: {ProjectType}, EntryPoints: {EntryPoints}",
+                repoContext.ProjectType, string.Join(", ", repoContext.EntryPoints));
+
+            _logger.LogDebug("Loading mindmap-generator prompt template");
+            var prompt = await _promptPlugin.LoadPromptAsync(
+                "mindmap-generator",
+                new Dictionary<string, string>
+                {
+                    ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
+                    ["language"] = branchLanguage.LanguageCode,
+                    ["project_type"] = repoContext.ProjectType,
+                    ["file_tree"] = repoContext.DirectoryTree,
+                    ["readme_content"] = repoContext.ReadmeContent,
+                    ["key_files"] = string.Join(", ", repoContext.KeyFiles),
+                    ["entry_points"] = string.Join("\n", repoContext.EntryPoints.Select(e => $"- {e}"))
+                },
+                cancellationToken);
+            _logger.LogDebug("Prompt template loaded. Length: {PromptLength} chars", prompt.Length);
+
+            _logger.LogDebug("Initializing tools for mind map generation");
+            var gitTool = new GitTool(workspace.WorkingDirectory);
+            var mindMapTool = new MindMapTool(_context, branchLanguage.Id);
+
+            var tools = gitTool.GetTools()
+                .Concat(mindMapTool.GetTools())
+                .ToArray();
+            _logger.LogDebug("Tools initialized. ToolCount: {ToolCount}, Tools: {ToolNames}",
+                tools.Length, string.Join(", ", tools.Select(t => t.Name)));
+
+            var userMessage = $@"Generate project architecture mind map for: {workspace.Organization}/{workspace.RepositoryName}
+
+Project Type: {repoContext.ProjectType}
+Entry Points: {string.Join(", ", repoContext.EntryPoints.Take(5))}
+
+Execute the workflow now. Read entry point files to understand the architecture, then generate a comprehensive mind map in {branchLanguage.LanguageCode}.
+Remember to call WriteMindMapAsync with the complete mind map content.";
+
+            await ExecuteAgentWithRetryAsync(
+                _options.CatalogModel,
+                _options.GetCatalogRequestOptions(),
+                prompt,
+                userMessage,
+                tools,
+                "MindMapGeneration",
+                ProcessingStep.Catalog,
+                cancellationToken);
+
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Mind map generation completed successfully. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, stopwatch.ElapsedMilliseconds);
+
+            await LogProcessingAsync(ProcessingStep.Catalog,
+                $"项目架构思维导图生成完成，耗时 {stopwatch.ElapsedMilliseconds}ms",
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex,
+                "Mind map generation failed. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, stopwatch.ElapsedMilliseconds);
+
+            // 更新状态为失败
+            branchLanguage.MindMapStatus = MindMapStatus.Failed;
+            await _context.SaveChangesAsync(cancellationToken);
+
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
     public async Task GenerateCatalogAsync(
         RepositoryWorkspace workspace,
         BranchLanguage branchLanguage,
@@ -958,6 +1052,31 @@ Please start executing the task.";
                 result.Value.TargetCatalog.UpdateTimestamp();
             }
 
+            // 9. 翻译思维导图（如果存在）
+            if (!string.IsNullOrEmpty(sourceBranchLanguage.MindMapContent))
+            {
+                await LogProcessingAsync(ProcessingStep.Translation,
+                    $"正在翻译思维导图 -> {targetLanguageCode}", cancellationToken);
+
+                try
+                {
+                    var translatedMindMap = await TranslateMindMapAsync(
+                        sourceBranchLanguage.MindMapContent,
+                        sourceBranchLanguage.LanguageCode,
+                        targetLanguageCode,
+                        cancellationToken);
+
+                    targetBranchLanguage.MindMapContent = translatedMindMap;
+                    targetBranchLanguage.MindMapStatus = MindMapStatus.Completed;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to translate mind map to {TargetLang}", targetLanguageCode);
+                    // 思维导图翻译失败不影响整体流程
+                    targetBranchLanguage.MindMapStatus = MindMapStatus.Failed;
+                }
+            }
+
             await _context.SaveChangesAsync(cancellationToken);
 
             stopwatch.Stop();
@@ -1126,6 +1245,73 @@ Translated document:";
         }
 
         return contentBuilder.ToString().Trim();
+    }
+
+    /// <summary>
+    /// Translates mind map content from source language to target language using AI.
+    /// Preserves the hierarchical format (# ## ###) and file paths.
+    /// </summary>
+    private async Task<string> TranslateMindMapAsync(
+        string sourceMindMap,
+        string sourceLanguage,
+        string targetLanguage,
+        CancellationToken cancellationToken)
+    {
+        var prompt = $@"You are a professional technical documentation translator. Translate the following mind map content from {sourceLanguage} to {targetLanguage}.
+
+IMPORTANT RULES:
+1. Translate only the title text (before the colon if present)
+2. Keep the hierarchical format (# ## ###) exactly as is
+3. Keep all file paths (after the colon) unchanged
+4. Keep the line structure unchanged
+5. Return only the translated mind map, no explanations
+
+Example:
+Input:
+# 系统架构
+## 前端应用:web/app
+## 后端服务:src/Api
+
+Output (if translating to English):
+# System Architecture
+## Frontend Application:web/app
+## Backend Service:src/Api
+
+Source mind map:
+{sourceMindMap}
+
+Translated mind map:";
+
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.User, prompt)
+        };
+
+        var chatClient = _agentFactory.CreateSimpleChatClient(
+            _options.GetTranslationModel(),
+            32000,
+            _options.GetTranslationRequestOptions());
+        var thread = await chatClient.GetNewSessionAsync(cancellationToken);
+
+        var contentBuilder = new StringBuilder();
+        await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
+        {
+            if (!string.IsNullOrEmpty(update.Text))
+            {
+                contentBuilder.Append(update.Text);
+            }
+        }
+
+        var result = contentBuilder.ToString().Trim();
+
+        // 清理可能的 <think> 标签
+        result = System.Text.RegularExpressions.Regex.Replace(
+            result,
+            @"<think>[\s\S]*?</think>",
+            string.Empty,
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+
+        return result;
     }
 
     /// <summary>

@@ -47,8 +47,8 @@
       # 多语言支持 (逗号分隔，如: en,zh,ja,ko)
       - WIKI_LANGUAGES=en,zh
     volumes:
-      - opendeepwiki-repos:/app/repositories
-      - opendeepwiki-data:/app/data
+      - ./data:/app/repositories
+      - ./data:/data
 
   web:
     image: crpi-j9ha7sxwhatgtvj4.cn-shenzhen.personal.cr.aliyuncs.com/open-deepwiki/opendeepwiki-web
@@ -62,7 +62,3 @@
     environment:
       - NODE_ENV=production
       - API_PROXY_URL=http://opendeepwiki:8080
-
-volumes:
-  opendeepwiki-repos:
-

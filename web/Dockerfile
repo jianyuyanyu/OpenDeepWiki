@@ -11,8 +11,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # 构建时环境变量
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG API_PROXY_URL
+ENV API_PROXY_URL=$API_PROXY_URL
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

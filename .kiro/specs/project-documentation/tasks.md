@@ -16,15 +16,15 @@
   - [x] 1.7 创建 docs/deployment/ 目录
   - _Requirements: 1.1_
 
-- [ ] 2. Getting Started 模块文档
-  - [ ] 2.1 编写 docs/getting-started/introduction.md - 项目简介
+- [x] 2. Getting Started 模块文档
+  - [x] 2.1 编写 docs/getting-started/introduction.md - 项目简介
     - 项目定位与愿景、核心功能列表、技术栈概览（.NET 9, Next.js, Semantic Kernel）
     - 绘制功能架构图（Mermaid flowchart）
     - 编写与 DeepWiki 关系说明
     - 参考文件: README.md, src/OpenDeepWiki/Program.cs
     - _Requirements: 1.1, 1.2_
 
-  - [ ] 2.2 编写 docs/getting-started/quick-start.md - 快速启动指南
+  - [x] 2.2 编写 docs/getting-started/quick-start.md - 快速启动指南
     - 环境要求（Docker, .NET SDK, Node.js 版本）
     - Docker 一键启动步骤（参考 compose.yaml）
     - 首次配置步骤（API Key, 数据库选择）
@@ -32,7 +32,7 @@
     - 参考文件: compose.yaml, start.sh, start.bat, README.md
     - _Requirements: 1.3_
 
-  - [ ] 2.3 编写 docs/getting-started/configuration.md - 环境配置说明
+  - [x] 2.3 编写 docs/getting-started/configuration.md - 环境配置说明
     - AI 模型配置（CHAT_MODEL, ENDPOINT, API_KEY）
     - 数据库配置（SQLite/PostgreSQL/MySQL/SqlServer）
     - Wiki 生成配置、聊天系统配置（飞书/QQ/微信）
@@ -40,14 +40,14 @@
     - 参考文件: src/OpenDeepWiki/appsettings.json, compose.yaml
     - _Requirements: 1.3_
 
-- [ ] 3. Architecture 模块文档
-  - [ ] 3.1 编写 docs/architecture/overview.md - 系统架构总览
+- [-] 3. Architecture 模块文档
+  - [x] 3.1 编写 docs/architecture/overview.md - 系统架构总览
     - 整体架构设计理念、前后端分离架构图（Mermaid graph）
     - 核心模块划分说明、数据流向图、扩展点设计说明
     - 参考文件: src/OpenDeepWiki/Program.cs, web/app/layout.tsx
     - _Requirements: 2.1, 2.4_
 
-  - [ ] 3.2 编写 docs/architecture/backend-architecture.md - 后端架构原理
+  - [x] 3.2 编写 docs/architecture/backend-architecture.md - 后端架构原理
     - ASP.NET Core Minimal APIs 设计模式解析
     - Program.cs 依赖注入配置解析、请求处理管道图
     - JWT 认证机制、服务层设计模式、后台任务处理（HostedService）

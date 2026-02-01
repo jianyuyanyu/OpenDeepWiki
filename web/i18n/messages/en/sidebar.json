@@ -5,5 +5,7 @@
   "subscribe": "Subscribe",
   "bookmarks": "Bookmarks",
   "organizations": "Organizations",
-  "github": "GitHub"
+  "github": "GitHub",
+  "feishu": "Feishu",
+  "scanQrCode": "Scan to follow Feishu"
 }

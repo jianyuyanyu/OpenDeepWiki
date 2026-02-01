@@ -9,7 +9,8 @@ import type {
   UpdateVisibilityRequest,
   UpdateVisibilityResponse,
   ProcessingLogResponse,
-  GitRepoCheckResponse
+  GitRepoCheckResponse,
+  MindMapResponse
 } from "@/types/repository";
 import { api, buildApiUrl } from "./api-client";
 
@@ -242,4 +243,32 @@ export async function regenerateRepository(
     "/api/v1/repositories/regenerate",
     { owner, repo }
   );
+}
+
+/**
+ * Fetch repository mind map
+ * 获取仓库项目架构思维导图
+ */
+export async function fetchMindMap(
+  owner: string,
+  repo: string,
+  branch?: string,
+  lang?: string
+): Promise<MindMapResponse> {
+  const params = new URLSearchParams();
+  if (branch) params.set("branch", branch);
+  if (lang) params.set("lang", lang);
+
+  const queryString = params.toString();
+  const url = buildApiUrl(
+    `/api/v1/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/mindmap${queryString ? `?${queryString}` : ""}`
+  );
+
+  const response = await fetch(url, { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch mind map");
+  }
+
+  return (await response.json()) as MindMapResponse;
 }

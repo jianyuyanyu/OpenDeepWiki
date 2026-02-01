@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import type * as PageTree from "fumadocs-core/page-tree";
 import type { RepoTreeNode, RepoBranchesResponse } from "@/types/repository";
 import { BranchLanguageSelector } from "./branch-language-selector";
 import { fetchRepoTree, fetchRepoBranches } from "@/lib/repository-api";
+import { Network } from "lucide-react";
 
 interface RepoShellProps {
   owner: string;
@@ -127,19 +129,35 @@ export function RepoShell({
   // 构建查询字符串 - 优先使用 URL 参数，确保链接始终保持当前 URL 的参数
   const queryString = searchParams.toString();
 
+  // 构建思维导图链接
+  const mindMapUrl = queryString 
+    ? `/${owner}/${repo}/mindmap?${queryString}` 
+    : `/${owner}/${repo}/mindmap`;
+
   const tree = convertToPageTree(nodes, owner, repo, queryString);
   const title = `${owner}/${repo}`;
 
-  // 构建侧边栏顶部的选择器
-  const sidebarBanner = branches ? (
-    <BranchLanguageSelector
-      owner={owner}
-      repo={repo}
-      branches={branches}
-      currentBranch={currentBranch}
-      currentLanguage={currentLanguage}
-    />
-  ) : undefined;
+  // 构建侧边栏顶部的选择器和思维导图入口
+  const sidebarBanner = (
+    <div className="space-y-3">
+      {branches && (
+        <BranchLanguageSelector
+          owner={owner}
+          repo={repo}
+          branches={branches}
+          currentBranch={currentBranch}
+          currentLanguage={currentLanguage}
+        />
+      )}
+      <Link
+        href={mindMapUrl}
+        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20 transition-colors"
+      >
+        <Network className="h-4 w-4" />
+        <span className="font-medium text-sm">项目架构</span>
+      </Link>
+    </div>
+  );
 
   return (
     <DocsLayout
