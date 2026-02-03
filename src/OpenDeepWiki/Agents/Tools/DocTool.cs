@@ -50,71 +50,79 @@ Usage:
 
 Example:
 content: '# Overview\n\nThis is the overview section...'")]
-    public async Task WriteAsync(
-        [Description("Document content in Markdown format")] 
+    public async Task<string> WriteAsync(
+        [Description("Document content in Markdown format")]
         string content,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
-            throw new ArgumentException("Content cannot be empty.", nameof(content));
+            return "ERROR: Content cannot be empty. Please provide valid Markdown content for the document.";
         }
 
-        // Find the catalog item
-        var catalog = await _context.DocCatalogs
-            .FirstOrDefaultAsync(c => c.BranchLanguageId == _branchLanguageId && 
-                                      c.Path == _catalogPath && 
-                                      !c.IsDeleted, cancellationToken);
-
-        if (catalog == null)
+        try
         {
-            throw new InvalidOperationException($"Catalog item with path '{_catalogPath}' not found.");
-        }
+            // Find the catalog item
+            var catalog = await _context.DocCatalogs
+                .FirstOrDefaultAsync(c => c.BranchLanguageId == _branchLanguageId &&
+                                          c.Path == _catalogPath &&
+                                          !c.IsDeleted, cancellationToken);
 
-        // 从 GitTool 获取读取的文件列表
-        string? sourceFilesJson = null;
-        if (_gitTool != null)
-        {
-            var readFiles = _gitTool.GetReadFiles();
-            if (readFiles.Count > 0)
+            if (catalog == null)
             {
-                sourceFilesJson = JsonSerializer.Serialize(readFiles);
+                return $"ERROR: Catalog item with path '{_catalogPath}' not found. Please ensure the catalog item exists before writing content.";
             }
-        }
 
-        // Check if document already exists
-        if (!string.IsNullOrEmpty(catalog.DocFileId))
-        {
-            var existingDoc = await _context.DocFiles
-                .FirstOrDefaultAsync(d => d.Id == catalog.DocFileId && !d.IsDeleted, cancellationToken);
-
-            if (existingDoc != null)
+            // 从 GitTool 获取读取的文件列表
+            string? sourceFilesJson = null;
+            if (_gitTool != null)
             {
-                // Update existing document
-                existingDoc.Content = content;
-                existingDoc.SourceFiles = sourceFilesJson;
-                existingDoc.UpdateTimestamp();
-                await _context.SaveChangesAsync(cancellationToken);
-                return;
+                var readFiles = _gitTool.GetReadFiles();
+                if (readFiles.Count > 0)
+                {
+                    sourceFilesJson = JsonSerializer.Serialize(readFiles);
+                }
             }
+
+            // Check if document already exists
+            if (!string.IsNullOrEmpty(catalog.DocFileId))
+            {
+                var existingDoc = await _context.DocFiles
+                    .FirstOrDefaultAsync(d => d.Id == catalog.DocFileId && !d.IsDeleted, cancellationToken);
+
+                if (existingDoc != null)
+                {
+                    // Update existing document
+                    existingDoc.Content = content;
+                    existingDoc.SourceFiles = sourceFilesJson;
+                    existingDoc.UpdateTimestamp();
+                    await _context.SaveChangesAsync(cancellationToken);
+                    return $"SUCCESS: Document '{_catalogPath}' has been updated successfully.";
+                }
+            }
+
+            // Create new document
+            var docFile = new DocFile
+            {
+                Id = Guid.NewGuid().ToString(),
+                BranchLanguageId = _branchLanguageId,
+                Content = content,
+                SourceFiles = sourceFilesJson
+            };
+
+            _context.DocFiles.Add(docFile);
+
+            // Associate with catalog item
+            catalog.DocFileId = docFile.Id;
+            catalog.UpdateTimestamp();
+
+            await _context.SaveChangesAsync(cancellationToken);
+            return $"SUCCESS: Document '{_catalogPath}' has been created successfully.";
         }
-
-        // Create new document
-        var docFile = new DocFile
+        catch (Exception ex)
         {
-            Id = Guid.NewGuid().ToString(),
-            BranchLanguageId = _branchLanguageId,
-            Content = content,
-            SourceFiles = sourceFilesJson
-        };
-
-        _context.DocFiles.Add(docFile);
-
-        // Associate with catalog item
-        catalog.DocFileId = docFile.Id;
-        catalog.UpdateTimestamp();
-
-        await _context.SaveChangesAsync(cancellationToken);
+            return $"ERROR: Failed to write document '{_catalogPath}': {ex.Message}";
+        }
     }
 
     /// <summary>
@@ -134,54 +142,62 @@ Usage:
 Example:
 oldContent: '## Old Section'
 newContent: '## New Section\n\nUpdated content here'")]
-    public async Task EditAsync(
-        [Description("Exact text to find and replace (must exist in document)")] 
+    public async Task<string> EditAsync(
+        [Description("Exact text to find and replace (must exist in document)")]
         string oldContent,
-        [Description("New text to replace the old content with")] 
+        [Description("New text to replace the old content with")]
         string newContent,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(oldContent))
         {
-            throw new ArgumentException("Old content cannot be empty.", nameof(oldContent));
+            return "ERROR: Old content cannot be empty. Please provide the exact text you want to replace.";
         }
 
-        // Find the catalog item
-        var catalog = await _context.DocCatalogs
-            .FirstOrDefaultAsync(c => c.BranchLanguageId == _branchLanguageId && 
-                                      c.Path == _catalogPath && 
-                                      !c.IsDeleted, cancellationToken);
-
-        if (catalog == null)
+        try
         {
-            throw new InvalidOperationException($"Catalog item with path '{_catalogPath}' not found.");
-        }
+            // Find the catalog item
+            var catalog = await _context.DocCatalogs
+                .FirstOrDefaultAsync(c => c.BranchLanguageId == _branchLanguageId &&
+                                          c.Path == _catalogPath &&
+                                          !c.IsDeleted, cancellationToken);
 
-        if (string.IsNullOrEmpty(catalog.DocFileId))
+            if (catalog == null)
+            {
+                return $"ERROR: Catalog item with path '{_catalogPath}' not found.";
+            }
+
+            if (string.IsNullOrEmpty(catalog.DocFileId))
+            {
+                return $"ERROR: No document associated with catalog item '{_catalogPath}'. Use WriteAsync to create a document first.";
+            }
+
+            // Find the document
+            var docFile = await _context.DocFiles
+                .FirstOrDefaultAsync(d => d.Id == catalog.DocFileId && !d.IsDeleted, cancellationToken);
+
+            if (docFile == null)
+            {
+                return $"ERROR: Document not found for catalog item '{_catalogPath}'.";
+            }
+
+            // Check if old content exists in the document
+            if (!docFile.Content.Contains(oldContent))
+            {
+                return $"ERROR: The specified content to replace was not found in the document. Please use ReadAsync to see the current content and ensure the text matches exactly.";
+            }
+
+            // Replace content
+            docFile.Content = docFile.Content.Replace(oldContent, newContent);
+            docFile.UpdateTimestamp();
+
+            await _context.SaveChangesAsync(cancellationToken);
+            return $"SUCCESS: Document '{_catalogPath}' has been edited successfully.";
+        }
+        catch (Exception ex)
         {
-            throw new InvalidOperationException($"No document associated with catalog item '{_catalogPath}'.");
+            return $"ERROR: Failed to edit document '{_catalogPath}': {ex.Message}";
         }
-
-        // Find the document
-        var docFile = await _context.DocFiles
-            .FirstOrDefaultAsync(d => d.Id == catalog.DocFileId && !d.IsDeleted, cancellationToken);
-
-        if (docFile == null)
-        {
-            throw new InvalidOperationException($"Document not found for catalog item '{_catalogPath}'.");
-        }
-
-        // Check if old content exists in the document
-        if (!docFile.Content.Contains(oldContent))
-        {
-            throw new InvalidOperationException($"The specified content to replace was not found in the document.");
-        }
-
-        // Replace content
-        docFile.Content = docFile.Content.Replace(oldContent, newContent);
-        docFile.UpdateTimestamp();
-
-        await _context.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>

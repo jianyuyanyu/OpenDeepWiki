@@ -67,14 +67,14 @@ JSON Format:
     }
   ]
 }")]
-    public async Task WriteAsync(
-        [Description("Complete catalog JSON with 'items' array. Each item needs: title, path, order, children")] 
+    public async Task<string> WriteAsync(
+        [Description("Complete catalog JSON with 'items' array. Each item needs: title, path, order, children")]
         string catalogJson,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(catalogJson))
         {
-            throw new ArgumentException("Catalog JSON cannot be empty.", nameof(catalogJson));
+            return "ERROR: Catalog JSON cannot be empty. Please provide a valid JSON structure with an 'items' array.";
         }
 
         // Validate JSON structure before writing
@@ -83,17 +83,33 @@ JSON Format:
             var root = JsonSerializer.Deserialize<CatalogRoot>(catalogJson, JsonOptions);
             if (root == null)
             {
-                throw new ArgumentException("Invalid catalog JSON format: deserialization returned null.", nameof(catalogJson));
+                return "ERROR: Invalid catalog JSON format - deserialization returned null. Please check your JSON syntax.";
             }
-            
+
             ValidateCatalogStructure(root);
         }
         catch (JsonException ex)
         {
-            throw new ArgumentException($"Invalid catalog JSON format: {ex.Message}", nameof(catalogJson), ex);
+            return $"ERROR: Invalid catalog JSON format: {ex.Message}. Please ensure the JSON is properly formatted.";
+        }
+        catch (ArgumentException ex)
+        {
+            return $"ERROR: Catalog validation failed: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            return $"ERROR: Failed to validate catalog: {ex.Message}";
         }
 
-        await _storage.SetCatalogAsync(catalogJson, cancellationToken);
+        try
+        {
+            await _storage.SetCatalogAsync(catalogJson, cancellationToken);
+            return "SUCCESS: Catalog has been written successfully.";
+        }
+        catch (Exception ex)
+        {
+            return $"ERROR: Failed to write catalog: {ex.Message}";
+        }
     }
 
     /// <summary>
@@ -112,21 +128,21 @@ Usage:
 Example:
 path: '1-overview'
 nodeJson: {""title"": ""Updated Title"", ""path"": ""1-overview"", ""order"": 1, ""children"": []}")]
-    public async Task EditAsync(
-        [Description("Path of the catalog node to edit, e.g., '1-overview' or '2-api/2.1-endpoints'")] 
+    public async Task<string> EditAsync(
+        [Description("Path of the catalog node to edit, e.g., '1-overview' or '2-api/2.1-endpoints'")]
         string path,
-        [Description("Updated node JSON with title, path, order, and children fields")] 
+        [Description("Updated node JSON with title, path, order, and children fields")]
         string nodeJson,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
-            throw new ArgumentException("Path cannot be empty.", nameof(path));
+            return "ERROR: Path cannot be empty. Please provide a valid catalog node path (e.g., '1-overview').";
         }
 
         if (string.IsNullOrWhiteSpace(nodeJson))
         {
-            throw new ArgumentException("Node JSON cannot be empty.", nameof(nodeJson));
+            return "ERROR: Node JSON cannot be empty. Please provide valid JSON with title, path, order, and children fields.";
         }
 
         // Validate node JSON structure before editing
@@ -135,17 +151,33 @@ nodeJson: {""title"": ""Updated Title"", ""path"": ""1-overview"", ""order"": 1,
             var node = JsonSerializer.Deserialize<CatalogItem>(nodeJson, JsonOptions);
             if (node == null)
             {
-                throw new ArgumentException("Invalid node JSON format: deserialization returned null.", nameof(nodeJson));
+                return "ERROR: Invalid node JSON format - deserialization returned null. Please check your JSON syntax.";
             }
-            
+
             ValidateCatalogItem(node);
         }
         catch (JsonException ex)
         {
-            throw new ArgumentException($"Invalid node JSON format: {ex.Message}", nameof(nodeJson), ex);
+            return $"ERROR: Invalid node JSON format: {ex.Message}. Please ensure the JSON is properly formatted.";
+        }
+        catch (ArgumentException ex)
+        {
+            return $"ERROR: Node validation failed: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            return $"ERROR: Failed to validate node: {ex.Message}";
         }
 
-        await _storage.UpdateNodeAsync(path, nodeJson, cancellationToken);
+        try
+        {
+            await _storage.UpdateNodeAsync(path, nodeJson, cancellationToken);
+            return $"SUCCESS: Catalog node '{path}' has been updated successfully.";
+        }
+        catch (Exception ex)
+        {
+            return $"ERROR: Failed to update catalog node '{path}': {ex.Message}";
+        }
     }
 
     /// <summary>

@@ -198,47 +198,62 @@ Usage:
     {
         if (string.IsNullOrWhiteSpace(relativePath))
         {
-            throw new ArgumentException("Relative path cannot be empty.", nameof(relativePath));
+            return "ERROR: Relative path cannot be empty. Please provide a valid file path relative to the repository root.";
         }
 
-        var normalizedPath = NormalizePath(relativePath);
-        var fullPath = Path.GetFullPath(Path.Combine(_workingDirectory, normalizedPath));
-
-        if (!fullPath.StartsWith(_workingDirectory, StringComparison.OrdinalIgnoreCase))
+        try
         {
-            throw new UnauthorizedAccessException($"Access denied: path '{relativePath}' is outside the repository.");
-        }
+            var normalizedPath = NormalizePath(relativePath);
+            var fullPath = Path.GetFullPath(Path.Combine(_workingDirectory, normalizedPath));
 
-        if (!File.Exists(fullPath))
-        {
-            throw new FileNotFoundException($"File not found: {relativePath}");
-        }
-
-        var lines = await File.ReadAllLinesAsync(fullPath, cancellationToken);
-        var startIndex = Math.Max(0, offset - 1);
-        var endIndex = Math.Min(lines.Length, startIndex + limit);
-
-        // 记录读取的文件
-        _readFiles.Add(normalizedPath);
-
-        var result = new StringBuilder();
-        for (int i = startIndex; i < endIndex; i++)
-        {
-            var line = lines[i];
-            if (line.Length > MaxLineLength)
+            if (!fullPath.StartsWith(_workingDirectory, StringComparison.OrdinalIgnoreCase))
             {
-                line = line[..MaxLineLength] + "... [truncated]";
+                return $"ERROR: Access denied. The path '{relativePath}' is outside the repository boundaries. Please use a path relative to the repository root.";
             }
 
-            result.AppendLine($"{i + 1}: {line}");
-        }
+            if (!File.Exists(fullPath))
+            {
+                return $"ERROR: File not found at path '{relativePath}'. Please verify the file path is correct and the file exists in the repository.";
+            }
 
-        if (endIndex < lines.Length)
+            var lines = await File.ReadAllLinesAsync(fullPath, cancellationToken);
+            var startIndex = Math.Max(0, offset - 1);
+            var endIndex = Math.Min(lines.Length, startIndex + limit);
+
+            // 记录读取的文件
+            _readFiles.Add(normalizedPath);
+
+            var result = new StringBuilder();
+            for (int i = startIndex; i < endIndex; i++)
+            {
+                var line = lines[i];
+                if (line.Length > MaxLineLength)
+                {
+                    line = line[..MaxLineLength] + "... [truncated]";
+                }
+
+                result.AppendLine($"{i + 1}: {line}");
+            }
+
+            if (endIndex < lines.Length)
+            {
+                result.AppendLine($"[{lines.Length - endIndex} more lines not shown. Use offset/limit to read more.]");
+            }
+
+            return result.ToString();
+        }
+        catch (UnauthorizedAccessException)
         {
-            result.AppendLine($"[{lines.Length - endIndex} more lines not shown. Use offset/limit to read more.]");
+            return $"ERROR: Permission denied when trying to read '{relativePath}'. The file may have restricted access permissions.";
         }
-
-        return result.ToString();
+        catch (IOException ex)
+        {
+            return $"ERROR: Failed to read file '{relativePath}'. IO error: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            return $"ERROR: Unexpected error reading file '{relativePath}': {ex.Message}";
+        }
     }
 
     /// <summary>
@@ -280,18 +295,29 @@ Pattern Examples:
     {
         if (string.IsNullOrWhiteSpace(pattern))
         {
-            throw new ArgumentException("Search pattern cannot be empty.", nameof(pattern));
+            return new[]
+            {
+                new GrepResult
+                {
+                    FilePath = "ERROR",
+                    LineNumber = 0,
+                    LineContent = "Search pattern cannot be empty. Please provide a valid regex pattern to search for.",
+                    Context = "Example patterns: 'class\\s+\\w+' for class definitions, 'TODO|FIXME' for comments, '^using|^import' for imports"
+                }
+            };
         }
 
-        var regexOptions = RegexOptions.Compiled;
-        if (!caseSensitive)
+        try
         {
-            regexOptions |= RegexOptions.IgnoreCase;
-        }
+            var regexOptions = RegexOptions.Compiled;
+            if (!caseSensitive)
+            {
+                regexOptions |= RegexOptions.IgnoreCase;
+            }
 
-        var regex = new Regex(pattern, regexOptions);
-        var results = new ConcurrentBag<GrepResult>();
-        var resultCount = 0;
+            var regex = new Regex(pattern, regexOptions);
+            var results = new ConcurrentBag<GrepResult>();
+            var resultCount = 0;
 
         await Task.Run(() =>
         {
@@ -334,6 +360,33 @@ Pattern Examples:
         }, cancellationToken);
 
         return [.. results.OrderBy(r => r.FilePath).ThenBy(r => r.LineNumber).Take(maxResults)];
+        }
+        catch (ArgumentException ex)
+        {
+            return new[]
+            {
+                new GrepResult
+                {
+                    FilePath = "ERROR",
+                    LineNumber = 0,
+                    LineContent = $"Invalid regex pattern: {ex.Message}",
+                    Context = "Please check your regex syntax. Common issues: unescaped special characters, unmatched brackets, invalid escape sequences."
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            return new[]
+            {
+                new GrepResult
+                {
+                    FilePath = "ERROR",
+                    LineNumber = 0,
+                    LineContent = $"Search failed: {ex.Message}",
+                    Context = "An unexpected error occurred during the search operation."
+                }
+            };
+        }
     }
 
     /// <summary>

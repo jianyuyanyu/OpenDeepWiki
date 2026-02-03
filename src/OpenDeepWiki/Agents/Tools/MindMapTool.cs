@@ -50,37 +50,45 @@ Example:
 Usage:
 - Call this tool once with the complete mind map content
 - Content will be stored and displayed in the repository sidebar")]
-    public async Task WriteMindMapAsync(
+    public async Task<string> WriteMindMapAsync(
         [Description("Mind map content in hierarchical format using # ## ### for levels")]
         string content,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
-            throw new ArgumentException("Mind map content cannot be empty.", nameof(content));
+            return "ERROR: Mind map content cannot be empty. Please provide hierarchical content using # ## ### for levels.";
         }
 
         // Validate format - should contain at least one # header
         if (!content.Contains('#'))
         {
-            throw new ArgumentException("Mind map content must contain at least one # header.", nameof(content));
+            return "ERROR: Mind map content must contain at least one # header. Use # for level 1, ## for level 2, ### for level 3.";
         }
 
-        // Find the branch language
-        var branchLanguage = await _context.BranchLanguages
-            .FirstOrDefaultAsync(bl => bl.Id == _branchLanguageId && !bl.IsDeleted, cancellationToken);
-
-        if (branchLanguage == null)
+        try
         {
-            throw new InvalidOperationException($"BranchLanguage with ID '{_branchLanguageId}' not found.");
+            // Find the branch language
+            var branchLanguage = await _context.BranchLanguages
+                .FirstOrDefaultAsync(bl => bl.Id == _branchLanguageId && !bl.IsDeleted, cancellationToken);
+
+            if (branchLanguage == null)
+            {
+                return $"ERROR: BranchLanguage with ID '{_branchLanguageId}' not found.";
+            }
+
+            // Update the mind map content
+            branchLanguage.MindMapContent = content;
+            branchLanguage.MindMapStatus = MindMapStatus.Completed;
+            branchLanguage.UpdateTimestamp();
+
+            await _context.SaveChangesAsync(cancellationToken);
+            return "SUCCESS: Mind map has been written successfully.";
         }
-
-        // Update the mind map content
-        branchLanguage.MindMapContent = content;
-        branchLanguage.MindMapStatus = MindMapStatus.Completed;
-        branchLanguage.UpdateTimestamp();
-
-        await _context.SaveChangesAsync(cancellationToken);
+        catch (Exception ex)
+        {
+            return $"ERROR: Failed to write mind map: {ex.Message}";
+        }
     }
 
     /// <summary>
