@@ -6,7 +6,7 @@ using OpenDeepWiki.Entities.Tools;
 
 namespace OpenDeepWiki.EFCore;
 
-public interface IContext
+public interface IContext : IDisposable
 {
     DbSet<User> Users { get; set; }
     DbSet<Role> Roles { get; set; }

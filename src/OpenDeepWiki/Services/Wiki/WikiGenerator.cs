@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 using AIDotNet.Toon;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
@@ -55,15 +56,22 @@ public class TokenUsageStats
 /// </summary>
 public class WikiGenerator : IWikiGenerator
 {
+    // Compiled regex for better performance when removing <think> tags
+    private static readonly Regex ThinkTagRegex = new(
+        @"<think>[\s\S]*?</think>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled,
+        TimeSpan.FromSeconds(1));
+
     private readonly AgentFactory _agentFactory;
     private readonly IPromptPlugin _promptPlugin;
     private readonly WikiGeneratorOptions _options;
     private readonly IContext _context;
+    private readonly IContextFactory _contextFactory;
     private readonly ILogger<WikiGenerator> _logger;
     private readonly IProcessingLogService _processingLogService;
 
-    // 当前处理的仓库ID（用于记录日志）
-    private string? _currentRepositoryId;
+    // Use AsyncLocal for thread-safe repository ID tracking in concurrent scenarios
+    private static readonly AsyncLocal<string?> _currentRepositoryId = new();
 
     /// <summary>
     /// Initializes a new instance of WikiGenerator.
@@ -73,6 +81,7 @@ public class WikiGenerator : IWikiGenerator
         IPromptPlugin promptPlugin,
         IOptions<WikiGeneratorOptions> options,
         IContext context,
+        IContextFactory contextFactory,
         ILogger<WikiGenerator> logger,
         IProcessingLogService processingLogService)
     {
@@ -80,6 +89,7 @@ public class WikiGenerator : IWikiGenerator
         _promptPlugin = promptPlugin ?? throw new ArgumentNullException(nameof(promptPlugin));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _processingLogService = processingLogService ?? throw new ArgumentNullException(nameof(processingLogService));
 
@@ -93,7 +103,7 @@ public class WikiGenerator : IWikiGenerator
     /// </summary>
     public void SetCurrentRepository(string repositoryId)
     {
-        _currentRepositoryId = repositoryId;
+        _currentRepositoryId.Value = repositoryId;
     }
 
     /// <inheritdoc />
@@ -313,39 +323,63 @@ Execute the workflow now. Read entry point files to understand the architecture,
         var successCount = 0;
         var failCount = 0;
         var processedCount = 0;
-        var lockObj = new object();
 
-        // Use SemaphoreSlim to control parallel execution
-        using var semaphore = new SemaphoreSlim(parallelCount, parallelCount);
-        var tasks = catalogItems.Select(async item =>
+        // Use Parallel.ForEachAsync for better parallel control with timeout protection
+        var parallelOptions = new ParallelOptions
         {
-            await semaphore.WaitAsync(cancellationToken);
+            MaxDegreeOfParallelism = parallelCount,
+            CancellationToken = cancellationToken
+        };
+
+        await Parallel.ForEachAsync(catalogItems, parallelOptions, async (item, ct) =>
+        {
+            var currentIndex = Interlocked.Increment(ref processedCount);
+
             try
             {
-                var currentIndex = Interlocked.Increment(ref processedCount);
-                await LogProcessingAsync(ProcessingStep.Content, $"正在生成文档 ({currentIndex}/{catalogItems.Count}): {item.Title}", cancellationToken);
+                await LogProcessingAsync(ProcessingStep.Content, $"正在生成文档 ({currentIndex}/{catalogItems.Count}): {item.Title}", ct);
+
+                // Add timeout protection for each document generation
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(_options.DocumentGenerationTimeoutMinutes));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
                 await GenerateDocumentContentAsync(
-                    workspace, branchLanguage, item.Path, item.Title, cancellationToken);
-                
-                lock (lockObj) { successCount++; }
+                    workspace, branchLanguage, item.Path, item.Title, linkedCts.Token);
+
+                Interlocked.Increment(ref successCount);
+
+                _logger.LogDebug(
+                    "Document generated successfully. Path: {Path}, Title: {Title}, Progress: {Current}/{Total}",
+                    item.Path, item.Title, currentIndex, catalogItems.Count);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // User cancelled the operation
+                Interlocked.Increment(ref failCount);
+                _logger.LogWarning(
+                    "Document generation cancelled by user. Path: {Path}, Title: {Title}",
+                    item.Path, item.Title);
+                throw; // Re-throw to stop the parallel loop
+            }
+            catch (OperationCanceledException)
+            {
+                // Timeout occurred
+                Interlocked.Increment(ref failCount);
+                _logger.LogError(
+                    "Document generation timed out after {Timeout} minutes. Path: {Path}, Title: {Title}, Repository: {Org}/{Repo}",
+                    _options.DocumentGenerationTimeoutMinutes, item.Path, item.Title, workspace.Organization, workspace.RepositoryName);
+                await LogProcessingAsync(ProcessingStep.Content, $"文档生成超时 ({_options.DocumentGenerationTimeoutMinutes}分钟): {item.Title}", ct);
             }
             catch (Exception ex)
             {
-                lock (lockObj) { failCount++; }
+                Interlocked.Increment(ref failCount);
                 _logger.LogError(ex,
                     "Failed to generate document. Path: {Path}, Title: {Title}, Repository: {Org}/{Repo}",
                     item.Path, item.Title, workspace.Organization, workspace.RepositoryName);
-                await LogProcessingAsync(ProcessingStep.Content, $"文档生成失败: {item.Title} - {ex.Message}", cancellationToken);
-                // Continue with other documents
+                await LogProcessingAsync(ProcessingStep.Content, $"文档生成失败: {item.Title} - {ex.Message}", ct);
+                // Continue with other documents - don't throw
             }
-            finally
-            {
-                semaphore.Release();
-            }
-        }).ToList();
-
-        await Task.WhenAll(tasks);
+        });
 
         stopwatch.Stop();
         _logger.LogInformation(
@@ -489,6 +523,9 @@ Please start executing the task.";
             "Starting document content generation. Path: {Path}, Title: {Title}, Language: {Language}",
             catalogPath, catalogTitle, branchLanguage.LanguageCode);
 
+        // Create a new DbContext instance for this parallel task to ensure thread safety
+        using var context = _contextFactory.CreateContext();
+
         try
         {
             // 构建文件引用的基础URL
@@ -506,7 +543,7 @@ Please start executing the task.";
                 cancellationToken);
 
             var gitTool = new GitTool(workspace.WorkingDirectory);
-            var docTool = new DocTool(_context, branchLanguage.Id, catalogPath, gitTool);
+            var docTool = new DocTool(context, branchLanguage.Id, catalogPath, gitTool);
 
             var tools = gitTool.GetTools()
                 .Concat(docTool.GetTools())
@@ -526,7 +563,8 @@ Please start executing the task.";
 
 1. **Gather Source Material**
    - Use ListFiles to find source files related to ""{catalogTitle}""
-   - Read key implementation files, interface definitions, configuration files
+   - Read key implementation files and configuration files
+   - Read interface definitions only when they are directly used or necessary for this document (skip unused/irrelevant interfaces)
    - Use Grep to search for related classes, functions, API endpoints
 
 2. **Document Structure** (Must Include)
@@ -619,7 +657,7 @@ Please start executing the task.";
 
 
     /// <summary>
-    /// Executes an AI agent with retry logic.
+    /// Executes an AI agent with retry logic using exponential backoff.
     /// </summary>
     private async Task ExecuteAgentWithRetryAsync(
         string model,
@@ -655,7 +693,7 @@ Please start executing the task.";
                     ChatOptions = new ChatOptions()
                     {
                         ToolMode = ChatToolMode.Auto,
-                        MaxOutputTokens = 32000,
+                        MaxOutputTokens = _options.MaxOutputTokens,
                         Tools = tools
                     }
                 };
@@ -774,7 +812,7 @@ Please start executing the task.";
 
                 return;
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException && IsTransientException(ex))
             {
                 attemptStopwatch.Stop();
                 lastException = ex;
@@ -782,17 +820,32 @@ Please start executing the task.";
 
                 _logger.LogWarning(
                     ex,
-                    "AI agent attempt {Attempt}/{MaxAttempts} failed. Operation: {Operation}, Model: {Model}, Duration: {Duration}ms, ErrorType: {ErrorType}",
+                    "AI agent attempt {Attempt}/{MaxAttempts} failed with transient error. Operation: {Operation}, Model: {Model}, Duration: {Duration}ms, ErrorType: {ErrorType}",
                     retryCount, _options.MaxRetryAttempts, operationName, model, attemptStopwatch.ElapsedMilliseconds, ex.GetType().Name);
 
                 if (retryCount < _options.MaxRetryAttempts)
                 {
-                    _logger.LogInformation(
-                        "Retrying AI agent in {Delay}ms. Operation: {Operation}, Attempt: {NextAttempt}/{MaxAttempts}",
-                        _options.RetryDelayMs, operationName, retryCount + 1, _options.MaxRetryAttempts);
+                    // Exponential backoff with jitter: base_delay * 2^(attempt-1) + random(0, 1000ms)
+                    var exponentialDelay = _options.RetryDelayMs * Math.Pow(2, retryCount - 1);
+                    var jitter = Random.Shared.Next(0, 1000);
+                    var totalDelay = (int)Math.Min(exponentialDelay + jitter, 60000); // Cap at 60 seconds
 
-                    await Task.Delay(_options.RetryDelayMs, cancellationToken);
+                    _logger.LogInformation(
+                        "Retrying AI agent in {Delay}ms (exponential backoff). Operation: {Operation}, Attempt: {NextAttempt}/{MaxAttempts}",
+                        totalDelay, operationName, retryCount + 1, _options.MaxRetryAttempts);
+
+                    await Task.Delay(totalDelay, cancellationToken);
                 }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Non-transient exception, don't retry
+                attemptStopwatch.Stop();
+                _logger.LogError(
+                    ex,
+                    "AI agent failed with non-transient error. Operation: {Operation}, Model: {Model}, Duration: {Duration}ms, ErrorType: {ErrorType}",
+                    operationName, model, attemptStopwatch.ElapsedMilliseconds, ex.GetType().Name);
+                throw;
             }
         }
 
@@ -804,6 +857,28 @@ Please start executing the task.";
         throw new InvalidOperationException(
             $"AI agent execution failed after {_options.MaxRetryAttempts} attempts for operation '{operationName}'",
             lastException);
+    }
+
+    /// <summary>
+    /// Determines if an exception is transient and should be retried.
+    /// </summary>
+    private static bool IsTransientException(Exception ex)
+    {
+        // Network-related exceptions
+        if (ex is HttpRequestException or TaskCanceledException or TimeoutException)
+        {
+            return true;
+        }
+
+        // Check exception message for common transient error patterns
+        var message = ex.Message.ToLowerInvariant();
+        return message.Contains("timeout") ||
+               message.Contains("rate limit") ||
+               message.Contains("too many requests") ||
+               message.Contains("service unavailable") ||
+               message.Contains("temporarily unavailable") ||
+               message.Contains("connection") ||
+               message.Contains("network");
     }
 
     /// <summary>
@@ -868,7 +943,8 @@ Please start executing the task.";
         string? toolName = null,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(_currentRepositoryId))
+        var repositoryId = _currentRepositoryId.Value;
+        if (string.IsNullOrEmpty(repositoryId))
         {
             return;
         }
@@ -876,7 +952,7 @@ Please start executing the task.";
         try
         {
             await _processingLogService.LogAsync(
-                _currentRepositoryId,
+                repositoryId,
                 step,
                 message,
                 isAiOutput,
@@ -895,6 +971,27 @@ Please start executing the task.";
     private Task LogProcessingAsync(ProcessingStep step, string message, CancellationToken cancellationToken)
     {
         return LogProcessingAsync(step, message, false, null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Removes &lt;think&gt; tags and their content from text using compiled regex.
+    /// </summary>
+    private static string RemoveThinkTags(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        try
+        {
+            return ThinkTagRegex.Replace(text, string.Empty).Trim();
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            // If regex times out, return original text
+            return text;
+        }
     }
 
     /// <inheritdoc />
@@ -957,36 +1054,51 @@ Please start executing the task.";
             await LogProcessingAsync(ProcessingStep.Translation, 
                 $"发现 {totalDocs} 个文档需要翻译 -> {targetLanguageCode}", cancellationToken);
 
-            // 6. 预加载所有需要的数据（单线程 EF Core 操作）
+            // 6. 批量预加载所有需要的数据（优化 N+1 查询）
+            var catalogPaths = catalogItems.Select(i => i.Path).ToList();
+
+            // 批量加载源语言的目录和文档
+            var sourceCatalogs = await _context.DocCatalogs
+                .Where(c => c.BranchLanguageId == sourceBranchLanguage.Id &&
+                           catalogPaths.Contains(c.Path) &&
+                           !c.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+            var sourceDocFileIds = sourceCatalogs
+                .Where(c => !string.IsNullOrEmpty(c.DocFileId))
+                .Select(c => c.DocFileId!)
+                .ToList();
+
+            var sourceDocFiles = await _context.DocFiles
+                .Where(d => sourceDocFileIds.Contains(d.Id) && !d.IsDeleted)
+                .ToDictionaryAsync(d => d.Id, cancellationToken);
+
+            // 批量加载目标语言的目录
+            var targetCatalogs = await _context.DocCatalogs
+                .Where(c => c.BranchLanguageId == targetBranchLanguage.Id &&
+                           catalogPaths.Contains(c.Path) &&
+                           !c.IsDeleted)
+                .ToDictionaryAsync(c => c.Path, cancellationToken);
+
+            // 构建翻译任务列表
             var translationTasks = new List<((string Path, string Title) Item, string SourceContent, DocCatalog TargetCatalog)>();
             foreach (var item in catalogItems)
             {
-                var sourceCatalog = await _context.DocCatalogs
-                    .FirstOrDefaultAsync(c => c.BranchLanguageId == sourceBranchLanguage.Id && 
-                                              c.Path == item.Path && 
-                                              !c.IsDeleted, cancellationToken);
-
+                var sourceCatalog = sourceCatalogs.FirstOrDefault(c => c.Path == item.Path);
                 if (sourceCatalog == null || string.IsNullOrEmpty(sourceCatalog.DocFileId))
                 {
                     _logger.LogWarning("Source document not found for path: {Path}", item.Path);
                     continue;
                 }
 
-                var sourceDocFile = await _context.DocFiles
-                    .FirstOrDefaultAsync(d => d.Id == sourceCatalog.DocFileId && !d.IsDeleted, cancellationToken);
-
-                if (sourceDocFile == null || string.IsNullOrEmpty(sourceDocFile.Content))
+                if (!sourceDocFiles.TryGetValue(sourceCatalog.DocFileId, out var sourceDocFile) ||
+                    string.IsNullOrEmpty(sourceDocFile.Content))
                 {
                     _logger.LogWarning("Source document content not found for path: {Path}", item.Path);
                     continue;
                 }
 
-                var targetCatalog = await _context.DocCatalogs
-                    .FirstOrDefaultAsync(c => c.BranchLanguageId == targetBranchLanguage.Id && 
-                                              c.Path == item.Path && 
-                                              !c.IsDeleted, cancellationToken);
-
-                if (targetCatalog == null)
+                if (!targetCatalogs.TryGetValue(item.Path, out var targetCatalog))
                 {
                     _logger.LogWarning("Target catalog not found for path: {Path}", item.Path);
                     continue;
@@ -997,28 +1109,34 @@ Please start executing the task.";
 
             // 7. 并行执行 AI 翻译（IO 密集型操作）
             var translationResults = new ConcurrentBag<(DocCatalog TargetCatalog, DocFile NewDocFile)?>();
-            using var semaphore = new SemaphoreSlim(_options.ParallelCount, _options.ParallelCount);
-            var tasks = translationTasks.Select(async task =>
+
+            var parallelOptions = new ParallelOptions
             {
-                await semaphore.WaitAsync(cancellationToken);
+                MaxDegreeOfParallelism = _options.ParallelCount,
+                CancellationToken = cancellationToken
+            };
+
+            await Parallel.ForEachAsync(translationTasks, parallelOptions, async (task, ct) =>
+            {
+                var currentIndex = Interlocked.Increment(ref translatedCount);
+
                 try
                 {
-                    var currentIndex = Interlocked.Increment(ref translatedCount);
-                    await LogProcessingAsync(ProcessingStep.Translation, 
-                        $"正在翻译文档 ({currentIndex}/{totalDocs}): {task.Item.Title} -> {targetLanguageCode}", cancellationToken);
+                    await LogProcessingAsync(ProcessingStep.Translation,
+                        $"正在翻译文档 ({currentIndex}/{totalDocs}): {task.Item.Title} -> {targetLanguageCode}", ct);
+
+                    // Add timeout protection for translation
+                    using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(_options.TranslationTimeoutMinutes));
+                    using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
                     var translatedContent = await TranslateContentAsync(
                         task.SourceContent!,
                         sourceBranchLanguage.LanguageCode,
                         targetLanguageCode,
-                        cancellationToken);
+                        linkedCts.Token);
 
                     // 清理 <think> 标签
-                    translatedContent = System.Text.RegularExpressions.Regex.Replace(
-                        translatedContent,
-                        @"<think>[\s\S]*?</think>",
-                        string.Empty,
-                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    translatedContent = RemoveThinkTags(translatedContent);
 
                     var newDocFile = new DocFile
                     {
@@ -1029,20 +1147,33 @@ Please start executing the task.";
 
                     translationResults.Add((task.TargetCatalog!, newDocFile));
                 }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    // User cancelled
+                    Interlocked.Increment(ref failedCount);
+                    _logger.LogWarning("Translation cancelled by user. Path: {Path}", task.Item.Path);
+                    throw; // Stop the parallel loop
+                }
+                catch (OperationCanceledException)
+                {
+                    // Timeout occurred
+                    Interlocked.Increment(ref failedCount);
+                    _logger.LogError("Translation timed out after {Timeout} minutes. Path: {Path}, TargetLang: {TargetLang}",
+                        _options.TranslationTimeoutMinutes, task.Item.Path, targetLanguageCode);
+                    await LogProcessingAsync(ProcessingStep.Translation,
+                        $"文档翻译超时 ({_options.TranslationTimeoutMinutes}分钟): {task.Item.Title}", ct);
+                    translationResults.Add(null);
+                }
                 catch (Exception ex)
                 {
                     Interlocked.Increment(ref failedCount);
                     _logger.LogError(ex, "Failed to translate document. Path: {Path}, TargetLang: {TargetLang}",
                         task.Item.Path, targetLanguageCode);
+                    await LogProcessingAsync(ProcessingStep.Translation,
+                        $"文档翻译失败: {task.Item.Title} - {ex.Message}", ct);
                     translationResults.Add(null);
                 }
-                finally
-                {
-                    semaphore.Release();
-                }
-            }).ToList();
-
-            await Task.WhenAll(tasks);
+            });
 
             // 8. 批量保存翻译结果（单线程 EF Core 操作）
             foreach (var result in translationResults.Where(r => r != null))
@@ -1129,23 +1260,40 @@ Please start executing the task.";
         _logger.LogDebug("Collected {Count} catalog items for parallel translation", allItems.Count);
 
         // 并发翻译所有标题
-        using var semaphore = new SemaphoreSlim(_options.ParallelCount, _options.ParallelCount);
-        var translationTasks = allItems.Select(async item =>
+        var parallelOptions = new ParallelOptions
         {
-            await semaphore.WaitAsync(cancellationToken);
+            MaxDegreeOfParallelism = _options.ParallelCount,
+            CancellationToken = cancellationToken
+        };
+
+        await Parallel.ForEachAsync(allItems, parallelOptions, async (item, ct) =>
+        {
             try
             {
+                // Add timeout protection for title translation
+                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(_options.TitleTranslationTimeoutMinutes));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+
                 var translatedTitle = await TranslateSingleTitleAsync(
-                    item.Title, sourceLanguage, targetLanguage, cancellationToken);
+                    item.Title, sourceLanguage, targetLanguage, linkedCts.Token);
                 item.Title = translatedTitle;
             }
-            finally
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                semaphore.Release();
+                _logger.LogWarning("Catalog title translation cancelled. Title: {Title}", item.Title);
+                throw; // Stop the parallel loop
             }
-        }).ToList();
-
-        await Task.WhenAll(translationTasks);
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Catalog title translation timed out. Title: {Title}", item.Title);
+                // Keep original title on timeout
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to translate catalog title. Title: {Title}", item.Title);
+                // Keep original title on error
+            }
+        });
 
         // 序列化回 JSON
         return System.Text.Json.JsonSerializer.Serialize(root, new System.Text.Json.JsonSerializerOptions
@@ -1202,13 +1350,9 @@ Translation:";
         var response = await chatClient.RunAsync(messages, cancellationToken: cancellationToken);
         
         var translatedTitle = response.Text?.Trim() ?? string.Empty;
-        
+
         // 清理可能的<think>标签及其内容
-        translatedTitle = System.Text.RegularExpressions.Regex.Replace(
-            translatedTitle, 
-            @"<think>[\s\S]*?</think>", 
-            string.Empty, 
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+        translatedTitle = RemoveThinkTags(translatedTitle);
 
         // 如果翻译失败或返回空，保留原标题
         return string.IsNullOrWhiteSpace(translatedTitle) ? title : translatedTitle;
@@ -1320,11 +1464,7 @@ Translated mind map:";
         var result = contentBuilder.ToString().Trim();
 
         // 清理可能的 <think> 标签
-        result = System.Text.RegularExpressions.Regex.Replace(
-            result,
-            @"<think>[\s\S]*?</think>",
-            string.Empty,
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
+        result = RemoveThinkTags(result);
 
         return result;
     }
@@ -1351,11 +1491,11 @@ Translated mind map:";
             context.ProjectType = DetectProjectType(rootDir);
             
             // 2. Collect directory structure as tree data and serialize with Toon
-            var treeData = CollectDirectoryTreeData(rootDir, excludedDirs, maxDepth: 2, currentDepth: 0);
+            var treeData = CollectDirectoryTreeData(rootDir, excludedDirs, maxDepth: _options.DirectoryTreeMaxDepth, currentDepth: 0);
             context.DirectoryTree = ToonSerializer.Serialize(treeData);
             
             // 3. Read README content (truncated if too long)
-            context.ReadmeContent = ReadReadmeContent(rootDir);
+            context.ReadmeContent = ReadReadmeContent(rootDir, _options.ReadmeMaxLength);
             
             // 4. Collect key configuration files
             context.KeyFiles = CollectKeyFiles(rootDir, context.ProjectType);
@@ -1482,10 +1622,10 @@ Translated mind map:";
     /// <summary>
     /// Reads README content, truncated if too long.
     /// </summary>
-    private static string ReadReadmeContent(DirectoryInfo rootDir)
+    private static string ReadReadmeContent(DirectoryInfo rootDir, int maxLength)
     {
         var readmeNames = new[] { "README.md", "README.MD", "readme.md", "README.rst", "README.txt", "README" };
-        
+
         foreach (var name in readmeNames)
         {
             var path = Path.Combine(rootDir.FullName, name);
@@ -1494,10 +1634,10 @@ Translated mind map:";
                 try
                 {
                     var content = File.ReadAllText(path);
-                    // Truncate if too long (keep first 4000 chars)
-                    if (content.Length > 4000)
+                    // Truncate if too long
+                    if (content.Length > maxLength)
                     {
-                        content = content[..4000] + "\n\n[... README truncated for brevity ...]";
+                        content = content[..maxLength] + "\n\n[... README truncated for brevity ...]";
                     }
                     return content;
                 }
@@ -1617,114 +1757,6 @@ Translated mind map:";
         public string ReadmeContent { get; set; } = "";
         public List<string> KeyFiles { get; set; } = new();
         public List<string> EntryPoints { get; set; } = new();
-    }
-
-    /// <summary>
-    /// Collects the repository file tree structure as a formatted string.
-    /// This provides the AI with a complete view of the repository structure upfront,
-    /// reducing the need for ListFiles tool calls and improving catalog accuracy.
-    /// </summary>
-    /// <param name="workingDirectory">The repository working directory path.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A formatted file tree string.</returns>
-    [Obsolete("Use CollectTopLevelStructureAsync instead to reduce token consumption")]
-    private async Task<string> CollectFileTreeAsync(string workingDirectory, CancellationToken cancellationToken)
-    {
-        return await Task.Run(() =>
-        {
-            var sb = new StringBuilder();
-            var rootDir = new DirectoryInfo(workingDirectory);
-            
-            // 收集所有文件和目录，排除隐藏目录和常见的忽略目录
-            var excludedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "node_modules", "bin", "obj", "dist", "build", ".git", ".svn", ".hg",
-                ".idea", ".vscode", ".vs", "__pycache__", ".cache", "coverage",
-                "packages", "vendor", ".next", ".nuxt", "target"
-            };
-
-            var tree = new Dictionary<string, object>();
-            CollectDirectoryTree(rootDir, tree, excludedDirs, maxDepth: 6, currentDepth: 0);
-            
-            // 格式化输出
-            sb.AppendLine("```");
-            FormatFileTree(tree, sb, "", isLast: true);
-            sb.AppendLine("```");
-            
-            return sb.ToString();
-        }, cancellationToken);
-    }
-
-    /// <summary>
-    /// Recursively collects directory tree structure.
-    /// </summary>
-    private void CollectDirectoryTree(
-        DirectoryInfo dir, 
-        Dictionary<string, object> tree, 
-        HashSet<string> excludedDirs,
-        int maxDepth,
-        int currentDepth)
-    {
-        if (currentDepth > maxDepth) return;
-
-        try
-        {
-            // 获取子目录
-            foreach (var subDir in dir.GetDirectories().OrderBy(d => d.Name))
-            {
-                // 跳过隐藏目录和排除的目录
-                if (subDir.Name.StartsWith('.') || excludedDirs.Contains(subDir.Name))
-                    continue;
-
-                var subTree = new Dictionary<string, object>();
-                tree[subDir.Name + "/"] = subTree;
-                CollectDirectoryTree(subDir, subTree, excludedDirs, maxDepth, currentDepth + 1);
-            }
-
-            // 获取文件
-            foreach (var file in dir.GetFiles().OrderBy(f => f.Name))
-            {
-                // 跳过隐藏文件
-                if (file.Name.StartsWith('.')) continue;
-                
-                tree[file.Name] = file.Length;
-            }
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // 忽略无权限访问的目录
-        }
-        catch (DirectoryNotFoundException)
-        {
-            // 忽略不存在的目录
-        }
-    }
-
-    /// <summary>
-    /// Formats the file tree dictionary into a readable tree string.
-    /// </summary>
-    private void FormatFileTree(Dictionary<string, object> tree, StringBuilder sb, string prefix, bool isLast)
-    {
-        var entries = tree.ToList();
-        for (int i = 0; i < entries.Count; i++)
-        {
-            var entry = entries[i];
-            var isLastEntry = i == entries.Count - 1;
-            var connector = isLastEntry ? "└── " : "├── ";
-            var childPrefix = prefix + (isLastEntry ? "    " : "│   ");
-
-            if (entry.Value is Dictionary<string, object> subTree)
-            {
-                // 目录
-                sb.AppendLine($"{prefix}{connector}{entry.Key}");
-                FormatFileTree(subTree, sb, childPrefix, isLastEntry);
-            }
-            else
-            {
-                // 文件
-                sb.AppendLine($"{prefix}{connector}{entry.Key}");
-            }
-        }
     }
 
     /// <summary>

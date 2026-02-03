@@ -74,6 +74,42 @@ public class WikiGeneratorOptions
     public int ParallelCount { get; set; } = GetParallelCountFromEnv();
 
     /// <summary>
+    /// Maximum output tokens for AI generation.
+    /// Default: 32000
+    /// </summary>
+    public int MaxOutputTokens { get; set; } = 32000;
+
+    /// <summary>
+    /// Timeout in minutes for document generation tasks.
+    /// Default: 30 minutes
+    /// </summary>
+    public int DocumentGenerationTimeoutMinutes { get; set; } = 30;
+
+    /// <summary>
+    /// Timeout in minutes for translation tasks.
+    /// Default: 20 minutes
+    /// </summary>
+    public int TranslationTimeoutMinutes { get; set; } = 20;
+
+    /// <summary>
+    /// Timeout in minutes for catalog title translation tasks.
+    /// Default: 2 minutes
+    /// </summary>
+    public int TitleTranslationTimeoutMinutes { get; set; } = 2;
+
+    /// <summary>
+    /// Maximum length for README content before truncation.
+    /// Default: 4000 characters
+    /// </summary>
+    public int ReadmeMaxLength { get; set; } = 4000;
+
+    /// <summary>
+    /// Maximum depth for directory tree traversal.
+    /// Default: 2 levels
+    /// </summary>
+    public int DirectoryTreeMaxDepth { get; set; } = 2;
+
+    /// <summary>
     /// Comma-separated list of language codes for multi-language wiki generation.
     /// Example: "en,zh,ja,ko". Can be configured via WIKI_LANGUAGES environment variable.
     /// The primary language selected by user will be generated first, then translated to other languages.
