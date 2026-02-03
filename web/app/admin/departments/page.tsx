@@ -65,6 +65,7 @@ import {
   Search,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "@/hooks/use-translations";
 
 
 interface FormData {
@@ -93,6 +94,7 @@ function DepartmentTreeNode({
   onToggle,
   onEdit,
   onDelete,
+  t,
 }: {
   dept: AdminDepartment;
   level: number;
@@ -102,6 +104,7 @@ function DepartmentTreeNode({
   onToggle: (id: string) => void;
   onEdit: (dept: AdminDepartment) => void;
   onDelete: (id: string) => void;
+  t: (key: string) => string;
 }) {
   const hasChildren = dept.children && dept.children.length > 0;
   const isExpanded = expandedIds.has(dept.id);
@@ -129,11 +132,11 @@ function DepartmentTreeNode({
         <Building2 className="h-4 w-4 text-primary flex-shrink-0" />
         <span className="flex-1 font-medium text-sm truncate">{dept.name}</span>
         <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
-          dept.isActive 
-            ? "bg-green-500/20 text-green-400" 
+          dept.isActive
+            ? "bg-green-500/20 text-green-400"
             : "bg-muted text-muted-foreground"
         }`}>
-          {dept.isActive ? "启用" : "禁用"}
+          {dept.isActive ? t('admin.departments.enabled') : t('admin.departments.disabled')}
         </span>
         <div className="flex gap-0.5 flex-shrink-0">
           <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted-foreground/20" onClick={(e) => { e.stopPropagation(); onEdit(dept); }}>
@@ -157,6 +160,7 @@ function DepartmentTreeNode({
               onToggle={onToggle}
               onEdit={onEdit}
               onDelete={onDelete}
+              t={t}
             />
           ))}
         </div>
@@ -185,6 +189,7 @@ export default function AdminDepartmentsPage() {
   const [editingDept, setEditingDept] = useState<AdminDepartment | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(defaultFormData);
+  const t = useTranslations();
 
   // 树形展开状态
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -233,7 +238,7 @@ export default function AdminDepartmentsPage() {
       setExpandedIds(allIds);
     } catch (error) {
       console.error("Failed to fetch departments:", error);
-      toast.error("获取部门列表失败");
+      toast.error(t('admin.toast.fetchDeptFailed'));
     } finally {
       setLoading(false);
     }
@@ -254,7 +259,7 @@ export default function AdminDepartmentsPage() {
       setDeptUsers(users);
       setDeptRepos(repos);
     } catch (error) {
-      toast.error("获取部门详情失败");
+      toast.error(t('admin.toast.fetchDeptDetailFailed'));
     } finally {
       setDetailLoading(false);
     }
@@ -289,7 +294,7 @@ export default function AdminDepartmentsPage() {
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
-      toast.error("请输入部门名称");
+      toast.error(t('admin.toast.enterDeptName'));
       return;
     }
     try {
@@ -302,16 +307,16 @@ export default function AdminDepartmentsPage() {
       };
       if (editingDept) {
         await updateDepartment(editingDept.id, payload);
-        toast.success("更新成功");
+        toast.success(t('admin.toast.updateSuccess'));
       } else {
         await createDepartment(payload);
-        toast.success("创建成功");
+        toast.success(t('admin.toast.createSuccess'));
       }
       setShowDialog(false);
       fetchData();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "操作失败";
-      toast.error(message);
+      toast.error(message || t('admin.toast.operationFailed'));
     }
   };
 
@@ -319,7 +324,7 @@ export default function AdminDepartmentsPage() {
     if (!deleteId) return;
     try {
       await deleteDepartment(deleteId);
-      toast.success("删除成功");
+      toast.success(t('admin.toast.deleteSuccess'));
       setDeleteId(null);
       if (selectedDept?.id === deleteId) {
         setSelectedDept(null);
@@ -327,7 +332,7 @@ export default function AdminDepartmentsPage() {
       fetchData();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "删除失败";
-      toast.error(message);
+      toast.error(message || t('admin.toast.operationFailed'));
     }
   };
 
@@ -340,7 +345,7 @@ export default function AdminDepartmentsPage() {
       setUserSearchResults(result.items.map(u => ({ id: u.id, name: u.name, email: u.email })));
       setUserTotal(result.total);
     } catch (error) {
-      toast.error("搜索用户失败");
+      toast.error(t('admin.toast.searchUserFailed'));
     } finally {
       setUserLoading(false);
     }
@@ -369,12 +374,12 @@ export default function AdminDepartmentsPage() {
     if (!selectedDept || !selectedUserId) return;
     try {
       await addUserToDepartment(selectedDept.id, selectedUserId, isManager);
-      toast.success("添加成功");
+      toast.success(t('admin.toast.addSuccess'));
       setShowAddUserDialog(false);
       fetchDeptDetail(selectedDept);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "添加失败";
-      toast.error(message);
+      toast.error(message || t('admin.toast.operationFailed'));
     }
   };
 
@@ -382,10 +387,10 @@ export default function AdminDepartmentsPage() {
     if (!selectedDept) return;
     try {
       await removeUserFromDepartment(selectedDept.id, userId);
-      toast.success("移除成功");
+      toast.success(t('admin.toast.removeSuccess'));
       fetchDeptDetail(selectedDept);
     } catch (error) {
-      toast.error("移除失败");
+      toast.error(t('admin.toast.removeFailed'));
     }
   };
 
@@ -397,7 +402,7 @@ export default function AdminDepartmentsPage() {
       setRepoSearchResults(result.items.map(r => ({ id: r.id, name: r.repoName, orgName: r.orgName })));
       setRepoTotal(result.total);
     } catch (error) {
-      toast.error("搜索仓库失败");
+      toast.error(t('admin.toast.searchRepoFailed'));
     } finally {
       setRepoLoading(false);
     }
@@ -426,12 +431,12 @@ export default function AdminDepartmentsPage() {
     try {
       const assigneeId = deptUsers[0]?.userId || "";
       await assignRepositoryToDepartment(selectedDept.id, selectedRepoId, assigneeId);
-      toast.success("分配成功");
+      toast.success(t('admin.toast.assignSuccess'));
       setShowAddRepoDialog(false);
       fetchDeptDetail(selectedDept);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "分配失败";
-      toast.error(message);
+      toast.error(message || t('admin.toast.operationFailed'));
     }
   };
 
@@ -439,10 +444,10 @@ export default function AdminDepartmentsPage() {
     if (!selectedDept) return;
     try {
       await removeRepositoryFromDepartment(selectedDept.id, repositoryId);
-      toast.success("移除成功");
+      toast.success(t('admin.toast.removeSuccess'));
       fetchDeptDetail(selectedDept);
     } catch (error) {
-      toast.error("移除失败");
+      toast.error(t('admin.toast.removeFailed'));
     }
   };
 
@@ -454,15 +459,15 @@ export default function AdminDepartmentsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">部门管理</h1>
+        <h1 className="text-2xl font-bold">{t('admin.departments.title')}</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchData}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            刷新
+            {t('admin.common.refresh')}
           </Button>
           <Button onClick={openCreateDialog}>
             <Plus className="mr-2 h-4 w-4" />
-            新增部门
+            {t('admin.departments.createDept')}
           </Button>
         </div>
       </div>
@@ -473,7 +478,7 @@ export default function AdminDepartmentsPage() {
           <Card className="p-4">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
               <FolderTree className="h-4 w-4" />
-              部门结构
+              {t('admin.departments.structure')}
             </h3>
             {loading ? (
               <div className="flex h-48 items-center justify-center">
@@ -482,7 +487,7 @@ export default function AdminDepartmentsPage() {
             ) : departmentTree.length === 0 ? (
               <div className="flex h-48 flex-col items-center justify-center text-muted-foreground">
                 <Building2 className="h-10 w-10 mb-2 opacity-50" />
-                <p>暂无部门</p>
+                <p>{t('admin.departments.noDepartments')}</p>
               </div>
             ) : (
               <div className="space-y-1 max-h-[500px] overflow-y-auto">
@@ -497,6 +502,7 @@ export default function AdminDepartmentsPage() {
                     onToggle={toggleExpand}
                     onEdit={openEditDialog}
                     onDelete={setDeleteId}
+                    t={t}
                   />
                 ))}
               </div>
@@ -509,7 +515,7 @@ export default function AdminDepartmentsPage() {
           {!selectedDept ? (
             <Card className="flex h-64 flex-col items-center justify-center">
               <FolderTree className="h-12 w-12 text-muted-foreground/50" />
-              <p className="mt-4 text-muted-foreground">选择一个部门查看详情</p>
+              <p className="mt-4 text-muted-foreground">{t('admin.departments.selectToView')}</p>
             </Card>
           ) : detailLoading ? (
             <Card className="flex h-64 items-center justify-center">
@@ -528,11 +534,11 @@ export default function AdminDepartmentsPage() {
                 <TabsList>
                   <TabsTrigger value="users">
                     <Users className="mr-2 h-4 w-4" />
-                    用户 ({deptUsers.length})
+                    {t('admin.departments.users')} ({deptUsers.length})
                   </TabsTrigger>
                   <TabsTrigger value="repos">
                     <GitBranch className="mr-2 h-4 w-4" />
-                    仓库 ({deptRepos.length})
+                    {t('admin.departments.repositories')} ({deptRepos.length})
                   </TabsTrigger>
                 </TabsList>
 
@@ -540,11 +546,11 @@ export default function AdminDepartmentsPage() {
                   <div className="flex justify-end mb-4">
                     <Button size="sm" onClick={openAddUserDialog}>
                       <UserPlus className="mr-2 h-4 w-4" />
-                      添加用户
+                      {t('admin.departments.addUser')}
                     </Button>
                   </div>
                   {deptUsers.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">暂无用户</p>
+                    <p className="text-center text-muted-foreground py-8">{t('admin.departments.noUsers')}</p>
                   ) : (
                     <div className="space-y-2">
                       {deptUsers.map((user) => (
@@ -558,7 +564,7 @@ export default function AdminDepartmentsPage() {
                               <p className="text-xs text-muted-foreground">{user.email}</p>
                             </div>
                             {user.isManager && (
-                              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">主管</span>
+                              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">{t('admin.departments.manager')}</span>
                             )}
                           </div>
                           <Button variant="ghost" size="icon" className="hover:bg-red-500/20" onClick={() => handleRemoveUser(user.userId)}>
@@ -574,11 +580,11 @@ export default function AdminDepartmentsPage() {
                   <div className="flex justify-end mb-4">
                     <Button size="sm" onClick={openAddRepoDialog}>
                       <Plus className="mr-2 h-4 w-4" />
-                      分配仓库
+                      {t('admin.departments.assignRepo')}
                     </Button>
                   </div>
                   {deptRepos.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">暂无仓库</p>
+                    <p className="text-center text-muted-foreground py-8">{t('admin.departments.noRepos')}</p>
                   ) : (
                     <div className="space-y-2">
                       {deptRepos.map((repo) => (
@@ -590,7 +596,7 @@ export default function AdminDepartmentsPage() {
                             <div>
                               <p className="font-medium text-sm">{repo.orgName}/{repo.repoName}</p>
                               {repo.assigneeUserName && (
-                                <p className="text-xs text-muted-foreground">负责人: {repo.assigneeUserName}</p>
+                                <p className="text-xs text-muted-foreground">{t('admin.departments.assignee')}: {repo.assigneeUserName}</p>
                               )}
                             </div>
                           </div>
@@ -613,28 +619,28 @@ export default function AdminDepartmentsPage() {
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingDept ? "编辑部门" : "新增部门"}</DialogTitle>
+            <DialogTitle>{editingDept ? t('admin.departments.editDept') : t('admin.departments.createDept')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">部门名称 *</label>
+              <label className="text-sm font-medium">{t('admin.departments.deptName')} *</label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="请输入部门名称"
+                placeholder={t('admin.departments.enterDeptName')}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">上级部门</label>
+              <label className="text-sm font-medium">{t('admin.departments.parentDept')}</label>
               <Select
                 value={formData.parentId || "__none__"}
                 onValueChange={(value) => setFormData({ ...formData, parentId: value === "__none__" ? "" : value })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="选择上级部门（可选）" />
+                  <SelectValue placeholder={t('admin.departments.selectParentDept')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">无</SelectItem>
+                  <SelectItem value="__none__">{t('admin.departments.none')}</SelectItem>
                   {flatDepts
                     .filter((d) => d.id !== editingDept?.id)
                     .map((dept) => (
@@ -646,16 +652,16 @@ export default function AdminDepartmentsPage() {
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium">描述</label>
+              <label className="text-sm font-medium">{t('admin.departments.description')}</label>
               <Textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="请输入部门描述"
+                placeholder={t('admin.departments.enterDeptDesc')}
                 rows={3}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">排序号</label>
+              <label className="text-sm font-medium">{t('admin.departments.sortOrder')}</label>
               <Input
                 type="number"
                 value={formData.sortOrder}
@@ -663,7 +669,7 @@ export default function AdminDepartmentsPage() {
               />
             </div>
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">启用状态</label>
+              <label className="text-sm font-medium">{t('admin.departments.activeStatus')}</label>
               <Switch
                 checked={formData.isActive}
                 onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
@@ -671,8 +677,8 @@ export default function AdminDepartmentsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button>
-            <Button onClick={handleSave}>{editingDept ? "保存" : "创建"}</Button>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>{t('admin.common.cancel')}</Button>
+            <Button onClick={handleSave}>{editingDept ? t('admin.common.save') : t('admin.common.create')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -681,12 +687,12 @@ export default function AdminDepartmentsPage() {
       <Dialog open={showAddUserDialog} onOpenChange={setShowAddUserDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>添加用户到部门</DialogTitle>
+            <DialogTitle>{t('admin.departments.addUserToDept')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex gap-2">
               <Input
-                placeholder="搜索用户名或邮箱..."
+                placeholder={t('admin.departments.searchUserPlaceholder')}
                 value={userSearchKeyword}
                 onChange={(e) => setUserSearchKeyword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleUserSearch()}
@@ -695,14 +701,14 @@ export default function AdminDepartmentsPage() {
                 <Search className="h-4 w-4" />
               </Button>
             </div>
-            
+
             <div className="border border-border rounded-lg max-h-[300px] overflow-y-auto">
               {userLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
               ) : userSearchResults.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">无搜索结果</p>
+                <p className="text-center text-muted-foreground py-8">{t('admin.departments.noSearchResults')}</p>
               ) : (
                 <div className="divide-y divide-border">
                   {userSearchResults
@@ -739,7 +745,7 @@ export default function AdminDepartmentsPage() {
                   disabled={userPage <= 1}
                   onClick={() => handleUserPageChange(userPage - 1)}
                 >
-                  上一页
+                  {t('admin.departments.prevPage')}
                 </Button>
                 <span className="text-sm text-muted-foreground">
                   {userPage} / {userTotalPages}
@@ -750,19 +756,19 @@ export default function AdminDepartmentsPage() {
                   disabled={userPage >= userTotalPages}
                   onClick={() => handleUserPageChange(userPage + 1)}
                 >
-                  下一页
+                  {t('admin.departments.nextPage')}
                 </Button>
               </div>
             )}
 
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">设为部门主管</label>
+              <label className="text-sm font-medium">{t('admin.departments.setAsManager')}</label>
               <Switch checked={isManager} onCheckedChange={setIsManager} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddUserDialog(false)}>取消</Button>
-            <Button onClick={handleAddUser} disabled={!selectedUserId}>添加</Button>
+            <Button variant="outline" onClick={() => setShowAddUserDialog(false)}>{t('admin.common.cancel')}</Button>
+            <Button onClick={handleAddUser} disabled={!selectedUserId}>{t('admin.common.add')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -772,12 +778,12 @@ export default function AdminDepartmentsPage() {
       <Dialog open={showAddRepoDialog} onOpenChange={setShowAddRepoDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>分配仓库到部门</DialogTitle>
+            <DialogTitle>{t('admin.departments.assignRepoToDept')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex gap-2">
               <Input
-                placeholder="搜索仓库名..."
+                placeholder={t('admin.departments.searchRepoPlaceholder')}
                 value={repoSearchKeyword}
                 onChange={(e) => setRepoSearchKeyword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleRepoSearch()}
@@ -786,14 +792,14 @@ export default function AdminDepartmentsPage() {
                 <Search className="h-4 w-4" />
               </Button>
             </div>
-            
+
             <div className="border border-border rounded-lg max-h-[300px] overflow-y-auto">
               {repoLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
               ) : repoSearchResults.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">无搜索结果</p>
+                <p className="text-center text-muted-foreground py-8">{t('admin.departments.noSearchResults')}</p>
               ) : (
                 <div className="divide-y divide-border">
                   {repoSearchResults
@@ -829,7 +835,7 @@ export default function AdminDepartmentsPage() {
                   disabled={repoPage <= 1}
                   onClick={() => handleRepoPageChange(repoPage - 1)}
                 >
-                  上一页
+                  {t('admin.departments.prevPage')}
                 </Button>
                 <span className="text-sm text-muted-foreground">
                   {repoPage} / {repoTotalPages}
@@ -840,14 +846,14 @@ export default function AdminDepartmentsPage() {
                   disabled={repoPage >= repoTotalPages}
                   onClick={() => handleRepoPageChange(repoPage + 1)}
                 >
-                  下一页
+                  {t('admin.departments.nextPage')}
                 </Button>
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddRepoDialog(false)}>取消</Button>
-            <Button onClick={handleAddRepo} disabled={!selectedRepoId}>分配</Button>
+            <Button variant="outline" onClick={() => setShowAddRepoDialog(false)}>{t('admin.common.cancel')}</Button>
+            <Button onClick={handleAddRepo} disabled={!selectedRepoId}>{t('admin.common.assign')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -856,14 +862,14 @@ export default function AdminDepartmentsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogTitle>{t('admin.common.confirmDelete')}</AlertDialogTitle>
             <AlertDialogDescription>
-              删除部门后不可恢复，如果该部门下有子部门则无法删除。确定要继续吗？
+              {t('admin.departments.deleteWarning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">删除</AlertDialogAction>
+            <AlertDialogCancel>{t('admin.common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">{t('admin.common.delete')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -54,6 +54,9 @@
     isOpen: false,
     isLoading: true,
     isEnabled: false,
+    isResizing: false,
+    startX: 0,
+    startWidth: 400,
     appConfig: null,
     messages: [],
     selectedModel: null
@@ -66,7 +69,18 @@
       'z-index: 999999',
       'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
     ].join(';'),
+    backdrop: [
+      'position: fixed',
+      'top: 0',
+      'left: 0',
+      'right: 0',
+      'bottom: 0',
+      'background: rgba(0, 0, 0, 0.2)',
+      'transition: opacity 0.3s ease',
+      'z-index: 999998'
+    ].join(';'),
     floatingBall: [
+      'position: fixed',
       'width: 56px',
       'height: 56px',
       'border-radius: 50%',
@@ -78,21 +92,26 @@
       'justify-content: center',
       'box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15)',
       'transition: transform 0.2s ease, box-shadow 0.2s ease',
-      'outline: none'
+      'outline: none',
+      'right: 24px',
+      'bottom: 24px',
+      'z-index: 999999'
     ].join(';'),
     floatingBallHover: 'transform: scale(1.1); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);',
     panel: [
       'position: fixed',
-      'width: 380px',
-      'height: 600px',
-      'max-height: calc(100vh - 100px)',
+      'top: 0',
+      'right: 0',
+      'width: 400px',
+      'height: 100%',
+      'max-width: 100vw',
       'background: #ffffff',
-      'border-radius: 12px',
-      'box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15)',
+      'box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15)',
       'display: flex',
       'flex-direction: column',
       'overflow: hidden',
-      'transition: opacity 0.3s ease, transform 0.3s ease'
+      'transition: transform 0.3s ease',
+      'z-index: 999999'
     ].join(';'),
     panelDark: 'background: #1a1a2e; color: #ffffff;',
     header: [
@@ -107,10 +126,14 @@
     messagesContainer: [
       'flex: 1',
       'overflow-y: auto',
+      'overflow-x: hidden',
       'padding: 16px',
       'display: flex',
       'flex-direction: column',
-      'gap: 12px'
+      'gap: 12px',
+      'min-height: 0',
+      'scrollbar-width: thin',
+      'scrollbar-color: #d1d5db transparent'
     ].join(';'),
     inputContainer: [
       'padding: 16px',
@@ -222,31 +245,16 @@
       '}',
       '.odw-dot-1 { animation-delay: -0.32s; }',
       '.odw-dot-2 { animation-delay: -0.16s; }',
-      '.odw-dot-3 { animation-delay: 0s; }'
+      '.odw-dot-3 { animation-delay: 0s; }',
+      '#odw-messages::-webkit-scrollbar { width: 6px; }',
+      '#odw-messages::-webkit-scrollbar-track { background: transparent; }',
+      '#odw-messages::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }',
+      '#odw-messages::-webkit-scrollbar-thumb:hover { background: #9ca3af; }',
+      '@media (max-width: 480px) {',
+      '  #odw-panel { width: 100% !important; }',
+      '}'
     ].join('\n');
     document.head.appendChild(styleEl);
-  }
-
-  // 获取位置样式
-  function getPositionStyle(position) {
-    var positions = {
-      'bottom-right': 'right: 24px; bottom: 24px;',
-      'bottom-left': 'left: 24px; bottom: 24px;',
-      'top-right': 'right: 24px; top: 24px;',
-      'top-left': 'left: 24px; top: 24px;'
-    };
-    return positions[position] || positions['bottom-right'];
-  }
-
-  // 获取面板位置样式
-  function getPanelPositionStyle(position) {
-    var positions = {
-      'bottom-right': 'right: 24px; bottom: 90px;',
-      'bottom-left': 'left: 24px; bottom: 90px;',
-      'top-right': 'right: 24px; top: 90px;',
-      'top-left': 'left: 24px; top: 90px;'
-    };
-    return positions[position] || positions['bottom-right'];
   }
 
 
@@ -400,9 +408,8 @@
 
   // 渲染悬浮球
   function renderFloatingBall(container) {
-    var isDark = config.theme === 'dark';
-    var ballStyle = styles.floatingBall + ';' + getPositionStyle(config.position);
-    
+    var ballStyle = styles.floatingBall;
+
     var iconContent;
     if (config.iconUrl) {
       iconContent = '<img src="' + config.iconUrl + '" alt="Chat" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">';
@@ -418,7 +425,7 @@
         togglePanel();
       },
       onMouseenter: function() {
-        this.style.cssText = ballStyle + styles.floatingBallHover;
+        this.style.cssText = ballStyle + ';' + styles.floatingBallHover;
       },
       onMouseleave: function() {
         this.style.cssText = ballStyle;
@@ -429,19 +436,86 @@
     return ball;
   }
 
+  // 渲染背景遮罩
+  function renderBackdrop(container) {
+    var backdrop = createElement('div', {
+      id: 'odw-backdrop',
+      style: styles.backdrop + '; opacity: 0; pointer-events: none;',
+      onClick: function() {
+        togglePanel();
+      }
+    });
+    container.appendChild(backdrop);
+    return backdrop;
+  }
+
   // 渲染对话面板
   function renderPanel(container) {
     var isDark = config.theme === 'dark';
-    var panelStyle = styles.panel + ';' + getPanelPositionStyle(config.position);
+    var panelStyle = styles.panel;
     if (isDark) {
-      panelStyle += styles.panelDark;
+      panelStyle += ';' + styles.panelDark;
     }
-    panelStyle += 'opacity: 0; transform: scale(0.95); pointer-events: none;';
+    // 初始状态：隐藏在右侧
+    panelStyle += '; transform: translateX(100%);';
 
     var panel = createElement('div', {
       id: 'odw-panel',
       style: panelStyle
     });
+
+    // 拖动调整宽度的手柄
+    var resizeHandle = createElement('div', {
+      id: 'odw-resize-handle',
+      style: [
+        'position: absolute',
+        'left: 0',
+        'top: 0',
+        'width: 6px',
+        'height: 100%',
+        'cursor: ew-resize',
+        'background: transparent',
+        'transition: background 0.2s ease',
+        'z-index: 10'
+      ].join(';'),
+      onMouseenter: function() {
+        this.style.background = 'rgba(102, 126, 234, 0.3)';
+      },
+      onMouseleave: function() {
+        if (!state.isResizing) {
+          this.style.background = 'transparent';
+        }
+      },
+      onMousedown: function(e) {
+        e.preventDefault();
+        state.isResizing = true;
+        state.startX = e.clientX;
+        state.startWidth = panel.offsetWidth;
+        this.style.background = 'rgba(102, 126, 234, 0.5)';
+
+        document.addEventListener('mousemove', handleResize);
+        document.addEventListener('mouseup', stopResize);
+      }
+    });
+
+    function handleResize(e) {
+      if (!state.isResizing) return;
+      var diff = state.startX - e.clientX;
+      var newWidth = Math.min(Math.max(state.startWidth + diff, 320), window.innerWidth * 0.8);
+      panel.style.width = newWidth + 'px';
+    }
+
+    function stopResize() {
+      state.isResizing = false;
+      var handle = document.getElementById('odw-resize-handle');
+      if (handle) {
+        handle.style.background = 'transparent';
+      }
+      document.removeEventListener('mousemove', handleResize);
+      document.removeEventListener('mouseup', stopResize);
+    }
+
+    panel.appendChild(resizeHandle);
 
     // 头部
     var headerStyle = styles.header;
@@ -548,26 +622,37 @@
     state.isOpen = !state.isOpen;
     var panel = document.getElementById('odw-panel');
     var ball = document.getElementById('odw-floating-ball');
-    
+    var backdrop = document.getElementById('odw-backdrop');
+
     if (panel) {
       if (state.isOpen) {
-        panel.style.opacity = '1';
-        panel.style.transform = 'scale(1)';
-        panel.style.pointerEvents = 'auto';
+        // 展开：从右侧滑入
+        panel.style.transform = 'translateX(0)';
         // 聚焦输入框
-        var input = document.getElementById('odw-input');
-        if (input) input.focus();
+        setTimeout(function() {
+          var input = document.getElementById('odw-input');
+          if (input) input.focus();
+        }, 300);
       } else {
-        panel.style.opacity = '0';
-        panel.style.transform = 'scale(0.95)';
-        panel.style.pointerEvents = 'none';
+        // 收起：滑出到右侧
+        panel.style.transform = 'translateX(100%)';
+      }
+    }
+
+    if (backdrop) {
+      if (state.isOpen) {
+        backdrop.style.opacity = '1';
+        backdrop.style.pointerEvents = 'auto';
+      } else {
+        backdrop.style.opacity = '0';
+        backdrop.style.pointerEvents = 'none';
       }
     }
 
     if (ball) {
-      ball.innerHTML = state.isOpen 
+      ball.innerHTML = state.isOpen
         ? '<span style="color: white;">' + icons.close + '</span>'
-        : (config.iconUrl 
+        : (config.iconUrl
             ? '<img src="' + config.iconUrl + '" alt="Chat" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover;">'
             : '<span style="color: white;">' + icons.chat + '</span>');
       ball.setAttribute('aria-label', state.isOpen ? '关闭对话助手' : '打开对话助手');
@@ -789,16 +874,17 @@
     state.isLoading = true;
     validateAndGetConfig(function(error, appConfig) {
       state.isLoading = false;
-      
+
       if (error) {
         console.error('[OpenDeepWiki] 初始化失败:', error.message);
         return;
       }
 
-      // 渲染UI
-      renderFloatingBall(container);
+      // 渲染UI - 先渲染背景遮罩，再渲染面板，最后渲染悬浮球
+      renderBackdrop(container);
       renderPanel(container);
-      
+      renderFloatingBall(container);
+
       console.log('[OpenDeepWiki] 初始化成功');
     });
   }

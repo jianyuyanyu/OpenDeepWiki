@@ -33,13 +33,13 @@ public static class PostgresqlServiceCollectionExtensions
         this IServiceCollection services,
         string connectionString)
     {
-        // Register DbContext for normal DI
-        services.AddDbContext<IContext, PostgresqlDbContext>(
+        // Register pooled DbContext for both normal DI and factory usage
+        services.AddPooledDbContextFactory<PostgresqlDbContext>(
             options => options.UseNpgsql(connectionString));
 
-        // Register DbContextFactory for parallel operations
-        services.AddDbContextFactory<PostgresqlDbContext>(
-            options => options.UseNpgsql(connectionString));
+        // Register IContext to resolve from the pool
+        services.AddScoped<IContext>(sp =>
+            sp.GetRequiredService<IDbContextFactory<PostgresqlDbContext>>().CreateDbContext());
 
         // Register IContextFactory
         services.AddSingleton<IContextFactory, PostgresqlContextFactory>();

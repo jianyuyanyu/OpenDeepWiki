@@ -19,6 +19,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Loader2, GitBranch, Users, Coins, TrendingUp } from "lucide-react";
+import { useTranslations } from "@/hooks/use-translations";
+import { useLocale } from "next-intl";
 
 // 自定义 Tooltip 组件
 interface TooltipPayload {
@@ -31,9 +33,10 @@ interface CustomTooltipProps {
   active?: boolean;
   payload?: TooltipPayload[];
   label?: string;
+  totalLabel?: string;
 }
 
-function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, label, totalLabel }: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
 
   return (
@@ -43,8 +46,8 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
         {payload.map((entry, index: number) => (
           <div key={index} className="flex items-center justify-between gap-8">
             <div className="flex items-center gap-2">
-              <span 
-                className="h-3 w-3 rounded-full" 
+              <span
+                className="h-3 w-3 rounded-full"
                 style={{ backgroundColor: entry.color }}
               />
               <span className="text-sm text-muted-foreground">{entry.name}</span>
@@ -57,7 +60,7 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
       </div>
       {payload.length > 1 && (
         <div className="mt-3 pt-3 border-t flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">合计</span>
+          <span className="text-sm text-muted-foreground">{totalLabel}</span>
           <span className="text-sm font-bold tabular-nums">
             {payload.reduce((sum: number, entry) => sum + (entry.value ?? 0), 0).toLocaleString()}
           </span>
@@ -72,6 +75,8 @@ export default function AdminDashboardPage() {
   const [tokenStats, setTokenStats] = useState<TokenUsageStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(7);
+  const t = useTranslations();
+  const locale = useLocale();
 
   useEffect(() => {
     async function fetchData() {
@@ -101,20 +106,20 @@ export default function AdminDashboardPage() {
   }
 
   const repoChartData = dashboardStats?.repositoryStats.map((stat) => ({
-    date: new Date(stat.date).toLocaleDateString("zh-CN", { month: "short", day: "numeric" }),
-    提交数: stat.submittedCount,
-    处理完成: stat.processedCount,
+    date: new Date(stat.date).toLocaleDateString(locale === 'zh' ? 'zh-CN' : locale, { month: "short", day: "numeric" }),
+    [t('admin.dashboard.submitCount')]: stat.submittedCount,
+    [t('admin.dashboard.processed')]: stat.processedCount,
   })) || [];
 
   const userChartData = dashboardStats?.userStats.map((stat) => ({
-    date: new Date(stat.date).toLocaleDateString("zh-CN", { month: "short", day: "numeric" }),
-    新增用户: stat.newUserCount,
+    date: new Date(stat.date).toLocaleDateString(locale === 'zh' ? 'zh-CN' : locale, { month: "short", day: "numeric" }),
+    [t('admin.dashboard.newUsers')]: stat.newUserCount,
   })) || [];
 
   const tokenChartData = tokenStats?.dailyUsages.map((stat) => ({
-    date: new Date(stat.date).toLocaleDateString("zh-CN", { month: "short", day: "numeric" }),
-    输入Token: stat.inputTokens,
-    输出Token: stat.outputTokens,
+    date: new Date(stat.date).toLocaleDateString(locale === 'zh' ? 'zh-CN' : locale, { month: "short", day: "numeric" }),
+    [t('admin.dashboard.inputToken')]: stat.inputTokens,
+    [t('admin.dashboard.outputToken')]: stat.outputTokens,
   })) || [];
 
   const totalRepoSubmitted = dashboardStats?.repositoryStats.reduce((sum, s) => sum + s.submittedCount, 0) || 0;
@@ -124,12 +129,12 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">仪表盘</h1>
+        <h1 className="text-2xl font-bold">{t('admin.dashboard.title')}</h1>
         <Tabs value={days.toString()} onValueChange={(v) => setDays(parseInt(v))}>
           <TabsList>
-            <TabsTrigger value="7">7天</TabsTrigger>
-            <TabsTrigger value="14">14天</TabsTrigger>
-            <TabsTrigger value="30">30天</TabsTrigger>
+            <TabsTrigger value="7">{t('admin.dashboard.days7')}</TabsTrigger>
+            <TabsTrigger value="14">{t('admin.dashboard.days14')}</TabsTrigger>
+            <TabsTrigger value="30">{t('admin.dashboard.days30')}</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -142,7 +147,7 @@ export default function AdminDashboardPage() {
               <GitBranch className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">仓库提交</p>
+              <p className="text-sm text-muted-foreground">{t('admin.dashboard.repoSubmit')}</p>
               <p className="text-2xl font-bold">{totalRepoSubmitted}</p>
             </div>
           </div>
@@ -153,7 +158,7 @@ export default function AdminDashboardPage() {
               <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">处理完成</p>
+              <p className="text-sm text-muted-foreground">{t('admin.dashboard.processed')}</p>
               <p className="text-2xl font-bold">{totalRepoProcessed}</p>
             </div>
           </div>
@@ -164,7 +169,7 @@ export default function AdminDashboardPage() {
               <Users className="h-6 w-6 text-purple-600 dark:text-purple-400" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">新增用户</p>
+              <p className="text-sm text-muted-foreground">{t('admin.dashboard.newUsers')}</p>
               <p className="text-2xl font-bold">{totalNewUsers}</p>
             </div>
           </div>
@@ -175,7 +180,7 @@ export default function AdminDashboardPage() {
               <Coins className="h-6 w-6 text-orange-600 dark:text-orange-400" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Token 消耗</p>
+              <p className="text-sm text-muted-foreground">{t('admin.dashboard.tokenUsage')}</p>
               <p className="text-2xl font-bold">{(tokenStats?.totalTokens || 0).toLocaleString()}</p>
             </div>
           </div>
@@ -186,80 +191,80 @@ export default function AdminDashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* 仓库统计图表 */}
         <Card className="p-6">
-          <h3 className="mb-4 text-lg font-semibold">仓库统计</h3>
+          <h3 className="mb-4 text-lg font-semibold">{t('admin.dashboard.repoStats')}</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={repoChartData} barCategoryGap="20%">
-              <XAxis 
-                dataKey="date" 
-                axisLine={false} 
+              <XAxis
+                dataKey="date"
+                axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#888', fontSize: 12 }}
               />
-              <YAxis 
-                axisLine={false} 
+              <YAxis
+                axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#888', fontSize: 12 }}
               />
-              <Tooltip 
+              <Tooltip
                 cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                content={<CustomTooltip />}
+                content={<CustomTooltip totalLabel={t('admin.dashboard.total')} />}
               />
               <Legend wrapperStyle={{ paddingTop: 16 }} />
-              <Bar dataKey="提交数" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="处理完成" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              <Bar dataKey={t('admin.dashboard.submitCount')} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey={t('admin.dashboard.processed')} fill="#22c55e" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
 
         {/* 用户增长图表 */}
         <Card className="p-6">
-          <h3 className="mb-4 text-lg font-semibold">用户增长</h3>
+          <h3 className="mb-4 text-lg font-semibold">{t('admin.dashboard.userGrowth')}</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={userChartData} barCategoryGap="30%">
-              <XAxis 
-                dataKey="date" 
-                axisLine={false} 
+              <XAxis
+                dataKey="date"
+                axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#888', fontSize: 12 }}
               />
-              <YAxis 
-                axisLine={false} 
+              <YAxis
+                axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#888', fontSize: 12 }}
               />
-              <Tooltip 
+              <Tooltip
                 cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                content={<CustomTooltip />}
+                content={<CustomTooltip totalLabel={t('admin.dashboard.total')} />}
               />
               <Legend wrapperStyle={{ paddingTop: 16 }} />
-              <Bar dataKey="新增用户" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey={t('admin.dashboard.newUsers')} fill="#8b5cf6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
 
         {/* Token 消耗图表 */}
         <Card className="p-6 lg:col-span-2">
-          <h3 className="mb-4 text-lg font-semibold">Token 消耗趋势</h3>
+          <h3 className="mb-4 text-lg font-semibold">{t('admin.dashboard.tokenTrend')}</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={tokenChartData} barCategoryGap="20%">
-              <XAxis 
-                dataKey="date" 
-                axisLine={false} 
+              <XAxis
+                dataKey="date"
+                axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#888', fontSize: 12 }}
               />
-              <YAxis 
-                axisLine={false} 
+              <YAxis
+                axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#888', fontSize: 12 }}
               />
-              <Tooltip 
+              <Tooltip
                 cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                content={<CustomTooltip />}
+                content={<CustomTooltip totalLabel={t('admin.dashboard.total')} />}
               />
               <Legend wrapperStyle={{ paddingTop: 16 }} />
-              <Bar dataKey="输入Token" fill="#f97316" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="输出Token" fill="#eab308" radius={[4, 4, 0, 0]} />
+              <Bar dataKey={t('admin.dashboard.inputToken')} fill="#f97316" radius={[4, 4, 0, 0]} />
+              <Bar dataKey={t('admin.dashboard.outputToken')} fill="#eab308" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>

@@ -2,7 +2,7 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <TimeStamp>$([System.DateTime]::UtcNow.ToString("yyyyMMdd"))</TimeStamp>
-    <Version>2.0.0</Version>
+    <Version>2.0.0-preview</Version>
     <!-- 项目信息 -->
     <Product>OpenDeepWiki</Product>
     <Title>OpenDeepWiki - AI驱动的代码知识库</Title>
@@ -46,7 +46,7 @@
     <PackageVersion Include="ModelContextProtocolServer.Sse" Version="0.6.0" />
     <PackageVersion Include="MySql.EntityFrameworkCore" Version="10.0.0-rc" />
     <PackageVersion Include="OpenAI" Version="2.8.0" />
-    <PackageVersion Include="Scalar.AspNetCore" Version="2.12.24" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.12.30" />
     <!-- Entity Framework Core -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.2" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Abstractions" Version="10.0.2" />
@@ -128,8 +128,8 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <PackageVersion Include="FsCheck" Version="3.1.0" />
-    <PackageVersion Include="FsCheck.Xunit" Version="3.1.0" />
+    <PackageVersion Include="FsCheck" Version="3.3.2" />
+    <PackageVersion Include="FsCheck.Xunit" Version="3.3.2" />
     <PackageVersion Include="YamlDotNet" Version="16.3.0" />
     <PackageVersion Include="BCrypt.Net-Next" Version="4.0.3" />
   </ItemGroup>

@@ -87,7 +87,14 @@ export function AppSidebar({ activeItem, onItemClick, ...props }: AppSidebarProp
             <SidebarContent>
                 <SidebarGroup>
                     <SidebarGroupLabel>
-                        OpenDeepWiki
+                        <Image
+                            src="/favicon.png"
+                            alt="OpenDeepWiki"
+                            width={24}
+                            height={24}
+                            className="shrink-0 rounded"
+                        />
+                        <span className="ml-2">OpenDeepWiki</span>
                     </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>

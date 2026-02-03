@@ -60,14 +60,8 @@ import {
   CheckSquare,
 } from "lucide-react";
 import { toast } from "sonner";
-
-const statusOptions = [
-  { value: "all", label: "全部状态" },
-  { value: "0", label: "待处理" },
-  { value: "1", label: "处理中" },
-  { value: "2", label: "已完成" },
-  { value: "3", label: "失败" },
-];
+import { useTranslations } from "@/hooks/use-translations";
+import { useLocale } from "next-intl";
 
 const statusColors: Record<number, string> = {
   0: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
@@ -89,6 +83,23 @@ export default function AdminRepositoriesPage() {
   const [batchSyncing, setBatchSyncing] = useState(false);
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
+  const t = useTranslations();
+  const locale = useLocale();
+
+  const statusOptions = [
+    { value: "all", label: t('admin.repositories.allStatus') },
+    { value: "0", label: t('admin.repositories.pending') },
+    { value: "1", label: t('admin.repositories.processing') },
+    { value: "2", label: t('admin.repositories.completed') },
+    { value: "3", label: t('admin.repositories.failed') },
+  ];
+
+  const statusLabels: Record<number, string> = {
+    0: t('admin.repositories.pending'),
+    1: t('admin.repositories.processing'),
+    2: t('admin.repositories.completed'),
+    3: t('admin.repositories.failed'),
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -103,7 +114,7 @@ export default function AdminRepositoriesPage() {
       setSelectedIds(new Set());
     } catch (error) {
       console.error("Failed to fetch repositories:", error);
-      toast.error("获取仓库列表失败");
+      toast.error(t('admin.toast.fetchRepoFailed'));
     } finally {
       setLoading(false);
     }
@@ -122,18 +133,18 @@ export default function AdminRepositoriesPage() {
     if (!deleteId) return;
     try {
       await deleteRepository(deleteId);
-      toast.success("删除成功");
+      toast.success(t('admin.toast.deleteSuccess'));
       setDeleteId(null);
       fetchData();
     } catch (error) {
-      toast.error("删除失败");
+      toast.error(t('admin.toast.deleteFailed'));
     }
   };
 
   const handleStatusChange = async (id: string, newStatus: number) => {
     try {
       await updateRepositoryStatus(id, newStatus);
-      toast.success("状态更新成功");
+      toast.success(t('admin.toast.statusUpdateSuccess'));
       fetchData();
     } catch (error) {
       toast.error("状态更新失败");

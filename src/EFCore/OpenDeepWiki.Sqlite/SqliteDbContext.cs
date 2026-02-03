@@ -33,13 +33,13 @@ public static class SqliteServiceCollectionExtensions
         this IServiceCollection services,
         string connectionString)
     {
-        // Register DbContext for normal DI
-        services.AddDbContext<IContext, SqliteDbContext>(
+        // Register pooled DbContext for both normal DI and factory usage
+        services.AddPooledDbContextFactory<SqliteDbContext>(
             options => options.UseSqlite(connectionString));
 
-        // Register DbContextFactory for parallel operations
-        services.AddDbContextFactory<SqliteDbContext>(
-            options => options.UseSqlite(connectionString));
+        // Register IContext to resolve from the pool
+        services.AddScoped<IContext>(sp =>
+            sp.GetRequiredService<IDbContextFactory<SqliteDbContext>>().CreateDbContext());
 
         // Register IContextFactory
         services.AddSingleton<IContextFactory, SqliteContextFactory>();
