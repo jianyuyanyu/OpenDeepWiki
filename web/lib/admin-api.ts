@@ -154,6 +154,63 @@ export async function updateRepositoryStatus(id: string, status: number): Promis
   });
 }
 
+// 同步单个仓库统计信息
+export interface SyncStatsResult {
+  success: boolean;
+  message?: string;
+  starCount: number;
+  forkCount: number;
+}
+
+export async function syncRepositoryStats(id: string): Promise<SyncStatsResult> {
+  const url = buildApiUrl(`/api/admin/repositories/${id}/sync-stats`);
+  const result = await fetchWithAuth(url, { method: "POST" });
+  return result.data;
+}
+
+// 批量同步统计信息
+export interface BatchSyncItemResult {
+  id: string;
+  repoName: string;
+  success: boolean;
+  message?: string;
+  starCount: number;
+  forkCount: number;
+}
+
+export interface BatchSyncStatsResult {
+  totalCount: number;
+  successCount: number;
+  failedCount: number;
+  results: BatchSyncItemResult[];
+}
+
+export async function batchSyncRepositoryStats(ids: string[]): Promise<BatchSyncStatsResult> {
+  const url = buildApiUrl("/api/admin/repositories/batch/sync-stats");
+  const result = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+  return result.data;
+}
+
+// 批量删除仓库
+export interface BatchDeleteResult {
+  totalCount: number;
+  successCount: number;
+  failedCount: number;
+  failedIds: string[];
+}
+
+export async function batchDeleteRepositories(ids: string[]): Promise<BatchDeleteResult> {
+  const url = buildApiUrl("/api/admin/repositories/batch/delete");
+  const result = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+  return result.data;
+}
+
 // ==================== User API ====================
 
 export interface AdminUser {

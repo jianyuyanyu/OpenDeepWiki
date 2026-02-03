@@ -41,6 +41,7 @@ export interface GitBranchItem {
 }
 
 export interface RepoDocResponse {
+  exists: boolean;
   slug: string;
   content: string;
   sourceFiles: string[];

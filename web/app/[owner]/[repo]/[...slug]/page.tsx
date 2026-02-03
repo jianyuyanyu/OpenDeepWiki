@@ -21,6 +21,9 @@ interface RepoDocPageProps {
 async function getDocData(owner: string, repo: string, slug: string, branch?: string, lang?: string) {
   try {
     const doc = await fetchRepoDoc(owner, repo, slug, branch, lang);
+    if (!doc.exists) {
+      return null;
+    }
     const headings = extractHeadings(doc.content, 3);
     return { doc, headings };
   } catch {

@@ -144,16 +144,39 @@ public class TranslationWorker : BackgroundService
                     continue;
                 }
 
-                // 检查是否已有待处理或处理中的翻译任务
+                // 检查是否已有翻译任务（任何状态）
                 var existingTask = await context.TranslationTasks
-                    .AnyAsync(t => t.RepositoryBranchId == branchLanguage.RepositoryBranchId &&
-                                   t.TargetLanguageCode == targetLang &&
-                                   !t.IsDeleted &&
-                                   (t.Status == TranslationTaskStatus.Pending ||
-                                    t.Status == TranslationTaskStatus.Processing), stoppingToken);
+                    .FirstOrDefaultAsync(t => t.RepositoryBranchId == branchLanguage.RepositoryBranchId &&
+                                              t.TargetLanguageCode == targetLang &&
+                                              !t.IsDeleted, stoppingToken);
 
-                if (existingTask)
+                if (existingTask != null)
                 {
+                    // 如果是待处理或处理中的任务，跳过
+                    if (existingTask.Status == TranslationTaskStatus.Pending ||
+                        existingTask.Status == TranslationTaskStatus.Processing)
+                    {
+                        continue;
+                    }
+
+                    // 如果是已完成的任务，跳过（目标语言应该已存在）
+                    if (existingTask.Status == TranslationTaskStatus.Completed)
+                    {
+                        continue;
+                    }
+
+                    // 如果是失败的任务且未超过最大重试次数，重置为待处理
+                    if (existingTask.Status == TranslationTaskStatus.Failed &&
+                        existingTask.RetryCount < existingTask.MaxRetryCount)
+                    {
+                        existingTask.Status = TranslationTaskStatus.Pending;
+                        existingTask.ErrorMessage = null;
+                        createdCount++;
+
+                        _logger.LogDebug("Translation task reset to pending. TargetLang: {TargetLang}, Repository: {Org}/{Repo}, RetryCount: {RetryCount}",
+                            targetLang, repository.OrgName, repository.RepoName, existingTask.RetryCount);
+                    }
+
                     continue;
                 }
 

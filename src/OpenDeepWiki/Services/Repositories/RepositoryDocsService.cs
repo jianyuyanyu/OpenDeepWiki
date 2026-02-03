@@ -182,23 +182,33 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     [HttpGet("/{owner}/{repo}/docs/{*slug}")]
     public async Task<RepositoryDocResponse> GetDocAsync(string owner, string repo, string slug, [FromQuery] string? branch = null, [FromQuery] string? lang = null)
     {
-        var repository = await GetRepositoryAsync(owner, repo);
-        var branchEntity = await GetBranchAsync(repository.Id, branch);
-        var language = await GetLanguageAsync(branchEntity.Id, lang);
         var normalizedSlug = NormalizePath(slug);
+
+        var repository = await GetRepositoryAsync(owner, repo);
+        if (repository is null)
+        {
+            return new RepositoryDocResponse { Slug = normalizedSlug, Exists = false };
+        }
+
+        var branchEntity = await GetBranchAsync(repository.Id, branch);
+        if (branchEntity is null)
+        {
+            return new RepositoryDocResponse { Slug = normalizedSlug, Exists = false };
+        }
+
+        var language = await GetLanguageAsync(branchEntity.Id, lang);
+        if (language is null)
+        {
+            return new RepositoryDocResponse { Slug = normalizedSlug, Exists = false };
+        }
 
         var catalog = await context.DocCatalogs
             .AsNoTracking()
             .FirstOrDefaultAsync(item => item.BranchLanguageId == language.Id && item.Path == normalizedSlug && !item.IsDeleted);
 
-        if (catalog is null)
+        if (catalog is null || catalog.DocFileId is null)
         {
-            throw new InvalidOperationException("文档不存在");
-        }
-
-        if (catalog.DocFileId is null)
-        {
-            throw new InvalidOperationException("文档内容不存在");
+            return new RepositoryDocResponse { Slug = normalizedSlug, Exists = false };
         }
 
         var docFile = await context.DocFiles
@@ -207,7 +217,7 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
 
         if (docFile is null)
         {
-            throw new InvalidOperationException("文档不存在");
+            return new RepositoryDocResponse { Slug = normalizedSlug, Exists = false };
         }
 
         // 解析来源文件列表
@@ -228,7 +238,8 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
         {
             Slug = normalizedSlug,
             Content = docFile.Content,
-            SourceFiles = sourceFiles
+            SourceFiles = sourceFiles,
+            Exists = true
         };
     }
 
@@ -254,21 +265,14 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
         };
     }
 
-    private async Task<Repository> GetRepositoryAsync(string owner, string repo)
+    private async Task<Repository?> GetRepositoryAsync(string owner, string repo)
     {
-        var repository = await context.Repositories
+        return await context.Repositories
             .AsNoTracking()
             .FirstOrDefaultAsync(item => item.OrgName == owner && item.RepoName == repo);
-
-        if (repository is null)
-        {
-            throw new InvalidOperationException("仓库不存在");
-        }
-
-        return repository;
     }
 
-    private async Task<RepositoryBranch> GetBranchAsync(string repositoryId, string? branchName)
+    private async Task<RepositoryBranch?> GetBranchAsync(string repositoryId, string? branchName)
     {
         var branches = await context.RepositoryBranches
             .AsNoTracking()
@@ -277,13 +281,13 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
 
         if (branches.Count == 0)
         {
-            throw new InvalidOperationException("仓库分支不存在");
+            return null;
         }
 
         // 如果指定了分支名，尝试查找
         if (!string.IsNullOrWhiteSpace(branchName))
         {
-            var specified = branches.FirstOrDefault(item => 
+            var specified = branches.FirstOrDefault(item =>
                 string.Equals(item.BranchName, branchName, StringComparison.OrdinalIgnoreCase));
             if (specified is not null)
             {
@@ -297,7 +301,7 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
                ?? branches.OrderBy(item => item.CreatedAt).First();
     }
 
-    private async Task<BranchLanguage> GetLanguageAsync(string branchId, string? languageCode)
+    private async Task<BranchLanguage?> GetLanguageAsync(string branchId, string? languageCode)
     {
         var languages = await context.BranchLanguages
             .AsNoTracking()
@@ -306,13 +310,13 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
 
         if (languages.Count == 0)
         {
-            throw new InvalidOperationException("仓库语言不存在");
+            return null;
         }
 
         // 如果指定了语言代码，尝试查找
         if (!string.IsNullOrWhiteSpace(languageCode))
         {
-            var specified = languages.FirstOrDefault(item => 
+            var specified = languages.FirstOrDefault(item =>
                 string.Equals(item.LanguageCode, languageCode, StringComparison.OrdinalIgnoreCase));
             if (specified is not null)
             {

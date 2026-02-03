@@ -353,11 +353,6 @@ try
     app.MapMiniApis();
     app.MapAuthEndpoints();
     app.MapOAuthEndpoints();
-    // 以下 Endpoints 已通过 MiniApi 源生成器注册：
-    // - BookmarkService, SubscriptionService, WikiService
-    // - RepositoryService, RepositoryDocsService
-    // - ProcessingLogApiService, MindMapApiService
-    // - RecommendationApiService, UserProfileApiService
     app.MapAdminEndpoints();
     app.MapOrganizationEndpoints();
     app.MapChatAssistantEndpoints();

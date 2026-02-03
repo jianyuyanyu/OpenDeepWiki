@@ -10,6 +10,7 @@ import { BranchLanguageSelector } from "./branch-language-selector";
 import { fetchRepoTree, fetchRepoBranches } from "@/lib/repository-api";
 import { Network } from "lucide-react";
 import { ChatAssistantEnhanced, buildCatalogMenuEnhanced } from "@/components/chat";
+import { useTranslations } from "@/hooks/use-translations";
 
 interface RepoShellProps {
   owner: string;
@@ -80,6 +81,7 @@ export function RepoShell({
   const pathname = usePathname();
   const urlBranch = searchParams.get("branch");
   const urlLang = searchParams.get("lang");
+  const t = useTranslations();
   
   const [nodes, setNodes] = useState<RepoTreeNode[]>(initialNodes);
   const [branches, setBranches] = useState<RepoBranchesResponse | undefined>(initialBranches);
@@ -166,7 +168,7 @@ export function RepoShell({
         className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20 transition-colors"
       >
         <Network className="h-4 w-4" />
-        <span className="font-medium text-sm">项目架构</span>
+        <span className="font-medium text-sm">{t("mindmap.title")}</span>
       </Link>
     </div>
   );

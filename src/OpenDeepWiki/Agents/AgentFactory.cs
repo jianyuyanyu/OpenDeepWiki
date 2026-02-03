@@ -28,58 +28,6 @@ namespace OpenDeepWiki.Agents
     }
 
     /// <summary>
-    /// 自定义 HTTP 消息处理器，用于拦截和记录请求/响应状态
-    /// </summary>
-    public class LoggingHttpHandler : DelegatingHandler
-    {
-        public LoggingHttpHandler() : base(new HttpClientHandler())
-        {
-        }
-
-        public LoggingHttpHandler(HttpMessageHandler innerHandler) : base(innerHandler)
-        {
-        }
-
-        protected override async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            // 请求前拦截
-            var requestId = Guid.NewGuid().ToString("N")[..8];
-            var startTime = DateTime.UtcNow;
-
-            Console.WriteLine($"[{requestId}] >>> 请求开始: {request.Method} {request.RequestUri}");
-
-            try
-            {
-                var body = await request.Content.ReadAsStringAsync();
-                var response = await base.SendAsync(request, cancellationToken);
-
-                var elapsed = DateTime.UtcNow - startTime;
-
-                // 响应后拦截
-                Console.WriteLine(
-                    $"[{requestId}] <<< 响应完成: {(int)response.StatusCode} {response.StatusCode} | 耗时: {elapsed.TotalMilliseconds:F0}ms");
-
-                // 如果请求失败，记录更多信息
-                if (!response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync(cancellationToken);
-                    Console.WriteLine($"[{requestId}] !!! 错误响应: {content[..Math.Min(500, content.Length)]}");
-                }
-
-                return response;
-            }
-            catch (Exception ex)
-            {
-                var elapsed = DateTime.UtcNow - startTime;
-                Console.WriteLine($"[{requestId}] !!! 请求异常: {ex.Message} | 耗时: {elapsed.TotalMilliseconds:F0}ms");
-                throw;
-            }
-        }
-    }
-
-    /// <summary>
     /// Options for creating an AI agent.
     /// </summary>
     public class AgentCreationOptions
@@ -111,7 +59,10 @@ namespace OpenDeepWiki.Agents
         private static HttpClient CreateHttpClient()
         {
             var handler = new LoggingHttpHandler();
-            return new HttpClient(handler);
+            return new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(300)
+            };
         }
 
         public static ChatClientAgent CreateAgentInternal(

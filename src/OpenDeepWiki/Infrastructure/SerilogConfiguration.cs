@@ -1,6 +1,5 @@
 using Serilog;
 using Serilog.Events;
-using Serilog.Formatting.Compact;
 
 namespace OpenDeepWiki.Infrastructure;
 
@@ -59,71 +58,20 @@ public static class SerilogConfiguration
                 // Enable detailed logging for our services
                 .MinimumLevel.Override("OpenDeepWiki", LogEventLevel.Debug);
 
-            // Console sink - environment-aware log levels with detailed output
-            if (context.HostingEnvironment.IsDevelopment())
-            {
-                configuration.WriteTo.Console(
-                    restrictedToMinimumLevel: LogEventLevel.Debug,
-                    outputTemplate: "[{Timestamp:HH:mm:ss.fff} {Level:u3}] [{ThreadId}] {SourceContext}{NewLine}    {Message:lj}{NewLine}{Exception}");
-            }
-            else
-            {
-                configuration.WriteTo.Console(
-                    restrictedToMinimumLevel: LogEventLevel.Information,
-                    outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] [{MachineName}/{ProcessId}] {SourceContext}{NewLine}    {Message:lj}{NewLine}{Exception}");
-            }
+            // Console sink - all logs except Error (Error goes to file)
+            configuration.WriteTo.Console(
+                restrictedToMinimumLevel: minimumLevel,
+                outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff} {Level:u3}] {SourceContext}{NewLine}    {Message:lj}{NewLine}{Exception}");
 
-            // File sink - all logs with daily rolling (structured JSON)
-            var allLogPath = Path.Combine(logDirectory, "opendeepwiki-.log");
+            // File sink - Error logs only, daily rolling
+            var errorLogPath = Path.Combine(logDirectory, "error-.log");
             configuration.WriteTo.File(
-                allLogPath,
-                restrictedToMinimumLevel: LogEventLevel.Debug,
-                rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: loggingOptions.RetainedFileCountLimit,
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{ThreadId}] [{SourceContext}] {Message:lj}{NewLine}{Properties:j}{NewLine}{Exception}",
-                shared: true,
-                fileSizeLimitBytes: 100 * 1024 * 1024, // 100MB per file
-                rollOnFileSizeLimit: true);
-
-            // File sink - error logging only with daily rolling (JSON format for analysis)
-            var errorLogPath = Path.Combine(logDirectory, "errors-.json");
-            configuration.WriteTo.File(
-                new CompactJsonFormatter(),
                 errorLogPath,
                 restrictedToMinimumLevel: LogEventLevel.Error,
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: loggingOptions.RetainedFileCountLimit,
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Properties:j}{NewLine}{Exception}",
                 shared: true);
-
-            // File sink - repository processing specific logs
-            var processingLogPath = Path.Combine(logDirectory, "processing-.log");
-            configuration.WriteTo.Logger(lc => lc
-                .Filter.ByIncludingOnly(e => 
-                    e.Properties.ContainsKey("SourceContext") &&
-                    e.Properties["SourceContext"].ToString().Contains("Repository") ||
-                    e.Properties["SourceContext"].ToString().Contains("Wiki"))
-                .WriteTo.File(
-                    processingLogPath,
-                    restrictedToMinimumLevel: LogEventLevel.Information,
-                    rollingInterval: RollingInterval.Day,
-                    retainedFileCountLimit: loggingOptions.RetainedFileCountLimit,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}{NewLine}    {Message:lj}{NewLine}{Properties:j}{NewLine}{Exception}",
-                    shared: true));
-
-            // File sink - AI agent specific logs
-            var agentLogPath = Path.Combine(logDirectory, "agents-.log");
-            configuration.WriteTo.Logger(lc => lc
-                .Filter.ByIncludingOnly(e => 
-                    e.Properties.ContainsKey("SourceContext") &&
-                    (e.Properties["SourceContext"].ToString().Contains("Agent") ||
-                     e.Properties["SourceContext"].ToString().Contains("Tool")))
-                .WriteTo.File(
-                    agentLogPath,
-                    restrictedToMinimumLevel: LogEventLevel.Debug,
-                    rollingInterval: RollingInterval.Day,
-                    retainedFileCountLimit: loggingOptions.RetainedFileCountLimit,
-                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext}{NewLine}    {Message:lj}{NewLine}{Properties:j}{NewLine}{Exception}",
-                    shared: true));
         });
 
         return builder;
@@ -144,7 +92,7 @@ public static class SerilogConfiguration
                 diagnosticContext.Set("RequestHost", httpContext.Request.Host.ToString());
                 diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
                 diagnosticContext.Set("QueryString", httpContext.Request.QueryString.ToString());
-                
+
                 // Add user identity if authenticated
                 if (httpContext.User.Identity?.IsAuthenticated == true)
                 {

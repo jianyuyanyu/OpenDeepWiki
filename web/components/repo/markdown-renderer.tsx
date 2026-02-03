@@ -443,7 +443,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           h1: ({ children, ...props }) => {
             const id = getHeadingId(getText(children));
             return (
-              <h1 id={id} className="scroll-mt-24" {...props}>
+              <h1 id={id} data-toc="" className="scroll-mt-24" {...props}>
                 {children}
               </h1>
             );
@@ -451,7 +451,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           h2: ({ children, ...props }) => {
             const id = getHeadingId(getText(children));
             return (
-              <h2 id={id} className="scroll-mt-24" {...props}>
+              <h2 id={id} data-toc="" className="scroll-mt-24" {...props}>
                 {children}
               </h2>
             );
@@ -459,7 +459,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           h3: ({ children, ...props }) => {
             const id = getHeadingId(getText(children));
             return (
-              <h3 id={id} className="scroll-mt-24" {...props}>
+              <h3 id={id} data-toc="" className="scroll-mt-24" {...props}>
                 {children}
               </h3>
             );
@@ -467,7 +467,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           h4: ({ children, ...props }) => {
             const id = getHeadingId(getText(children));
             return (
-              <h4 id={id} className="scroll-mt-24" {...props}>
+              <h4 id={id} data-toc="" className="scroll-mt-24" {...props}>
                 {children}
               </h4>
             );
@@ -475,7 +475,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           h5: ({ children, ...props }) => {
             const id = getHeadingId(getText(children));
             return (
-              <h5 id={id} className="scroll-mt-24" {...props}>
+              <h5 id={id} data-toc="" className="scroll-mt-24" {...props}>
                 {children}
               </h5>
             );
@@ -483,7 +483,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           h6: ({ children, ...props }) => {
             const id = getHeadingId(getText(children));
             return (
-              <h6 id={id} className="scroll-mt-24" {...props}>
+              <h6 id={id} data-toc="" className="scroll-mt-24" {...props}>
                 {children}
               </h6>
             );

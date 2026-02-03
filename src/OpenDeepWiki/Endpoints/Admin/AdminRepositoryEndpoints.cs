@@ -84,6 +84,39 @@ public static class AdminRepositoryEndpoints
         .WithName("AdminUpdateRepositoryStatus")
         .WithSummary("更新仓库状态");
 
+        // 同步单个仓库统计信息
+        repoGroup.MapPost("/{id}/sync-stats", async (
+            string id,
+            [FromServices] IAdminRepositoryService repositoryService) =>
+        {
+            var result = await repositoryService.SyncRepositoryStatsAsync(id);
+            return Results.Ok(new { success = result.Success, message = result.Message, data = result });
+        })
+        .WithName("AdminSyncRepositoryStats")
+        .WithSummary("同步仓库统计信息");
+
+        // 批量同步仓库统计信息
+        repoGroup.MapPost("/batch/sync-stats", async (
+            [FromBody] BatchOperationRequest request,
+            [FromServices] IAdminRepositoryService repositoryService) =>
+        {
+            var result = await repositoryService.BatchSyncRepositoryStatsAsync(request.Ids);
+            return Results.Ok(new { success = true, data = result });
+        })
+        .WithName("AdminBatchSyncRepositoryStats")
+        .WithSummary("批量同步仓库统计信息");
+
+        // 批量删除仓库
+        repoGroup.MapPost("/batch/delete", async (
+            [FromBody] BatchOperationRequest request,
+            [FromServices] IAdminRepositoryService repositoryService) =>
+        {
+            var result = await repositoryService.BatchDeleteRepositoriesAsync(request.Ids);
+            return Results.Ok(new { success = true, data = result });
+        })
+        .WithName("AdminBatchDeleteRepositories")
+        .WithSummary("批量删除仓库");
+
         return group;
     }
 }

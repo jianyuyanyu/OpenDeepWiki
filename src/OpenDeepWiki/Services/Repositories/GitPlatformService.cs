@@ -5,8 +5,11 @@ namespace OpenDeepWiki.Services.Repositories;
 /// <summary>
 /// Git平台服务实现
 /// </summary>
-public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<GitPlatformService> logger) : IGitPlatformService
+public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<GitPlatformService> logger, IConfiguration configuration) : IGitPlatformService
 {
+    private string? GitHubToken => configuration["GitHub:Token"];
+    private string? GiteeToken => configuration["Gitee:Token"];
+    private string? GitLabToken => configuration["GitLab:Token"];
     public async Task<GitRepoStats?> GetRepoStatsAsync(string gitUrl)
     {
         var (platform, owner, repo) = ParseGitUrl(gitUrl);
@@ -88,9 +91,13 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
             var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("User-Agent", "OpenDeepWiki");
             client.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
+            if (!string.IsNullOrEmpty(GitHubToken))
+            {
+                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {GitHubToken}");
+            }
 
             var response = await client.GetAsync($"https://api.github.com/repos/{owner}/{repo}");
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning("获取GitHub仓库信息失败: {Owner}/{Repo}, 状态码: {StatusCode}", owner, repo, response.StatusCode);
@@ -120,8 +127,14 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
             var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("User-Agent", "OpenDeepWiki");
 
-            var response = await client.GetAsync($"https://gitee.com/api/v5/repos/{owner}/{repo}");
-            
+            var url = $"https://gitee.com/api/v5/repos/{owner}/{repo}";
+            if (!string.IsNullOrEmpty(GiteeToken))
+            {
+                url += $"?access_token={GiteeToken}";
+            }
+
+            var response = await client.GetAsync(url);
+
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning("获取Gitee仓库信息失败: {Owner}/{Repo}, 状态码: {StatusCode}", owner, repo, response.StatusCode);
@@ -151,11 +164,15 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
             var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("User-Agent", "OpenDeepWiki");
             client.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
+            if (!string.IsNullOrEmpty(GitHubToken))
+            {
+                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {GitHubToken}");
+            }
 
             // 先获取默认分支
             var repoResponse = await client.GetAsync($"https://api.github.com/repos/{owner}/{repo}");
             string? defaultBranch = null;
-            
+
             if (repoResponse.IsSuccessStatusCode)
             {
                 var repoJson = await repoResponse.Content.ReadAsStringAsync();
@@ -165,7 +182,7 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
 
             // 获取分支列表（最多100个）
             var branchesResponse = await client.GetAsync($"https://api.github.com/repos/{owner}/{repo}/branches?per_page=100");
-            
+
             if (!branchesResponse.IsSuccessStatusCode)
             {
                 logger.LogWarning("获取GitHub分支列表失败: {Owner}/{Repo}, 状态码: {StatusCode}", owner, repo, branchesResponse.StatusCode);
@@ -174,7 +191,7 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
 
             var json = await branchesResponse.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
-            
+
             var branches = doc.RootElement.EnumerateArray()
                 .Select(b => new GitBranchInfo(
                     b.GetProperty("name").GetString() ?? "",
@@ -197,10 +214,12 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
             var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("User-Agent", "OpenDeepWiki");
 
+            var tokenParam = !string.IsNullOrEmpty(GiteeToken) ? $"?access_token={GiteeToken}" : "";
+
             // 先获取默认分支
-            var repoResponse = await client.GetAsync($"https://gitee.com/api/v5/repos/{owner}/{repo}");
+            var repoResponse = await client.GetAsync($"https://gitee.com/api/v5/repos/{owner}/{repo}{tokenParam}");
             string? defaultBranch = null;
-            
+
             if (repoResponse.IsSuccessStatusCode)
             {
                 var repoJson = await repoResponse.Content.ReadAsStringAsync();
@@ -209,8 +228,13 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
             }
 
             // 获取分支列表
-            var branchesResponse = await client.GetAsync($"https://gitee.com/api/v5/repos/{owner}/{repo}/branches?per_page=100");
-            
+            var branchesUrl = $"https://gitee.com/api/v5/repos/{owner}/{repo}/branches?per_page=100";
+            if (!string.IsNullOrEmpty(GiteeToken))
+            {
+                branchesUrl += $"&access_token={GiteeToken}";
+            }
+            var branchesResponse = await client.GetAsync(branchesUrl);
+
             if (!branchesResponse.IsSuccessStatusCode)
             {
                 logger.LogWarning("获取Gitee分支列表失败: {Owner}/{Repo}, 状态码: {StatusCode}", owner, repo, branchesResponse.StatusCode);
@@ -219,7 +243,7 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
 
             var json = await branchesResponse.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
-            
+
             var branches = doc.RootElement.EnumerateArray()
                 .Select(b => new GitBranchInfo(
                     b.GetProperty("name").GetString() ?? "",
@@ -241,10 +265,14 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
         {
             var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("User-Agent", "OpenDeepWiki");
+            if (!string.IsNullOrEmpty(GitLabToken))
+            {
+                client.DefaultRequestHeaders.Add("PRIVATE-TOKEN", GitLabToken);
+            }
 
             var projectPath = Uri.EscapeDataString($"{owner}/{repo}");
             var response = await client.GetAsync($"https://gitlab.com/api/v4/projects/{projectPath}");
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning("获取GitLab仓库信息失败: {Owner}/{Repo}, 状态码: {StatusCode}", owner, repo, response.StatusCode);
@@ -273,13 +301,17 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
         {
             var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("User-Agent", "OpenDeepWiki");
+            if (!string.IsNullOrEmpty(GitLabToken))
+            {
+                client.DefaultRequestHeaders.Add("PRIVATE-TOKEN", GitLabToken);
+            }
 
             var projectPath = Uri.EscapeDataString($"{owner}/{repo}");
-            
+
             // 先获取默认分支
             var repoResponse = await client.GetAsync($"https://gitlab.com/api/v4/projects/{projectPath}");
             string? defaultBranch = null;
-            
+
             if (repoResponse.IsSuccessStatusCode)
             {
                 var repoJson = await repoResponse.Content.ReadAsStringAsync();
@@ -289,7 +321,7 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
 
             // 获取分支列表
             var branchesResponse = await client.GetAsync($"https://gitlab.com/api/v4/projects/{projectPath}/repository/branches?per_page=100");
-            
+
             if (!branchesResponse.IsSuccessStatusCode)
             {
                 logger.LogWarning("获取GitLab分支列表失败: {Owner}/{Repo}, 状态码: {StatusCode}", owner, repo, branchesResponse.StatusCode);
@@ -298,7 +330,7 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
 
             var json = await branchesResponse.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(json);
-            
+
             var branches = doc.RootElement.EnumerateArray()
                 .Select(b => new GitBranchInfo(
                     b.GetProperty("name").GetString() ?? "",
@@ -327,9 +359,13 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
             var client = httpClientFactory.CreateClient();
             client.DefaultRequestHeaders.Add("User-Agent", "OpenDeepWiki");
             client.DefaultRequestHeaders.Add("Accept", "application/vnd.github.v3+json");
+            if (!string.IsNullOrEmpty(GitHubToken))
+            {
+                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {GitHubToken}");
+            }
 
             var response = await client.GetAsync($"https://api.github.com/repos/{owner}/{repo}");
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 return new GitRepoInfo(false, null, null, null, 0, 0, null, null);
@@ -340,17 +376,17 @@ public class GitPlatformService(IHttpClientFactory httpClientFactory, ILogger<Gi
             var root = doc.RootElement;
 
             var name = root.GetProperty("name").GetString();
-            var description = root.TryGetProperty("description", out var descProp) && descProp.ValueKind != JsonValueKind.Null 
-                ? descProp.GetString() 
+            var description = root.TryGetProperty("description", out var descProp) && descProp.ValueKind != JsonValueKind.Null
+                ? descProp.GetString()
                 : null;
             var defaultBranch = root.GetProperty("default_branch").GetString();
             var starCount = root.GetProperty("stargazers_count").GetInt32();
             var forkCount = root.GetProperty("forks_count").GetInt32();
-            var language = root.TryGetProperty("language", out var langProp) && langProp.ValueKind != JsonValueKind.Null 
-                ? langProp.GetString() 
+            var language = root.TryGetProperty("language", out var langProp) && langProp.ValueKind != JsonValueKind.Null
+                ? langProp.GetString()
                 : null;
-            var avatarUrl = root.TryGetProperty("owner", out var ownerProp) 
-                ? ownerProp.GetProperty("avatar_url").GetString() 
+            var avatarUrl = root.TryGetProperty("owner", out var ownerProp)
+                ? ownerProp.GetProperty("avatar_url").GetString()
                 : null;
 
             return new GitRepoInfo(true, name, description, defaultBranch, starCount, forkCount, language, avatarUrl);

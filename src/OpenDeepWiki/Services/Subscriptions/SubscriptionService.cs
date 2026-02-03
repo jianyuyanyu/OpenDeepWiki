@@ -18,7 +18,7 @@ public class SubscriptionService(IContext context)
     /// 添加订阅
     /// 原子性增加仓库订阅计数
     /// </summary>
-    [HttpPost]
+    [HttpPost("/")]
     public async Task<IResult> AddSubscriptionAsync([FromBody] AddSubscriptionRequest request)
     {
         try
@@ -212,7 +212,7 @@ public class SubscriptionService(IContext context)
     /// <summary>
     /// 获取用户订阅列表
     /// </summary>
-    [HttpGet]
+    [HttpGet("/")]
     public async Task<SubscriptionListResponse> GetUserSubscriptionsAsync(
         [FromQuery] string userId,
         [FromQuery] int page = 1,

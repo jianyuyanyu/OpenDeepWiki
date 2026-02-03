@@ -211,27 +211,49 @@ public class CatalogStorage
     }
 
     /// <summary>
-    /// Recursively creates DocCatalog entities from CatalogItems.
+    /// Recursively creates or updates DocCatalog entities from CatalogItems.
+    /// Handles existing records (including soft-deleted ones) to avoid unique constraint violations.
     /// </summary>
     private async Task CreateCatalogItemsAsync(List<CatalogItem> items, string? parentId, CancellationToken cancellationToken)
     {
         foreach (var item in items)
         {
-            var catalog = new DocCatalog
-            {
-                Id = Guid.NewGuid().ToString(),
-                BranchLanguageId = _branchLanguageId,
-                ParentId = parentId,
-                Title = item.Title,
-                Path = item.Path,
-                Order = item.Order
-            };
+            // Check if a record with the same path exists (including soft-deleted)
+            var existingCatalog = await _context.DocCatalogs
+                .FirstOrDefaultAsync(c => c.BranchLanguageId == _branchLanguageId &&
+                                          c.Path == item.Path, cancellationToken);
 
-            _context.DocCatalogs.Add(catalog);
+            string catalogId;
+            if (existingCatalog != null)
+            {
+                // Reuse existing record - update it instead of creating new
+                existingCatalog.ParentId = parentId;
+                existingCatalog.Title = item.Title;
+                existingCatalog.Order = item.Order;
+                existingCatalog.IsDeleted = false;
+                existingCatalog.UpdateTimestamp();
+                catalogId = existingCatalog.Id;
+            }
+            else
+            {
+                // Create new record
+                var catalog = new DocCatalog
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    BranchLanguageId = _branchLanguageId,
+                    ParentId = parentId,
+                    Title = item.Title,
+                    Path = item.Path,
+                    Order = item.Order
+                };
+
+                _context.DocCatalogs.Add(catalog);
+                catalogId = catalog.Id;
+            }
 
             if (item.Children.Count > 0)
             {
-                await CreateCatalogItemsAsync(item.Children, catalog.Id, cancellationToken);
+                await CreateCatalogItemsAsync(item.Children, catalogId, cancellationToken);
             }
         }
     }

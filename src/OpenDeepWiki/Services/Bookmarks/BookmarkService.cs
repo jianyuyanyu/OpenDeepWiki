@@ -20,7 +20,7 @@ public class BookmarkService(IContext context)
     /// </summary>
     /// <param name="request">添加收藏请求</param>
     /// <returns>收藏操作响应</returns>
-    [HttpPost]
+    [HttpPost("/")]
     public async Task<IResult> AddBookmarkAsync([FromBody] AddBookmarkRequest request)
     {
         try
@@ -201,7 +201,7 @@ public class BookmarkService(IContext context)
     /// <param name="page">页码（从1开始）</param>
     /// <param name="pageSize">每页大小</param>
     /// <returns>收藏列表响应</returns>
-    [HttpGet]
+    [HttpGet("/")]
     public async Task<BookmarkListResponse> GetUserBookmarksAsync(
         [FromQuery] string userId,
         [FromQuery] int page = 1,

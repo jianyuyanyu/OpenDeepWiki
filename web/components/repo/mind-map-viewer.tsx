@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Download, ZoomIn, ZoomOut, RotateCcw, List, Network } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useTranslations } from "@/hooks/use-translations";
 
 interface MindMapViewerProps {
   content: string;
@@ -472,6 +473,7 @@ export function MindMapViewer({ content, owner, repo, branch = "main", gitUrl }:
   const [baseScale, setBaseScale] = useState(1);
   const [mounted, setMounted] = useState(false);
   const { resolvedTheme } = useTheme();
+  const t = useTranslations();
 
   const defaultGitUrl = gitUrl || `https://github.com/${owner}/${repo}`;
   const repoName = `${owner}/${repo}`;
@@ -481,6 +483,23 @@ export function MindMapViewer({ content, owner, repo, branch = "main", gitUrl }:
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // 鼠标滚轮缩放
+  useEffect(() => {
+    if (!mounted || viewMode !== "mindmap" || !containerRef.current) return;
+
+    const container = containerRef.current;
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        setScale(s => Math.min(Math.max(s + delta, 0.3), 3));
+      }
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [mounted, viewMode]);
 
   // 绘制思维导图
   useEffect(() => {
@@ -553,15 +572,15 @@ export function MindMapViewer({ content, owner, repo, branch = "main", gitUrl }:
   if (treeNodes.length === 0 && !content.trim()) {
     return (
       <div className="text-center py-12 text-fd-muted-foreground">
-        <p>思维导图内容为空</p>
+        <p>{t("mindmap.emptyContent")}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 px-4 md:px-6 lg:px-8">
       {/* 工具栏 */}
-      <div className="flex items-center justify-between gap-4 p-3 bg-fd-muted/30 rounded-lg">
+      <div className="flex items-center justify-between gap-4 p-3 bg-fd-muted/30 rounded-lg flex-wrap">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setViewMode("mindmap")}
@@ -570,7 +589,7 @@ export function MindMapViewer({ content, owner, repo, branch = "main", gitUrl }:
             }`}
           >
             <Network className="h-4 w-4" />
-            思维导图
+            {t("mindmap.toolbar.mindmap")}
           </button>
           <button
             onClick={() => setViewMode("list")}
@@ -579,21 +598,21 @@ export function MindMapViewer({ content, owner, repo, branch = "main", gitUrl }:
             }`}
           >
             <List className="h-4 w-4" />
-            列表视图
+            {t("mindmap.toolbar.list")}
           </button>
         </div>
 
         {viewMode === "mindmap" && (
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 border rounded-md">
-              <button onClick={handleZoomOut} className="p-1.5 hover:bg-fd-muted rounded-l-md" title="缩小">
+              <button onClick={handleZoomOut} className="p-1.5 hover:bg-fd-muted rounded-l-md" title={t("mindmap.toolbar.zoomOut")}>
                 <ZoomOut className="h-4 w-4" />
               </button>
               <span className="px-2 text-sm min-w-[3rem] text-center">{Math.round(actualScale * 100)}%</span>
-              <button onClick={handleZoomIn} className="p-1.5 hover:bg-fd-muted" title="放大">
+              <button onClick={handleZoomIn} className="p-1.5 hover:bg-fd-muted" title={t("mindmap.toolbar.zoomIn")}>
                 <ZoomIn className="h-4 w-4" />
               </button>
-              <button onClick={handleResetZoom} className="p-1.5 hover:bg-fd-muted rounded-r-md border-l" title="重置">
+              <button onClick={handleResetZoom} className="p-1.5 hover:bg-fd-muted rounded-r-md border-l" title={t("mindmap.toolbar.reset")}>
                 <RotateCcw className="h-4 w-4" />
               </button>
             </div>
@@ -612,9 +631,12 @@ export function MindMapViewer({ content, owner, repo, branch = "main", gitUrl }:
       {/* 思维导图视图 */}
       {viewMode === "mindmap" && (
         <div className="border rounded-lg overflow-hidden bg-fd-card">
-          <div ref={containerRef} className="overflow-auto flex items-center justify-center p-4" style={{ minHeight: "400px", maxHeight: "70vh" }}>
+          <div ref={containerRef} className="overflow-auto flex items-center justify-center p-4 relative" style={{ minHeight: "calc(100vh - 280px)" }}>
             <div className="transition-transform duration-200" style={{ transform: `scale(${actualScale})`, transformOrigin: "center center" }}>
               <canvas ref={canvasRef} />
+            </div>
+            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-fd-muted-foreground bg-fd-background/80 px-2 py-1 rounded">
+              Ctrl/Cmd + {t("mindmap.tips.scroll")}
             </div>
           </div>
         </div>
@@ -623,7 +645,7 @@ export function MindMapViewer({ content, owner, repo, branch = "main", gitUrl }:
       {/* 列表视图 */}
       {viewMode === "list" && (
         <div className="border rounded-lg p-4 bg-fd-card">
-          <div className="text-sm text-fd-muted-foreground mb-4">点击节点展开/折叠 • 点击文件路径跳转到源代码</div>
+          <div className="text-sm text-fd-muted-foreground mb-4">{t("mindmap.tips.expand")} • {t("mindmap.tips.link")}</div>
           <div className="space-y-1">
             {treeNodes.map((node, index) => (
               <ListNodeItem key={`${node.title}-${index}`} node={node} gitUrl={defaultGitUrl} branch={branch} />

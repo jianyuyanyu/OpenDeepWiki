@@ -12,4 +12,19 @@ public interface IAdminRepositoryService
     Task<bool> UpdateRepositoryAsync(string id, UpdateRepositoryRequest request);
     Task<bool> DeleteRepositoryAsync(string id);
     Task<bool> UpdateRepositoryStatusAsync(string id, int status);
+    
+    /// <summary>
+    /// 同步单个仓库的统计信息（star、fork等）
+    /// </summary>
+    Task<SyncStatsResult> SyncRepositoryStatsAsync(string id);
+    
+    /// <summary>
+    /// 批量同步仓库统计信息
+    /// </summary>
+    Task<BatchSyncStatsResult> BatchSyncRepositoryStatsAsync(string[] ids);
+    
+    /// <summary>
+    /// 批量删除仓库
+    /// </summary>
+    Task<BatchDeleteResult> BatchDeleteRepositoriesAsync(string[] ids);
 }

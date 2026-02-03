@@ -17,7 +17,7 @@ if (fs.existsSync(envLocalPath)) {
 }
 
 // 获取环境变量，构建时会被"烘焙"进去
-const apiUrl = process.env.API_PROXY_URL || 'http://localhost:5265';
+const apiUrl = process.env.API_PROXY_URL;
 
 console.log('[Next.js Build] API_PROXY_URL:', apiUrl);
 

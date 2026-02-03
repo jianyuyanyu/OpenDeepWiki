@@ -6,6 +6,11 @@ namespace OpenDeepWiki.Models;
 public class RepositoryDocResponse
 {
     /// <summary>
+    /// 文档是否存在
+    /// </summary>
+    public bool Exists { get; set; } = true;
+
+    /// <summary>
     /// 文档路径（slug）
     /// </summary>
     public string Slug { get; set; } = string.Empty;

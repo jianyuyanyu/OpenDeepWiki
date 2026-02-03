@@ -70,7 +70,8 @@ export function BranchLanguageSelector({
     if (currentBranch) {
       params.set("branch", currentBranch);
     }
-    router.push(`${pathname}?${params.toString()}`);
+    // 使用 window.location 强制刷新页面，确保 middleware 重新执行以更新 i18n locale
+    window.location.href = `${pathname}?${params.toString()}`;
   };
 
   // 如果没有分支和语言数据，不显示选择器

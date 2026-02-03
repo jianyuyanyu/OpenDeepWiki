@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -29,9 +30,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   getRepositories,
   deleteRepository,
   updateRepositoryStatus,
+  syncRepositoryStats,
+  batchSyncRepositoryStats,
+  batchDeleteRepositories,
   AdminRepository,
   RepositoryListResponse,
 } from "@/lib/admin-api";
@@ -45,6 +55,9 @@ import {
   ChevronRight,
   Globe,
   Lock,
+  RotateCcw,
+  MoreHorizontal,
+  CheckSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -71,6 +84,11 @@ export default function AdminRepositoriesPage() {
   const [status, setStatus] = useState("all");
   const [selectedRepo, setSelectedRepo] = useState<AdminRepository | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const [batchSyncing, setBatchSyncing] = useState(false);
+  const [batchDeleting, setBatchDeleting] = useState(false);
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -82,6 +100,7 @@ export default function AdminRepositoriesPage() {
         status === "all" ? undefined : parseInt(status)
       );
       setData(result);
+      setSelectedIds(new Set());
     } catch (error) {
       console.error("Failed to fetch repositories:", error);
       toast.error("获取仓库列表失败");
@@ -121,7 +140,76 @@ export default function AdminRepositoriesPage() {
     }
   };
 
+  const handleSyncStats = async (id: string) => {
+    setSyncing(id);
+    try {
+      const result = await syncRepositoryStats(id);
+      if (result.success) {
+        toast.success(`同步成功: ⭐ ${result.starCount} 🍴 ${result.forkCount}`);
+        fetchData();
+      } else {
+        toast.error(result.message || "同步失败");
+      }
+    } catch (error) {
+      toast.error("同步失败");
+    } finally {
+      setSyncing(null);
+    }
+  };
+
+  const handleBatchSync = async () => {
+    if (selectedIds.size === 0) {
+      toast.warning("请先选择要同步的仓库");
+      return;
+    }
+    setBatchSyncing(true);
+    try {
+      const result = await batchSyncRepositoryStats(Array.from(selectedIds));
+      toast.success(`批量同步完成: 成功 ${result.successCount} 个，失败 ${result.failedCount} 个`);
+      fetchData();
+    } catch (error) {
+      toast.error("批量同步失败");
+    } finally {
+      setBatchSyncing(false);
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    setBatchDeleting(true);
+    try {
+      const result = await batchDeleteRepositories(Array.from(selectedIds));
+      toast.success(`批量删除完成: 成功 ${result.successCount} 个，失败 ${result.failedCount} 个`);
+      setShowBatchDeleteConfirm(false);
+      fetchData();
+    } catch (error) {
+      toast.error("批量删除失败");
+    } finally {
+      setBatchDeleting(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (!data) return;
+    if (selectedIds.size === data.items.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(data.items.map((r) => r.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  };
+
   const totalPages = data ? Math.ceil(data.total / data.pageSize) : 0;
+  const allSelected = data && data.items.length > 0 && selectedIds.size === data.items.length;
+  const someSelected = selectedIds.size > 0 && !allSelected;
 
   return (
     <div className="space-y-6">
@@ -164,6 +252,47 @@ export default function AdminRepositoriesPage() {
         </div>
       </Card>
 
+      {/* 批量操作栏 */}
+      {selectedIds.size > 0 && (
+        <Card className="p-3 bg-muted/50">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              已选择 {selectedIds.size} 个仓库
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBatchSync}
+                disabled={batchSyncing}
+              >
+                {batchSyncing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                )}
+                批量同步统计
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setShowBatchDeleteConfirm(true)}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                批量删除
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                取消选择
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* 仓库列表 */}
       <Card>
         {loading ? (
@@ -176,6 +305,13 @@ export default function AdminRepositoriesPage() {
               <table className="w-full">
                 <thead className="border-b bg-muted/50">
                   <tr>
+                    <th className="px-4 py-3 text-left">
+                      <Checkbox
+                        checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="全选"
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-sm font-medium">仓库</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">可见性</th>
                     <th className="px-4 py-3 text-left text-sm font-medium">状态</th>
@@ -186,7 +322,14 @@ export default function AdminRepositoriesPage() {
                 </thead>
                 <tbody className="divide-y">
                   {data?.items.map((repo) => (
-                    <tr key={repo.id} className="hover:bg-muted/50">
+                    <tr key={repo.id} className={`hover:bg-muted/50 ${selectedIds.has(repo.id) ? "bg-muted/30" : ""}`}>
+                      <td className="px-4 py-3">
+                        <Checkbox
+                          checked={selectedIds.has(repo.id)}
+                          onCheckedChange={() => toggleSelect(repo.id)}
+                          aria-label={`选择 ${repo.repoName}`}
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <div>
                           <p className="font-medium">{repo.orgName}/{repo.repoName}</p>
@@ -227,7 +370,7 @@ export default function AdminRepositoriesPage() {
                       <td className="px-4 py-3">
                         <div className="text-sm">
                           <span className="text-muted-foreground">⭐ {repo.starCount}</span>
-                          <span className="ml-2 text-muted-foreground">🔖 {repo.bookmarkCount}</span>
+                          <span className="ml-2 text-muted-foreground">🍴 {repo.forkCount}</span>
                           <span className="ml-2 text-muted-foreground">👁 {repo.viewCount}</span>
                         </div>
                       </td>
@@ -235,11 +378,25 @@ export default function AdminRepositoriesPage() {
                         {new Date(repo.createdAt).toLocaleDateString("zh-CN")}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleSyncStats(repo.id)}
+                            disabled={syncing === repo.id}
+                            title="同步统计信息"
+                          >
+                            {syncing === repo.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="h-4 w-4" />
+                            )}
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => setSelectedRepo(repo)}
+                            title="查看详情"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -247,6 +404,7 @@ export default function AdminRepositoriesPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => setDeleteId(repo.id)}
+                            title="删除"
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -317,10 +475,14 @@ export default function AdminRepositoriesPage() {
                   <p>{selectedRepo.isPublic ? "公开" : "私有"}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div>
                   <label className="text-sm font-medium">Star</label>
                   <p>{selectedRepo.starCount}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Fork</label>
+                  <p>{selectedRepo.forkCount}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium">收藏</label>
@@ -358,6 +520,35 @@ export default function AdminRepositoriesPage() {
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
               删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 批量删除确认对话框 */}
+      <AlertDialog open={showBatchDeleteConfirm} onOpenChange={setShowBatchDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认批量删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              此操作将删除选中的 {selectedIds.size} 个仓库及其所有相关数据，且无法恢复。确定要继续吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={batchDeleting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBatchDelete}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={batchDeleting}
+            >
+              {batchDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  删除中...
+                </>
+              ) : (
+                "确认删除"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
