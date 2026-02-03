@@ -29,6 +29,8 @@
     "models": "モデル設定",
     "roles": "ロール管理",
     "users": "ユーザー管理",
+    "departments": "部門管理",
+    "chatAssistant": "チャットアシスタント",
     "settings": "システム設定",
     "refresh": "更新",
     "create": "新規作成",

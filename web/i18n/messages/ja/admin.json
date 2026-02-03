@@ -194,7 +194,9 @@
     "allowedTools": "許可されたツール",
     "description": "説明",
     "deleteWarning": "このスキルを削除しますか？ディスク上のフォルダも削除されます。この操作は元に戻せません。",
-    "onlyZip": "ZIP形式のみサポートされています"
+    "onlyZip": "ZIP形式のみサポートされています",
+    "enabled": "有効",
+    "disabled": "無効"
   },
   "models": {
     "title": "モデル設定",

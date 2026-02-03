@@ -19,51 +19,52 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api-client";
+import { useTranslations } from "@/hooks/use-translations";
 
-const navItems = [
+const getNavItems = (t: (key: string) => string) => [
   {
     href: "/admin",
     icon: LayoutDashboard,
-    label: "仪表盘",
+    label: t('common.admin.dashboard'),
   },
   {
     href: "/admin/repositories",
     icon: GitBranch,
-    label: "仓库管理",
+    label: t('common.admin.repositories'),
   },
   {
-    label: "工具配置",
+    label: t('common.admin.tools'),
     icon: Wrench,
     children: [
-      { href: "/admin/tools/mcps", label: "MCPs 管理" },
-      { href: "/admin/tools/skills", label: "Skills 管理" },
-      { href: "/admin/tools/models", label: "模型配置" },
+      { href: "/admin/tools/mcps", label: t('common.admin.mcps') },
+      { href: "/admin/tools/skills", label: t('common.admin.skills') },
+      { href: "/admin/tools/models", label: t('common.admin.models') },
     ],
   },
   {
     href: "/admin/roles",
     icon: Shield,
-    label: "角色管理",
+    label: t('common.admin.roles'),
   },
   {
     href: "/admin/departments",
     icon: Building2,
-    label: "部门管理",
+    label: t('admin.departments.title'),
   },
   {
     href: "/admin/users",
     icon: Users,
-    label: "用户管理",
+    label: t('common.admin.users'),
   },
   {
     href: "/admin/chat-assistant",
     icon: MessageCircle,
-    label: "对话助手",
+    label: t('admin.chatAssistant.title'),
   },
   {
     href: "/admin/settings",
     icon: Cog,
-    label: "系统设置",
+    label: t('common.admin.settings'),
   },
 ];
 
@@ -75,7 +76,9 @@ interface VersionInfo {
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const [expandedItems, setExpandedItems] = React.useState<string[]>(["工具配置"]);
+  const t = useTranslations();
+  const navItems = getNavItems(t);
+  const [expandedItems, setExpandedItems] = React.useState<string[]>([t('common.admin.tools')]);
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
 
   useEffect(() => {
@@ -104,9 +107,9 @@ export function AdminSidebar() {
     <aside className="w-64 border-r bg-card flex flex-col">
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold">管理后台</h1>
+          <h1 className="text-lg font-semibold">{t('common.adminPanel')}</h1>
           <Link href="/">
-            <Button variant="ghost" size="icon" title="返回首页">
+            <Button variant="ghost" size="icon" title={t('common.backToHome')}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
           </Link>

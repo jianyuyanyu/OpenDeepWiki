@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -47,6 +47,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "@/hooks/use-translations";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -64,6 +65,7 @@ export default function AdminSkillsPage() {
   const [selectedDetail, setSelectedDetail] = useState<SkillDetail | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const t = useTranslations();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -72,11 +74,11 @@ export default function AdminSkillsPage() {
       setConfigs(result);
     } catch (error) {
       console.error("Failed to fetch Skill configs:", error);
-      toast.error("获取 Skills 列表失败");
+      toast.error(t('admin.toast.fetchSkillFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -91,17 +93,17 @@ export default function AdminSkillsPage() {
     if (!file) return;
 
     if (!file.name.endsWith(".zip")) {
-      toast.error("只支持 ZIP 格式的压缩包");
+      toast.error(t('admin.skills.onlyZip'));
       return;
     }
 
     setUploading(true);
     try {
       await uploadSkill(file);
-      toast.success("Skill 上传成功");
+      toast.success(t('admin.toast.uploadSuccess'));
       fetchData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "上传失败");
+      toast.error(error instanceof Error ? error.message : t('admin.toast.uploadFailed'));
     } finally {
       setUploading(false);
       if (fileInputRef.current) {
@@ -116,7 +118,7 @@ export default function AdminSkillsPage() {
       setSelectedDetail(detail);
       setDetailDialog(true);
     } catch (error) {
-      toast.error("获取详情失败");
+      toast.error(t('admin.toast.fetchDetailFailed'));
     }
   };
 
@@ -124,31 +126,31 @@ export default function AdminSkillsPage() {
     if (!deleteId) return;
     try {
       await deleteSkillConfig(deleteId);
-      toast.success("删除成功");
+      toast.success(t('admin.toast.deleteSuccess'));
       setDeleteId(null);
       fetchData();
     } catch (error) {
-      toast.error("删除失败");
+      toast.error(t('admin.toast.deleteFailed'));
     }
   };
 
   const handleToggleActive = async (config: SkillConfig) => {
     try {
       await updateSkillConfig(config.id, { isActive: !config.isActive });
-      toast.success(config.isActive ? "已禁用" : "已启用");
+      toast.success(config.isActive ? t('admin.skills.disabled') : t('admin.skills.enabled'));
       fetchData();
     } catch (error) {
-      toast.error("操作失败");
+      toast.error(t('admin.toast.operationFailed'));
     }
   };
 
   const handleRefresh = async () => {
     try {
       await refreshSkills();
-      toast.success("刷新完成");
+      toast.success(t('admin.toast.refreshSuccess'));
       fetchData();
     } catch (error) {
-      toast.error("刷新失败");
+      toast.error(t('admin.toast.refreshFailed'));
     }
   };
 
@@ -156,15 +158,15 @@ export default function AdminSkillsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Agent Skills 管理</h1>
+          <h1 className="text-2xl font-bold">{t('admin.skills.title')}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            遵循 <a href="https://agentskills.io" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Agent Skills 开放标准</a>
+            {t('admin.skills.subtitle')} <a href="https://agentskills.io" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Agent Skills</a>
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleRefresh}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            从磁盘刷新
+            {t('admin.skills.refreshFromDisk')}
           </Button>
           <Button onClick={handleUploadClick} disabled={uploading}>
             {uploading ? (
@@ -172,7 +174,7 @@ export default function AdminSkillsPage() {
             ) : (
               <Upload className="mr-2 h-4 w-4" />
             )}
-            上传 Skill
+            {t('admin.skills.uploadSkill')}
           </Button>
           <input
             ref={fileInputRef}
@@ -189,10 +191,9 @@ export default function AdminSkillsPage() {
         <div className="flex items-start gap-3">
           <Package className="h-5 w-5 text-muted-foreground mt-0.5" />
           <div className="text-sm">
-            <p className="font-medium">上传说明</p>
+            <p className="font-medium">{t('admin.skills.uploadTip')}</p>
             <p className="text-muted-foreground mt-1">
-              上传包含 <code className="bg-muted px-1 rounded">SKILL.md</code> 文件的 ZIP 压缩包。
-              SKILL.md 必须包含 <code className="bg-muted px-1 rounded">name</code> 和 <code className="bg-muted px-1 rounded">description</code> 字段。
+              {t('admin.skills.uploadDesc')}
             </p>
           </div>
         </div>
@@ -207,10 +208,10 @@ export default function AdminSkillsPage() {
         <Card className="flex h-64 items-center justify-center">
           <div className="text-center">
             <Sparkles className="mx-auto h-12 w-12 text-muted-foreground" />
-            <p className="mt-4 text-muted-foreground">暂无 Skills</p>
+            <p className="mt-4 text-muted-foreground">{t('admin.skills.noSkills')}</p>
             <Button className="mt-4" onClick={handleUploadClick}>
               <Upload className="mr-2 h-4 w-4" />
-              上传第一个 Skill
+              {t('admin.skills.uploadFirst')}
             </Button>
           </div>
         </Card>
@@ -300,30 +301,30 @@ export default function AdminSkillsPage() {
               {/* 基本信息 */}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-muted-foreground">版本:</span>
+                  <span className="text-muted-foreground">{t('admin.skills.version')}:</span>
                   <span className="ml-2">{selectedDetail.version}</span>
                 </div>
                 {selectedDetail.author && (
                   <div>
-                    <span className="text-muted-foreground">作者:</span>
+                    <span className="text-muted-foreground">{t('admin.skills.author')}:</span>
                     <span className="ml-2">{selectedDetail.author}</span>
                   </div>
                 )}
                 {selectedDetail.license && (
                   <div>
-                    <span className="text-muted-foreground">许可证:</span>
+                    <span className="text-muted-foreground">{t('admin.skills.license')}:</span>
                     <span className="ml-2">{selectedDetail.license}</span>
                   </div>
                 )}
                 {selectedDetail.compatibility && (
                   <div className="col-span-2">
-                    <span className="text-muted-foreground">兼容性:</span>
+                    <span className="text-muted-foreground">{t('admin.skills.compatibility')}:</span>
                     <span className="ml-2">{selectedDetail.compatibility}</span>
                   </div>
                 )}
                 {selectedDetail.allowedTools && (
                   <div className="col-span-2">
-                    <span className="text-muted-foreground">允许的工具:</span>
+                    <span className="text-muted-foreground">{t('admin.skills.allowedTools')}:</span>
                     <span className="ml-2 font-mono text-xs">{selectedDetail.allowedTools}</span>
                   </div>
                 )}
@@ -331,7 +332,7 @@ export default function AdminSkillsPage() {
 
               {/* 描述 */}
               <div>
-                <h4 className="font-medium mb-2">描述</h4>
+                <h4 className="font-medium mb-2">{t('admin.skills.description')}</h4>
                 <p className="text-sm text-muted-foreground">{selectedDetail.description}</p>
               </div>
 
@@ -410,15 +411,15 @@ export default function AdminSkillsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogTitle>{t('admin.common.confirmDelete')}</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除此 Skill 吗？这将同时删除磁盘上的文件夹，此操作无法撤销。
+              {t('admin.skills.deleteWarning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{t('admin.common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              删除
+              {t('admin.common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

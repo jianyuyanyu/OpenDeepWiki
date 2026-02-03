@@ -194,7 +194,9 @@
     "allowedTools": "Allowed Tools",
     "description": "Description",
     "deleteWarning": "Are you sure you want to delete this Skill? This will also delete the folder on disk. This action cannot be undone.",
-    "onlyZip": "Only ZIP format is supported"
+    "onlyZip": "Only ZIP format is supported",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
   },
   "models": {
     "title": "Model Configuration",

@@ -27,6 +27,8 @@
     "models": "模型配置",
     "roles": "角色管理",
     "users": "用户管理",
+    "departments": "部门管理",
+    "chatAssistant": "对话助手",
     "settings": "系统设置",
     "refresh": "刷新",
     "create": "新增",

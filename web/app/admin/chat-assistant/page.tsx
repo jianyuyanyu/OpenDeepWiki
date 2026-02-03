@@ -29,11 +29,13 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "@/hooks/use-translations";
 
 export default function AdminChatAssistantPage() {
   const [configOptions, setConfigOptions] = useState<ChatAssistantConfigOptions | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const t = useTranslations();
 
   // 编辑状态
   const [isEnabled, setIsEnabled] = useState(false);
@@ -55,11 +57,11 @@ export default function AdminChatAssistantPage() {
       setDefaultModelId(result.config.defaultModelId);
     } catch (error) {
       console.error("Failed to fetch chat assistant config:", error);
-      toast.error("获取对话助手配置失败");
+      toast.error(t('admin.toast.fetchConfigFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -75,11 +77,11 @@ export default function AdminChatAssistantPage() {
         enabledSkillIds: selectedSkillIds,
         defaultModelId,
       });
-      toast.success("配置保存成功");
+      toast.success(t('admin.toast.configSaveSuccess'));
       fetchData();
     } catch (error) {
       console.error("Failed to save config:", error);
-      toast.error("保存配置失败");
+      toast.error(t('admin.toast.configSaveFailed'));
     } finally {
       setSaving(false);
     }
@@ -128,12 +130,12 @@ export default function AdminChatAssistantPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <MessageCircle className="h-6 w-6" />
-          <h1 className="text-2xl font-bold">对话助手配置</h1>
+          <h1 className="text-2xl font-bold">{t('admin.chatAssistant.title')}</h1>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchData}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            刷新
+            {t('admin.common.refresh')}
           </Button>
           <Button onClick={handleSave} disabled={saving || !hasChanges}>
             {saving ? (
@@ -141,7 +143,7 @@ export default function AdminChatAssistantPage() {
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            保存配置
+            {t('admin.chatAssistant.saveConfig')}
           </Button>
         </div>
       </div>
@@ -150,9 +152,9 @@ export default function AdminChatAssistantPage() {
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <Label className="text-base font-medium">启用对话助手</Label>
+            <Label className="text-base font-medium">{t('admin.chatAssistant.enableAssistant')}</Label>
             <p className="text-sm text-muted-foreground">
-              启用后，文档页面将显示对话助手悬浮球
+              {t('admin.chatAssistant.enableDesc')}
             </p>
           </div>
           <Switch checked={isEnabled} onCheckedChange={setIsEnabled} />
@@ -164,15 +166,15 @@ export default function AdminChatAssistantPage() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Bot className="h-5 w-5" />
-            <h2 className="text-lg font-semibold">可用模型</h2>
+            <h2 className="text-lg font-semibold">{t('admin.chatAssistant.availableModels')}</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            选择对话助手可以使用的AI模型
+            {t('admin.chatAssistant.selectModelsDesc')}
           </p>
 
           {configOptions?.availableModels.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">
-              暂无可用模型，请先在工具配置中添加模型
+              {t('admin.chatAssistant.noModels')}
             </p>
           ) : (
             <div className="grid gap-3">
@@ -201,7 +203,7 @@ export default function AdminChatAssistantPage() {
                   </div>
                   {!model.isActive && (
                     <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">
-                      未激活
+                      {t('admin.chatAssistant.inactive')}
                     </span>
                   )}
                 </div>
@@ -212,13 +214,13 @@ export default function AdminChatAssistantPage() {
           {/* 默认模型选择 */}
           {selectedModels.length > 0 && (
             <div className="pt-4 border-t">
-              <Label className="text-sm font-medium">默认模型</Label>
+              <Label className="text-sm font-medium">{t('admin.chatAssistant.defaultModel')}</Label>
               <p className="text-xs text-muted-foreground mb-2">
-                用户打开对话面板时默认选中的模型
+                {t('admin.chatAssistant.defaultModelDesc')}
               </p>
               <Select value={defaultModelId} onValueChange={setDefaultModelId}>
                 <SelectTrigger className="w-full max-w-xs">
-                  <SelectValue placeholder="选择默认模型" />
+                  <SelectValue placeholder={t('admin.chatAssistant.selectDefaultModel')} />
                 </SelectTrigger>
                 <SelectContent>
                   {selectedModels.map((model) => (
@@ -238,15 +240,15 @@ export default function AdminChatAssistantPage() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Wrench className="h-5 w-5" />
-            <h2 className="text-lg font-semibold">可用MCPs</h2>
+            <h2 className="text-lg font-semibold">{t('admin.chatAssistant.availableMcps')}</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            选择对话助手可以调用的MCP工具
+            {t('admin.chatAssistant.selectMcpsDesc')}
           </p>
 
           {configOptions?.availableMcps.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">
-              暂无可用MCP，请先在工具配置中添加MCP
+              {t('admin.chatAssistant.noMcps')}
             </p>
           ) : (
             <div className="grid gap-3">
@@ -275,7 +277,7 @@ export default function AdminChatAssistantPage() {
                   </div>
                   {!mcp.isActive && (
                     <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">
-                      未激活
+                      {t('admin.chatAssistant.inactive')}
                     </span>
                   )}
                 </div>
@@ -290,15 +292,15 @@ export default function AdminChatAssistantPage() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5" />
-            <h2 className="text-lg font-semibold">可用Skills</h2>
+            <h2 className="text-lg font-semibold">{t('admin.chatAssistant.availableSkills')}</h2>
           </div>
           <p className="text-sm text-muted-foreground">
-            选择对话助手可以使用的技能
+            {t('admin.chatAssistant.selectSkillsDesc')}
           </p>
 
           {configOptions?.availableSkills.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4">
-              暂无可用Skill，请先在工具配置中添加Skill
+              {t('admin.chatAssistant.noSkills')}
             </p>
           ) : (
             <div className="grid gap-3">
@@ -327,7 +329,7 @@ export default function AdminChatAssistantPage() {
                   </div>
                   {!skill.isActive && (
                     <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded">
-                      未激活
+                      {t('admin.chatAssistant.inactive')}
                     </span>
                   )}
                 </div>
@@ -346,7 +348,7 @@ export default function AdminChatAssistantPage() {
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            保存配置
+            {t('admin.chatAssistant.saveConfig')}
           </Button>
         </div>
       )}

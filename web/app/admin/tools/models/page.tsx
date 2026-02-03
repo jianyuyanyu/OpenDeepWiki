@@ -49,14 +49,7 @@ import {
   Star,
 } from "lucide-react";
 import { toast } from "sonner";
-
-const providers = [
-  { value: "OpenAI", label: "OpenAI" },
-  { value: "Anthropic", label: "Anthropic" },
-  { value: "AzureOpenAI", label: "Azure OpenAI" },
-  { value: "Google", label: "Google" },
-  { value: "Custom", label: "自定义" },
-];
+import { useTranslations } from "@/hooks/use-translations";
 
 export default function AdminModelsPage() {
   const [configs, setConfigs] = useState<ModelConfig[]>([]);
@@ -74,6 +67,15 @@ export default function AdminModelsPage() {
     isActive: true,
     description: "",
   });
+  const t = useTranslations();
+
+  const providers = [
+    { value: "OpenAI", label: "OpenAI" },
+    { value: "Anthropic", label: "Anthropic" },
+    { value: "AzureOpenAI", label: "Azure OpenAI" },
+    { value: "Google", label: "Google" },
+    { value: "Custom", label: t('admin.models.custom') },
+  ];
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -82,11 +84,11 @@ export default function AdminModelsPage() {
       setConfigs(result);
     } catch (error) {
       console.error("Failed to fetch Model configs:", error);
-      toast.error("获取模型配置失败");
+      toast.error(t('admin.toast.fetchModelFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -124,21 +126,21 @@ export default function AdminModelsPage() {
 
   const handleSave = async () => {
     if (!formData.name.trim() || !formData.modelId.trim()) {
-      toast.error("请填写必填项");
+      toast.error(t('admin.toast.fillRequired'));
       return;
     }
     try {
       if (editingConfig) {
         await updateModelConfig(editingConfig.id, formData);
-        toast.success("更新成功");
+        toast.success(t('admin.toast.updateSuccess'));
       } else {
         await createModelConfig(formData);
-        toast.success("创建成功");
+        toast.success(t('admin.toast.createSuccess'));
       }
       setShowDialog(false);
       fetchData();
     } catch (error) {
-      toast.error(editingConfig ? "更新失败" : "创建失败");
+      toast.error(editingConfig ? t('admin.toast.updateFailed') : t('admin.toast.createFailed'));
     }
   };
 
@@ -146,21 +148,21 @@ export default function AdminModelsPage() {
     if (!deleteId) return;
     try {
       await deleteModelConfig(deleteId);
-      toast.success("删除成功");
+      toast.success(t('admin.toast.deleteSuccess'));
       setDeleteId(null);
       fetchData();
     } catch (error) {
-      toast.error("删除失败");
+      toast.error(t('admin.toast.deleteFailed'));
     }
   };
 
   const handleToggleActive = async (config: ModelConfig) => {
     try {
       await updateModelConfig(config.id, { isActive: !config.isActive });
-      toast.success(config.isActive ? "已禁用" : "已启用");
+      toast.success(config.isActive ? t('admin.models.disabled') : t('admin.models.enabled'));
       fetchData();
     } catch (error) {
-      toast.error("操作失败");
+      toast.error(t('admin.toast.operationFailed'));
     }
   };
 
@@ -168,25 +170,25 @@ export default function AdminModelsPage() {
     if (config.isDefault) return;
     try {
       await updateModelConfig(config.id, { isDefault: true });
-      toast.success("已设为默认模型");
+      toast.success(t('admin.toast.setDefaultSuccess'));
       fetchData();
     } catch (error) {
-      toast.error("操作失败");
+      toast.error(t('admin.toast.operationFailed'));
     }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">模型配置</h1>
+        <h1 className="text-2xl font-bold">{t('admin.models.title')}</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchData}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            刷新
+            {t('admin.common.refresh')}
           </Button>
           <Button onClick={openCreateDialog}>
             <Plus className="mr-2 h-4 w-4" />
-            新增模型
+            {t('admin.models.createModel')}
           </Button>
         </div>
       </div>
@@ -200,10 +202,10 @@ export default function AdminModelsPage() {
         <Card className="flex h-64 items-center justify-center">
           <div className="text-center">
             <Bot className="mx-auto h-12 w-12 text-muted-foreground" />
-            <p className="mt-4 text-muted-foreground">暂无模型配置</p>
+            <p className="mt-4 text-muted-foreground">{t('admin.models.noModels')}</p>
             <Button className="mt-4" onClick={openCreateDialog}>
               <Plus className="mr-2 h-4 w-4" />
-              添加第一个模型
+              {t('admin.models.addFirst')}
             </Button>
           </div>
         </Card>
@@ -249,11 +251,11 @@ export default function AdminModelsPage() {
                 <div className="flex items-center gap-2">
                   {config.isActive ? (
                     <span className="flex items-center gap-1 text-xs text-green-600">
-                      <CheckCircle className="h-3 w-3" /> 已启用
+                      <CheckCircle className="h-3 w-3" /> {t('admin.models.enabled')}
                     </span>
                   ) : (
                     <span className="flex items-center gap-1 text-xs text-gray-400">
-                      <XCircle className="h-3 w-3" /> 已禁用
+                      <XCircle className="h-3 w-3" /> {t('admin.models.disabled')}
                     </span>
                   )}
                 </div>
@@ -264,7 +266,7 @@ export default function AdminModelsPage() {
                       size="sm"
                       onClick={() => handleSetDefault(config)}
                     >
-                      设为默认
+                      {t('admin.models.setDefault')}
                     </Button>
                   )}
                   <Switch
@@ -282,20 +284,20 @@ export default function AdminModelsPage() {
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingConfig ? "编辑模型" : "新增模型"}</DialogTitle>
+            <DialogTitle>{editingConfig ? t('admin.models.editModel') : t('admin.models.createModel')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">显示名称 *</label>
+              <label className="text-sm font-medium">{t('admin.models.displayName')} *</label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="如: GPT-4o"
+                placeholder={t('admin.models.namePlaceholder')}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">提供商 *</label>
+                <label className="text-sm font-medium">{t('admin.models.provider')} *</label>
                 <Select
                   value={formData.provider}
                   onValueChange={(v) => setFormData({ ...formData, provider: v })}
@@ -313,37 +315,37 @@ export default function AdminModelsPage() {
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium">模型 ID *</label>
+                <label className="text-sm font-medium">{t('admin.models.modelId')} *</label>
                 <Input
                   value={formData.modelId}
                   onChange={(e) => setFormData({ ...formData, modelId: e.target.value })}
-                  placeholder="如: gpt-4o"
+                  placeholder={t('admin.models.modelIdPlaceholder')}
                 />
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium">API 端点</label>
+              <label className="text-sm font-medium">{t('admin.models.apiEndpoint')}</label>
               <Input
                 value={formData.endpoint}
                 onChange={(e) => setFormData({ ...formData, endpoint: e.target.value })}
-                placeholder="可选，留空使用默认端点"
+                placeholder={t('admin.models.endpointPlaceholder')}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">API Key</label>
+              <label className="text-sm font-medium">{t('admin.models.apiKey')}</label>
               <Input
                 type="password"
                 value={formData.apiKey}
                 onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-                placeholder="可选"
+                placeholder={t('admin.mcps.optional')}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">描述</label>
+              <label className="text-sm font-medium">{t('admin.models.description')}</label>
               <Textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="模型描述"
+                placeholder={t('admin.models.modelDesc')}
                 rows={2}
               />
             </div>
@@ -353,20 +355,20 @@ export default function AdminModelsPage() {
                   checked={formData.isDefault}
                   onCheckedChange={(checked) => setFormData({ ...formData, isDefault: checked })}
                 />
-                <label className="text-sm">设为默认模型</label>
+                <label className="text-sm">{t('admin.models.setAsDefault')}</label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch
                   checked={formData.isActive}
                   onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
                 />
-                <label className="text-sm">启用</label>
+                <label className="text-sm">{t('admin.models.enable')}</label>
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button>
-            <Button onClick={handleSave}>{editingConfig ? "保存" : "创建"}</Button>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>{t('admin.common.cancel')}</Button>
+            <Button onClick={handleSave}>{editingConfig ? t('admin.common.save') : t('admin.common.create')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -375,15 +377,15 @@ export default function AdminModelsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogTitle>{t('admin.common.confirmDelete')}</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除此模型配置吗？此操作无法撤销。
+              {t('admin.models.deleteWarning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{t('admin.common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              删除
+              {t('admin.common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

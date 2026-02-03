@@ -29,6 +29,8 @@
     "models": "모델 설정",
     "roles": "역할 관리",
     "users": "사용자 관리",
+    "departments": "부서 관리",
+    "chatAssistant": "채팅 도우미",
     "settings": "시스템 설정",
     "refresh": "새로고침",
     "create": "생성",

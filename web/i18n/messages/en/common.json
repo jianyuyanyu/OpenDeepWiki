@@ -29,6 +29,8 @@
     "models": "Models",
     "roles": "Roles",
     "users": "Users",
+    "departments": "Departments",
+    "chatAssistant": "Chat Assistant",
     "settings": "Settings",
     "refresh": "Refresh",
     "create": "Create",

@@ -194,7 +194,9 @@
     "allowedTools": "允许的工具",
     "description": "描述",
     "deleteWarning": "确定要删除此 Skill 吗？这将同时删除磁盘上的文件夹，此操作无法撤销。",
-    "onlyZip": "只支持 ZIP 格式的压缩包"
+    "onlyZip": "只支持 ZIP 格式的压缩包",
+    "enabled": "已启用",
+    "disabled": "已禁用"
   },
   "models": {
     "title": "模型配置",
