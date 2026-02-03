@@ -55,9 +55,13 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
+import { useTranslations } from "@/hooks/use-translations";
+import { useLocale } from "next-intl";
 
 export default function AdminUsersPage() {
   const [data, setData] = useState<UserListResponse | null>(null);
+  const t = useTranslations();
+  const locale = useLocale();
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -85,7 +89,7 @@ export default function AdminUsersPage() {
       setRoles(rolesResult);
     } catch (error) {
       console.error("Failed to fetch users:", error);
-      toast.error("获取用户列表失败");
+      toast.error(t('admin.toast.fetchUserFailed'));
     } finally {
       setLoading(false);
     }
@@ -102,17 +106,17 @@ export default function AdminUsersPage() {
 
   const handleCreate = async () => {
     if (!newUser.name || !newUser.email || !newUser.password) {
-      toast.error("请填写完整信息");
+      toast.error(t('admin.users.fillComplete'));
       return;
     }
     try {
       await createUser(newUser);
-      toast.success("创建成功");
+      toast.success(t('admin.toast.createSuccess'));
       setShowCreateDialog(false);
       setNewUser({ name: "", email: "", password: "" });
       fetchData();
     } catch (error) {
-      toast.error("创建失败");
+      toast.error(t('admin.toast.createFailed'));
     }
   };
 
@@ -120,21 +124,21 @@ export default function AdminUsersPage() {
     if (!deleteId) return;
     try {
       await deleteUser(deleteId);
-      toast.success("删除成功");
+      toast.success(t('admin.toast.deleteSuccess'));
       setDeleteId(null);
       fetchData();
     } catch (error) {
-      toast.error("删除失败");
+      toast.error(t('admin.toast.deleteFailed'));
     }
   };
 
   const handleStatusChange = async (id: string, newStatus: number) => {
     try {
       await updateUserStatus(id, newStatus);
-      toast.success("状态更新成功");
+      toast.success(t('admin.toast.statusUpdateSuccess'));
       fetchData();
     } catch (error) {
-      toast.error("状态更新失败");
+      toast.error(t('admin.toast.statusUpdateFailed'));
     }
   };
 
@@ -142,11 +146,11 @@ export default function AdminUsersPage() {
     if (!showRolesDialog) return;
     try {
       await updateUserRoles(showRolesDialog.id, selectedRoles);
-      toast.success("角色更新成功");
+      toast.success(t('admin.toast.roleUpdateSuccess'));
       setShowRolesDialog(null);
       fetchData();
     } catch (error) {
-      toast.error("角色更新失败");
+      toast.error(t('admin.toast.roleUpdateFailed'));
     }
   };
 
@@ -154,11 +158,11 @@ export default function AdminUsersPage() {
     if (!showPasswordDialog || !newPassword) return;
     try {
       await resetUserPassword(showPasswordDialog.id, newPassword);
-      toast.success("密码重置成功");
+      toast.success(t('admin.toast.passwordResetSuccess'));
       setShowPasswordDialog(null);
       setNewPassword("");
     } catch (error) {
-      toast.error("密码重置失败");
+      toast.error(t('admin.toast.passwordResetFailed'));
     }
   };
 
@@ -172,15 +176,15 @@ export default function AdminUsersPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">用户管理</h1>
+        <h1 className="text-2xl font-bold">{t('admin.users.title')}</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchData}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            刷新
+            {t('admin.common.refresh')}
           </Button>
           <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="mr-2 h-4 w-4" />
-            新增用户
+            {t('admin.users.createUser')}
           </Button>
         </div>
       </div>
@@ -190,7 +194,7 @@ export default function AdminUsersPage() {
         <div className="flex flex-wrap gap-4">
           <div className="flex flex-1 gap-2">
             <Input
-              placeholder="搜索用户名或邮箱..."
+              placeholder={t('admin.users.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -198,15 +202,15 @@ export default function AdminUsersPage() {
             />
             <Button onClick={handleSearch}>
               <Search className="mr-2 h-4 w-4" />
-              搜索
+              {t('admin.common.search')}
             </Button>
           </div>
           <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setPage(1); }}>
             <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="筛选角色" />
+              <SelectValue placeholder={t('admin.users.filterRole')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">全部角色</SelectItem>
+              <SelectItem value="all">{t('admin.users.allRoles')}</SelectItem>
               {roles.map((role) => (
                 <SelectItem key={role.id} value={role.id}>
                   {role.name}
@@ -229,12 +233,12 @@ export default function AdminUsersPage() {
               <table className="w-full">
                 <thead className="border-b bg-muted/50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium">用户</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">邮箱</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">角色</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">状态</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">创建时间</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium">操作</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.users.user')}</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.users.email')}</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.users.role')}</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.users.status')}</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.users.createdAt')}</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">{t('admin.users.operations')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -275,24 +279,24 @@ export default function AdminUsersPage() {
                                 ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                                 : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
                             }`}>
-                              {user.status === 1 ? "正常" : "禁用"}
+                              {user.status === 1 ? t('admin.users.normal') : t('admin.users.disabled')}
                             </span>
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="1">正常</SelectItem>
-                            <SelectItem value="0">禁用</SelectItem>
+                            <SelectItem value="1">{t('admin.users.normal')}</SelectItem>
+                            <SelectItem value="0">{t('admin.users.disabled')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {new Date(user.createdAt).toLocaleDateString("zh-CN")}
+                        {new Date(user.createdAt).toLocaleDateString(locale === 'zh' ? 'zh-CN' : locale)}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
-                            title="分配角色"
+                            title={t('admin.users.assignRoles')}
                             onClick={() => openRolesDialog(user)}
                           >
                             <Shield className="h-4 w-4" />
@@ -300,7 +304,7 @@ export default function AdminUsersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            title="重置密码"
+                            title={t('admin.users.resetPassword')}
                             onClick={() => setShowPasswordDialog(user)}
                           >
                             <Key className="h-4 w-4" />
@@ -308,7 +312,7 @@ export default function AdminUsersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            title="删除"
+                            title={t('admin.common.delete')}
                             onClick={() => setDeleteId(user.id)}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
@@ -324,7 +328,7 @@ export default function AdminUsersPage() {
             {/* 分页 */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between border-t px-4 py-3">
-                <p className="text-sm text-muted-foreground">共 {data?.total} 条记录</p>
+                <p className="text-sm text-muted-foreground">{t('admin.repositories.totalRecords', { count: data?.total })}</p>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(page - 1)}>
                     <ChevronLeft className="h-4 w-4" />
@@ -344,39 +348,39 @@ export default function AdminUsersPage() {
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>新增用户</DialogTitle>
+            <DialogTitle>{t('admin.users.createUser')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">用户名 *</label>
+              <label className="text-sm font-medium">{t('admin.users.username')} *</label>
               <Input
                 value={newUser.name}
                 onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                placeholder="请输入用户名"
+                placeholder={t('admin.users.enterUsername')}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">邮箱 *</label>
+              <label className="text-sm font-medium">{t('admin.users.email')} *</label>
               <Input
                 type="email"
                 value={newUser.email}
                 onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                placeholder="请输入邮箱"
+                placeholder={t('admin.users.enterEmail')}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">密码 *</label>
+              <label className="text-sm font-medium">{t('admin.users.password')} *</label>
               <Input
                 type="password"
                 value={newUser.password}
                 onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                placeholder="请输入密码"
+                placeholder={t('admin.users.enterPassword')}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>取消</Button>
-            <Button onClick={handleCreate}>创建</Button>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>{t('admin.common.cancel')}</Button>
+            <Button onClick={handleCreate}>{t('admin.common.create')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -385,7 +389,7 @@ export default function AdminUsersPage() {
       <Dialog open={!!showRolesDialog} onOpenChange={() => setShowRolesDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>分配角色 - {showRolesDialog?.name}</DialogTitle>
+            <DialogTitle>{t('admin.users.assignRoles')} - {showRolesDialog?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {roles.map((role) => (
@@ -411,8 +415,8 @@ export default function AdminUsersPage() {
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRolesDialog(null)}>取消</Button>
-            <Button onClick={handleRolesUpdate}>保存</Button>
+            <Button variant="outline" onClick={() => setShowRolesDialog(null)}>{t('admin.common.cancel')}</Button>
+            <Button onClick={handleRolesUpdate}>{t('admin.common.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -421,20 +425,20 @@ export default function AdminUsersPage() {
       <Dialog open={!!showPasswordDialog} onOpenChange={() => setShowPasswordDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>重置密码 - {showPasswordDialog?.name}</DialogTitle>
+            <DialogTitle>{t('admin.users.resetPassword')} - {showPasswordDialog?.name}</DialogTitle>
           </DialogHeader>
           <div>
-            <label className="text-sm font-medium">新密码</label>
+            <label className="text-sm font-medium">{t('admin.users.newPassword')}</label>
             <Input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="请输入新密码"
+              placeholder={t('admin.users.enterNewPassword')}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPasswordDialog(null)}>取消</Button>
-            <Button onClick={handlePasswordReset}>确认重置</Button>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(null)}>{t('admin.common.cancel')}</Button>
+            <Button onClick={handlePasswordReset}>{t('admin.users.confirmReset')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -443,15 +447,15 @@ export default function AdminUsersPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogTitle>{t('admin.common.confirmDelete')}</AlertDialogTitle>
             <AlertDialogDescription>
-              此操作将删除该用户及其所有相关数据，且无法恢复。确定要继续吗？
+              {t('admin.users.deleteWarning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{t('admin.common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              删除
+              {t('admin.common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -21,18 +21,7 @@ import {
   Globe,
 } from "lucide-react";
 import { toast } from "sonner";
-
-const categoryIcons: Record<string, React.ReactNode> = {
-  general: <Globe className="h-4 w-4" />,
-  ai: <Bot className="h-4 w-4" />,
-  security: <Shield className="h-4 w-4" />,
-};
-
-const categoryLabels: Record<string, string> = {
-  general: "通用设置",
-  ai: "AI 设置",
-  security: "安全设置",
-};
+import { useTranslations } from "@/hooks/use-translations";
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SystemSetting[]>([]);
@@ -40,13 +29,25 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [activeCategory, setActiveCategory] = useState("general");
   const [editedValues, setEditedValues] = useState<Record<string, string>>({});
+  const t = useTranslations();
+
+  const categoryIcons: Record<string, React.ReactNode> = {
+    general: <Globe className="h-4 w-4" />,
+    ai: <Bot className="h-4 w-4" />,
+    security: <Shield className="h-4 w-4" />,
+  };
+
+  const categoryLabels: Record<string, string> = {
+    general: t('admin.settings.general'),
+    ai: t('admin.settings.ai'),
+    security: t('admin.settings.security'),
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const result = await getSettings();
       setSettings(result);
-      // 初始化编辑值
       const values: Record<string, string> = {};
       result.forEach((s) => {
         values[s.key] = s.value || "";
@@ -54,11 +55,11 @@ export default function AdminSettingsPage() {
       setEditedValues(values);
     } catch (error) {
       console.error("Failed to fetch settings:", error);
-      toast.error("获取系统设置失败");
+      toast.error(t('admin.toast.fetchSettingsFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -72,23 +73,22 @@ export default function AdminSettingsPage() {
         .map((s) => ({ key: s.key, value: editedValues[s.key] }));
 
       if (changedSettings.length === 0) {
-        toast.info("没有需要保存的更改");
+        toast.info(t('admin.settings.noChanges'));
         setSaving(false);
         return;
       }
 
       await updateSettings(changedSettings);
-      toast.success("保存成功");
+      toast.success(t('admin.toast.saveSuccess'));
       fetchData();
     } catch (error) {
-      toast.error("保存失败");
+      toast.error(t('admin.toast.saveFailed'));
     } finally {
       setSaving(false);
     }
   };
 
   const categories = [...new Set(settings.map((s) => s.category))];
-  const filteredSettings = settings.filter((s) => s.category === activeCategory);
 
   const hasChanges = settings.some((s) => editedValues[s.key] !== (s.value || ""));
 
@@ -103,11 +103,11 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">系统设置</h1>
+        <h1 className="text-2xl font-bold">{t('admin.settings.title')}</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchData}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            刷新
+            {t('admin.common.refresh')}
           </Button>
           <Button onClick={handleSave} disabled={saving || !hasChanges}>
             {saving ? (
@@ -115,7 +115,7 @@ export default function AdminSettingsPage() {
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            保存更改
+            {t('admin.settings.saveChanges')}
           </Button>
         </div>
       </div>
@@ -124,7 +124,7 @@ export default function AdminSettingsPage() {
         <Card className="flex h-64 items-center justify-center">
           <div className="text-center">
             <Settings className="mx-auto h-12 w-12 text-muted-foreground" />
-            <p className="mt-4 text-muted-foreground">暂无系统设置</p>
+            <p className="mt-4 text-muted-foreground">{t('admin.settings.noSettings')}</p>
           </div>
         </Card>
       ) : (
@@ -207,7 +207,7 @@ export default function AdminSettingsPage() {
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            保存更改
+            {t('admin.settings.saveChanges')}
           </Button>
         </div>
       )}

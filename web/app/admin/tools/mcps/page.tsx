@@ -41,6 +41,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "@/hooks/use-translations";
 
 export default function AdminMcpsPage() {
   const [configs, setConfigs] = useState<McpConfig[]>([]);
@@ -56,6 +57,7 @@ export default function AdminMcpsPage() {
     isActive: true,
     sortOrder: 0,
   });
+  const t = useTranslations();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -64,11 +66,11 @@ export default function AdminMcpsPage() {
       setConfigs(result);
     } catch (error) {
       console.error("Failed to fetch MCP configs:", error);
-      toast.error("获取 MCP 配置失败");
+      toast.error(t('admin.toast.fetchMcpFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -102,21 +104,21 @@ export default function AdminMcpsPage() {
 
   const handleSave = async () => {
     if (!formData.name.trim() || !formData.serverUrl.trim()) {
-      toast.error("请填写必填项");
+      toast.error(t('admin.toast.fillRequired'));
       return;
     }
     try {
       if (editingConfig) {
         await updateMcpConfig(editingConfig.id, formData);
-        toast.success("更新成功");
+        toast.success(t('admin.toast.updateSuccess'));
       } else {
         await createMcpConfig(formData);
-        toast.success("创建成功");
+        toast.success(t('admin.toast.createSuccess'));
       }
       setShowDialog(false);
       fetchData();
     } catch (error) {
-      toast.error(editingConfig ? "更新失败" : "创建失败");
+      toast.error(editingConfig ? t('admin.toast.updateFailed') : t('admin.toast.createFailed'));
     }
   };
 
@@ -124,36 +126,36 @@ export default function AdminMcpsPage() {
     if (!deleteId) return;
     try {
       await deleteMcpConfig(deleteId);
-      toast.success("删除成功");
+      toast.success(t('admin.toast.deleteSuccess'));
       setDeleteId(null);
       fetchData();
     } catch (error) {
-      toast.error("删除失败");
+      toast.error(t('admin.toast.deleteFailed'));
     }
   };
 
   const handleToggleActive = async (config: McpConfig) => {
     try {
       await updateMcpConfig(config.id, { isActive: !config.isActive });
-      toast.success(config.isActive ? "已禁用" : "已启用");
+      toast.success(config.isActive ? t('admin.mcps.disabled') : t('admin.mcps.enabled'));
       fetchData();
     } catch (error) {
-      toast.error("操作失败");
+      toast.error(t('admin.toast.operationFailed'));
     }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">MCPs 管理</h1>
+        <h1 className="text-2xl font-bold">{t('admin.mcps.title')}</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchData}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            刷新
+            {t('admin.common.refresh')}
           </Button>
           <Button onClick={openCreateDialog}>
             <Plus className="mr-2 h-4 w-4" />
-            新增 MCP
+            {t('admin.mcps.createMcp')}
           </Button>
         </div>
       </div>
@@ -167,10 +169,10 @@ export default function AdminMcpsPage() {
         <Card className="flex h-64 items-center justify-center">
           <div className="text-center">
             <Server className="mx-auto h-12 w-12 text-muted-foreground" />
-            <p className="mt-4 text-muted-foreground">暂无 MCP 配置</p>
+            <p className="mt-4 text-muted-foreground">{t('admin.mcps.noMcps')}</p>
             <Button className="mt-4" onClick={openCreateDialog}>
               <Plus className="mr-2 h-4 w-4" />
-              添加第一个 MCP
+              {t('admin.mcps.addFirst')}
             </Button>
           </div>
         </Card>
@@ -187,9 +189,9 @@ export default function AdminMcpsPage() {
                     <h3 className="font-semibold">{config.name}</h3>
                     <div className="flex items-center gap-1 text-xs">
                       {config.isActive ? (
-                        <><CheckCircle className="h-3 w-3 text-green-500" /> 已启用</>
+                        <><CheckCircle className="h-3 w-3 text-green-500" /> {t('admin.mcps.enabled')}</>
                       ) : (
-                        <><XCircle className="h-3 w-3 text-gray-400" /> 已禁用</>
+                        <><XCircle className="h-3 w-3 text-gray-400" /> {t('admin.mcps.disabled')}</>
                       )}
                     </div>
                   </div>
@@ -213,7 +215,7 @@ export default function AdminMcpsPage() {
               </p>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
-                  排序: {config.sortOrder}
+                  {t('admin.mcps.sortOrder')}: {config.sortOrder}
                 </span>
                 <Switch
                   checked={config.isActive}
@@ -229,19 +231,19 @@ export default function AdminMcpsPage() {
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingConfig ? "编辑 MCP" : "新增 MCP"}</DialogTitle>
+            <DialogTitle>{editingConfig ? t('admin.mcps.editMcp') : t('admin.mcps.createMcp')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">名称 *</label>
+              <label className="text-sm font-medium">{t('admin.mcps.name')} *</label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="MCP 名称"
+                placeholder={t('admin.mcps.mcpName')}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">服务器地址 *</label>
+              <label className="text-sm font-medium">{t('admin.mcps.serverUrl')} *</label>
               <Input
                 value={formData.serverUrl}
                 onChange={(e) => setFormData({ ...formData, serverUrl: e.target.value })}
@@ -249,26 +251,26 @@ export default function AdminMcpsPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">API Key</label>
+              <label className="text-sm font-medium">{t('admin.mcps.apiKey')}</label>
               <Input
                 type="password"
                 value={formData.apiKey}
                 onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
-                placeholder="可选"
+                placeholder={t('admin.mcps.optional')}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">描述</label>
+              <label className="text-sm font-medium">{t('admin.mcps.description')}</label>
               <Textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="MCP 描述"
+                placeholder={t('admin.mcps.mcpDesc')}
                 rows={2}
               />
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium">排序</label>
+                <label className="text-sm font-medium">{t('admin.mcps.sortOrder')}</label>
                 <Input
                   type="number"
                   value={formData.sortOrder}
@@ -277,7 +279,7 @@ export default function AdminMcpsPage() {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium">启用</label>
+                <label className="text-sm font-medium">{t('admin.mcps.enable')}</label>
                 <Switch
                   checked={formData.isActive}
                   onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
@@ -286,8 +288,8 @@ export default function AdminMcpsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>取消</Button>
-            <Button onClick={handleSave}>{editingConfig ? "保存" : "创建"}</Button>
+            <Button variant="outline" onClick={() => setShowDialog(false)}>{t('admin.common.cancel')}</Button>
+            <Button onClick={handleSave}>{editingConfig ? t('admin.common.save') : t('admin.common.create')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -296,15 +298,15 @@ export default function AdminMcpsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogTitle>{t('admin.common.confirmDelete')}</AlertDialogTitle>
             <AlertDialogDescription>
-              确定要删除此 MCP 配置吗？此操作无法撤销。
+              {t('admin.mcps.deleteWarning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{t('admin.common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              删除
+              {t('admin.common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

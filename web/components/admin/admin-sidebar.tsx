@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,8 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { api } from "@/lib/api-client";
 
 const navItems = [
   {
@@ -65,9 +67,30 @@ const navItems = [
   },
 ];
 
+interface VersionInfo {
+  version: string;
+  assemblyVersion: string;
+  productName: string;
+}
+
 export function AdminSidebar() {
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = React.useState<string[]>(["工具配置"]);
+  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+
+  useEffect(() => {
+    api.get<{ success: boolean; data: VersionInfo }>("/api/system/version", { skipAuth: true })
+      .then((res) => {
+        if (res.success) {
+          setVersionInfo(res.data);
+        }
+      })
+      .catch(() => {
+        // 忽略版本获取失败
+      });
+  }, []);
+
+  const isPreview = versionInfo?.version?.toLowerCase().includes("preview");
 
   const toggleExpand = (label: string) => {
     setExpandedItems((prev) =>
@@ -159,6 +182,20 @@ export function AdminSidebar() {
           );
         })}
       </nav>
+
+      {versionInfo && (
+        <div className="p-4 border-t">
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            {isPreview ? (
+              <Badge className="text-[10px] px-2 py-0.5 bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/30">
+                v{versionInfo.version.split('+')[0]}
+              </Badge>
+            ) : (
+              <span>v{versionInfo.version.split('+')[0]}</span>
+            )}
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

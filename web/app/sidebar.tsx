@@ -21,12 +21,14 @@ import {
     SidebarMenuItem,
     SidebarRail,
 } from "@/components/animate-ui/components/radix/sidebar";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "@/hooks/use-translations";
 import { useAuth } from "@/contexts/auth-context";
 import Image from "next/image";
+import { Badge } from "@/components/ui/badge";
+import { api } from "@/lib/api-client";
 
 // 飞书图标 SVG 组件
 const FeishuIcon = () => (
@@ -61,11 +63,34 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
     onItemClick?: (title: string) => void;
 }
 
+interface VersionInfo {
+    version: string;
+    assemblyVersion: string;
+    productName: string;
+}
+
 export function AppSidebar({ activeItem, onItemClick, ...props }: AppSidebarProps) {
     const t = useTranslations();
     const router = useRouter();
     const { isAuthenticated } = useAuth();
     const [showFeishuQr, setShowFeishuQr] = useState(false);
+    const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+
+    useEffect(() => {
+        api.get<{ success: boolean; data: VersionInfo }>("/api/system/version", { skipAuth: true })
+            .then((res) => {
+                if (res.success) {
+                    setVersionInfo(res.data);
+                }
+            })
+            .catch(() => {
+                // 忽略版本获取失败
+            });
+    }, []);
+
+    // 处理版本号，去掉 commit hash（+号后面的部分）
+    const displayVersion = versionInfo?.version?.split('+')[0] || '';
+    const isPreview = displayVersion.toLowerCase().includes('preview');
 
     const items = itemKeys.map(item => ({
         title: t(`sidebar.${item.key}`),
@@ -135,7 +160,7 @@ export function AppSidebar({ activeItem, onItemClick, ...props }: AppSidebarProp
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarMenuItem>
-                        <div 
+                        <div
                             className="relative"
                             onMouseEnter={() => setShowFeishuQr(true)}
                             onMouseLeave={() => setShowFeishuQr(false)}
@@ -166,6 +191,19 @@ export function AppSidebar({ activeItem, onItemClick, ...props }: AppSidebarProp
                         </div>
                     </SidebarMenuItem>
                 </SidebarMenu>
+                {displayVersion && (
+                    <div className="px-3 py-2 border-t">
+                        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                            {isPreview ? (
+                                <Badge className="text-[10px] px-2 py-0.5 bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/30">
+                                    v{displayVersion}
+                                </Badge>
+                            ) : (
+                                <span>v{displayVersion}</span>
+                            )}
+                        </div>
+                    </div>
+                )}
             </SidebarFooter>
             <SidebarRail />
         </Sidebar>

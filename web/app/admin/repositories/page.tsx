@@ -147,7 +147,7 @@ export default function AdminRepositoriesPage() {
       toast.success(t('admin.toast.statusUpdateSuccess'));
       fetchData();
     } catch (error) {
-      toast.error("状态更新失败");
+      toast.error(t('admin.toast.statusUpdateFailed'));
     }
   };
 
@@ -156,13 +156,13 @@ export default function AdminRepositoriesPage() {
     try {
       const result = await syncRepositoryStats(id);
       if (result.success) {
-        toast.success(`同步成功: ⭐ ${result.starCount} 🍴 ${result.forkCount}`);
+        toast.success(`${t('admin.toast.syncSuccess')}: ⭐ ${result.starCount} 🍴 ${result.forkCount}`);
         fetchData();
       } else {
-        toast.error(result.message || "同步失败");
+        toast.error(result.message || t('admin.toast.syncFailed'));
       }
     } catch (error) {
-      toast.error("同步失败");
+      toast.error(t('admin.toast.syncFailed'));
     } finally {
       setSyncing(null);
     }
@@ -170,16 +170,16 @@ export default function AdminRepositoriesPage() {
 
   const handleBatchSync = async () => {
     if (selectedIds.size === 0) {
-      toast.warning("请先选择要同步的仓库");
+      toast.warning(t('admin.repositories.selectFirst'));
       return;
     }
     setBatchSyncing(true);
     try {
       const result = await batchSyncRepositoryStats(Array.from(selectedIds));
-      toast.success(`批量同步完成: 成功 ${result.successCount} 个，失败 ${result.failedCount} 个`);
+      toast.success(t('admin.repositories.batchSyncResult', { success: result.successCount, failed: result.failedCount }));
       fetchData();
     } catch (error) {
-      toast.error("批量同步失败");
+      toast.error(t('admin.toast.syncFailed'));
     } finally {
       setBatchSyncing(false);
     }
@@ -189,11 +189,11 @@ export default function AdminRepositoriesPage() {
     setBatchDeleting(true);
     try {
       const result = await batchDeleteRepositories(Array.from(selectedIds));
-      toast.success(`批量删除完成: 成功 ${result.successCount} 个，失败 ${result.failedCount} 个`);
+      toast.success(t('admin.repositories.batchDeleteResult', { success: result.successCount, failed: result.failedCount }));
       setShowBatchDeleteConfirm(false);
       fetchData();
     } catch (error) {
-      toast.error("批量删除失败");
+      toast.error(t('admin.toast.deleteFailed'));
     } finally {
       setBatchDeleting(false);
     }
@@ -225,10 +225,10 @@ export default function AdminRepositoriesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">仓库管理</h1>
+        <h1 className="text-2xl font-bold">{t('admin.repositories.title')}</h1>
         <Button variant="outline" onClick={fetchData}>
           <RefreshCw className="mr-2 h-4 w-4" />
-          刷新
+          {t('admin.common.refresh')}
         </Button>
       </div>
 
@@ -237,7 +237,7 @@ export default function AdminRepositoriesPage() {
         <div className="flex flex-wrap gap-4">
           <div className="flex flex-1 gap-2">
             <Input
-              placeholder="搜索仓库名称、组织或 Git URL..."
+              placeholder={t('admin.repositories.searchPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
@@ -245,7 +245,7 @@ export default function AdminRepositoriesPage() {
             />
             <Button onClick={handleSearch}>
               <Search className="mr-2 h-4 w-4" />
-              搜索
+              {t('admin.common.search')}
             </Button>
           </div>
           <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
@@ -268,7 +268,7 @@ export default function AdminRepositoriesPage() {
         <Card className="p-3 bg-muted/50">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
-              已选择 {selectedIds.size} 个仓库
+              {t('admin.repositories.selectedCount', { count: selectedIds.size })}
             </span>
             <div className="flex gap-2">
               <Button
@@ -282,7 +282,7 @@ export default function AdminRepositoriesPage() {
                 ) : (
                   <RotateCcw className="mr-2 h-4 w-4" />
                 )}
-                批量同步统计
+                {t('admin.repositories.batchSync')}
               </Button>
               <Button
                 variant="destructive"
@@ -290,14 +290,14 @@ export default function AdminRepositoriesPage() {
                 onClick={() => setShowBatchDeleteConfirm(true)}
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                批量删除
+                {t('admin.repositories.batchDelete')}
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelectedIds(new Set())}
               >
-                取消选择
+                {t('admin.repositories.cancelSelect')}
               </Button>
             </div>
           </div>
@@ -320,15 +320,15 @@ export default function AdminRepositoriesPage() {
                       <Checkbox
                         checked={allSelected ? true : someSelected ? "indeterminate" : false}
                         onCheckedChange={toggleSelectAll}
-                        aria-label="全选"
+                        aria-label={t('admin.common.selectAll')}
                       />
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">仓库</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">可见性</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">状态</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">统计</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">创建时间</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium">操作</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.repositories.repository')}</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.repositories.visibility')}</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.repositories.status')}</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.repositories.statistics')}</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.repositories.createdAt')}</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium">{t('admin.repositories.operations')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -338,7 +338,7 @@ export default function AdminRepositoriesPage() {
                         <Checkbox
                           checked={selectedIds.has(repo.id)}
                           onCheckedChange={() => toggleSelect(repo.id)}
-                          aria-label={`选择 ${repo.repoName}`}
+                          aria-label={`Select ${repo.repoName}`}
                         />
                       </td>
                       <td className="px-4 py-3">
@@ -352,11 +352,11 @@ export default function AdminRepositoriesPage() {
                       <td className="px-4 py-3">
                         {repo.isPublic ? (
                           <span className="inline-flex items-center gap-1 text-green-600">
-                            <Globe className="h-4 w-4" /> 公开
+                            <Globe className="h-4 w-4" /> {t('admin.repositories.public')}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-gray-500">
-                            <Lock className="h-4 w-4" /> 私有
+                            <Lock className="h-4 w-4" /> {t('admin.repositories.private')}
                           </span>
                         )}
                       </td>
@@ -367,14 +367,14 @@ export default function AdminRepositoriesPage() {
                         >
                           <SelectTrigger className="w-[100px]">
                             <span className={`px-2 py-1 rounded text-xs ${statusColors[repo.status]}`}>
-                              {repo.statusText}
+                              {statusLabels[repo.status]}
                             </span>
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="0">待处理</SelectItem>
-                            <SelectItem value="1">处理中</SelectItem>
-                            <SelectItem value="2">已完成</SelectItem>
-                            <SelectItem value="3">失败</SelectItem>
+                            <SelectItem value="0">{t('admin.repositories.pending')}</SelectItem>
+                            <SelectItem value="1">{t('admin.repositories.processing')}</SelectItem>
+                            <SelectItem value="2">{t('admin.repositories.completed')}</SelectItem>
+                            <SelectItem value="3">{t('admin.repositories.failed')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </td>
@@ -386,7 +386,7 @@ export default function AdminRepositoriesPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {new Date(repo.createdAt).toLocaleDateString("zh-CN")}
+                        {new Date(repo.createdAt).toLocaleDateString(locale === 'zh' ? 'zh-CN' : locale)}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-1">
@@ -395,7 +395,7 @@ export default function AdminRepositoriesPage() {
                             size="icon"
                             onClick={() => handleSyncStats(repo.id)}
                             disabled={syncing === repo.id}
-                            title="同步统计信息"
+                            title={t('admin.repositories.syncStats')}
                           >
                             {syncing === repo.id ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -407,7 +407,7 @@ export default function AdminRepositoriesPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => setSelectedRepo(repo)}
-                            title="查看详情"
+                            title={t('admin.repositories.viewDetail')}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -415,7 +415,7 @@ export default function AdminRepositoriesPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => setDeleteId(repo.id)}
-                            title="删除"
+                            title={t('admin.common.delete')}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -431,7 +431,7 @@ export default function AdminRepositoriesPage() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between border-t px-4 py-3">
                 <p className="text-sm text-muted-foreground">
-                  共 {data?.total} 条记录
+                  {t('admin.repositories.totalRecords', { count: data?.total })}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
@@ -464,55 +464,55 @@ export default function AdminRepositoriesPage() {
       <Dialog open={!!selectedRepo} onOpenChange={() => setSelectedRepo(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>仓库详情</DialogTitle>
+            <DialogTitle>{t('admin.repositories.repoDetail')}</DialogTitle>
           </DialogHeader>
           {selectedRepo && (
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium">仓库名称</label>
+                <label className="text-sm font-medium">{t('admin.repositories.repoName')}</label>
                 <p>{selectedRepo.orgName}/{selectedRepo.repoName}</p>
               </div>
               <div>
-                <label className="text-sm font-medium">Git URL</label>
+                <label className="text-sm font-medium">{t('admin.repositories.gitUrl')}</label>
                 <p className="text-sm text-muted-foreground break-all">{selectedRepo.gitUrl}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium">状态</label>
-                  <p>{selectedRepo.statusText}</p>
+                  <label className="text-sm font-medium">{t('admin.repositories.status')}</label>
+                  <p>{statusLabels[selectedRepo.status]}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">可见性</label>
-                  <p>{selectedRepo.isPublic ? "公开" : "私有"}</p>
+                  <label className="text-sm font-medium">{t('admin.repositories.visibility')}</label>
+                  <p>{selectedRepo.isPublic ? t('admin.repositories.public') : t('admin.repositories.private')}</p>
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-4">
                 <div>
-                  <label className="text-sm font-medium">Star</label>
+                  <label className="text-sm font-medium">{t('admin.repositories.star')}</label>
                   <p>{selectedRepo.starCount}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Fork</label>
+                  <label className="text-sm font-medium">{t('admin.repositories.fork')}</label>
                   <p>{selectedRepo.forkCount}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">收藏</label>
+                  <label className="text-sm font-medium">{t('admin.repositories.bookmark')}</label>
                   <p>{selectedRepo.bookmarkCount}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">浏览</label>
+                  <label className="text-sm font-medium">{t('admin.repositories.view')}</label>
                   <p>{selectedRepo.viewCount}</p>
                 </div>
               </div>
               <div>
-                <label className="text-sm font-medium">创建时间</label>
-                <p>{new Date(selectedRepo.createdAt).toLocaleString("zh-CN")}</p>
+                <label className="text-sm font-medium">{t('admin.repositories.createdAt')}</label>
+                <p>{new Date(selectedRepo.createdAt).toLocaleString(locale === 'zh' ? 'zh-CN' : locale)}</p>
               </div>
             </div>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelectedRepo(null)}>
-              关闭
+              {t('admin.common.close')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -522,15 +522,15 @@ export default function AdminRepositoriesPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogTitle>{t('admin.repositories.confirmDelete')}</AlertDialogTitle>
             <AlertDialogDescription>
-              此操作将删除该仓库及其所有相关数据，且无法恢复。确定要继续吗？
+              {t('admin.repositories.deleteWarning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{t('admin.common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              删除
+              {t('admin.common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -540,13 +540,13 @@ export default function AdminRepositoriesPage() {
       <AlertDialog open={showBatchDeleteConfirm} onOpenChange={setShowBatchDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认批量删除</AlertDialogTitle>
+            <AlertDialogTitle>{t('admin.repositories.confirmBatchDelete')}</AlertDialogTitle>
             <AlertDialogDescription>
-              此操作将删除选中的 {selectedIds.size} 个仓库及其所有相关数据，且无法恢复。确定要继续吗？
+              {t('admin.repositories.batchDeleteWarning', { count: selectedIds.size })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={batchDeleting}>取消</AlertDialogCancel>
+            <AlertDialogCancel disabled={batchDeleting}>{t('admin.common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleBatchDelete}
               className="bg-red-600 hover:bg-red-700"
@@ -555,10 +555,10 @@ export default function AdminRepositoriesPage() {
               {batchDeleting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  删除中...
+                  {t('admin.repositories.deleting')}
                 </>
               ) : (
-                "确认删除"
+                t('admin.common.confirm')
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

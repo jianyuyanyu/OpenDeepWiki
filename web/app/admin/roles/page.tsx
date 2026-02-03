@@ -39,6 +39,8 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "@/hooks/use-translations";
+import { useLocale } from "next-intl";
 
 export default function AdminRolesPage() {
   const [roles, setRoles] = useState<AdminRole[]>([]);
@@ -47,6 +49,8 @@ export default function AdminRolesPage() {
   const [editingRole, setEditingRole] = useState<AdminRole | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: "", description: "" });
+  const t = useTranslations();
+  const locale = useLocale();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -55,11 +59,11 @@ export default function AdminRolesPage() {
       setRoles(result);
     } catch (error) {
       console.error("Failed to fetch roles:", error);
-      toast.error("获取角色列表失败");
+      toast.error(t('admin.toast.fetchRoleFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -79,21 +83,21 @@ export default function AdminRolesPage() {
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
-      toast.error("请输入角色名称");
+      toast.error(t('admin.toast.enterRoleName'));
       return;
     }
     try {
       if (editingRole) {
         await updateRole(editingRole.id, formData);
-        toast.success("更新成功");
+        toast.success(t('admin.toast.updateSuccess'));
       } else {
         await createRole(formData);
-        toast.success("创建成功");
+        toast.success(t('admin.toast.createSuccess'));
       }
       setShowDialog(false);
       fetchData();
     } catch (error) {
-      toast.error(editingRole ? "更新失败" : "创建失败");
+      toast.error(editingRole ? t('admin.toast.updateFailed') : t('admin.toast.createFailed'));
     }
   };
 
@@ -101,26 +105,26 @@ export default function AdminRolesPage() {
     if (!deleteId) return;
     try {
       await deleteRole(deleteId);
-      toast.success("删除成功");
+      toast.success(t('admin.toast.deleteSuccess'));
       setDeleteId(null);
       fetchData();
     } catch (error: any) {
-      toast.error(error.message || "删除失败");
+      toast.error(error.message || t('admin.toast.deleteFailed'));
     }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">角色管理</h1>
+        <h1 className="text-2xl font-bold">{t('admin.roles.title')}</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={fetchData}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            刷新
+            {t('admin.common.refresh')}
           </Button>
           <Button onClick={openCreateDialog}>
             <Plus className="mr-2 h-4 w-4" />
-            新增角色
+            {t('admin.roles.createRole')}
           </Button>
         </div>
       </div>
@@ -142,7 +146,7 @@ export default function AdminRolesPage() {
                   <div>
                     <h3 className="font-semibold">{role.name}</h3>
                     {role.isSystem && (
-                      <span className="text-xs text-muted-foreground">系统角色</span>
+                      <span className="text-xs text-muted-foreground">{t('admin.roles.systemRole')}</span>
                     )}
                   </div>
                 </div>
@@ -172,10 +176,10 @@ export default function AdminRolesPage() {
               )}
               <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
                 <Users className="h-4 w-4" />
-                <span>{role.userCount} 个用户</span>
+                <span>{t('admin.roles.usersCount', { count: role.userCount })}</span>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                创建于 {new Date(role.createdAt).toLocaleDateString("zh-CN")}
+                {t('admin.roles.createdAt', { date: new Date(role.createdAt).toLocaleDateString(locale === 'zh' ? 'zh-CN' : locale) })}
               </p>
             </Card>
           ))}
@@ -186,34 +190,34 @@ export default function AdminRolesPage() {
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingRole ? "编辑角色" : "新增角色"}</DialogTitle>
+            <DialogTitle>{editingRole ? t('admin.roles.editRole') : t('admin.roles.createRole')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">角色名称 *</label>
+              <label className="text-sm font-medium">{t('admin.roles.roleName')} *</label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="请输入角色名称"
+                placeholder={t('admin.roles.enterRoleName')}
                 disabled={editingRole?.isSystem}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">描述</label>
+              <label className="text-sm font-medium">{t('admin.roles.description')}</label>
               <Textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="请输入角色描述"
+                placeholder={t('admin.roles.enterRoleDesc')}
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDialog(false)}>
-              取消
+              {t('admin.common.cancel')}
             </Button>
             <Button onClick={handleSave}>
-              {editingRole ? "保存" : "创建"}
+              {editingRole ? t('admin.common.save') : t('admin.common.create')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -223,15 +227,15 @@ export default function AdminRolesPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogTitle>{t('admin.common.confirmDelete')}</AlertDialogTitle>
             <AlertDialogDescription>
-              删除角色后，拥有该角色的用户将失去相应权限。确定要继续吗？
+              {t('admin.roles.deleteWarning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogCancel>{t('admin.common.cancel')}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              删除
+              {t('admin.common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
