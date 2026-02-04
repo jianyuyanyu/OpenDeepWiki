@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using OpenDeepWiki.Agents;
 using OpenDeepWiki.Chat;
@@ -7,15 +8,15 @@ using OpenDeepWiki.Endpoints;
 using OpenDeepWiki.Endpoints.Admin;
 using OpenDeepWiki.Infrastructure;
 using OpenDeepWiki.Services.Admin;
-using OpenDeepWiki.Services.Organizations;
 using OpenDeepWiki.Services.Auth;
-using OpenDeepWiki.Services.OAuth;
-using OpenDeepWiki.Services.Prompts;
-using OpenDeepWiki.Services.Repositories;
-using OpenDeepWiki.Services.Recommendation;
 using OpenDeepWiki.Services.Chat;
-using OpenDeepWiki.Services.Translation;
 using OpenDeepWiki.Services.MindMap;
+using OpenDeepWiki.Services.OAuth;
+using OpenDeepWiki.Services.Organizations;
+using OpenDeepWiki.Services.Prompts;
+using OpenDeepWiki.Services.Recommendation;
+using OpenDeepWiki.Services.Repositories;
+using OpenDeepWiki.Services.Translation;
 using OpenDeepWiki.Services.UserProfile;
 using OpenDeepWiki.Services.Wiki;
 using Scalar.AspNetCore;
@@ -262,7 +263,7 @@ try
     // 注册 Prompt Plugin
     builder.Services.AddSingleton<IPromptPlugin>(sp =>
     {
-        var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<WikiGeneratorOptions>>().Value;
+        var options = sp.GetRequiredService<IOptions<WikiGeneratorOptions>>().Value;
         var promptsDir = Path.Combine(AppContext.BaseDirectory, options.PromptsDirectory);
 
         // Fallback to current directory if base directory doesn't have prompts

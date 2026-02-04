@@ -292,6 +292,9 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
             RecurseSubmodules = false
         };
 
+        // 跳过 SSL 证书验证（解决 TLS 解密错误）
+        cloneOptions.FetchOptions.CertificateCheck = (_, _, _) => true;
+
         if (credentials != null)
         {
             cloneOptions.FetchOptions.CredentialsProvider = (_, _, _) => credentials;
@@ -313,12 +316,33 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
                 await Task.Run(() =>
                 {
                     GitRepository.Clone(workspace.GitUrl, workspace.WorkingDirectory, cloneOptions);
+                    
+                    // Explicitly checkout the target branch after clone
+                    using var repo = new GitRepository(workspace.WorkingDirectory);
+                    var targetBranch = repo.Branches[workspace.BranchName] 
+                        ?? repo.Branches[$"origin/{workspace.BranchName}"];
+                    
+                    if (targetBranch != null)
+                    {
+                        if (targetBranch.IsRemote)
+                        {
+                            // Create local tracking branch from remote
+                            var localBranch = repo.Branches[workspace.BranchName];
+                            if (localBranch == null)
+                            {
+                                localBranch = repo.CreateBranch(workspace.BranchName, targetBranch.Tip);
+                                repo.Branches.Update(localBranch, b => b.TrackedBranch = targetBranch.CanonicalName);
+                            }
+                            targetBranch = localBranch;
+                        }
+                        Commands.Checkout(repo, targetBranch);
+                    }
                 }, cancellationToken);
 
                 stopwatch.Stop();
                 _logger.LogInformation(
-                    "Repository cloned successfully. GitUrl: {Url}, TargetPath: {Path}, Duration: {Duration}ms",
-                    workspace.GitUrl, workspace.WorkingDirectory, stopwatch.ElapsedMilliseconds);
+                    "Repository cloned successfully. GitUrl: {Url}, Branch: {Branch}, TargetPath: {Path}, Duration: {Duration}ms",
+                    workspace.GitUrl, workspace.BranchName, workspace.WorkingDirectory, stopwatch.ElapsedMilliseconds);
                 return;
             }
             catch (LibGit2SharpException ex)
@@ -388,6 +412,9 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
                     var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
 
                     var fetchOptions = new FetchOptions();
+                    // 跳过 SSL 证书验证（解决 TLS 解密错误）
+                    fetchOptions.CertificateCheck = (_, _, _) => true;
+                    
                     if (credentials != null)
                     {
                         fetchOptions.CredentialsProvider = (_, _, _) => credentials;

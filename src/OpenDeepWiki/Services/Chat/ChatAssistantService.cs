@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using Anthropic.Models.Messages;
+using LibGit2Sharp;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -11,6 +12,8 @@ using OpenDeepWiki.Agents.Tools;
 using OpenDeepWiki.Chat.Exceptions;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.Repositories;
+using GitRepository = LibGit2Sharp.Repository;
 
 namespace OpenDeepWiki.Services.Chat;
 
@@ -183,17 +186,20 @@ public class ChatAssistantService : IChatAssistantService
     private readonly IContext _context;
     private readonly AgentFactory _agentFactory;
     private readonly IMcpToolConverter _mcpToolConverter;
+    private readonly RepositoryAnalyzerOptions _repoOptions;
     private readonly ILogger<ChatAssistantService> _logger;
 
     public ChatAssistantService(
         IContext context,
         AgentFactory agentFactory,
         IMcpToolConverter mcpToolConverter,
+        IOptions<RepositoryAnalyzerOptions> repoOptions,
         ILogger<ChatAssistantService> logger)
     {
         _context = context;
         _agentFactory = agentFactory;
         _mcpToolConverter = mcpToolConverter;
+        _repoOptions = repoOptions.Value;
         _logger = logger;
     }
 
@@ -283,6 +289,34 @@ public class ChatAssistantService : IChatAssistantService
         // Build tools
         var tools = new List<AITool>();
 
+        // Calculate repository path from Owner/Repo
+        var repositoryPath = GetRepositoryPath(request.Context.Owner, request.Context.Repo);
+
+        // Initialize GitTool with calculated repository path
+        GitTool? gitTool = null;
+        if (Directory.Exists(repositoryPath))
+        {
+            try
+            {
+                // Checkout to the specified branch before initializing GitTool
+                CheckoutBranch(repositoryPath, request.Context.Branch);
+                
+                gitTool = new GitTool(repositoryPath);
+                tools.AddRange(gitTool.GetTools());
+                _logger.LogInformation("GitTool initialized for {Owner}/{Repo}@{Branch} with path {RepoPath}",
+                    request.Context.Owner, request.Context.Repo, request.Context.Branch, repositoryPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to initialize GitTool for {Owner}/{Repo}@{Branch}",
+                    request.Context.Owner, request.Context.Repo, request.Context.Branch);
+            }
+        }
+        else
+        {
+            _logger.LogWarning("Repository path does not exist: {RepoPath}", repositoryPath);
+        }
+
         // Add ChatDocReaderTool with dynamic catalog
         var chatDocReaderTool = await ChatDocReaderTool.CreateAsync(
             _context,
@@ -302,7 +336,7 @@ public class ChatAssistantService : IChatAssistantService
         }
 
         // Build system prompt
-        var systemPrompt = BuildSystemPrompt(request.Context);
+        var systemPrompt = BuildSystemPrompt(request.Context, gitTool != null);
 
         // Create agent
         var agentOptions = new ChatClientAgentOptions
@@ -633,8 +667,9 @@ public class ChatAssistantService : IChatAssistantService
 
     /// <summary>
     /// Builds the system prompt with document context.
+    /// Uses XML-like tags for clear section boundaries.
     /// </summary>
-    private static string BuildSystemPrompt(DocContextDto context)
+    private static string BuildSystemPrompt(DocContextDto context, bool hasCodeAccess)
     {
         var responseLanguage = context.UserLanguage switch
         {
@@ -648,30 +683,178 @@ public class ChatAssistantService : IChatAssistantService
             _ => "English"
         };
 
-        return $@"You are a documentation assistant for the repository ""{context.Owner}/{context.Repo}"".
+        var sb = new StringBuilder();
 
-## Your Role
-You help users understand and navigate the documentation of this repository. You can read document content using the ReadDoc tool.
+        sb.AppendLine("<system>");
+        sb.AppendLine();
 
-## Current Context
-- Repository: {context.Owner}/{context.Repo}
-- Branch: {context.Branch}
-- Document Language: {context.Language}
-- Current Document: {context.CurrentDocPath}
+        // Identity Section
+        sb.AppendLine("<identity>");
+        sb.AppendLine($"You are an expert documentation and code analysis assistant for the repository \"{context.Owner}/{context.Repo}\".");
+        sb.AppendLine("You combine deep technical knowledge with clear, actionable communication.");
+        sb.AppendLine("You MUST use internal thinking to analyze problems thoroughly before responding.");
+        sb.AppendLine("</identity>");
+        sb.AppendLine();
 
-## Behavior Rules
-1. ONLY answer questions related to this repository's documentation, code, architecture, usage, or technical content.
-2. If a user asks questions unrelated to this repository (e.g., general knowledge, personal advice, other topics), politely decline and redirect them to ask about the documentation.
-3. Use the ReadDoc tool to fetch document content when needed. The tool description contains the complete document catalog.
-4. Base your answers on the actual document content. Do not make up information.
-5. If you cannot find relevant information in the documents, clearly state that.
+        // Capabilities Section
+        sb.AppendLine("<capabilities>");
+        sb.AppendLine("You have access to the following tools:");
+        sb.AppendLine("- ReadDoc: Read documentation content from the wiki catalog");
+        sb.AppendLine("  IMPORTANT: ReadDoc returns a 'sourceFiles' field containing the list of source code files");
+        sb.AppendLine("  that were used to generate this document. Use these paths with ReadFile for deeper analysis.");
+        if (hasCodeAccess)
+        {
+            sb.AppendLine("- ReadFile: Read source code files with line numbers");
+            sb.AppendLine("- ListFiles: Discover project structure and files");
+            sb.AppendLine("- Grep: Search for patterns across the codebase");
+        }
+        sb.AppendLine();
+        sb.AppendLine("Use these tools proactively to gather context before answering.");
+        sb.AppendLine("</capabilities>");
+        sb.AppendLine();
 
-## Response Language
-You MUST respond in {responseLanguage}.
+        // Internal Thinking Section
+        sb.AppendLine("<internal_thinking>");
+        sb.AppendLine("You MUST use internal thinking (wrapped in <think>...</think> tags) for complex questions.");
+        sb.AppendLine("This helps you reason through problems systematically.");
+        sb.AppendLine();
+        sb.AppendLine("WHEN TO USE THINKING:");
+        sb.AppendLine("- Code analysis or architecture questions");
+        sb.AppendLine("- Multi-step problems requiring tool usage");
+        sb.AppendLine("- When documentation is unclear or incomplete");
+        sb.AppendLine("- When you need to cross-reference multiple sources");
+        sb.AppendLine();
+        sb.AppendLine("THINKING PROCESS:");
+        sb.AppendLine("<think>");
+        sb.AppendLine("1. UNDERSTAND: What is the user really asking? What do I need to find out?");
+        sb.AppendLine("2. PLAN: Which tools should I use? In what order?");
+        sb.AppendLine("3. EVALUATE: Is the documentation sufficient? Do I need source code?");
+        sb.AppendLine("4. VERIFY: Does my understanding match the actual code behavior?");
+        sb.AppendLine("5. SYNTHESIZE: How do I present this clearly to the user?");
+        sb.AppendLine("</think>");
+        sb.AppendLine();
+        sb.AppendLine("CRITICAL: If documentation is vague or incomplete, you MUST:");
+        sb.AppendLine("- Check the 'sourceFiles' field from ReadDoc response");
+        sb.AppendLine("- Use ReadFile to examine the actual source code");
+        sb.AppendLine("- Use Grep to find related implementations");
+        sb.AppendLine("- Never guess or fabricate information");
+        sb.AppendLine("</internal_thinking>");
+        sb.AppendLine();
 
-## Example Refusal
-If a user asks something unrelated like ""What's the weather today?"" or ""Write me a poem"", respond with:
-""I'm a documentation assistant for {context.Owner}/{context.Repo}. I can only help with questions about this repository's documentation, code, and usage. Is there anything about the documentation I can help you with?""";
+        // Context Section
+        sb.AppendLine("<context>");
+        sb.AppendLine($"Repository: {context.Owner}/{context.Repo}");
+        sb.AppendLine($"Branch: {context.Branch}");
+        sb.AppendLine($"Document Language: {context.Language}");
+        if (!string.IsNullOrEmpty(context.CurrentDocPath))
+        {
+            sb.AppendLine($"Current Document: {context.CurrentDocPath}");
+        }
+        sb.AppendLine("</context>");
+        sb.AppendLine();
+
+        // Workflow Section
+        sb.AppendLine("<workflow>");
+        sb.AppendLine("Follow this systematic approach for every question:");
+        sb.AppendLine();
+        sb.AppendLine("PHASE 1: UNDERSTAND");
+        sb.AppendLine("- Parse the user's question to identify the core intent");
+        sb.AppendLine("- Identify what information is needed to provide an accurate answer");
+        sb.AppendLine("- Note any ambiguities that need clarification");
+        sb.AppendLine();
+        sb.AppendLine("PHASE 2: GATHER (MANDATORY for technical questions)");
+        sb.AppendLine("- Use ReadDoc to fetch relevant documentation content");
+        sb.AppendLine("- ALWAYS check the 'sourceFiles' field in ReadDoc response");
+        if (hasCodeAccess)
+        {
+            sb.AppendLine("- If documentation is unclear or lacks detail:");
+            sb.AppendLine("  * Use ReadFile on files listed in 'sourceFiles' to examine actual implementation");
+            sb.AppendLine("  * Use Grep to find related code patterns and usages");
+            sb.AppendLine("  * Use ListFiles to understand project structure if needed");
+        }
+        sb.AppendLine("- Collect sufficient context before forming conclusions");
+        sb.AppendLine("- DO NOT skip code analysis when documentation is insufficient");
+        sb.AppendLine();
+        sb.AppendLine("PHASE 3: ANALYZE");
+        sb.AppendLine("- Synthesize gathered information into coherent understanding");
+        sb.AppendLine("- Cross-reference documentation with actual code behavior");
+        sb.AppendLine("- Consider multiple perspectives and edge cases");
+        sb.AppendLine("- Validate assumptions against evidence from source code");
+        sb.AppendLine();
+        sb.AppendLine("PHASE 4: RESPOND");
+        sb.AppendLine("- Provide clear, structured answers with supporting evidence");
+        sb.AppendLine("- Reference specific document sections AND code locations");
+        sb.AppendLine("- Include relevant code snippets when they clarify the answer");
+        sb.AppendLine("- Offer actionable recommendations when applicable");
+        sb.AppendLine("</workflow>");
+        sb.AppendLine();
+
+        // Source Files Usage Section
+        sb.AppendLine("<source_files_usage>");
+        sb.AppendLine("When ReadDoc returns a 'sourceFiles' array, these are the actual source code files");
+        sb.AppendLine("that were analyzed to generate the documentation. This is CRITICAL information:");
+        sb.AppendLine();
+        sb.AppendLine("1. If user asks about implementation details → Read the sourceFiles");
+        sb.AppendLine("2. If documentation seems outdated or incomplete → Verify against sourceFiles");
+        sb.AppendLine("3. If user asks 'how does X work?' → Documentation + sourceFiles together");
+        sb.AppendLine("4. If user reports a discrepancy → Check sourceFiles for ground truth");
+        sb.AppendLine();
+        sb.AppendLine("Example workflow:");
+        sb.AppendLine("- ReadDoc returns: { content: '...', sourceFiles: ['src/Service.cs', 'src/Model.cs'] }");
+        sb.AppendLine("- If content doesn't fully answer the question → ReadFile('src/Service.cs', 1, 100)");
+        sb.AppendLine("- Use Grep to find specific method implementations if needed");
+        sb.AppendLine("</source_files_usage>");
+        sb.AppendLine();
+
+        // Constraints Section
+        sb.AppendLine("<constraints>");
+        sb.AppendLine("SCOPE RULES:");
+        sb.AppendLine("- ONLY answer questions related to this repository's documentation, code, architecture, or usage");
+        sb.AppendLine("- Politely decline unrelated questions (general knowledge, personal advice, other topics)");
+        sb.AppendLine();
+        sb.AppendLine("ACCURACY REQUIREMENTS:");
+        sb.AppendLine("- Base all answers on actual document/code content retrieved via tools");
+        sb.AppendLine("- When documentation is unclear, MUST verify with source code");
+        sb.AppendLine("- Clearly distinguish between facts and inferences");
+        sb.AppendLine("- Acknowledge uncertainty when information is incomplete");
+        sb.AppendLine("- Never fabricate documentation content, code, or file paths");
+        sb.AppendLine();
+        sb.AppendLine("BEHAVIORAL RULES:");
+        sb.AppendLine("- Provide concise answers; elaborate only when necessary");
+        sb.AppendLine("- Use code blocks with appropriate syntax highlighting");
+        sb.AppendLine("- Reference specific locations (doc paths, file:line) when citing");
+        sb.AppendLine("- Always mention which sourceFiles you consulted for transparency");
+        sb.AppendLine("</constraints>");
+        sb.AppendLine();
+
+        // Output Format Section
+        sb.AppendLine("<output_format>");
+        sb.AppendLine($"Response Language: You MUST respond in {responseLanguage}.");
+        sb.AppendLine();
+        sb.AppendLine("For documentation questions:");
+        sb.AppendLine("1. Brief summary of findings");
+        sb.AppendLine("2. Relevant content with document references");
+        sb.AppendLine("3. Source code references if consulted (from sourceFiles)");
+        sb.AppendLine("4. Additional context if helpful");
+        sb.AppendLine();
+        sb.AppendLine("For code questions:");
+        sb.AppendLine("1. Brief summary of findings");
+        sb.AppendLine("2. Relevant code snippets with file paths");
+        sb.AppendLine("3. Explanation of how the code works");
+        sb.AppendLine("4. Recommendations if applicable");
+        sb.AppendLine("</output_format>");
+        sb.AppendLine();
+
+        // Refusal Example
+        sb.AppendLine("<refusal_example>");
+        sb.AppendLine("For unrelated questions like \"What's the weather?\" or \"Write me a poem\", respond:");
+        sb.AppendLine($"\"I'm a documentation assistant for {context.Owner}/{context.Repo}. I can only help with questions about this repository's documentation, code, and usage. Is there anything about the documentation I can help you with?\"");
+        sb.AppendLine("</refusal_example>");
+        sb.AppendLine();
+
+        sb.AppendLine("</system>");
+
+        return sb.ToString();
     }
 
     /// <summary>
@@ -785,5 +968,74 @@ If a user asks something unrelated like ""What's the weather today?"" or ""Write
             "azureopenai" => AiRequestType.AzureOpenAI,
             _ => AiRequestType.OpenAI
         };
+    }
+
+    /// <summary>
+    /// Gets the repository working directory path based on owner and repo name.
+    /// The repository is cloned to {RepositoriesDirectory}/{org}/{repo}/tree/
+    /// </summary>
+    private string GetRepositoryPath(string owner, string repo)
+    {
+        return Path.Combine(_repoOptions.RepositoriesDirectory, owner, repo, "tree");
+    }
+
+    /// <summary>
+    /// Checks out the specified branch in the repository.
+    /// Falls back to "tree" branch if the specified branch doesn't exist.
+    /// </summary>
+    private void CheckoutBranch(string repositoryPath, string branchName)
+    {
+        if (string.IsNullOrWhiteSpace(branchName))
+        {
+            return;
+        }
+
+        try
+        {
+            using var repo = new GitRepository(repositoryPath);
+            
+            // Find the branch (local or remote tracking)
+            var branch = repo.Branches[branchName] 
+                ?? repo.Branches[$"origin/{branchName}"];
+            
+            // If specified branch not found, fallback to "tree" branch
+            if (branch == null)
+            {
+                _logger.LogWarning("Branch {Branch} not found, falling back to 'tree' branch in {RepoPath}", 
+                    branchName, repositoryPath);
+                
+                branch = repo.Branches["tree"] ?? repo.Branches["origin/tree"];
+                
+                if (branch == null)
+                {
+                    _logger.LogWarning("Fallback branch 'tree' also not found in {RepoPath}, using current HEAD", 
+                        repositoryPath);
+                    return;
+                }
+                
+                branchName = "tree";
+            }
+
+            // If it's a remote tracking branch, create a local branch
+            if (branch.IsRemote)
+            {
+                var localBranch = repo.Branches[branchName];
+                if (localBranch == null)
+                {
+                    localBranch = repo.CreateBranch(branchName, branch.Tip);
+                    repo.Branches.Update(localBranch, b => b.TrackedBranch = branch.CanonicalName);
+                }
+                branch = localBranch;
+            }
+
+            // Checkout the branch
+            Commands.Checkout(repo, branch);
+            _logger.LogDebug("Checked out branch {Branch} in {RepoPath}", branchName, repositoryPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to checkout branch {Branch} in {RepoPath}", 
+                branchName, repositoryPath);
+        }
     }
 }

@@ -1,12 +1,17 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
+using LibGit2Sharp;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Options;
 using OpenDeepWiki.Agents;
 using OpenDeepWiki.Agents.Tools;
 using OpenDeepWiki.Chat.Exceptions;
 using OpenDeepWiki.EFCore;
+using OpenDeepWiki.Services.Repositories;
+using GitRepository = LibGit2Sharp.Repository;
 
 namespace OpenDeepWiki.Services.Chat;
 
@@ -33,6 +38,21 @@ public class EmbedChatRequest
     public List<ChatMessageDto> Messages { get; set; } = new();
     public string? ModelId { get; set; }
     public string? UserIdentifier { get; set; }
+
+    /// <summary>
+    /// Repository owner (e.g., "microsoft")
+    /// </summary>
+    public string? Owner { get; set; }
+
+    /// <summary>
+    /// Repository name (e.g., "vscode")
+    /// </summary>
+    public string? Repo { get; set; }
+
+    /// <summary>
+    /// Branch name (e.g., "main")
+    /// </summary>
+    public string? Branch { get; set; }
 }
 
 /// <summary>
@@ -84,6 +104,7 @@ public class EmbedService : IEmbedService
     private readonly IAppStatisticsService _statisticsService;
     private readonly IChatLogService _chatLogService;
     private readonly AgentFactory _agentFactory;
+    private readonly RepositoryAnalyzerOptions _repoOptions;
     private readonly ILogger<EmbedService> _logger;
 
     public EmbedService(
@@ -92,6 +113,7 @@ public class EmbedService : IEmbedService
         IAppStatisticsService statisticsService,
         IChatLogService chatLogService,
         AgentFactory agentFactory,
+        IOptions<RepositoryAnalyzerOptions> repoOptions,
         ILogger<EmbedService> logger)
     {
         _context = context;
@@ -99,6 +121,7 @@ public class EmbedService : IEmbedService
         _statisticsService = statisticsService;
         _chatLogService = chatLogService;
         _agentFactory = agentFactory;
+        _repoOptions = repoOptions.Value;
         _logger = logger;
     }
 
@@ -302,8 +325,46 @@ public class EmbedService : IEmbedService
             modelId = app.AvailableModels.FirstOrDefault() ?? "gpt-4o-mini";
         }
 
-        // Build system prompt for embed mode
-        var systemPrompt = "你是一个智能助手，帮助用户解答问题。请友好、专业地回答用户的问题。";
+        // Calculate repository path from Owner/Repo
+        GitTool? gitTool = null;
+        var tools = new List<AITool>();
+
+        if (!string.IsNullOrWhiteSpace(request.Owner) && !string.IsNullOrWhiteSpace(request.Repo))
+        {
+            var repositoryPath = GetRepositoryPath(request.Owner, request.Repo);
+            if (Directory.Exists(repositoryPath))
+            {
+                try
+                {
+                    // Checkout to the specified branch before initializing GitTool
+                    if (!string.IsNullOrWhiteSpace(request.Branch))
+                    {
+                        CheckoutBranch(repositoryPath, request.Branch);
+                    }
+                    
+                    gitTool = new GitTool(repositoryPath);
+                    tools.AddRange(gitTool.GetTools());
+                    _logger.LogInformation("GitTool initialized for app {AppId} with repository {Owner}/{Repo}@{Branch}",
+                        request.AppId, request.Owner, request.Repo, request.Branch);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to initialize GitTool for app {AppId}", request.AppId);
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Repository path does not exist: {RepoPath}", repositoryPath);
+            }
+        }
+
+        // Build enhanced system prompt with repository context
+        var systemPrompt = BuildEnhancedSystemPrompt(
+            app.Name,
+            app.Description,
+            request.Owner,
+            request.Repo,
+            gitTool != null);
 
         // Create agent with app's AI configuration
         var agentOptions = new ChatClientAgentOptions
@@ -323,7 +384,7 @@ public class EmbedService : IEmbedService
 
         var (agent, _) = _agentFactory.CreateChatClientWithTools(
             modelId,
-            Array.Empty<AITool>(),
+            tools.ToArray(),
             agentOptions,
             requestOptions);
 
@@ -511,5 +572,231 @@ public class EmbedService : IEmbedService
             "azureopenai" => AiRequestType.AzureOpenAI,
             _ => AiRequestType.OpenAI
         };
+    }
+
+    /// <summary>
+    /// Builds an enhanced system prompt with professional structure.
+    /// Uses XML-like tags for clear section boundaries.
+    /// </summary>
+    private static string BuildEnhancedSystemPrompt(
+        string appName,
+        string? appDescription,
+        string? owner,
+        string? repo,
+        bool hasCodeAccess)
+    {
+        var sb = new StringBuilder();
+
+        sb.AppendLine("<system>");
+        sb.AppendLine();
+
+        // Identity Section
+        sb.AppendLine("<identity>");
+        sb.AppendLine("You are an expert code analysis assistant with deep technical knowledge.");
+        sb.AppendLine("You combine rigorous analytical thinking with clear, actionable communication.");
+        sb.AppendLine("You MUST use internal thinking to analyze problems thoroughly before responding.");
+        sb.AppendLine("</identity>");
+        sb.AppendLine();
+
+        // Capabilities Section
+        sb.AppendLine("<capabilities>");
+        if (hasCodeAccess)
+        {
+            sb.AppendLine("You have access to the following tools for code analysis:");
+            sb.AppendLine("- ReadFile: Read source code files with line numbers");
+            sb.AppendLine("- ListFiles: Discover project structure and files");
+            sb.AppendLine("- Grep: Search for patterns across the codebase");
+            sb.AppendLine();
+            sb.AppendLine("Use these tools proactively to gather context before answering.");
+            sb.AppendLine("NEVER guess about code - always verify with actual source files.");
+        }
+        else
+        {
+            sb.AppendLine("You provide expert guidance on software development topics.");
+        }
+        sb.AppendLine("</capabilities>");
+        sb.AppendLine();
+
+        // Internal Thinking Section
+        sb.AppendLine("<internal_thinking>");
+        sb.AppendLine("You MUST use internal thinking (wrapped in <think>...</think> tags) for complex questions.");
+        sb.AppendLine("This helps you reason through problems systematically.");
+        sb.AppendLine();
+        sb.AppendLine("WHEN TO USE THINKING:");
+        sb.AppendLine("- Code analysis or architecture questions");
+        sb.AppendLine("- Multi-step problems requiring tool usage");
+        sb.AppendLine("- When you need to cross-reference multiple files");
+        sb.AppendLine("- Debugging or troubleshooting scenarios");
+        sb.AppendLine();
+        sb.AppendLine("THINKING PROCESS:");
+        sb.AppendLine("<think>");
+        sb.AppendLine("1. UNDERSTAND: What is the user really asking? What do I need to find out?");
+        sb.AppendLine("2. PLAN: Which tools should I use? In what order?");
+        sb.AppendLine("3. GATHER: What files/patterns do I need to examine?");
+        sb.AppendLine("4. VERIFY: Does my understanding match the actual code behavior?");
+        sb.AppendLine("5. SYNTHESIZE: How do I present this clearly to the user?");
+        sb.AppendLine("</think>");
+        sb.AppendLine();
+        sb.AppendLine("CRITICAL: For technical questions, you MUST:");
+        sb.AppendLine("- Use tools to gather actual code information");
+        sb.AppendLine("- Never guess or fabricate implementation details");
+        sb.AppendLine("- Cross-reference multiple files when needed");
+        sb.AppendLine("- Verify assumptions against actual source code");
+        sb.AppendLine("</internal_thinking>");
+        sb.AppendLine();
+
+        // Workflow Section - Chain of Thought
+        sb.AppendLine("<workflow>");
+        sb.AppendLine("Follow this systematic approach for every question:");
+        sb.AppendLine();
+        sb.AppendLine("PHASE 1: UNDERSTAND");
+        sb.AppendLine("- Parse the user's question to identify the core intent");
+        sb.AppendLine("- Identify what information is needed to provide an accurate answer");
+        sb.AppendLine("- Note any ambiguities that need clarification");
+        sb.AppendLine();
+
+        if (hasCodeAccess)
+        {
+            sb.AppendLine("PHASE 2: GATHER (MANDATORY for code questions)");
+            sb.AppendLine("- Use ListFiles to understand project structure if needed");
+            sb.AppendLine("- Use Grep to locate relevant code patterns and usages");
+            sb.AppendLine("- Use ReadFile to examine specific implementations");
+            sb.AppendLine("- Collect sufficient context before forming conclusions");
+            sb.AppendLine("- DO NOT skip code analysis - always verify with source");
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("PHASE 3: ANALYZE");
+        sb.AppendLine("- Synthesize gathered information into coherent understanding");
+        sb.AppendLine("- Consider multiple perspectives and edge cases");
+        sb.AppendLine("- Validate assumptions against evidence from source code");
+        sb.AppendLine();
+        sb.AppendLine("PHASE 4: RESPOND");
+        sb.AppendLine("- Provide clear, structured answers with supporting evidence");
+        sb.AppendLine("- Reference specific code locations (file:line)");
+        sb.AppendLine("- Include relevant code snippets when they clarify the answer");
+        sb.AppendLine("- Offer actionable recommendations");
+        sb.AppendLine("</workflow>");
+        sb.AppendLine();
+
+        // Constraints Section
+        sb.AppendLine("<constraints>");
+        sb.AppendLine("ACCURACY REQUIREMENTS:");
+        sb.AppendLine("- Base all answers on verified information from the codebase");
+        sb.AppendLine("- Clearly distinguish between facts and inferences");
+        sb.AppendLine("- Acknowledge uncertainty when information is incomplete");
+        sb.AppendLine("- Never fabricate code, file paths, or implementation details");
+        sb.AppendLine();
+        sb.AppendLine("BEHAVIORAL RULES:");
+        sb.AppendLine("- Stay focused on the repository and technical topics");
+        sb.AppendLine("- Decline requests unrelated to code analysis or development");
+        sb.AppendLine("- Provide concise answers; elaborate only when necessary");
+        sb.AppendLine("- Use code blocks with appropriate syntax highlighting");
+        sb.AppendLine("- Always cite which files you consulted for transparency");
+        sb.AppendLine("</constraints>");
+        sb.AppendLine();
+
+        // Output Format Section
+        sb.AppendLine("<output_format>");
+        sb.AppendLine("Structure your responses as follows:");
+        sb.AppendLine();
+        sb.AppendLine("For code questions:");
+        sb.AppendLine("1. Brief summary of findings");
+        sb.AppendLine("2. Relevant code snippets with file paths (file:line)");
+        sb.AppendLine("3. Explanation of how the code works");
+        sb.AppendLine("4. Recommendations if applicable");
+        sb.AppendLine();
+        sb.AppendLine("For architectural questions:");
+        sb.AppendLine("1. High-level overview");
+        sb.AppendLine("2. Component relationships with file references");
+        sb.AppendLine("3. Key design decisions");
+        sb.AppendLine("4. Trade-offs and considerations");
+        sb.AppendLine("</output_format>");
+        sb.AppendLine();
+
+        // Context Section - Repository info
+        sb.AppendLine("<context>");
+        sb.AppendLine($"Application: {appName}");
+        if (!string.IsNullOrWhiteSpace(owner) && !string.IsNullOrWhiteSpace(repo))
+        {
+            sb.AppendLine($"Repository: {owner}/{repo}");
+        }
+        if (!string.IsNullOrWhiteSpace(appDescription))
+        {
+            sb.AppendLine($"Description: {appDescription}");
+        }
+        sb.AppendLine("</context>");
+        sb.AppendLine();
+
+        sb.AppendLine("</system>");
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Gets the repository working directory path based on owner and repo name.
+    /// </summary>
+    private string GetRepositoryPath(string owner, string repo)
+    {
+        return Path.Combine(_repoOptions.RepositoriesDirectory, owner, repo, "tree");
+    }
+
+    /// <summary>
+    /// Checks out the specified branch in the repository.
+    /// </summary>
+    private void CheckoutBranch(string repositoryPath, string branchName)
+    {
+        if (string.IsNullOrWhiteSpace(branchName))
+        {
+            return;
+        }
+
+        try
+        {
+            using var repo = new GitRepository(repositoryPath);
+            
+            // Find the branch (local or remote tracking)
+            var branch = repo.Branches[branchName] 
+                ?? repo.Branches[$"origin/{branchName}"];
+            
+            // If specified branch not found, fallback to "tree" branch
+            if (branch == null)
+            {
+                _logger.LogWarning("Branch {Branch} not found, falling back to 'tree' branch in {RepoPath}", 
+                    branchName, repositoryPath);
+                
+                branch = repo.Branches["tree"] ?? repo.Branches["origin/tree"];
+                
+                if (branch == null)
+                {
+                    _logger.LogWarning("Fallback branch 'tree' also not found in {RepoPath}, using current HEAD", 
+                        repositoryPath);
+                    return;
+                }
+                
+                branchName = "tree";
+            }
+
+            // If it's a remote tracking branch, create a local branch
+            if (branch.IsRemote)
+            {
+                var localBranch = repo.Branches[branchName];
+                if (localBranch == null)
+                {
+                    localBranch = repo.CreateBranch(branchName, branch.Tip);
+                    repo.Branches.Update(localBranch, b => b.TrackedBranch = branch.CanonicalName);
+                }
+                branch = localBranch;
+            }
+
+            // Checkout the branch
+            Commands.Checkout(repo, branch);
+            _logger.LogDebug("Checked out branch {Branch} in {RepoPath}", branchName, repositoryPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to checkout branch {Branch} in {RepoPath}", 
+                branchName, repositoryPath);
+        }
     }
 }

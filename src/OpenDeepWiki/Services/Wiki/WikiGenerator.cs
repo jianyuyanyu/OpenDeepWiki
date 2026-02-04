@@ -726,14 +726,14 @@ Please start executing the task.";
                 };
 
                 // Use streaming response for real-time output
-                var contentBuilder = new System.Text.StringBuilder();
+                var contentBuilder = new StringBuilder();
                 UsageDetails? usageDetails = null;
                 var toolCallCount = 0;
 
                 _logger.LogDebug("Starting streaming response. Operation: {Operation}", operationName);
 
                 var thread = await chatClient.GetNewSessionAsync(cancellationToken);
-
+                
                 await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
                 {
                     // Print streaming content
@@ -870,6 +870,12 @@ Please start executing the task.";
             return true;
         }
 
+        // Check for HttpIOException (response ended prematurely)
+        if (ex is System.Net.Http.HttpIOException)
+        {
+            return true;
+        }
+
         // Check exception message for common transient error patterns
         var message = ex.Message.ToLowerInvariant();
         return message.Contains("timeout") ||
@@ -878,7 +884,8 @@ Please start executing the task.";
                message.Contains("service unavailable") ||
                message.Contains("temporarily unavailable") ||
                message.Contains("connection") ||
-               message.Contains("network");
+               message.Contains("network") ||
+               message.Contains("response ended prematurely");
     }
 
     /// <summary>
@@ -1388,22 +1395,50 @@ Translated document:";
             new(ChatRole.User, prompt)
         };
 
-        var chatClient = _agentFactory.CreateSimpleChatClient(
-            _options.GetTranslationModel(), 
-            32000, 
-            _options.GetTranslationRequestOptions());
-        var thread = await chatClient.GetNewSessionAsync(cancellationToken);
-        
-        var contentBuilder = new StringBuilder();
-        await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
+        var retryCount = 0;
+        Exception? lastException = null;
+
+        while (retryCount < _options.MaxRetryAttempts)
         {
-            if (!string.IsNullOrEmpty(update.Text))
+            try
             {
-                contentBuilder.Append(update.Text);
+                var chatClient = _agentFactory.CreateSimpleChatClient(
+                    _options.GetTranslationModel(), 
+                    32000, 
+                    _options.GetTranslationRequestOptions());
+                var thread = await chatClient.GetNewSessionAsync(cancellationToken);
+                
+                var contentBuilder = new StringBuilder();
+                await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
+                {
+                    if (!string.IsNullOrEmpty(update.Text))
+                    {
+                        contentBuilder.Append(update.Text);
+                    }
+                }
+
+                return contentBuilder.ToString().Trim();
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException && IsTransientException(ex))
+            {
+                lastException = ex;
+                retryCount++;
+
+                _logger.LogWarning(ex,
+                    "TranslateContentAsync attempt {Attempt}/{MaxAttempts} failed with transient error. SourceLang: {SourceLang}, TargetLang: {TargetLang}",
+                    retryCount, _options.MaxRetryAttempts, sourceLanguage, targetLanguage);
+
+                if (retryCount < _options.MaxRetryAttempts)
+                {
+                    var delay = _options.RetryDelayMs * Math.Pow(2, retryCount - 1) + Random.Shared.Next(0, 1000);
+                    await Task.Delay((int)Math.Min(delay, 60000), cancellationToken);
+                }
             }
         }
 
-        return contentBuilder.ToString().Trim();
+        throw new InvalidOperationException(
+            $"TranslateContentAsync failed after {_options.MaxRetryAttempts} attempts",
+            lastException);
     }
 
     /// <summary>
@@ -1446,27 +1481,55 @@ Translated mind map:";
             new(ChatRole.User, prompt)
         };
 
-        var chatClient = _agentFactory.CreateSimpleChatClient(
-            _options.GetTranslationModel(),
-            32000,
-            _options.GetTranslationRequestOptions());
-        var thread = await chatClient.GetNewSessionAsync(cancellationToken);
+        var retryCount = 0;
+        Exception? lastException = null;
 
-        var contentBuilder = new StringBuilder();
-        await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
+        while (retryCount < _options.MaxRetryAttempts)
         {
-            if (!string.IsNullOrEmpty(update.Text))
+            try
             {
-                contentBuilder.Append(update.Text);
+                var chatClient = _agentFactory.CreateSimpleChatClient(
+                    _options.GetTranslationModel(),
+                    32000,
+                    _options.GetTranslationRequestOptions());
+                var thread = await chatClient.GetNewSessionAsync(cancellationToken);
+
+                var contentBuilder = new StringBuilder();
+                await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
+                {
+                    if (!string.IsNullOrEmpty(update.Text))
+                    {
+                        contentBuilder.Append(update.Text);
+                    }
+                }
+
+                var result = contentBuilder.ToString().Trim();
+
+                // 清理可能的 <think> 标签
+                result = RemoveThinkTags(result);
+
+                return result;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException && IsTransientException(ex))
+            {
+                lastException = ex;
+                retryCount++;
+
+                _logger.LogWarning(ex,
+                    "TranslateMindMapAsync attempt {Attempt}/{MaxAttempts} failed with transient error. SourceLang: {SourceLang}, TargetLang: {TargetLang}",
+                    retryCount, _options.MaxRetryAttempts, sourceLanguage, targetLanguage);
+
+                if (retryCount < _options.MaxRetryAttempts)
+                {
+                    var delay = _options.RetryDelayMs * Math.Pow(2, retryCount - 1) + Random.Shared.Next(0, 1000);
+                    await Task.Delay((int)Math.Min(delay, 60000), cancellationToken);
+                }
             }
         }
 
-        var result = contentBuilder.ToString().Trim();
-
-        // 清理可能的 <think> 标签
-        result = RemoveThinkTags(result);
-
-        return result;
+        throw new InvalidOperationException(
+            $"TranslateMindMapAsync failed after {_options.MaxRetryAttempts} attempts",
+            lastException);
     }
 
     /// <summary>

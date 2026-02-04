@@ -10,7 +10,7 @@
       
       # 数据库配置 (支持: sqlite, postgresql)
       - DB_TYPE=sqlite
-      - CONNECTION_STRING=Data Source=/app/data/opendeepwiki.db
+      - CONNECTION_STRING=Data Source=/data/opendeepwiki.db
       
       # JWT 认证配置
       - JWT_SECRET_KEY=your-secret-key-please-change-in-production

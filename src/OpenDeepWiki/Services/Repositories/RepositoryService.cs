@@ -160,6 +160,16 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
         {
             orderedQuery = isDesc ? query.OrderByDescending(r => r.UpdatedAt) : query.OrderBy(r => r.UpdatedAt);
         }
+        else if (sortBy?.Equals("status", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            // 状态排序优先级: Processing(1) > Pending(0) > Completed(2) > Failed(3)
+            // 使用自定义排序权重
+            orderedQuery = query.OrderBy(r => 
+                r.Status == RepositoryStatus.Processing ? 0 :
+                r.Status == RepositoryStatus.Pending ? 1 :
+                r.Status == RepositoryStatus.Completed ? 2 : 3)
+                .ThenByDescending(r => r.CreatedAt);
+        }
         else
         {
             orderedQuery = isDesc ? query.OrderByDescending(r => r.CreatedAt) : query.OrderBy(r => r.CreatedAt);

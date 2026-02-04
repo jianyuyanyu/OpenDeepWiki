@@ -89,7 +89,7 @@ public class WikiGeneratorOptions
     /// Timeout in minutes for translation tasks.
     /// Default: 20 minutes
     /// </summary>
-    public int TranslationTimeoutMinutes { get; set; } = 20;
+    public int TranslationTimeoutMinutes { get; set; } = 35;
 
     /// <summary>
     /// Timeout in minutes for catalog title translation tasks.

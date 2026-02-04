@@ -113,7 +113,7 @@ export async function fetchRepositoryList(params?: {
   status?: number;
   keyword?: string;
   language?: string;
-  sortBy?: 'createdAt' | 'updatedAt';
+  sortBy?: 'createdAt' | 'updatedAt' | 'status';
   sortOrder?: 'asc' | 'desc';
   isPublic?: boolean;
 }): Promise<RepositoryListResponse> {

@@ -249,8 +249,10 @@ export function ChatMessageItem({ message }: ChatMessageProps) {
       {/* 消息内容 */}
       <div
         className={cn(
-          "flex min-w-0 flex-1 flex-col overflow-hidden",
-          isUser ? "items-end" : "items-start"
+          "flex flex-col overflow-hidden",
+          isUser 
+            ? "items-end max-w-[85%]" 
+            : "items-start min-w-0 flex-1"
         )}
       >
         {/* 引用文本（用户消息） */}
@@ -290,10 +292,10 @@ export function ChatMessageItem({ message }: ChatMessageProps) {
             {message.content && (
               <div
                 className={cn(
-                  "rounded-lg px-3 py-2 w-full overflow-hidden",
+                  "rounded-2xl px-3 py-2 overflow-hidden",
                   isUser
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted/50 text-foreground"
+                    ? "bg-primary text-primary-foreground rounded-br-md"
+                    : "bg-muted/50 text-foreground w-full rounded-bl-md"
                 )}
               >
                 {isUser ? (
@@ -351,7 +353,10 @@ export function ChatMessageItem({ message }: ChatMessageProps) {
         )}
 
         {/* 时间戳和Token统计 */}
-        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+        <div className={cn(
+          "mt-1 flex items-center gap-2 text-xs text-muted-foreground",
+          isUser ? "flex-row-reverse" : "flex-row"
+        )}>
           <span>{new Date(message.timestamp).toLocaleTimeString()}</span>
           {message.tokenUsage && (
             <span className="flex items-center gap-1">

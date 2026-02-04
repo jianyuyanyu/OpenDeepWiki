@@ -97,7 +97,7 @@ export function ChatPanel({
   const panelRef = React.useRef<HTMLDivElement>(null)
   const isDraggingRef = React.useRef(false)
   const rafRef = React.useRef<number | null>(null)
-  const scrollRef = React.useRef<HTMLDivElement>(null)
+  const messagesEndRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const abortControllerRef = React.useRef<AbortController | null>(null)
@@ -208,21 +208,27 @@ export function ChatPanel({
   }, [])
 
   // 滚动到底部的函数
-  const scrollToBottom = React.useCallback(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+  const scrollToBottom = React.useCallback((smooth = true) => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: smooth ? "smooth" : "instant",
+        block: "end" 
+      })
     }
   }, [])
 
   // 消息变化时滚动到底部
   React.useEffect(() => {
-    scrollToBottom()
+    // 使用 requestAnimationFrame 确保 DOM 更新后再滚动
+    requestAnimationFrame(() => {
+      scrollToBottom()
+    })
   }, [messages, scrollToBottom])
 
   // AI 回复时持续滚动到底部
   React.useEffect(() => {
     if (isLoading) {
-      const interval = setInterval(scrollToBottom, 100)
+      const interval = setInterval(() => scrollToBottom(false), 100)
       return () => clearInterval(interval)
     }
   }, [isLoading, scrollToBottom])
@@ -593,8 +599,8 @@ export function ChatPanel({
         </div>
 
         {/* 消息列表 - 底部留出空间给悬浮输入框 */}
-        <ScrollArea className="flex-1 overflow-hidden w-full" ref={scrollRef}>
-          <div className="flex flex-col pb-44 w-full">
+        <ScrollArea className="flex-1 overflow-hidden w-full">
+          <div className="flex flex-col w-full">
             {!isEnabled ? (
               <div className="flex h-full items-center justify-center p-8 text-center text-muted-foreground">
                 {t("assistant.disabled")}
@@ -612,19 +618,32 @@ export function ChatPanel({
               </div>
             ) : (
               <div className="w-full">
-                {messages.map((message) => (
-                  <ChatMessageItem key={message.id} message={message} />
+                {messages.map((message, index) => (
+                  <div
+                    key={message.id}
+                    className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
+                    style={{ animationDelay: `${Math.min(index * 50, 200)}ms` }}
+                  >
+                    <ChatMessageItem message={message} />
+                  </div>
                 ))}
               </div>
             )}
 
             {/* 加载指示器 */}
             {isLoading && (
-              <div className="flex items-center gap-2 p-4 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
+              <div className="flex items-center gap-2 p-4 text-muted-foreground animate-in fade-in-0 duration-200">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
                 <span className="text-sm">{t("assistant.thinking")}</span>
               </div>
             )}
+            
+            {/* 滚动锚点 + 底部空白区域，确保内容不被输入框遮挡 */}
+            <div ref={messagesEndRef} className="h-52 shrink-0" />
           </div>
         </ScrollArea>
 

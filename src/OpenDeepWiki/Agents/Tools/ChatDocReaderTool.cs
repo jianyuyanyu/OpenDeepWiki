@@ -148,12 +148,27 @@ public class ChatDocReaderTool
             var selectedLines = allLines.Skip(startLine - 1).Take(actualEndLine - startLine + 1);
             var content = string.Join("\n", selectedLines);
 
+            // 解析文档依赖的源代码文件列表
+            List<string>? sourceFiles = null;
+            if (!string.IsNullOrEmpty(docFile.SourceFiles))
+            {
+                try
+                {
+                    sourceFiles = JsonSerializer.Deserialize<List<string>>(docFile.SourceFiles);
+                }
+                catch
+                {
+                    // 解析失败时忽略
+                }
+            }
+
             return JsonSerializer.Serialize(new { 
                 content,
                 startLine,
                 endLine = actualEndLine,
                 totalLines,
-                path
+                path,
+                sourceFiles
             });
         }
         catch (Exception ex)

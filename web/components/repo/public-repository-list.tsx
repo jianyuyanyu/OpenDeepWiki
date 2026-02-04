@@ -53,8 +53,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
       setError(null);
       const response = await fetchRepositoryList({
         isPublic: true,
-        sortBy: "createdAt",
-        sortOrder: "desc",
+        sortBy: "status",
         keyword: keyword || undefined,
         language: selectedLanguage || undefined,
         page,

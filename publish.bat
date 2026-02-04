@@ -59,25 +59,41 @@ echo.
 echo # 服务监听地址
 echo URLS=http://localhost:8080
 echo.
-echo # 数据库配置
+echo # 数据库配置 ^(支持: sqlite, postgresql^)
 echo DB_TYPE=sqlite
-echo DB_CONNECTION_STRING=Data Source=./OpenDeepWiki.db
+echo CONNECTION_STRING=Data Source=./opendeepwiki.db
 echo.
-echo # AI 模型配置
-echo CHAT_MODEL=DeepSeek-V3
+echo # 仓库存储目录
+echo REPOSITORIES_DIRECTORY=./repositories
+echo.
+echo # AI 服务配置 ^(全局默认，用于 Chat 等功能^)
 echo CHAT_API_KEY=your-api-key-here
 echo ENDPOINT=https://api.openai.com/v1
-echo MODEL_PROVIDER=OpenAI
+echo CHAT_REQUEST_TYPE=OpenAI
 echo.
-echo # 可选配置
-echo ANALYSIS_MODEL=
-echo LANGUAGE=中文
-echo TASK_MAX_SIZE_PER_USER=5
-echo EnableSmartFilter=true
-echo UPDATE_INTERVAL=5
-echo MAX_FILE_LIMIT=100
-echo ENABLE_INCREMENTAL_UPDATE=true
-echo DEEP_RESEARCH_MODEL=
+echo # Wiki 生成器配置 - 目录生成
+echo WIKI_CATALOG_MODEL=gpt-4o
+echo WIKI_CATALOG_ENDPOINT=https://api.openai.com/v1
+echo WIKI_CATALOG_API_KEY=your-catalog-api-key
+echo WIKI_CATALOG_REQUEST_TYPE=OpenAI
+echo.
+echo # Wiki 生成器配置 - 内容生成
+echo WIKI_CONTENT_MODEL=gpt-4o
+echo WIKI_CONTENT_ENDPOINT=https://api.openai.com/v1
+echo WIKI_CONTENT_API_KEY=your-content-api-key
+echo WIKI_CONTENT_REQUEST_TYPE=OpenAI
+echo.
+echo # Wiki 生成器配置 - 翻译 ^(可选，不配置则使用内容生成配置^)
+echo # WIKI_TRANSLATION_MODEL=gpt-4o
+echo # WIKI_TRANSLATION_ENDPOINT=https://api.openai.com/v1
+echo # WIKI_TRANSLATION_API_KEY=your-translation-api-key
+echo # WIKI_TRANSLATION_REQUEST_TYPE=OpenAI
+echo.
+echo # Wiki 生成并行数 ^(默认: 5^)
+echo WIKI_PARALLEL_COUNT=5
+echo.
+echo # 多语言支持 ^(逗号分隔，如: en,zh,ja,ko^)
+echo WIKI_LANGUAGES=en,zh
 echo.
 echo # JWT 配置（生产环境请修改）
 echo JWT_SECRET_KEY=OpenDeepWiki-Default-Secret-Key-Please-Change-In-Production-Environment-2024
