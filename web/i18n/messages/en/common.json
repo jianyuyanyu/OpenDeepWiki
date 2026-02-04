@@ -103,5 +103,23 @@
       "existsButNoDoc": "This repository exists on GitHub but has no documentation yet. Click the button below to generate Wiki documentation.",
       "generateWiki": "Generate Wiki"
     }
+  },
+  "theme": {
+    "toggle": "Toggle theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "branch": {
+    "selectBranch": "Select branch"
+  },
+  "language": {
+    "selectLanguage": "Select language"
+  },
+  "mermaid": {
+    "zoomOut": "Zoom out",
+    "zoomIn": "Zoom in",
+    "resetView": "Reset view",
+    "close": "Close (ESC)"
   }
 }

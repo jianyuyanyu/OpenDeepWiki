@@ -1,12 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { Send, Loader2, X, ImagePlus, Trash2, RefreshCw } from "lucide-react"
+import { useTranslations } from "next-intl"
+import { Send, Loader2, X, ImagePlus, Trash2, RefreshCw, GripVertical } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useChatHistory, ChatMessage } from "@/hooks/use-chat-history"
+import { useChatHistory } from "@/hooks/use-chat-history"
+import { useLocale } from "next-intl"
 import {
   streamChat,
   getAvailableModels,
@@ -14,16 +16,23 @@ import {
   toChatMessageDto,
   DocContext,
   ModelConfig,
-  SSEEvent,
   ToolCall,
   ToolResult,
   ErrorInfo,
   ChatErrorCodes,
   getErrorMessage,
   isRetryableError,
+  ThinkingEvent,
+  ToolCallEvent,
 } from "@/lib/chat-api"
+import { ContentBlock } from "@/hooks/use-chat-history"
 import { ModelSelector } from "./model-selector"
 import { ChatMessageItem } from "./chat-message"
+
+const MIN_WIDTH = 320
+const MAX_WIDTH = 800
+const DEFAULT_WIDTH = 420
+const STORAGE_KEY = "chat-panel-width"
 
 /**
  * 对话面板属性
@@ -63,6 +72,8 @@ export function ChatPanel({
   context,
   appId,
 }: ChatPanelProps) {
+  const locale = useLocale()
+  const t = useTranslations("chat")
   const { messages, addMessage, updateMessage, clearHistory } = useChatHistory()
   const [input, setInput] = React.useState("")
   const [images, setImages] = React.useState<string[]>([])
@@ -70,7 +81,10 @@ export function ChatPanel({
   const [models, setModels] = React.useState<ModelConfig[]>([])
   const [selectedModelId, setSelectedModelId] = React.useState("")
   const [isEnabled, setIsEnabled] = React.useState(true)
+  const [enableImageUpload, setEnableImageUpload] = React.useState(false)
   const [error, setError] = React.useState<ErrorState | null>(null)
+  // 引用的选中文本（包含标题）
+  const [quotedText, setQuotedText] = React.useState<{ title?: string; text: string } | null>(null)
   const [lastRequest, setLastRequest] = React.useState<{
     input: string
     images: string[]
@@ -78,10 +92,75 @@ export function ChatPanel({
     assistantMessageId: string
   } | null>(null)
   
+  // 面板宽度状态
+  const [panelWidth, setPanelWidth] = React.useState(DEFAULT_WIDTH)
+  const panelRef = React.useRef<HTMLDivElement>(null)
+  const isDraggingRef = React.useRef(false)
+  const rafRef = React.useRef<number | null>(null)
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const abortControllerRef = React.useRef<AbortController | null>(null)
+
+  // 从 localStorage 加载保存的宽度
+  React.useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const width = parseInt(saved, 10)
+      if (width >= MIN_WIDTH && width <= MAX_WIDTH) {
+        setPanelWidth(width)
+      }
+    }
+  }, [])
+
+  // 拖动调整宽度
+  const handleResizeStart = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    isDraggingRef.current = true
+    document.body.style.cursor = "col-resize"
+    document.body.style.userSelect = "none"
+  }, [])
+
+  React.useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return
+      
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current)
+      }
+      
+      rafRef.current = requestAnimationFrame(() => {
+        const newWidth = window.innerWidth - e.clientX
+        const clampedWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, newWidth))
+        setPanelWidth(clampedWidth)
+      })
+    }
+
+    const handleMouseUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false
+        document.body.style.cursor = ""
+        document.body.style.userSelect = ""
+        // 保存到 localStorage
+        localStorage.setItem(STORAGE_KEY, panelWidth.toString())
+      }
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
+
+    document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener("mouseup", handleMouseUp)
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove)
+      document.removeEventListener("mouseup", handleMouseUp)
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current)
+      }
+    }
+  }, [panelWidth])
 
   // 加载配置和模型列表
   React.useEffect(() => {
@@ -94,6 +173,7 @@ export function ChatPanel({
           getAvailableModels(),
         ])
         setIsEnabled(config.isEnabled)
+        setEnableImageUpload(config.enableImageUpload)
         setModels(modelList)
         
         // 设置默认模型
@@ -106,9 +186,9 @@ export function ChatPanel({
           }
         }
       } catch (err) {
-        console.error("加载配置失败:", err)
+        console.error(t("error.loadConfigFailed"), err)
         setError({
-          message: "加载配置失败，请刷新重试",
+          message: t("assistant.loadConfigFailed"),
           code: ChatErrorCodes.CONFIG_MISSING,
           retryable: true,
         })
@@ -127,12 +207,82 @@ export function ChatPanel({
     }
   }, [])
 
-  // 滚动到底部
-  React.useEffect(() => {
+  // 滚动到底部的函数
+  const scrollToBottom = React.useCallback(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [messages])
+  }, [])
+
+  // 消息变化时滚动到底部
+  React.useEffect(() => {
+    scrollToBottom()
+  }, [messages, scrollToBottom])
+
+  // AI 回复时持续滚动到底部
+  React.useEffect(() => {
+    if (isLoading) {
+      const interval = setInterval(scrollToBottom, 100)
+      return () => clearInterval(interval)
+    }
+  }, [isLoading, scrollToBottom])
+
+  // 监听用户选中文本（只在文档内容区域）
+  React.useEffect(() => {
+    if (!isOpen) return
+
+    const handleSelectionChange = () => {
+      const selection = window.getSelection()
+      const text = selection?.toString().trim()
+      
+      // 如果没有选中文本，清除引用
+      if (!text) {
+        setQuotedText(null)
+        return
+      }
+      
+      const anchorNode = selection?.anchorNode
+      if (!anchorNode) return
+      
+      // 检查选中的文本是否在文档内容区域
+      const docContentSelectors = [
+        '[data-doc-content]',
+        '.prose',
+        '.markdown-body',
+        'article',
+        'main',
+      ]
+      
+      const parentElement = anchorNode.parentElement
+      if (!parentElement) return
+      
+      // 检查是否在文档内容区域内
+      const isInDocContent = docContentSelectors.some(selector => 
+        parentElement.closest(selector) !== null
+      )
+      
+      // 排除在对话面板内选中的文本
+      const isInChatPanel = panelRef.current?.contains(anchorNode as Node)
+      
+      if (isInDocContent && !isInChatPanel) {
+        const title = context.currentDocPath || document.title
+        setQuotedText({ title, text })
+      }
+    }
+
+    document.addEventListener("mouseup", handleSelectionChange)
+    // 监听 selectionchange 事件来检测取消选择
+    document.addEventListener("selectionchange", () => {
+      const selection = window.getSelection()
+      if (!selection?.toString().trim()) {
+        setQuotedText(null)
+      }
+    })
+    
+    return () => {
+      document.removeEventListener("mouseup", handleSelectionChange)
+    }
+  }, [isOpen, context.currentDocPath])
 
   // 处理图片上传
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,7 +293,7 @@ export function ChatPanel({
       // 检查文件类型
       if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.type)) {
         setError({
-          message: "仅支持 PNG、JPG、GIF、WebP 格式的图片",
+          message: t("image.unsupportedFormat"),
           retryable: false,
         })
         return
@@ -152,7 +302,7 @@ export function ChatPanel({
       // 检查文件大小 (10MB)
       if (file.size > 10 * 1024 * 1024) {
         setError({
-          message: "图片大小不能超过 10MB",
+          message: t("image.sizeTooLarge"),
           retryable: false,
         })
         return
@@ -178,10 +328,10 @@ export function ChatPanel({
   // 发送消息
   const handleSend = async () => {
     const trimmedInput = input.trim()
-    if (!trimmedInput && images.length === 0) return
+    if (!trimmedInput && images.length === 0 && !quotedText) return
     if (!selectedModelId) {
       setError({
-        message: "请先选择模型",
+        message: t("assistant.selectModel"),
         code: ChatErrorCodes.MODEL_UNAVAILABLE,
         retryable: false,
       })
@@ -194,18 +344,21 @@ export function ChatPanel({
     // 创建新的AbortController
     abortControllerRef.current = new AbortController()
 
-    // 添加用户消息
+    // 添加用户消息（引用文本单独存储，不合并到 content）
     const userMessageId = addMessage({
       role: "user",
       content: trimmedInput,
       images: images.length > 0 ? [...images] : undefined,
+      quotedText: quotedText || undefined,
     })
 
     // 清空输入
     const savedInput = input
     const savedImages = [...images]
+    const savedQuotedText = quotedText
     setInput("")
     setImages([])
+    setQuotedText(null)
 
     // 准备请求
     const allMessages = [...messages, {
@@ -213,6 +366,7 @@ export function ChatPanel({
       role: "user" as const,
       content: trimmedInput,
       images: images.length > 0 ? [...images] : undefined,
+      quotedText: savedQuotedText || undefined,
       timestamp: Date.now(),
     }]
 
@@ -231,14 +385,20 @@ export function ChatPanel({
     })
 
     let assistantContent = ""
+    let contentBlocks: ContentBlock[] = []
     let currentToolCalls: ToolCall[] = []
+    // 用于跟踪当前正在构建的内容块
+    let currentThinkingContent = ""
 
     try {
       const stream = streamChat(
         {
           messages: allMessages.map(toChatMessageDto),
           modelId: selectedModelId,
-          context,
+          context: {
+            ...context,
+            userLanguage: locale,
+          },
           appId,
         },
         {
@@ -249,16 +409,76 @@ export function ChatPanel({
       for await (const event of stream) {
         switch (event.type) {
           case "content":
-            assistantContent += event.data as string
-            updateMessage(assistantMessageId, { content: assistantContent })
+            const textContent = event.data as string
+            assistantContent += textContent
+            // 添加或更新 text 内容块
+            const lastBlock = contentBlocks[contentBlocks.length - 1]
+            if (lastBlock && lastBlock.type === "text") {
+              lastBlock.content = (lastBlock.content || "") + textContent
+            } else {
+              contentBlocks.push({ type: "text", content: textContent })
+            }
+            updateMessage(assistantMessageId, { 
+              content: assistantContent, 
+              contentBlocks: [...contentBlocks],
+              toolCalls: currentToolCalls.length > 0 ? currentToolCalls : undefined
+            })
+            break
+
+          case "thinking":
+            const thinkingEvent = event.data as ThinkingEvent
+            if (thinkingEvent.type === "start") {
+              // 开始新的 thinking 块
+              currentThinkingContent = ""
+              contentBlocks.push({ type: "thinking", content: "" })
+            } else if (thinkingEvent.type === "delta" && thinkingEvent.content) {
+              currentThinkingContent += thinkingEvent.content
+              // 更新最后一个 thinking 块
+              const thinkingBlock = contentBlocks.findLast(b => b.type === "thinking")
+              if (thinkingBlock) {
+                thinkingBlock.content = currentThinkingContent
+              }
+              updateMessage(assistantMessageId, { 
+                content: assistantContent, 
+                thinking: currentThinkingContent,
+                contentBlocks: [...contentBlocks],
+                toolCalls: currentToolCalls.length > 0 ? currentToolCalls : undefined
+              })
+            }
             break
 
           case "tool_call":
-            const toolCall = event.data as ToolCall
-            currentToolCalls = [...currentToolCalls, toolCall]
+            const toolCallEvent = event.data as ToolCallEvent
+            // 检查是否已存在相同 ID 的 tool call
+            const existingIndex = currentToolCalls.findIndex(t => t.id === toolCallEvent.id)
+            
+            if (existingIndex >= 0) {
+              // 更新已存在的 tool call（添加参数）
+              if (toolCallEvent.arguments) {
+                currentToolCalls[existingIndex].arguments = toolCallEvent.arguments
+                // 更新对应的 contentBlock
+                const blockIndex = contentBlocks.findIndex(
+                  b => b.type === "tool_call" && b.toolCall?.id === toolCallEvent.id
+                )
+                if (blockIndex >= 0) {
+                  contentBlocks[blockIndex].toolCall = currentToolCalls[existingIndex]
+                }
+              }
+            } else {
+              // 新的 tool call
+              const newToolCall: ToolCall = {
+                id: toolCallEvent.id,
+                name: toolCallEvent.name,
+                arguments: toolCallEvent.arguments || {}
+              }
+              currentToolCalls = [...currentToolCalls, newToolCall]
+              contentBlocks.push({ type: "tool_call", toolCall: newToolCall })
+            }
+            
             updateMessage(assistantMessageId, {
               content: assistantContent,
-              toolCalls: currentToolCalls,
+              contentBlocks: [...contentBlocks],
+              toolCalls: [...currentToolCalls],
             })
             break
 
@@ -289,9 +509,9 @@ export function ChatPanel({
         }
       }
     } catch (err) {
-      console.error("对话失败:", err)
+      console.error(t("error.chatFailed"), err)
       setError({
-        message: err instanceof Error ? err.message : "对话失败，请重试",
+        message: err instanceof Error ? err.message : t("error.chatFailed"),
         retryable: true,
       })
     } finally {
@@ -313,27 +533,11 @@ export function ChatPanel({
     handleSend()
   }
 
-  // 取消请求
-  const handleCancel = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      abortControllerRef.current = null
-    }
-    setIsLoading(false)
-  }
-
   // 处理键盘事件
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSend()
-    }
-  }
-
-  // 点击面板外部关闭
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose()
     }
   }
 
@@ -344,39 +548,40 @@ export function ChatPanel({
 
   return (
     <>
-      {/* 背景遮罩 */}
+      {/* 背景遮罩 - 不关闭面板，仅作为视觉分隔 */}
       <div
-        className="fixed inset-0 z-40 bg-black/20"
-        onClick={handleBackdropClick}
+        className="fixed inset-0 z-40 bg-black/20 pointer-events-none"
       />
 
       {/* 对话面板 */}
       <div
+        ref={panelRef}
+        style={{ width: panelWidth }}
         className={cn(
-          "fixed right-0 top-0 z-50 flex h-full w-full flex-col",
+          "fixed right-0 top-0 z-50 flex h-full flex-col",
           "bg-background shadow-xl",
-          "sm:w-[400px] md:w-[450px]",
           "transform transition-transform duration-300 ease-in-out",
           isOpen ? "translate-x-0" : "translate-x-full"
         )}
       >
+        {/* 左侧拖动条 */}
+        <div
+          onMouseDown={handleResizeStart}
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors group flex items-center"
+        >
+          <div className="absolute left-0 w-4 h-full" />
+          <GripVertical className="h-6 w-6 text-muted-foreground/30 group-hover:text-muted-foreground/60 -ml-2.5" />
+        </div>
+
         {/* 头部 */}
-        <div className="flex items-center justify-between border-b px-4 py-3">
-          <div className="flex items-center gap-3">
-            <h2 className="font-semibold">文档助手</h2>
-            <ModelSelector
-              models={models}
-              selectedModelId={selectedModelId}
-              onModelChange={setSelectedModelId}
-              disabled={isLoading}
-            />
-          </div>
+        <div className="flex items-center justify-between px-4 py-3">
+          <h2 className="font-semibold">{t("assistant.title")}</h2>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
               onClick={clearHistory}
-              title="清空对话"
+              title={t("panel.clearHistory")}
               disabled={messages.length === 0}
             >
               <Trash2 className="h-4 w-4" />
@@ -387,35 +592,37 @@ export function ChatPanel({
           </div>
         </div>
 
-        {/* 消息列表 */}
-        <ScrollArea className="flex-1" ref={scrollRef}>
-          <div className="flex flex-col">
+        {/* 消息列表 - 底部留出空间给悬浮输入框 */}
+        <ScrollArea className="flex-1 overflow-hidden w-full" ref={scrollRef}>
+          <div className="flex flex-col pb-44 w-full">
             {!isEnabled ? (
               <div className="flex h-full items-center justify-center p-8 text-center text-muted-foreground">
-                对话助手功能已禁用
+                {t("assistant.disabled")}
               </div>
             ) : enabledModels.length === 0 ? (
               <div className="flex h-full items-center justify-center p-8 text-center text-muted-foreground">
-                暂无可用模型，请联系管理员配置
+                {t("assistant.noModels")}
               </div>
             ) : messages.length === 0 ? (
               <div className="flex h-full items-center justify-center p-8 text-center text-muted-foreground">
                 <div>
-                  <p className="mb-2">👋 你好！我是文档助手</p>
-                  <p className="text-sm">有什么关于文档的问题可以问我</p>
+                  <p className="mb-2">{t("assistant.greeting")}</p>
+                  <p className="text-sm">{t("assistant.greetingSubtitle")}</p>
                 </div>
               </div>
             ) : (
-              messages.map((message) => (
-                <ChatMessageItem key={message.id} message={message} />
-              ))
+              <div className="w-full">
+                {messages.map((message) => (
+                  <ChatMessageItem key={message.id} message={message} />
+                ))}
+              </div>
             )}
 
             {/* 加载指示器 */}
             {isLoading && (
               <div className="flex items-center gap-2 p-4 text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">正在思考...</span>
+                <span className="text-sm">{t("assistant.thinking")}</span>
               </div>
             )}
           </div>
@@ -423,7 +630,7 @@ export function ChatPanel({
 
         {/* 错误提示 */}
         {error && (
-          <div className="border-t border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          <div className="absolute bottom-44 left-4 right-4 rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive shadow-lg">
             <div className="flex items-center justify-between">
               <span>{error.message}</span>
               <div className="flex items-center gap-2">
@@ -448,74 +655,122 @@ export function ChatPanel({
           </div>
         )}
 
-        {/* 图片预览 */}
-        {images.length > 0 && (
-          <div className="flex flex-wrap gap-2 border-t px-4 py-2">
-            {images.map((img, index) => (
-              <div key={index} className="relative">
-                <img
-                  src={img}
-                  alt={`预览 ${index + 1}`}
-                  className="h-16 w-16 rounded-md object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeImage(index)}
-                  className="absolute -right-1 -top-1 rounded-full bg-destructive p-0.5 text-destructive-foreground"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+        {/* 悬浮输入区域 - ChatGPT 风格 */}
+        <div className="absolute bottom-0 left-0 right-0 p-3">
+          <div className="rounded-2xl border border-border/50 bg-background/90 backdrop-blur-sm shadow-lg">
+            {/* 引用文本预览 */}
+            {quotedText && (
+              <div className="border-b border-border/50 px-3 py-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 overflow-hidden">
+                    <div className="text-xs text-primary font-medium mb-1 flex items-center gap-1">
+                      <span>{t("quote.icon")}</span>
+                      <span>{t("quote.label")}{quotedText.title || t("message.currentPage")}</span>
+                    </div>
+                    <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-words max-h-16 overflow-y-auto">
+                      {quotedText.text}
+                    </pre>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setQuotedText(null)}
+                    className="shrink-0 rounded p-1 hover:bg-muted"
+                  >
+                    <X className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
+            )}
 
-        {/* 输入区域 */}
-        <div className="border-t p-4">
-          <div className="flex items-end gap-2">
-            {/* 图片上传按钮 */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp"
-              multiple
-              className="hidden"
-              onChange={handleImageUpload}
-            />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!isEnabled || enabledModels.length === 0}
-              title="上传图片"
-            >
-              <ImagePlus className="h-4 w-4" />
-            </Button>
+            {/* 图片预览 */}
+            {images.length > 0 && (
+              <div className="border-b border-border/50 px-3 py-2">
+                <div className="flex flex-wrap gap-2">
+                  {images.map((img, index) => (
+                    <div key={index} className="relative">
+                      <img
+                        src={img}
+                        alt={t("image.preview", { index: index + 1 })}
+                        className="h-10 w-10 rounded-lg object-cover border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(index)}
+                        className="absolute -right-1 -top-1 rounded-full bg-destructive p-0.5 text-destructive-foreground shadow"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* 输入框 */}
-            <Textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="输入消息，按 Enter 发送..."
-              className="min-h-[40px] max-h-[120px] resize-none"
-              disabled={!isEnabled || enabledModels.length === 0 || isLoading}
-              rows={1}
-            />
+            <div className="px-3 py-1.5">
+              <Textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={t("panel.inputPlaceholder")}
+                className="min-h-[100px] resize-none border-0 !bg-transparent p-0 text-sm leading-5 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/60 shadow-none"
+                disabled={!isEnabled || enabledModels.length === 0 || isLoading}
+                rows={5}
+              />
+            </div>
 
-            {/* 发送按钮 */}
-            <Button
-              onClick={handleSend}
-              disabled={!canSend}
-              size="icon"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
+            {/* 底部工具栏 */}
+            <div className="flex items-center justify-between border-t border-border/50 px-2 py-1">
+              {/* 左侧按钮 */}
+              <div className="flex items-center gap-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+                {enableImageUpload && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 rounded-md"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={!isEnabled || enabledModels.length === 0}
+                    title={t("panel.uploadImage")}
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+
+              {/* 右侧：模型选择 + 发送按钮 */}
+              <div className="flex items-center gap-1.5">
+                <ModelSelector
+                  models={models}
+                  selectedModelId={selectedModelId}
+                  onModelChange={setSelectedModelId}
+                  disabled={isLoading}
+                />
+                <Button
+                  onClick={handleSend}
+                  disabled={!canSend}
+                  size="icon"
+                  className={cn(
+                    "h-6 w-6 rounded-md transition-all",
+                    canSend ? "bg-primary hover:bg-primary/90" : "bg-muted text-muted-foreground"
+                  )}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Send className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

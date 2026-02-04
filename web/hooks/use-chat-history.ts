@@ -19,11 +19,33 @@ export interface ToolResult {
 }
 
 /**
+ * 引用的选中文本
+ */
+export interface QuotedText {
+  title?: string
+  text: string
+}
+
+/**
  * Token 使用统计
  */
 export interface TokenUsage {
   inputTokens: number
   outputTokens: number
+}
+
+/**
+ * 内容块类型
+ */
+export type ContentBlockType = 'thinking' | 'text' | 'tool_call'
+
+/**
+ * 内容块
+ */
+export interface ContentBlock {
+  type: ContentBlockType
+  content?: string           // thinking 或 text 内容
+  toolCall?: ToolCall        // tool_call 时的工具调用信息
 }
 
 /**
@@ -33,8 +55,11 @@ export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'tool'
   content: string
+  thinking?: string          // AI 思考内容
+  contentBlocks?: ContentBlock[]  // 按顺序存储的内容块
   images?: string[]          // Base64编码的图片
-  toolCalls?: ToolCall[]     // 工具调用
+  quotedText?: QuotedText    // 引用的选中文本
+  toolCalls?: ToolCall[]     // 工具调用 (兼容旧结构)
   toolResult?: ToolResult    // 工具结果
   tokenUsage?: TokenUsage    // Token 使用统计
   timestamp: number

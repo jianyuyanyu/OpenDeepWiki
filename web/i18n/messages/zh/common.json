@@ -101,5 +101,23 @@
       "existsButNoDoc": "该仓库在 GitHub 上存在，但尚未生成文档。点击下方按钮开始生成 Wiki 文档。",
       "generateWiki": "生成 Wiki 文档"
     }
+  },
+  "theme": {
+    "toggle": "切换主题",
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统"
+  },
+  "branch": {
+    "selectBranch": "选择分支"
+  },
+  "language": {
+    "selectLanguage": "选择语言"
+  },
+  "mermaid": {
+    "zoomOut": "缩小",
+    "zoomIn": "放大",
+    "resetView": "重置视图",
+    "close": "关闭 (ESC)"
   }
 }

@@ -19,13 +19,3 @@ export type { ChatAssistantProps, RepoTreeNode } from "./chat-assistant"
 
 export { EmbedChatWidget } from "./embed-chat-widget"
 export type { EmbedChatWidgetProps } from "./embed-chat-widget"
-
-// 增强版组件
-export { FloatingBallEnhanced } from "./floating-ball-enhanced"
-export type { FloatingBallEnhancedProps } from "./floating-ball-enhanced"
-
-export { ChatPanelEnhanced } from "./chat-panel-enhanced"
-export type { ChatPanelEnhancedProps } from "./chat-panel-enhanced"
-
-export { ChatAssistantEnhanced, buildCatalogMenuEnhanced } from "./chat-assistant-enhanced"
-export type { ChatAssistantEnhancedProps } from "./chat-assistant-enhanced"

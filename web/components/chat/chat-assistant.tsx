@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { FloatingBall } from "./floating-ball"
 import { ChatPanel } from "./chat-panel"
 import { getChatConfig, DocContext, CatalogItem } from "@/lib/chat-api"
@@ -29,6 +30,7 @@ export function ChatAssistant({
   appId,
   iconUrl,
 }: ChatAssistantProps) {
+  const t = useTranslations("chat")
   const [isOpen, setIsOpen] = React.useState(false)
   const [isEnabled, setIsEnabled] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(true)
@@ -40,7 +42,7 @@ export function ChatAssistant({
         const config = await getChatConfig()
         setIsEnabled(config.isEnabled)
       } catch (err) {
-        console.error("加载对话助手配置失败:", err)
+        console.error(t("assistant.loadConfigFailed"), err)
         setIsEnabled(false)
       } finally {
         setIsLoading(false)

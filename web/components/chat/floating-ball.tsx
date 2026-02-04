@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { MessageCircle, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -34,6 +35,8 @@ export function FloatingBall({
   onToggle,
   className,
 }: FloatingBallProps) {
+  const t = useTranslations("chat")
+  
   // 如果功能未启用，不显示悬浮球
   if (!enabled) {
     return null
@@ -61,7 +64,7 @@ export function FloatingBall({
         "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
         className
       )}
-      aria-label={isOpen ? "关闭对话助手" : "打开对话助手"}
+      aria-label={isOpen ? t("panel.close") : t("assistant.title")}
       aria-expanded={isOpen}
     >
       {isOpen ? (
@@ -71,7 +74,7 @@ export function FloatingBall({
         // 自定义图标
         <img
           src={iconUrl}
-          alt="对话助手"
+          alt={t("assistant.title")}
           className="h-8 w-8 rounded-full object-cover"
         />
       ) : (

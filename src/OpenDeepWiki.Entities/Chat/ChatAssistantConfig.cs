@@ -36,4 +36,9 @@ public class ChatAssistantConfig : AggregateRoot<Guid>
     /// </summary>
     [StringLength(100)]
     public string? DefaultModelId { get; set; }
+
+    /// <summary>
+    /// 是否启用图片上传功能
+    /// </summary>
+    public bool EnableImageUpload { get; set; } = false;
 }

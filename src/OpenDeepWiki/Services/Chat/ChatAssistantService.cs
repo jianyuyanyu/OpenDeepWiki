@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Text.Json;
+using Anthropic.Models.Messages;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -22,6 +24,7 @@ public class ChatAssistantConfigDto
     public List<string> EnabledMcpIds { get; set; } = new();
     public List<string> EnabledSkillIds { get; set; } = new();
     public string? DefaultModelId { get; set; }
+    public bool EnableImageUpload { get; set; }
 }
 
 /// <summary>
@@ -48,6 +51,25 @@ public class ChatMessageDto
     public List<string>? Images { get; set; }
     public List<ToolCallDto>? ToolCalls { get; set; }
     public ToolResultDto? ToolResult { get; set; }
+    /// <summary>
+    /// 引用的选中文本
+    /// </summary>
+    public QuotedTextDto? QuotedText { get; set; }
+}
+
+/// <summary>
+/// DTO for quoted/selected text.
+/// </summary>
+public class QuotedTextDto
+{
+    /// <summary>
+    /// 引用来源的标题（如文档标题）
+    /// </summary>
+    public string? Title { get; set; }
+    /// <summary>
+    /// 选中的文本内容
+    /// </summary>
+    public string Text { get; set; } = string.Empty;
 }
 
 /// <summary>
@@ -81,6 +103,10 @@ public class DocContextDto
     public string Language { get; set; } = string.Empty;
     public string CurrentDocPath { get; set; } = string.Empty;
     public List<CatalogItemDto> CatalogMenu { get; set; } = new();
+    /// <summary>
+    /// User's preferred language for AI responses (e.g., "zh-CN", "en")
+    /// </summary>
+    public string UserLanguage { get; set; } = "en";
 }
 
 /// <summary>
@@ -110,6 +136,7 @@ public class ChatRequest
 public static class SSEEventType
 {
     public const string Content = "content";
+    public const string Thinking = "thinking";
     public const string ToolCall = "tool_call";
     public const string ToolResult = "tool_result";
     public const string Done = "done";
@@ -124,7 +151,6 @@ public class SSEEvent
     public string Type { get; set; } = string.Empty;
     public object? Data { get; set; }
 }
-
 
 /// <summary>
 /// Interface for chat assistant service.
@@ -188,7 +214,8 @@ public class ChatAssistantService : IChatAssistantService
             EnabledModelIds = ParseJsonArray(config.EnabledModelIds),
             EnabledMcpIds = ParseJsonArray(config.EnabledMcpIds),
             EnabledSkillIds = ParseJsonArray(config.EnabledSkillIds),
-            DefaultModelId = config.DefaultModelId
+            DefaultModelId = config.DefaultModelId,
+            EnableImageUpload = config.EnableImageUpload
         };
     }
 
@@ -256,14 +283,15 @@ public class ChatAssistantService : IChatAssistantService
         // Build tools
         var tools = new List<AITool>();
 
-        // Add DocReadTool
-        var docReadTool = new DocReadTool(
+        // Add ChatDocReaderTool with dynamic catalog
+        var chatDocReaderTool = await ChatDocReaderTool.CreateAsync(
             _context,
             request.Context.Owner,
             request.Context.Repo,
             request.Context.Branch,
-            request.Context.Language);
-        tools.AddRange(docReadTool.GetTools());
+            request.Context.Language,
+            cancellationToken);
+        tools.Add(chatDocReaderTool.GetTool());
 
         // Add MCP tools
         if (config.EnabledMcpIds.Count > 0)
@@ -310,10 +338,21 @@ public class ChatAssistantService : IChatAssistantService
         // Stream response
         var inputTokens = 0;
         var outputTokens = 0;
+        
+        // 跟踪当前内容块
+        var currentBlockIndex = -1;
+        var currentBlockType = "";
+        var currentToolId = "";
+        var currentToolName = "";
+        var toolInputJson = new System.Text.StringBuilder();
+        
+        // OpenAI 格式的 tool call 跟踪
+        var openAiToolCalls = new Dictionary<int, (string Id, string Name, System.Text.StringBuilder Args)>();
 
         var thread = await agent.GetNewSessionAsync(cancellationToken);
 
-        await foreach (var update in agent.RunStreamingAsync(chatMessages, thread, cancellationToken: cancellationToken))
+        await foreach (var update in
+                       agent.RunStreamingAsync(chatMessages, thread, cancellationToken: cancellationToken))
         {
             if (!string.IsNullOrEmpty(update.Text))
             {
@@ -324,34 +363,239 @@ public class ChatAssistantService : IChatAssistantService
                 };
             }
 
-            // Handle tool calls if present in raw representation
+            // Handle tool calls if present in raw representation (OpenAI format)
             if (update.RawRepresentation is OpenAI.Chat.StreamingChatCompletionUpdate chatCompletionUpdate &&
                 chatCompletionUpdate.ToolCallUpdates.Count > 0)
             {
                 foreach (var toolCall in chatCompletionUpdate.ToolCallUpdates)
                 {
+                    var index = toolCall.Index;
+                    
+                    // 如果是新的 tool call（有 FunctionName）
                     if (!string.IsNullOrEmpty(toolCall.FunctionName))
                     {
+                        var toolId = toolCall.ToolCallId ?? Guid.NewGuid().ToString();
+                        openAiToolCalls[index] = (toolId, toolCall.FunctionName, new System.Text.StringBuilder());
+                        
+                        // 发送 tool_call 开始事件
                         yield return new SSEEvent
                         {
                             Type = SSEEventType.ToolCall,
                             Data = new ToolCallDto
                             {
-                                Id = toolCall.ToolCallId ?? Guid.NewGuid().ToString(),
+                                Id = toolId,
                                 Name = toolCall.FunctionName,
                                 Arguments = null
                             }
                         };
                     }
+                    
+                    var str = Encoding.UTF8.GetString(toolCall.FunctionArgumentsUpdate);
+                    // 累积参数
+                    if (!string.IsNullOrEmpty(str) && openAiToolCalls.ContainsKey(index))
+                    {
+                        openAiToolCalls[index].Args.Append(str);
+                    }
+                }
+            }
+            
+            // 检查 OpenAI finish_reason 是否为 tool_calls，发送完整参数
+            if (update.RawRepresentation is OpenAI.Chat.StreamingChatCompletionUpdate finishUpdate)
+            {
+                var finishReason = finishUpdate.FinishReason;
+                if (finishReason == OpenAI.Chat.ChatFinishReason.ToolCalls)
+                {
+                    // 发送所有累积的 tool calls 的完整参数
+                    foreach (var kvp in openAiToolCalls)
+                    {
+                        var (id, name, args) = kvp.Value;
+                        var argsStr = args.ToString();
+                        Dictionary<string, object>? arguments = null;
+                        
+                        if (!string.IsNullOrEmpty(argsStr))
+                        {
+                            try
+                            {
+                                arguments = JsonSerializer.Deserialize<Dictionary<string, object>>(argsStr);
+                            }
+                            catch
+                            {
+                                // 解析失败
+                            }
+                        }
+                        
+                        yield return new SSEEvent
+                        {
+                            Type = SSEEventType.ToolCall,
+                            Data = new ToolCallDto
+                            {
+                                Id = id,
+                                Name = name,
+                                Arguments = arguments
+                            }
+                        };
+                    }
+                    openAiToolCalls.Clear();
                 }
             }
 
-            // Track token usage if available
-            var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
-            if (usage != null)
+            if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
             {
-                inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
-                outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
+                if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
+                    {
+                        Value: RawMessageDeltaEvent deltaEvent
+                    })
+                {
+                    inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
+                        deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
+                    outputTokens = (int)(deltaEvent.Usage.OutputTokens);
+                }
+                else if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent rawMessageStreamEvent)
+                {
+                    // 解析 Anthropic SSE 事件
+                    if (rawMessageStreamEvent.Json.TryGetProperty("type", out var typeElement))
+                    {
+                        var eventType = typeElement.GetString();
+                        
+                        // 处理 content_block_start 事件
+                        if (eventType == "content_block_start")
+                        {
+                            // 获取 block index
+                            if (rawMessageStreamEvent.Json.TryGetProperty("index", out var indexElement))
+                            {
+                                currentBlockIndex = indexElement.GetInt32();
+                            }
+                            
+                            if (rawMessageStreamEvent.Json.TryGetProperty("content_block", out var contentBlock))
+                            {
+                                var blockType = contentBlock.TryGetProperty("type", out var blockTypeElement) 
+                                    ? blockTypeElement.GetString() ?? ""
+                                    : "";
+                                currentBlockType = blockType;
+                                
+                                // 处理 thinking 块开始
+                                if (blockType == "thinking")
+                                {
+                                    yield return new SSEEvent
+                                    {
+                                        Type = SSEEventType.Thinking,
+                                        Data = new { type = "start", index = currentBlockIndex }
+                                    };
+                                }
+                                // 处理 tool_use 块开始
+                                else if (blockType == "tool_use")
+                                {
+                                    currentToolId = contentBlock.TryGetProperty("id", out var idElement) 
+                                        ? idElement.GetString() ?? "" 
+                                        : "";
+                                    currentToolName = contentBlock.TryGetProperty("name", out var nameElement) 
+                                        ? nameElement.GetString() ?? "" 
+                                        : "";
+                                    toolInputJson.Clear();
+                                    
+                                    // 发送 tool_call 开始事件
+                                    yield return new SSEEvent
+                                    {
+                                        Type = SSEEventType.ToolCall,
+                                        Data = new ToolCallDto
+                                        {
+                                            Id = currentToolId,
+                                            Name = currentToolName,
+                                            Arguments = null
+                                        }
+                                    };
+                                }
+                            }
+                        }
+                        // 处理 content_block_delta 事件
+                        else if (eventType == "content_block_delta")
+                        {
+                            if (rawMessageStreamEvent.Json.TryGetProperty("delta", out var delta))
+                            {
+                                var deltaType = delta.TryGetProperty("type", out var deltaTypeElement) 
+                                    ? deltaTypeElement.GetString() 
+                                    : null;
+                                
+                                // 处理 thinking 内容增量
+                                if (deltaType == "thinking_delta")
+                                {
+                                    var thinkingText = delta.TryGetProperty("thinking", out var thinkingElement) 
+                                        ? thinkingElement.GetString() ?? "" 
+                                        : "";
+                                    
+                                    if (!string.IsNullOrEmpty(thinkingText))
+                                    {
+                                        yield return new SSEEvent
+                                        {
+                                            Type = SSEEventType.Thinking,
+                                            Data = new { type = "delta", content = thinkingText, index = currentBlockIndex }
+                                        };
+                                    }
+                                }
+                                // 处理 tool_use 输入增量
+                                else if (deltaType == "input_json_delta")
+                                {
+                                    var partialJson = delta.TryGetProperty("partial_json", out var jsonElement) 
+                                        ? jsonElement.GetString() ?? "" 
+                                        : "";
+                                    
+                                    // 累积 JSON 片段
+                                    toolInputJson.Append(partialJson);
+                                }
+                            }
+                        }
+                        // 处理 content_block_stop 事件
+                        else if (eventType == "content_block_stop")
+                        {
+                            // 如果是 tool_use 块结束，发送完整的参数
+                            if (currentBlockType == "tool_use" && !string.IsNullOrEmpty(currentToolId))
+                            {
+                                Dictionary<string, object>? arguments = null;
+                                var jsonStr = toolInputJson.ToString();
+                                if (!string.IsNullOrEmpty(jsonStr))
+                                {
+                                    try
+                                    {
+                                        arguments = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonStr);
+                                    }
+                                    catch
+                                    {
+                                        // 解析失败，保持 null
+                                    }
+                                }
+                                
+                                // 发送带完整参数的 tool_call 事件
+                                yield return new SSEEvent
+                                {
+                                    Type = SSEEventType.ToolCall,
+                                    Data = new ToolCallDto
+                                    {
+                                        Id = currentToolId,
+                                        Name = currentToolName,
+                                        Arguments = arguments
+                                    }
+                                };
+                                
+                                // 重置状态
+                                currentToolId = "";
+                                currentToolName = "";
+                                toolInputJson.Clear();
+                            }
+                            
+                            currentBlockType = "";
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Track token usage if available
+                var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
+                if (usage != null)
+                {
+                    inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
+                    outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
+                }
             }
         }
 
@@ -392,23 +636,42 @@ public class ChatAssistantService : IChatAssistantService
     /// </summary>
     private static string BuildSystemPrompt(DocContextDto context)
     {
-        var catalogMenu = FormatCatalogMenu(context.CatalogMenu);
-        var languageInstruction = context.Language == "zh" ? "中文" : context.Language;
+        var responseLanguage = context.UserLanguage switch
+        {
+            "zh-CN" or "zh" => "Chinese (Simplified)",
+            "zh-TW" => "Chinese (Traditional)",
+            "ja" => "Japanese",
+            "ko" => "Korean",
+            "es" => "Spanish",
+            "fr" => "French",
+            "de" => "German",
+            _ => "English"
+        };
 
-        return $@"你是一个文档助手，帮助用户理解和查找文档内容。
+        return $@"You are a documentation assistant for the repository ""{context.Owner}/{context.Repo}"".
 
-当前文档上下文：
-- 仓库：{context.Owner}/{context.Repo}
-- 分支：{context.Branch}
-- 语言：{context.Language}
-- 当前文档：{context.CurrentDocPath}
+## Your Role
+You help users understand and navigate the documentation of this repository. You can read document content using the ReadDoc tool.
 
-文档目录结构：
-{catalogMenu}
+## Current Context
+- Repository: {context.Owner}/{context.Repo}
+- Branch: {context.Branch}
+- Document Language: {context.Language}
+- Current Document: {context.CurrentDocPath}
 
-你可以使用 ReadDocument 工具读取其他文档内容。
-你可以使用 ListDocuments 工具查看所有可用文档。
-请使用{languageInstruction}回答用户问题。";
+## Behavior Rules
+1. ONLY answer questions related to this repository's documentation, code, architecture, usage, or technical content.
+2. If a user asks questions unrelated to this repository (e.g., general knowledge, personal advice, other topics), politely decline and redirect them to ask about the documentation.
+3. Use the ReadDoc tool to fetch document content when needed. The tool description contains the complete document catalog.
+4. Base your answers on the actual document content. Do not make up information.
+5. If you cannot find relevant information in the documents, clearly state that.
+
+## Response Language
+You MUST respond in {responseLanguage}.
+
+## Example Refusal
+If a user asks something unrelated like ""What's the weather today?"" or ""Write me a poem"", respond with:
+""I'm a documentation assistant for {context.Owner}/{context.Repo}. I can only help with questions about this repository's documentation, code, and usage. Is there anything about the documentation I can help you with?""";
     }
 
     /// <summary>
@@ -455,6 +718,16 @@ public class ChatAssistantService : IChatAssistantService
             };
 
             var contents = new List<AIContent>();
+
+            // Add quoted text as reference block (if present)
+            if (msg.QuotedText != null && !string.IsNullOrEmpty(msg.QuotedText.Text))
+            {
+                var title = !string.IsNullOrEmpty(msg.QuotedText.Title) 
+                    ? msg.QuotedText.Title 
+                    : "引用内容";
+                var quotedContent = $"引用来源：{title}\n<select_text>\n{msg.QuotedText.Text}\n</select_text>";
+                contents.Add(new TextContent(quotedContent));
+            }
 
             // Add text content
             if (!string.IsNullOrEmpty(msg.Content))

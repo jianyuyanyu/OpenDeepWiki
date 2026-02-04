@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { GitBranch, Languages } from "lucide-react";
 import {
@@ -40,6 +41,7 @@ export function BranchLanguageSelector({
   currentBranch,
   currentLanguage,
 }: BranchLanguageSelectorProps) {
+  const t = useTranslations("common");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -86,7 +88,7 @@ export function BranchLanguageSelector({
           <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
           <Select value={currentBranch} onValueChange={handleBranchChange}>
             <SelectTrigger className="h-8 text-xs flex-1">
-              <SelectValue placeholder="选择分支" />
+              <SelectValue placeholder={t("branch.selectBranch")} />
             </SelectTrigger>
             <SelectContent>
               {branches.branches.map((branch) => (
@@ -104,7 +106,7 @@ export function BranchLanguageSelector({
           <Languages className="h-4 w-4 text-muted-foreground shrink-0" />
           <Select value={currentLanguage} onValueChange={handleLanguageChange}>
             <SelectTrigger className="h-8 text-xs flex-1">
-              <SelectValue placeholder="选择语言" />
+              <SelectValue placeholder={t("language.selectLanguage")} />
             </SelectTrigger>
             <SelectContent>
               {availableLanguages.map((lang) => (

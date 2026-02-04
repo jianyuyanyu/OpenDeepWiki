@@ -3,9 +3,9 @@
  * 自动处理 token 认证、错误处理等通用逻辑
  */
 
+import { getApiProxyUrl } from "./env";
 import { getToken, removeToken } from "./auth-api";
-
-const API_BASE_URL = process.env.API_PROXY_URL ?? "";
+const API_BASE_URL = getApiProxyUrl();
 
 function buildApiUrl(path: string): string {
   if (!API_BASE_URL) {

@@ -1,4 +1,6 @@
-const API_BASE_URL = process.env.API_PROXY_URL ?? "";
+import { getApiProxyUrl } from "./env";
+
+const API_BASE_URL = getApiProxyUrl();
 
 function buildApiUrl(path: string) {
   if (!API_BASE_URL) {

@@ -5,13 +5,14 @@
  * Requirements: 9.2, 11.1, 11.2, 11.3, 11.4
  */
 
+import { getApiProxyUrl } from './env'
 import { getToken } from './auth-api'
-import { ChatMessage, ToolCall, ToolResult } from '@/hooks/use-chat-history'
+import { ChatMessage, ToolCall, ToolResult, QuotedText } from '@/hooks/use-chat-history'
 
 // 重新导出类型以便其他模块使用
-export type { ChatMessage, ToolCall, ToolResult }
+export type { ChatMessage, ToolCall, ToolResult, QuotedText }
 
-const API_BASE_URL = process.env.API_PROXY_URL ?? ''
+const API_BASE_URL = getApiProxyUrl()
 
 /** 默认请求超时时间（毫秒） */
 const DEFAULT_TIMEOUT_MS = 30000
@@ -51,6 +52,8 @@ export interface DocContext {
   language: string
   currentDocPath: string
   catalogMenu: CatalogItem[]
+  /** User's preferred language for AI responses */
+  userLanguage?: string
 }
 
 /**
@@ -60,6 +63,7 @@ export interface ChatMessageDto {
   role: 'user' | 'assistant' | 'tool'
   content: string
   images?: string[]
+  quotedText?: QuotedText
   toolCalls?: ToolCall[]
   toolResult?: ToolResult
 }
@@ -77,7 +81,26 @@ export interface ChatRequest {
 /**
  * SSE事件类型
  */
-export type SSEEventType = 'content' | 'tool_call' | 'tool_result' | 'done' | 'error'
+export type SSEEventType = 'content' | 'thinking' | 'tool_call' | 'tool_result' | 'done' | 'error'
+
+/**
+ * Thinking 事件数据
+ */
+export interface ThinkingEvent {
+  type: 'start' | 'delta'
+  content?: string
+  index?: number
+}
+
+/**
+ * ToolCall 事件数据（带 index）
+ */
+export interface ToolCallEvent {
+  id: string
+  name: string
+  arguments?: Record<string, unknown> | null
+  index?: number
+}
 
 /**
  * 错误信息
@@ -193,7 +216,7 @@ export interface DoneInfo {
  */
 export interface SSEEvent {
   type: SSEEventType
-  data: string | ToolCall | ToolResult | DoneInfo | ErrorInfo
+  data: string | ThinkingEvent | ToolCall | ToolCallEvent | ToolResult | DoneInfo | ErrorInfo
 }
 
 /**
@@ -212,6 +235,7 @@ export interface ModelConfig {
 export interface ChatAssistantConfig {
   isEnabled: boolean
   defaultModelId?: string
+  enableImageUpload: boolean
 }
 
 /**
@@ -576,6 +600,7 @@ export function toChatMessageDto(message: ChatMessage): ChatMessageDto {
     role: message.role,
     content: message.content,
     images: message.images,
+    quotedText: message.quotedText,
     toolCalls: message.toolCalls,
     toolResult: message.toolResult,
   }

@@ -9,7 +9,7 @@ import type { RepoTreeNode, RepoBranchesResponse } from "@/types/repository";
 import { BranchLanguageSelector } from "./branch-language-selector";
 import { fetchRepoTree, fetchRepoBranches } from "@/lib/repository-api";
 import { Network } from "lucide-react";
-import { ChatAssistantEnhanced, buildCatalogMenuEnhanced } from "@/components/chat";
+import { ChatAssistant, buildCatalogMenu } from "@/components/chat";
 import { useTranslations } from "@/hooks/use-translations";
 
 interface RepoShellProps {
@@ -193,19 +193,16 @@ export function RepoShell({
         children
       )}
       
-      {/* 文档对话助手悬浮球 - 增强版 */}
-      <ChatAssistantEnhanced
+      {/* 文档对话助手悬浮球 */}
+      <ChatAssistant
         context={{
           owner,
           repo,
           branch: currentBranch,
           language: currentLanguage,
           currentDocPath,
-          catalogMenu: buildCatalogMenuEnhanced(nodes),
+          catalogMenu: buildCatalogMenu(nodes),
         }}
-        position="bottom-right"
-        panelMode="popup"
-        showPulse={true}
       />
     </DocsLayout>
   );

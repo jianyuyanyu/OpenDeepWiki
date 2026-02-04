@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { MessageCircle, X, Send, Loader2, Trash2, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -92,6 +93,7 @@ export function EmbedChatWidget({
   theme = 'light',
   apiBaseUrl = '',
 }: EmbedChatWidgetProps) {
+  const t = useTranslations("chat")
   const [isOpen, setIsOpen] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(true)
   const [isEnabled, setIsEnabled] = React.useState(false)
@@ -127,11 +129,11 @@ export function EmbedChatWidget({
           setConfig(data)
           setSelectedModel(data.defaultModel || data.availableModels?.[0] || '')
         } else {
-          console.error('[EmbedChatWidget] 配置验证失败:', data.errorMessage)
+          console.error('[EmbedChatWidget] ' + t("embed.configInvalid"), data.errorMessage)
           setIsEnabled(false)
         }
       } catch (err) {
-        console.error('[EmbedChatWidget] 加载配置失败:', err)
+        console.error('[EmbedChatWidget] ' + t("embed.loadConfigFailed"), err)
         setIsEnabled(false)
       } finally {
         setIsLoading(false)
@@ -466,7 +468,7 @@ export function EmbedChatWidget({
           "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2",
           getPositionClasses()
         )}
-        aria-label={isOpen ? "关闭对话助手" : "打开对话助手"}
+        aria-label={isOpen ? t("panel.close") : t("assistant.title")}
         aria-expanded={isOpen}
       >
         {isOpen ? (
@@ -474,7 +476,7 @@ export function EmbedChatWidget({
         ) : iconUrl ? (
           <img
             src={iconUrl}
-            alt="对话助手"
+            alt={t("assistant.title")}
             className="h-8 w-8 rounded-full object-cover"
           />
         ) : (
@@ -503,7 +505,7 @@ export function EmbedChatWidget({
           >
             <div className="flex items-center gap-3">
               <span className="font-semibold">
-                {config?.appName || '对话助手'}
+                {config?.appName || t("embed.title")}
               </span>
               {config?.availableModels && config.availableModels.length > 1 && (
                 <select
@@ -536,7 +538,7 @@ export function EmbedChatWidget({
                     ? "hover:bg-gray-700 disabled:opacity-50" 
                     : "hover:bg-gray-200 disabled:opacity-50"
                 )}
-                title="清空对话"
+                title={t("panel.clearHistory")}
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -558,8 +560,8 @@ export function EmbedChatWidget({
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
                 <div className="text-4xl mb-2">👋</div>
-                <div className="font-medium mb-1">你好！</div>
-                <div className="text-sm">有什么可以帮助你的吗？</div>
+                <div className="font-medium mb-1">{t("embed.greeting")}</div>
+                <div className="text-sm">{t("embed.greetingSubtitle")}</div>
               </div>
             ) : (
               messages.map((message) => (
@@ -603,14 +605,14 @@ export function EmbedChatWidget({
                       disabled={isSending}
                     >
                       <RefreshCw className="h-3 w-3" />
-                      重试
+                      {t("panel.retry")}
                     </button>
                   )}
                   <button
                     className="underline hover:no-underline"
                     onClick={() => setError(null)}
                   >
-                    关闭
+                    {t("panel.closeError")}
                   </button>
                 </div>
               </div>
@@ -629,7 +631,7 @@ export function EmbedChatWidget({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="输入消息..."
+              placeholder={t("embed.inputPlaceholder")}
               rows={1}
               disabled={isSending}
               className={cn(

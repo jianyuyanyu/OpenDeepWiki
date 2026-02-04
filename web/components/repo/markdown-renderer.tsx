@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState, useEffect, useId, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -47,11 +48,13 @@ function cleanupMermaidErrors(diagramId: string) {
 function MermaidFullscreenModal({ 
   svg, 
   isOpen, 
-  onClose 
+  onClose,
+  t,
 }: { 
   svg: string; 
   isOpen: boolean; 
   onClose: () => void;
+  t?: (key: string) => string;
 }) {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -139,7 +142,7 @@ function MermaidFullscreenModal({
         <button
           onClick={handleZoomOut}
           className="rounded-md p-1.5 transition-colors hover:bg-muted"
-          title="缩小"
+          title={t?.("mermaid.zoomOut") || "Zoom out"}
         >
           <ZoomOut className="h-5 w-5" />
         </button>
@@ -149,7 +152,7 @@ function MermaidFullscreenModal({
         <button
           onClick={handleZoomIn}
           className="rounded-md p-1.5 transition-colors hover:bg-muted"
-          title="放大"
+          title={t?.("mermaid.zoomIn") || "Zoom in"}
         >
           <ZoomIn className="h-5 w-5" />
         </button>
@@ -157,7 +160,7 @@ function MermaidFullscreenModal({
         <button
           onClick={resetView}
           className="rounded-md p-1.5 transition-colors hover:bg-muted"
-          title="重置视图"
+          title={t?.("mermaid.resetView") || "Reset view"}
         >
           <RotateCcw className="h-5 w-5" />
         </button>
@@ -167,7 +170,7 @@ function MermaidFullscreenModal({
       <button
         onClick={onClose}
         className="absolute right-4 top-4 z-50 rounded-full bg-background/90 p-2 text-foreground shadow-lg transition-colors hover:bg-muted"
-        title="关闭 (ESC)"
+        title={t?.("mermaid.close") || "Close (ESC)"}
       >
         <X className="h-6 w-6" />
       </button>
@@ -207,7 +210,7 @@ function MermaidFullscreenModal({
 }
 
 // Mermaid 图表组件
-function MermaidDiagram({ code, isDark }: { code: string; isDark: boolean }) {
+function MermaidDiagram({ code, isDark, t }: { code: string; isDark: boolean; t?: (key: string) => string }) {
   const id = useId().replace(/:/g, "");
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -278,7 +281,8 @@ function MermaidDiagram({ code, isDark }: { code: string; isDark: boolean }) {
       <MermaidFullscreenModal 
         svg={svg} 
         isOpen={isFullscreen} 
-        onClose={handleCloseFullscreen} 
+        onClose={handleCloseFullscreen}
+        t={t}
       />
     </>
   );
@@ -397,6 +401,7 @@ function createHeadingIdMap(texts: string[]): Map<string, string[]> {
 }
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+  const t = useTranslations("common");
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   
@@ -495,7 +500,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             
             // 处理 mermaid 图表
             if (language === "mermaid") {
-              return <MermaidDiagram code={codeString} isDark={isDark} />;
+              return <MermaidDiagram code={codeString} isDark={isDark} t={t} />;
             }
             
             // Check if this is a code block (has language) or inline code

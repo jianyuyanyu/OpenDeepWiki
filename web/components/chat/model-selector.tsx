@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import {
   Select,
   SelectContent,
@@ -35,12 +36,13 @@ export function ModelSelector({
   onModelChange,
   disabled = false,
 }: ModelSelectorProps) {
+  const t = useTranslations("chat")
   const enabledModels = models.filter(m => m.isEnabled)
 
   if (enabledModels.length === 0) {
     return (
       <div className="text-sm text-muted-foreground">
-        暂无可用模型
+        {t("model.noModels")}
       </div>
     )
   }
@@ -52,7 +54,7 @@ export function ModelSelector({
       disabled={disabled}
     >
       <SelectTrigger className="w-[180px] h-8 text-sm">
-        <SelectValue placeholder="选择模型" />
+        <SelectValue placeholder={t("model.selector")} />
       </SelectTrigger>
       <SelectContent>
         {enabledModels.map((model) => (

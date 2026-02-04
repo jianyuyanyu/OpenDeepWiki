@@ -96,12 +96,13 @@ public class AdminChatAssistantService : IAdminChatAssistantService
         config.EnabledMcpIds = SerializeJsonArray(request.EnabledMcpIds);
         config.EnabledSkillIds = SerializeJsonArray(request.EnabledSkillIds);
         config.DefaultModelId = request.DefaultModelId;
+        config.EnableImageUpload = request.EnableImageUpload;
         config.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("对话助手配置已更新: IsEnabled={IsEnabled}, Models={ModelCount}, MCPs={McpCount}, Skills={SkillCount}",
-            config.IsEnabled, request.EnabledModelIds.Count, request.EnabledMcpIds.Count, request.EnabledSkillIds.Count);
+        _logger.LogInformation("对话助手配置已更新: IsEnabled={IsEnabled}, Models={ModelCount}, MCPs={McpCount}, Skills={SkillCount}, EnableImageUpload={EnableImageUpload}",
+            config.IsEnabled, request.EnabledModelIds.Count, request.EnabledMcpIds.Count, request.EnabledSkillIds.Count, config.EnableImageUpload);
 
         return MapToDto(config);
     }
@@ -137,6 +138,7 @@ public class AdminChatAssistantService : IAdminChatAssistantService
             EnabledMcpIds = ParseJsonArray(config.EnabledMcpIds),
             EnabledSkillIds = ParseJsonArray(config.EnabledSkillIds),
             DefaultModelId = config.DefaultModelId,
+            EnableImageUpload = config.EnableImageUpload,
             CreatedAt = config.CreatedAt,
             UpdatedAt = config.UpdatedAt
         };

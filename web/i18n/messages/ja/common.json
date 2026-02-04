@@ -103,5 +103,23 @@
       "existsButNoDoc": "このリポジトリはGitHubに存在しますが、まだドキュメントが生成されていません。下のボタンをクリックしてWikiドキュメントを生成してください。",
       "generateWiki": "Wiki を生成"
     }
+  },
+  "theme": {
+    "toggle": "テーマを切り替え",
+    "light": "ライト",
+    "dark": "ダーク",
+    "system": "システム"
+  },
+  "branch": {
+    "selectBranch": "ブランチを選択"
+  },
+  "language": {
+    "selectLanguage": "言語を選択"
+  },
+  "mermaid": {
+    "zoomOut": "縮小",
+    "zoomIn": "拡大",
+    "resetView": "ビューをリセット",
+    "close": "閉じる (ESC)"
   }
 }

@@ -57,7 +57,7 @@ echo # OpenDeepWiki 后端环境变量配置
 echo # 复制此文件为 .env 并修改配置
 echo.
 echo # 服务监听地址
-echo URLS=http://localhost:5000
+echo URLS=http://localhost:8080
 echo.
 echo # 数据库配置
 echo DB_TYPE=sqlite
@@ -94,9 +94,6 @@ echo --------------------------------------------
 
 cd web
 
-:: 设置构建时的 API 代理地址
-set API_PROXY_URL=http://localhost:5000
-
 :: 安装依赖
 if not exist "node_modules" (
     echo 安装前端依赖...
@@ -108,7 +105,7 @@ if not exist "node_modules" (
     )
 )
 
-:: 构建前端
+:: 构建前端（不需要 API_PROXY_URL，运行时动态获取）
 echo 构建前端项目...
 call npm run build
 
@@ -130,10 +127,10 @@ xcopy /E /I /Y "web\public" "%FRONTEND_DIR%\public"
 echo 创建前端 .env 示例文件...
 (
 echo # OpenDeepWiki 前端环境变量配置
-echo # 复制此文件为 .env.local 并修改配置
+echo # 启动前端服务时设置此环境变量
 echo.
-echo # 后端 API 地址
-echo NEXT_PUBLIC_API_URL=http://localhost:5000
+echo # 后端 API 代理地址（运行时动态读取）
+echo API_PROXY_URL=http://localhost:8080
 ) > "%FRONTEND_DIR%\.env.example"
 
 echo 前端构建完成！
@@ -161,7 +158,7 @@ echo     ^)
 echo ^)
 echo.
 echo :: 设置默认值（如果 .env 中未设置）
-echo if not defined URLS set URLS=http://localhost:5000
+echo if not defined URLS set URLS=http://localhost:8080
 echo.
 echo echo 后端服务地址: %%URLS%%
 echo echo.
@@ -218,7 +215,7 @@ echo.
 echo echo.
 echo echo ============================================
 echo echo   服务已启动
-echo echo   后端: http://localhost:5000
+echo echo   后端: http://localhost:8080
 echo echo   前端: http://localhost:3000
 echo echo ============================================
 echo echo.

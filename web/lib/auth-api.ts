@@ -1,5 +1,7 @@
+import { getApiProxyUrl } from "./env";
+
 function getApiBaseUrl(): string {
-  return process.env.API_PROXY_URL ?? "";
+  return getApiProxyUrl();
 }
 
 function buildApiUrl(path: string) {

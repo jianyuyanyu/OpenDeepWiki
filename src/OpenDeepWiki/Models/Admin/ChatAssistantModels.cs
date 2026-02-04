@@ -11,6 +11,7 @@ public class ChatAssistantConfigDto
     public List<string> EnabledMcpIds { get; set; } = new();
     public List<string> EnabledSkillIds { get; set; } = new();
     public string? DefaultModelId { get; set; }
+    public bool EnableImageUpload { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 }
@@ -25,6 +26,7 @@ public class UpdateChatAssistantConfigRequest
     public List<string> EnabledMcpIds { get; set; } = new();
     public List<string> EnabledSkillIds { get; set; } = new();
     public string? DefaultModelId { get; set; }
+    public bool EnableImageUpload { get; set; }
 }
 
 /// <summary>

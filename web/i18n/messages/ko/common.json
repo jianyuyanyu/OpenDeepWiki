@@ -103,5 +103,23 @@
       "existsButNoDoc": "이 저장소는 GitHub에 존재하지만 아직 문서가 생성되지 않았습니다. 아래 버튼을 클릭하여 Wiki 문서를 생성하세요.",
       "generateWiki": "Wiki 생성"
     }
+  },
+  "theme": {
+    "toggle": "테마 전환",
+    "light": "라이트",
+    "dark": "다크",
+    "system": "시스템"
+  },
+  "branch": {
+    "selectBranch": "브랜치 선택"
+  },
+  "language": {
+    "selectLanguage": "언어 선택"
+  },
+  "mermaid": {
+    "zoomOut": "축소",
+    "zoomIn": "확대",
+    "resetView": "보기 재설정",
+    "close": "닫기 (ESC)"
   }
 }

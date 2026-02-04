@@ -1,11 +1,8 @@
+import { getApiProxyUrl } from "./env";
 import { getToken } from "./auth-api";
 
-function getApiBaseUrl(): string {
-  return process.env.API_PROXY_URL ?? "";
-}
-
 function buildApiUrl(path: string) {
-  const baseUrl = getApiBaseUrl();
+  const baseUrl = getApiProxyUrl();
   if (!baseUrl) {
     return path;
   }

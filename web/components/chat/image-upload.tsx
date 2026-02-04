@@ -1,24 +1,18 @@
 "use client"
 
 import * as React from "react"
+import { useTranslations } from "next-intl"
 import { ImagePlus, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-
-/**
- * 支持的图片格式
- */
-export const SUPPORTED_IMAGE_TYPES = [
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-] as const
-
-/**
- * 图片大小限制 (10MB)
- */
-export const MAX_IMAGE_SIZE = 10 * 1024 * 1024
+import {
+  validateImageFile,
+  fileToBase64,
+  validateBase64Image,
+  getMimeTypeFromBase64,
+  SUPPORTED_IMAGE_TYPES,
+  MAX_IMAGE_SIZE,
+} from "@/lib/image-validation"
 
 /**
  * 图片上传组件属性
@@ -39,70 +33,6 @@ export interface ImageUploadProps {
 }
 
 /**
- * 验证图片文件
- */
-export function validateImageFile(file: File): { valid: boolean; error?: string } {
-  // 检查文件类型
-  if (!SUPPORTED_IMAGE_TYPES.includes(file.type as typeof SUPPORTED_IMAGE_TYPES[number])) {
-    return {
-      valid: false,
-      error: `不支持的图片格式: ${file.type}。仅支持 PNG、JPG、GIF、WebP`,
-    }
-  }
-
-  // 检查文件大小
-  if (file.size > MAX_IMAGE_SIZE) {
-    const sizeMB = (file.size / (1024 * 1024)).toFixed(2)
-    return {
-      valid: false,
-      error: `图片大小 (${sizeMB}MB) 超过限制 (10MB)`,
-    }
-  }
-
-  return { valid: true }
-}
-
-/**
- * 将文件转换为Base64
- */
-export function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(new Error("读取文件失败"))
-    reader.readAsDataURL(file)
-  })
-}
-
-/**
- * 从Base64字符串中提取MIME类型
- */
-export function getMimeTypeFromBase64(base64: string): string | null {
-  const match = base64.match(/^data:([^;]+);base64,/)
-  return match ? match[1] : null
-}
-
-/**
- * 验证Base64图片格式
- */
-export function validateBase64Image(base64: string): { valid: boolean; error?: string } {
-  const mimeType = getMimeTypeFromBase64(base64)
-  
-  if (!mimeType) {
-    return { valid: false, error: "无效的Base64图片格式" }
-  }
-
-  if (!SUPPORTED_IMAGE_TYPES.includes(mimeType as typeof SUPPORTED_IMAGE_TYPES[number])) {
-    return {
-      valid: false,
-      error: `不支持的图片格式: ${mimeType}。仅支持 PNG、JPG、GIF、WebP`,
-    }
-  }
-
-  return { valid: true }
-}
-
-/**
  * 图片上传组件
  * 
  * 支持PNG、JPG、GIF、WebP格式
@@ -120,6 +50,7 @@ export function ImageUpload({
   maxImages = 5,
   className,
 }: ImageUploadProps) {
+  const t = useTranslations("chat")
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   // 处理文件选择
@@ -133,7 +64,7 @@ export function ImageUpload({
     for (const file of Array.from(files)) {
       // 检查是否超过最大数量
       if (images.length + newImages.length >= maxImages) {
-        errors.push(`最多只能上传 ${maxImages} 张图片`)
+        errors.push(t("image.supportedFormats", { maxImages }))
         break
       }
 
@@ -148,7 +79,7 @@ export function ImageUpload({
         const base64 = await fileToBase64(file)
         newImages.push(base64)
       } catch (err) {
-        errors.push(`读取文件 ${file.name} 失败`)
+        errors.push(t("image.readFailed"))
       }
     }
 
@@ -185,7 +116,7 @@ export function ImageUpload({
             <div key={index} className="relative group">
               <img
                 src={img}
-                alt={`预览 ${index + 1}`}
+                alt={t("image.preview", { index: index + 1 })}
                 className="h-16 w-16 rounded-md object-cover border border-border"
               />
               <button
@@ -199,7 +130,7 @@ export function ImageUpload({
                   "focus:opacity-100",
                   disabled && "cursor-not-allowed"
                 )}
-                aria-label={`移除图片 ${index + 1}`}
+                aria-label={t("image.remove", { index: index + 1 })}
               >
                 <X className="h-3 w-3" />
               </button>
@@ -229,14 +160,25 @@ export function ImageUpload({
           className="w-fit"
         >
           <ImagePlus className="mr-2 h-4 w-4" />
-          上传图片
+          {t("image.upload")}
         </Button>
       )}
 
       {/* 提示信息 */}
       <p className="text-xs text-muted-foreground">
-        支持 PNG、JPG、GIF、WebP，单张最大 10MB，最多 {maxImages} 张
+        {t("image.supportedFormats", { maxImages })}
       </p>
     </div>
   )
 }
+
+// 导出验证函数和常量供外部使用
+export {
+  validateImageFile,
+  fileToBase64,
+  validateBase64Image,
+  getMimeTypeFromBase64,
+  SUPPORTED_IMAGE_TYPES,
+  MAX_IMAGE_SIZE,
+} from "@/lib/image-validation"
+
