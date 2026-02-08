@@ -101,6 +101,17 @@ public class Repository : AggregateRoot<string>
     public string? PrimaryLanguage { get; set; }
 
     /// <summary>
+    /// 更新检查间隔（分钟）
+    /// null 表示使用全局默认值
+    /// </summary>
+    public int? UpdateIntervalMinutes { get; set; }
+
+    /// <summary>
+    /// 上次检查更新时间
+    /// </summary>
+    public DateTime? LastUpdateCheckAt { get; set; }
+
+    /// <summary>
     /// 所属用户导航属性
     /// </summary>
     [ForeignKey("OwnerUserId")]

@@ -4,9 +4,11 @@ using FsCheck.Xunit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Services.Chat;
+using OpenDeepWiki.Services.Repositories;
 
 namespace OpenDeepWiki.Tests.Services.Chat;
 
@@ -21,6 +23,7 @@ public class EmbedServiceAppConfigPropertyTests
     private static readonly ILogger<EmbedService> EmbedLogger = NullLogger<EmbedService>.Instance;
     private static readonly ILogger<AppStatisticsService> StatsLogger = NullLogger<AppStatisticsService>.Instance;
     private static readonly ILogger<ChatLogService> LogLogger = NullLogger<ChatLogService>.Instance;
+    private static readonly IOptions<RepositoryAnalyzerOptions> RepoOptions = Options.Create(new RepositoryAnalyzerOptions());
 
     /// <summary>
     /// Creates an in-memory database context for testing.
@@ -52,7 +55,7 @@ public class EmbedServiceAppConfigPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, chatAppService, statsService, logService, null!, EmbedLogger);
+                    context, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
 
                 // Create app
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -91,7 +94,7 @@ public class EmbedServiceAppConfigPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, chatAppService, statsService, logService, null!, EmbedLogger);
+                    context, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
 
                 // Create app with specific models
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -134,7 +137,7 @@ public class EmbedServiceAppConfigPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, chatAppService, statsService, logService, null!, EmbedLogger);
+                    context, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
 
                 // Create app with specific default model
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -174,7 +177,7 @@ public class EmbedServiceAppConfigPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, chatAppService, statsService, logService, null!, EmbedLogger);
+                    context, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
 
                 // Create app with icon
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -252,7 +255,7 @@ public class EmbedServiceAppConfigPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, chatAppService, statsService, logService, null!, EmbedLogger);
+                    context, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
 
                 // Create app
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -279,6 +282,7 @@ public class EmbedServiceAppConfigPropertyTests
             });
     }
 
+
     /// <summary>
     /// Property 12: 应用配置应用正确性 - 域名校验配置应该正确应用
     /// For any app with domain validation, the config should reflect the setting.
@@ -297,7 +301,7 @@ public class EmbedServiceAppConfigPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, chatAppService, statsService, logService, null!, EmbedLogger);
+                    context, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
 
                 // Create app with domain validation
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -335,11 +339,11 @@ public static class AppConfigGenerators
     private static readonly string[] ApiKeys = { "sk-test-key-123", "sk-prod-key-456", "api-key-789", "sk-demo-000" };
     private static readonly string[] Models = { "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo", "claude-3-sonnet", "claude-3-haiku" };
     private static readonly string[] ProviderTypes = { "OpenAI", "OpenAIResponses", "Anthropic" };
-    private static readonly string[] IconUrls = { 
+    private static readonly string?[] IconUrls = { 
         "https://example.com/icon.png", 
         "https://cdn.example.com/bot.svg",
         "https://assets.example.com/chat-icon.png",
-        null! 
+        null 
     };
 
     /// <summary>

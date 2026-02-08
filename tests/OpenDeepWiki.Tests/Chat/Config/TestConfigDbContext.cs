@@ -48,6 +48,7 @@ public class TestConfigDbContext : DbContext, IContext
     public DbSet<AppStatistics> AppStatistics { get; set; } = null!;
     public DbSet<ChatLog> ChatLogs { get; set; } = null!;
     public DbSet<TranslationTask> TranslationTasks { get; set; } = null!;
+    public DbSet<IncrementalUpdateTask> IncrementalUpdateTasks { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

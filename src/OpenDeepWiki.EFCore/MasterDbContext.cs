@@ -42,6 +42,7 @@ public interface IContext : IDisposable
     DbSet<AppStatistics> AppStatistics { get; set; }
     DbSet<ChatLog> ChatLogs { get; set; }
     DbSet<TranslationTask> TranslationTasks { get; set; }
+    DbSet<IncrementalUpdateTask> IncrementalUpdateTasks { get; set; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
@@ -87,6 +88,7 @@ public abstract class MasterDbContext : DbContext, IContext
     public DbSet<AppStatistics> AppStatistics { get; set; } = null!;
     public DbSet<ChatLog> ChatLogs { get; set; } = null!;
     public DbSet<TranslationTask> TranslationTasks { get; set; } = null!;
+    public DbSet<IncrementalUpdateTask> IncrementalUpdateTasks { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -252,5 +254,17 @@ public abstract class MasterDbContext : DbContext, IContext
         modelBuilder.Entity<TranslationTask>()
             .HasIndex(t => new { t.RepositoryBranchId, t.TargetLanguageCode })
             .IsUnique();
+
+        // IncrementalUpdateTask 状态索引（用于查询待处理任务）
+        modelBuilder.Entity<IncrementalUpdateTask>()
+            .HasIndex(t => t.Status);
+
+        // IncrementalUpdateTask 仓库分支和状态组合索引（防止重复的待处理/处理中任务）
+        modelBuilder.Entity<IncrementalUpdateTask>()
+            .HasIndex(t => new { t.RepositoryId, t.BranchId, t.Status });
+
+        // IncrementalUpdateTask 优先级和创建时间索引（用于按优先级排序处理）
+        modelBuilder.Entity<IncrementalUpdateTask>()
+            .HasIndex(t => new { t.Priority, t.CreatedAt });
     }
 }

@@ -11,6 +11,7 @@ using OpenDeepWiki.Services.Admin;
 using OpenDeepWiki.Services.Auth;
 using OpenDeepWiki.Services.Chat;
 using OpenDeepWiki.Services.MindMap;
+using OpenDeepWiki.Services.Notifications;
 using OpenDeepWiki.Services.OAuth;
 using OpenDeepWiki.Services.Organizations;
 using OpenDeepWiki.Services.Prompts;
@@ -305,6 +306,23 @@ try
     builder.Services.AddHostedService<TranslationWorker>();
     builder.Services.AddHostedService<MindMapWorker>();
 
+    // 配置增量更新选项
+    // Requirements: 6.2, 6.3, 6.6 - 可配置的更新间隔
+    builder.Services.AddOptions<IncrementalUpdateOptions>()
+        .Bind(builder.Configuration.GetSection(IncrementalUpdateOptions.SectionName));
+
+    // 注册增量更新服务
+    // Requirements: 2.1 - 增量更新服务接口
+    builder.Services.AddScoped<IIncrementalUpdateService, IncrementalUpdateService>();
+
+    // 注册订阅者通知服务（空实现）
+    // Requirements: 4.1 - 订阅者通知服务接口
+    builder.Services.AddScoped<ISubscriberNotificationService, NullSubscriberNotificationService>();
+
+    // 注册增量更新后台工作器
+    // Requirements: 1.1 - 独立的增量更新后台工作器
+    builder.Services.AddHostedService<IncrementalUpdateWorker>();
+
     // 注册 Chat 系统服务
     // Requirements: 2.2, 2.4 - 通过依赖注入自动发现并加载 Provider
     builder.Services.AddChatServices(builder.Configuration);
@@ -360,6 +378,7 @@ try
     app.MapChatAppEndpoints();
     app.MapEmbedEndpoints();
     app.MapSystemEndpoints();
+    app.MapIncrementalUpdateEndpoints();
 
     app.Run();
 }
