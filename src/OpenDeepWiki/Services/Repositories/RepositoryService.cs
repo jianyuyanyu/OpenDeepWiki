@@ -25,6 +25,18 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
             throw new InvalidOperationException("仓库凭据为空时不允许设置为私有");
         }
 
+        // 校验是否已存在相同仓库（相同 GitUrl + BranchName）
+        var exists = await context.Repositories
+            .AsNoTracking()
+            .Where(r => r.GitUrl == request.GitUrl && !r.IsDeleted)
+            .Join(context.RepositoryBranches, r => r.Id, b => b.RepositoryId, (r, b) => b)
+            .AnyAsync(b => b.BranchName == request.BranchName);
+
+        if (exists)
+        {
+            throw new InvalidOperationException("该仓库的相同分支已存在，请勿重复提交");
+        }
+
         // 获取公开仓库的star和fork数
         int starCount = 0;
         int forkCount = 0;
