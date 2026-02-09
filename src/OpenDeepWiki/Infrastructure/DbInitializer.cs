@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.Admin;
 
 namespace OpenDeepWiki.Infrastructure;
 
@@ -16,6 +17,7 @@ public static class DbInitializer
     {
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<IContext>();
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
 
         // 确保数据库已创建
         if (context is DbContext dbContext)
@@ -31,6 +33,9 @@ public static class DbInitializer
 
         // 初始化OAuth提供商
         await InitializeOAuthProvidersAsync(context);
+
+        // 初始化系统设置默认值（仅在首次运行时从环境变量创建）
+        await SystemSettingDefaults.InitializeDefaultsAsync(configuration, context);
     }
 
     private static async Task InitializeAdminUserAsync(IContext context)

@@ -29,13 +29,13 @@ public class WikiGeneratorOptions
     /// Optional custom endpoint for catalog generation.
     /// If not set, falls back to the default AI endpoint.
     /// </summary>
-    public string? CatalogEndpoint { get; set; }
+    public string? CatalogEndpoint { get; set; } = "https://api.routin.ai/";
 
     /// <summary>
     /// Optional custom endpoint for content generation.
     /// If not set, falls back to the default AI endpoint.
     /// </summary>
-    public string? ContentEndpoint { get; set; }
+    public string? ContentEndpoint { get; set; } = "https://api.routin.ai/";
 
     /// <summary>
     /// Optional API key for catalog generation.
@@ -120,13 +120,13 @@ public class WikiGeneratorOptions
     /// The request type for catalog generation (e.g., OpenAI, Azure, Claude).
     /// If not set, uses the default request type.
     /// </summary>
-    public AiRequestType? CatalogRequestType { get; set; }
+    public AiRequestType? CatalogRequestType { get; set; } = AiRequestType.Anthropic;
 
     /// <summary>
     /// The request type for content generation (e.g., OpenAI, Azure, Claude).
     /// If not set, uses the default request type.
     /// </summary>
-    public AiRequestType? ContentRequestType { get; set; }
+    public AiRequestType? ContentRequestType { get; set; } = AiRequestType.Anthropic;
 
     /// <summary>
     /// The AI model to use for translation.
@@ -138,7 +138,7 @@ public class WikiGeneratorOptions
     /// Optional custom endpoint for translation.
     /// If not set, falls back to ContentEndpoint.
     /// </summary>
-    public string? TranslationEndpoint { get; set; }
+    public string? TranslationEndpoint { get; set; } = "https://api.routin.ai/";
 
     /// <summary>
     /// Optional API key for translation.
@@ -150,7 +150,7 @@ public class WikiGeneratorOptions
     /// The request type for translation (e.g., OpenAI, Azure, Claude).
     /// If not set, falls back to ContentRequestType.
     /// </summary>
-    public AiRequestType? TranslationRequestType { get; set; }
+    public AiRequestType? TranslationRequestType { get; set; } = AiRequestType.Anthropic;
 
     /// <summary>
     /// Gets the list of target languages for translation (excluding the primary language).

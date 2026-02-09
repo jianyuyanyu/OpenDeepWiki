@@ -404,7 +404,7 @@ public class EmbedService : IEmbedService
         var outputTokens = 0;
         var responseBuilder = new System.Text.StringBuilder();
 
-        var thread = await agent.GetNewSessionAsync(cancellationToken);
+        var thread = await agent.CreateSessionAsync(cancellationToken);
 
         await foreach (var update in agent.RunStreamingAsync(chatMessages, thread, cancellationToken: cancellationToken))
         {

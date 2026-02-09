@@ -52,6 +52,10 @@ public class SkillConfigDto
     public long SkillMdSize { get; set; }
     public long TotalSize { get; set; }
     public DateTime CreatedAt { get; set; }
+    /// <summary>
+    /// Parsed SKILL.md frontmatter for UI display (dynamic parameters, metadata, etc.)
+    /// </summary>
+    public Dictionary<string, object?> Frontmatter { get; set; } = new();
 }
 
 /// <summary>
@@ -59,6 +63,34 @@ public class SkillConfigDto
 /// </summary>
 public class SkillDetailDto : SkillConfigDto
 {
+    public SkillDetailDto()
+    {
+    }
+
+    public SkillDetailDto(SkillConfigDto source)
+    {
+        Id = source.Id;
+        Name = source.Name;
+        Description = source.Description;
+        License = source.License;
+        Compatibility = source.Compatibility;
+        AllowedTools = source.AllowedTools;
+        FolderPath = source.FolderPath;
+        IsActive = source.IsActive;
+        SortOrder = source.SortOrder;
+        Author = source.Author;
+        Version = source.Version;
+        Source = source.Source;
+        SourceUrl = source.SourceUrl;
+        HasScripts = source.HasScripts;
+        HasReferences = source.HasReferences;
+        HasAssets = source.HasAssets;
+        SkillMdSize = source.SkillMdSize;
+        TotalSize = source.TotalSize;
+        CreatedAt = source.CreatedAt;
+        Frontmatter = new Dictionary<string, object?>(source.Frontmatter);
+    }
+
     /// <summary>
     /// SKILL.md 完整内容
     /// </summary>

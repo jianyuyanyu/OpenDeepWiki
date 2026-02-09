@@ -60,7 +60,7 @@ public class AgentExecutor : IAgentExecutor
             cts.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
 
             // 使用流式 API 收集完整响应
-            var thread = await agent.GetNewSessionAsync(cts.Token);
+            var thread = await agent.CreateSessionAsync(cts.Token);
             var contentBuilder = new StringBuilder();
             
             await foreach (var update in agent.RunStreamingAsync(chatMessages, thread, cancellationToken: cts.Token))
@@ -138,7 +138,7 @@ public class AgentExecutor : IAgentExecutor
         // 获取线程
         try
         {
-            thread = await agent.GetNewSessionAsync(cts.Token);
+            thread = await agent.CreateSessionAsync(cts.Token);
         }
         catch (Exception ex)
         {

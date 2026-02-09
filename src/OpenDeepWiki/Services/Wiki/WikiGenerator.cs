@@ -14,6 +14,7 @@ using OpenDeepWiki.Agents;
 using OpenDeepWiki.Agents.Tools;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.Chat;
 using OpenDeepWiki.Services.Prompts;
 using OpenDeepWiki.Services.Repositories;
 using ChatMessage = Microsoft.Extensions.AI.ChatMessage;
@@ -69,6 +70,7 @@ public class WikiGenerator : IWikiGenerator
     private readonly IContextFactory _contextFactory;
     private readonly ILogger<WikiGenerator> _logger;
     private readonly IProcessingLogService _processingLogService;
+    private readonly ISkillToolConverter _skillToolConverter;
 
     // Use AsyncLocal for thread-safe repository ID tracking in concurrent scenarios
     private static readonly AsyncLocal<string?> _currentRepositoryId = new();
@@ -83,7 +85,8 @@ public class WikiGenerator : IWikiGenerator
         IContext context,
         IContextFactory contextFactory,
         ILogger<WikiGenerator> logger,
-        IProcessingLogService processingLogService)
+        IProcessingLogService processingLogService,
+        ISkillToolConverter skillToolConverter)
     {
         _agentFactory = agentFactory ?? throw new ArgumentNullException(nameof(agentFactory));
         _promptPlugin = promptPlugin ?? throw new ArgumentNullException(nameof(promptPlugin));
@@ -92,6 +95,7 @@ public class WikiGenerator : IWikiGenerator
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _processingLogService = processingLogService ?? throw new ArgumentNullException(nameof(processingLogService));
+        _skillToolConverter = skillToolConverter ?? throw new ArgumentNullException(nameof(skillToolConverter));
 
         _logger.LogDebug(
             "WikiGenerator initialized. CatalogModel: {CatalogModel}, ContentModel: {ContentModel}, MaxRetryAttempts: {MaxRetry}",
@@ -151,10 +155,9 @@ public class WikiGenerator : IWikiGenerator
             _logger.LogDebug("Initializing tools for mind map generation");
             var gitTool = new GitTool(workspace.WorkingDirectory);
             var mindMapTool = new MindMapTool(_context, branchLanguage.Id);
-
-            var tools = gitTool.GetTools()
-                .Concat(mindMapTool.GetTools())
-                .ToArray();
+            var tools = await BuildToolsAsync(
+                gitTool.GetTools().Concat(mindMapTool.GetTools()),
+                cancellationToken);
             _logger.LogDebug("Tools initialized. ToolCount: {ToolCount}, Tools: {ToolNames}",
                 tools.Length, string.Join(", ", tools.Select(t => t.Name)));
 
@@ -243,10 +246,9 @@ Remember to call WriteMindMapAsync with the complete mind map content.";
             var gitTool = new GitTool(workspace.WorkingDirectory);
             var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
             var catalogTool = new CatalogTool(catalogStorage);
-
-            var tools = gitTool.GetTools()
-                .Concat(catalogTool.GetTools())
-                .ToArray();
+            var tools = await BuildToolsAsync(
+                gitTool.GetTools().Concat(catalogTool.GetTools()),
+                cancellationToken);
             _logger.LogDebug("Tools initialized. ToolCount: {ToolCount}, Tools: {ToolNames}",
                 tools.Length, string.Join(", ", tools.Select(t => t.Name)));
 
@@ -544,10 +546,9 @@ Please start executing the task.";
 
             var gitTool = new GitTool(workspace.WorkingDirectory);
             var docTool = new DocTool(context, branchLanguage.Id, catalogPath, gitTool);
-
-            var tools = gitTool.GetTools()
-                .Concat(docTool.GetTools())
-                .ToArray();
+            var tools = await BuildToolsAsync(
+                gitTool.GetTools().Concat(docTool.GetTools()),
+                cancellationToken);
 
             var userMessage = $@"Please generate Wiki document content for catalog item ""{catalogTitle}"" (path: {catalogPath}).
 
@@ -657,6 +658,53 @@ Please start executing the task.";
 
 
     /// <summary>
+    /// Combines base tools with configured Skill tools for wiki generation workflows.
+    /// </summary>
+    private async Task<AITool[]> BuildToolsAsync(
+        IEnumerable<AITool> baseTools,
+        CancellationToken cancellationToken)
+    {
+        var tools = baseTools.ToList();
+
+        var enabledSkillIds = await GetEnabledSkillIdsAsync(cancellationToken);
+        if (enabledSkillIds.Count == 0)
+        {
+            return tools.ToArray();
+        }
+
+        try
+        {
+            var skillTools = await _skillToolConverter.ConvertSkillConfigsToToolsAsync(
+                enabledSkillIds,
+                cancellationToken);
+
+            if (skillTools.Count > 0)
+            {
+                tools.AddRange(skillTools);
+                _logger.LogDebug("Added {SkillCount} skill tools to wiki generator", skillTools.Count);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load skill tools for wiki generator");
+        }
+
+        return tools.ToArray();
+    }
+
+    private async Task<List<string>> GetEnabledSkillIdsAsync(CancellationToken cancellationToken)
+    {
+        using var context = _contextFactory.CreateContext();
+
+        return await context.SkillConfigs
+            .Where(s => s.IsActive && !s.IsDeleted)
+            .OrderBy(s => s.SortOrder)
+            .ThenBy(s => s.Name)
+            .Select(s => s.Id)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Executes an AI agent with retry logic using exponential backoff.
     /// </summary>
     private async Task ExecuteAgentWithRetryAsync(
@@ -732,7 +780,7 @@ Please start executing the task.";
 
                 _logger.LogDebug("Starting streaming response. Operation: {Operation}", operationName);
 
-                var thread = await chatClient.GetNewSessionAsync(cancellationToken);
+                var thread = await chatClient.CreateSessionAsync(cancellationToken);
                 
                 await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
                 {
@@ -1352,7 +1400,7 @@ Translation:";
 
         var chatClient = _agentFactory.CreateSimpleChatClient(
             _options.GetTranslationModel(), 
-            32000, 
+            _options.MaxOutputTokens, 
             _options.GetTranslationRequestOptions());
         var response = await chatClient.RunAsync(messages, cancellationToken: cancellationToken);
         
@@ -1404,9 +1452,9 @@ Translated document:";
             {
                 var chatClient = _agentFactory.CreateSimpleChatClient(
                     _options.GetTranslationModel(), 
-                    32000, 
+                    _options.MaxOutputTokens, 
                     _options.GetTranslationRequestOptions());
-                var thread = await chatClient.GetNewSessionAsync(cancellationToken);
+                var thread = await chatClient.CreateSessionAsync(cancellationToken);
                 
                 var contentBuilder = new StringBuilder();
                 await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
@@ -1490,9 +1538,9 @@ Translated mind map:";
             {
                 var chatClient = _agentFactory.CreateSimpleChatClient(
                     _options.GetTranslationModel(),
-                    32000,
+                    _options.MaxOutputTokens,
                     _options.GetTranslationRequestOptions());
-                var thread = await chatClient.GetNewSessionAsync(cancellationToken);
+                var thread = await chatClient.CreateSessionAsync(cancellationToken);
 
                 var contentBuilder = new StringBuilder();
                 await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))

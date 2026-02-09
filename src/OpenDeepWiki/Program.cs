@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using OpenDeepWiki.Agents;
+using OpenDeepWiki.Cache.DependencyInjection;
 using OpenDeepWiki.Chat;
 using OpenDeepWiki.Endpoints;
 using OpenDeepWiki.Endpoints.Admin;
@@ -279,6 +280,9 @@ try
     // 注册 Wiki Generator
     builder.Services.AddScoped<IWikiGenerator, WikiGenerator>();
 
+    // 注册缓存框架（默认内存实现）
+    builder.Services.AddOpenDeepWikiCache();
+
     // 注册处理日志服务（使用 Singleton，因为它内部使用 IServiceScopeFactory 创建独立 scope）
     builder.Services.AddSingleton<IProcessingLogService, ProcessingLogService>();
 
@@ -292,6 +296,9 @@ try
     builder.Services.AddScoped<IAdminSettingsService, AdminSettingsService>();
     builder.Services.AddScoped<IAdminChatAssistantService, AdminChatAssistantService>();
     builder.Services.AddScoped<IOrganizationService, OrganizationService>();
+
+    // 注册动态配置管理器
+    builder.Services.AddScoped<IDynamicConfigManager, DynamicConfigManager>();
 
     // 注册推荐服务
     builder.Services.AddScoped<RecommendationService>();
@@ -330,6 +337,7 @@ try
     // 注册对话助手服务
     // Requirements: 2.4, 3.1, 9.1 - 对话助手API服务
     builder.Services.AddScoped<IMcpToolConverter, McpToolConverter>();
+    builder.Services.AddScoped<ISkillToolConverter, SkillToolConverter>();
     builder.Services.AddScoped<IChatAssistantService, ChatAssistantService>();
 
     // 注册用户应用管理服务
@@ -352,6 +360,14 @@ try
 
     // 初始化数据库
     await DbInitializer.InitializeAsync(app.Services);
+
+    // 应用数据库中的系统设置到配置（覆盖环境变量和appsettings.json的值）
+    using (var scope = app.Services.CreateScope())
+    {
+        var settingsService = scope.ServiceProvider.GetRequiredService<IAdminSettingsService>();
+        var wikiOptions = scope.ServiceProvider.GetRequiredService<IOptions<WikiGeneratorOptions>>();
+        SystemSettingDefaults.ApplyToWikiGeneratorOptions(wikiOptions.Value, settingsService);
+    }
 
     // 启用 CORS
     app.UseCors("AllowAll");
@@ -377,6 +393,7 @@ try
     app.MapChatAssistantEndpoints();
     app.MapChatAppEndpoints();
     app.MapEmbedEndpoints();
+
     app.MapSystemEndpoints();
     app.MapIncrementalUpdateEndpoints();
 

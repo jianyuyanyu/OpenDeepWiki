@@ -62,6 +62,11 @@ const getNavItems = (t: (key: string) => string) => [
     label: t('admin.chatAssistant.title'),
   },
   {
+    href: "/admin/chat-providers",
+    icon: MessageCircle,
+    label: t('admin.chatProviders.title'),
+  },
+  {
     href: "/admin/settings",
     icon: Cog,
     label: t('common.admin.settings'),

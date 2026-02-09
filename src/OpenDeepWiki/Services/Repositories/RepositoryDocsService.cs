@@ -1,16 +1,28 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OpenDeepWiki.Cache.Abstractions;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Models;
+using System.IO.Compression;
+using System.Text;
+using Microsoft.AspNetCore.Authorization;
 
 namespace OpenDeepWiki.Services.Repositories;
 
 [MiniApi(Route = "/api/v1/repos")]
 [Tags("仓库文档")]
-public class RepositoryDocsService(IContext context, IGitPlatformService gitPlatformService)
+public class RepositoryDocsService(IContext context, IGitPlatformService gitPlatformService, ICache cache)
 {
     private const string FallbackLanguageCode = "zh"; // 当没有默认语言标记时的回退语言
+    private const int ExportRateLimitMinutes = 5; // 导出限流：5分钟内只能导出一次
+    private const int MaxConcurrentExports = 10; // 最大并发导出数
+    private const string ExportRateLimitKeyPrefix = "export:rate-limit";
+    private const string ExportConcurrencyCountKey = "export:concurrency:count";
+    private const string ExportConcurrencyLockKey = "export:concurrency:lock";
+    private static readonly TimeSpan ExportConcurrencyLockTimeout = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan ExportConcurrencyCountTtl = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan ExportRateLimitTtl = TimeSpan.FromMinutes(ExportRateLimitMinutes);
 
     [HttpGet("/{owner}/{repo}/branches")]
     public async Task<RepositoryBranchesResponse> GetBranchesAsync(string owner, string repo)
@@ -399,5 +411,177 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
         }
 
         return node;
+    }
+
+    /// <summary>
+    /// 导出仓库文档为压缩包
+    /// </summary>
+    [HttpGet("/{owner}/{repo}/export")]
+    [Authorize]
+    public async Task<IActionResult> ExportAsync(string owner, string repo, [FromQuery] string? branch = null, [FromQuery] string? lang = null)
+    {
+        var repository = await GetRepositoryAsync(owner, repo);
+        if (repository is null)
+        {
+            return new NotFoundObjectResult("仓库不存在");
+        }
+
+        var branchEntity = await GetBranchAsync(repository.Id, branch);
+        if (branchEntity is null)
+        {
+            return new NotFoundObjectResult("分支不存在");
+        }
+
+        var language = await GetLanguageAsync(branchEntity.Id, lang);
+        if (language is null)
+        {
+            return new NotFoundObjectResult("语言不存在");
+        }
+
+        var now = DateTime.UtcNow;
+        var rateLimitKey = BuildRateLimitKey(owner, repo, branchEntity.BranchName, language.LanguageCode);
+
+        var lastExportTime = await cache.GetAsync<DateTime?>(rateLimitKey);
+        if (lastExportTime.HasValue)
+        {
+            var timeSinceLastExport = now - lastExportTime.Value;
+            if (timeSinceLastExport.TotalMinutes < ExportRateLimitMinutes)
+            {
+                var remainingMinutes = Math.Ceiling(ExportRateLimitMinutes - timeSinceLastExport.TotalMinutes);
+                return new BadRequestObjectResult($"导出过于频繁，请在 {remainingMinutes} 分钟后重试");
+            }
+        }
+
+        if (!await TryAcquireExportSlotAsync())
+        {
+            return new BadRequestObjectResult("当前导出请求过多，请稍后重试");
+        }
+
+        try
+        {
+            await cache.SetAsync(rateLimitKey, now, new CacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = ExportRateLimitTtl
+            });
+
+            // 获取所有文档目录和文件
+            var catalogs = await context.DocCatalogs
+                .AsNoTracking()
+                .Where(item => item.BranchLanguageId == language.Id && !item.IsDeleted)
+                .Include(item => item.DocFile)
+                .OrderBy(item => item.Order)
+                .ToListAsync();
+
+            if (catalogs.Count == 0)
+            {
+                return new NotFoundObjectResult("该分支和语言下没有文档内容");
+            }
+
+            // 创建内存流用于生成压缩包
+            using var memoryStream = new MemoryStream();
+            using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
+            {
+                // 构建目录结构并添加文件
+                await AddFilesToArchive(archive, catalogs, null);
+            }
+
+            // 设置文件名
+            var fileName = $"{owner}-{repo}-{branchEntity.BranchName}-{language.LanguageCode}.zip";
+            
+            // 返回压缩包
+            return new FileContentResult(memoryStream.ToArray(), "application/zip")
+            {
+                FileDownloadName = fileName
+            };
+        }
+        finally
+        {
+            await ReleaseExportSlotAsync();
+        }
+    }
+
+    private static string BuildRateLimitKey(string owner, string repo, string branch, string language)
+    {
+        return $"{ExportRateLimitKeyPrefix}:{owner}:{repo}:{branch}:{language}";
+    }
+
+    private async Task<bool> TryAcquireExportSlotAsync()
+    {
+        await using var cacheLock = await cache.AcquireLockAsync(ExportConcurrencyLockKey, ExportConcurrencyLockTimeout);
+        if (cacheLock is null)
+        {
+            return false;
+        }
+
+        var currentCount = await cache.GetAsync<int?>(ExportConcurrencyCountKey) ?? 0;
+        if (currentCount >= MaxConcurrentExports)
+        {
+            return false;
+        }
+
+        await cache.SetAsync(ExportConcurrencyCountKey, currentCount + 1, new CacheEntryOptions
+        {
+            SlidingExpiration = ExportConcurrencyCountTtl
+        });
+
+        return true;
+    }
+
+    private async Task ReleaseExportSlotAsync()
+    {
+        await using var cacheLock = await cache.AcquireLockAsync(ExportConcurrencyLockKey, ExportConcurrencyLockTimeout);
+        if (cacheLock is null)
+        {
+            return;
+        }
+
+        var currentCount = await cache.GetAsync<int?>(ExportConcurrencyCountKey) ?? 0;
+        var nextCount = Math.Max(0, currentCount - 1);
+        await cache.SetAsync(ExportConcurrencyCountKey, nextCount, new CacheEntryOptions
+        {
+            SlidingExpiration = ExportConcurrencyCountTtl
+        });
+    }
+
+    /// <summary>
+    /// 递归添加文件到压缩包
+    /// </summary>
+    private static async Task AddFilesToArchive(ZipArchive archive, List<DocCatalog> catalogs, string? parentPath)
+    {
+        // 获取当前层级的目录项
+        var currentLevelItems = catalogs
+            .Where(c => c.ParentId == parentPath)
+            .OrderBy(c => c.Order)
+            .ToList();
+
+        foreach (var catalog in currentLevelItems)
+        {
+            // 构建当前项的完整路径
+            var currentPath = string.IsNullOrEmpty(parentPath) 
+                ? catalog.Title 
+                : Path.Combine(parentPath, catalog.Title);
+
+            // 如果有文档文件，创建文件条目
+            if (catalog.DocFile != null)
+            {
+                // 使用 .md 扩展名
+                var fileName = $"{catalog.Title}.md";
+                var fullPath = string.IsNullOrEmpty(parentPath) 
+                    ? fileName 
+                    : Path.Combine(parentPath, fileName);
+
+                var entry = archive.CreateEntry(fullPath);
+                using var entryStream = entry.Open();
+                using var writer = new StreamWriter(entryStream, Encoding.UTF8);
+                await writer.WriteAsync(catalog.DocFile.Content);
+            }
+
+            // 递归处理子目录
+            var children = catalogs.Where(c => c.ParentId == catalog.Id).ToList();
+            if (children.Count > 0)
+            {
+                await AddFilesToArchive(archive, catalogs, catalog.Id);
+            }
+        }
     }
 }

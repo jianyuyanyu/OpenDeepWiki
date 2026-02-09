@@ -1,10 +1,18 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   getSettings,
@@ -43,6 +51,8 @@ export default function AdminSettingsPage() {
     security: t('admin.settings.security'),
   };
 
+  const requestTypeOptions = ["OpenAI", "OpenAIResponses", "Anthropic"];
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -64,6 +74,21 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const formatSettingLabel = useCallback((key: string) => {
+    return key
+      .toLowerCase()
+      .split("_")
+      .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+      .join(" ");
+  }, []);
+
+  const handleFieldChange = useCallback((key: string, value: string) => {
+    setEditedValues((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -90,7 +115,27 @@ export default function AdminSettingsPage() {
 
   const categories = [...new Set(settings.map((s) => s.category))];
 
+  const settingsByCategory = useMemo(() => {
+    return categories.reduce<Record<string, SystemSetting[]>>((acc, cat) => {
+      acc[cat] = settings.filter((s) => s.category === cat);
+      return acc;
+    }, {});
+  }, [categories, settings]);
+
+  const activeSettings = settingsByCategory[activeCategory] ?? [];
+
+  useEffect(() => {
+    if (categories.length === 0) return;
+    if (!categories.includes(activeCategory)) {
+      setActiveCategory(categories[0] ?? "general");
+    }
+  }, [categories, activeCategory]);
+
   const hasChanges = settings.some((s) => editedValues[s.key] !== (s.value || ""));
+  const pendingChangeCount = settings.reduce((count, setting) => {
+    return count + (editedValues[setting.key] !== (setting.value || "") ? 1 : 0);
+  }, 0);
+  const hasSettings = settings.length > 0;
 
   if (loading) {
     return (
@@ -120,7 +165,7 @@ export default function AdminSettingsPage() {
         </div>
       </div>
 
-      {settings.length === 0 ? (
+      {!hasSettings ? (
         <Card className="flex h-64 items-center justify-center">
           <div className="text-center">
             <Settings className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -128,74 +173,190 @@ export default function AdminSettingsPage() {
           </div>
         </Card>
       ) : (
-        <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-          <TabsList>
-            {categories.map((cat) => (
-              <TabsTrigger key={cat} value={cat} className="flex items-center gap-2">
-                {categoryIcons[cat] || <Settings className="h-4 w-4" />}
-                {categoryLabels[cat] || cat}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {categories.map((cat) => (
-            <TabsContent key={cat} value={cat}>
-              <Card className="p-6">
-                <div className="space-y-6">
-                  {settings
-                    .filter((s) => s.category === cat)
-                    .map((setting) => (
-                      <div key={setting.key} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <label className="text-sm font-medium">{setting.key}</label>
-                          {setting.description && (
-                            <span className="text-xs text-muted-foreground">
-                              {setting.description}
-                            </span>
-                          )}
-                        </div>
-                        {(setting.value?.length || 0) > 100 || setting.key.toLowerCase().includes("template") ? (
-                          <Textarea
-                            value={editedValues[setting.key] || ""}
-                            onChange={(e) =>
-                              setEditedValues({
-                                ...editedValues,
-                                [setting.key]: e.target.value,
-                              })
-                            }
-                            rows={4}
-                            className="font-mono text-sm"
-                          />
-                        ) : setting.key.toLowerCase().includes("key") ||
-                          setting.key.toLowerCase().includes("secret") ||
-                          setting.key.toLowerCase().includes("password") ? (
-                          <Input
-                            type="password"
-                            value={editedValues[setting.key] || ""}
-                            onChange={(e) =>
-                              setEditedValues({
-                                ...editedValues,
-                                [setting.key]: e.target.value,
-                              })
-                            }
-                          />
-                        ) : (
-                          <Input
-                            value={editedValues[setting.key] || ""}
-                            onChange={(e) =>
-                              setEditedValues({
-                                ...editedValues,
-                                [setting.key]: e.target.value,
-                              })
-                            }
-                          />
-                        )}
-                      </div>
-                    ))}
+        <Tabs value={activeCategory} onValueChange={setActiveCategory} className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-[280px,1fr]">
+            <div className="space-y-4">
+              <Card className="border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background p-5 text-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                  {t('admin.settings.title')}
+                </p>
+                <div className="mt-4 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-full bg-primary/15 p-3 text-primary">
+                      {categoryIcons[activeCategory] || <Settings className="h-6 w-6" />}
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-muted-foreground">{t('admin.settings.activeCategory')}</p>
+                      <p className="text-lg font-semibold">
+                        {categoryLabels[activeCategory] || activeCategory}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {t('admin.settings.categorySummary', {
+                          settings: activeSettings.length,
+                          pending: pendingChangeCount,
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-primary/20 bg-background/40 p-3">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        {t('admin.settings.statCategories')}
+                      </p>
+                      <p className="text-xl font-semibold">{categories.length}</p>
+                    </div>
+                    <div className="rounded-xl border border-primary/20 bg-background/40 p-3">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                        {t('admin.settings.statFields')}
+                      </p>
+                      <p className="text-xl font-semibold">{settings.length}</p>
+                    </div>
+                  </div>
                 </div>
               </Card>
-            </TabsContent>
-          ))}
+
+              <Card className="p-4">
+                <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground">
+                  <span>{t('admin.settings.categoryNavigation')}</span>
+                  <span>{t('admin.settings.categoriesLabel')}</span>
+                </div>
+                <div className="sticky top-24 space-y-3">
+                  <TabsList className="flex flex-col gap-3 bg-transparent p-0">
+                    {categories.map((cat) => (
+                      <TabsTrigger
+                        key={cat}
+                        value={cat}
+                        className="flex w-full flex-col gap-1 rounded-xl border border-border/60 px-4 py-3 text-left transition hover:border-primary/50 hover:bg-primary/5 data-[state=active]:border-primary data-[state=active]:bg-primary/10"
+                      >
+                        <div className="flex items-center justify-between text-sm font-medium">
+                          <div className="flex items-center gap-2">
+                            {categoryIcons[cat] || <Settings className="h-4 w-4" />}
+                            {categoryLabels[cat] || cat}
+                          </div>
+                          <Badge variant="secondary" className="text-[11px]">
+                            {(settingsByCategory[cat]?.length ?? 0)}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {t('admin.settings.manageCategory')}
+                        </span>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </div>
+              </Card>
+            </div>
+
+            <div className="space-y-6">
+              {categories.map((cat) => {
+                const categorySettings = settingsByCategory[cat] ?? [];
+                return (
+                  <TabsContent key={cat} value={cat} className="mt-0">
+                    <Card className="p-6">
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-4">
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            {t('admin.settings.categoryHeading')}
+                          </p>
+                          <h2 className="text-xl font-semibold">
+                            {categoryLabels[cat] || cat}
+                          </h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs uppercase tracking-wide">
+                            {t('admin.settings.settingsCount', { count: categorySettings.length })}
+                          </Badge>
+                          {pendingChangeCount > 0 && (
+                            <Badge className="text-xs">
+                              {t('admin.settings.pendingCount', { count: pendingChangeCount })}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {categorySettings.map((setting) => {
+                          const lowerKey = setting.key.toLowerCase();
+                          const isTemplateField = (setting.value?.length || 0) > 100 || lowerKey.includes("template");
+                          const isSensitiveField =
+                            lowerKey.includes("key") ||
+                            lowerKey.includes("secret") ||
+                            lowerKey.includes("password");
+                          const isSelectField = setting.key.endsWith("_REQUEST_TYPE");
+                          const currentValue = editedValues[setting.key] || "";
+                          const hasPendingChange = currentValue !== (setting.value || "");
+
+                          return (
+                            <div
+                              key={setting.key}
+                              className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card/50 p-4 shadow-sm backdrop-blur"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-foreground">
+                                    {formatSettingLabel(setting.key)}
+                                  </p>
+                                  <p className="text-[11px] font-mono uppercase tracking-wide text-muted-foreground">
+                                    {setting.key}
+                                  </p>
+                                  {setting.description && (
+                                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                                      {setting.description}
+                                    </p>
+                                  )}
+                                </div>
+                                {hasPendingChange && (
+                                  <Badge className="shrink-0 text-[11px]">
+                                    {t('admin.settings.pendingChange')}
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {isSelectField ? (
+                                <Select
+                                  value={currentValue || undefined}
+                                  onValueChange={(value) => handleFieldChange(setting.key, value)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder={t('admin.settings.selectRequestType')} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {requestTypeOptions.map((option) => (
+                                      <SelectItem key={option} value={option}>
+                                        {t(`admin.settings.requestTypeOptions.${option}`)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : isTemplateField ? (
+                                <Textarea
+                                  value={currentValue}
+                                  onChange={(e) => handleFieldChange(setting.key, e.target.value)}
+                                  rows={4}
+                                  className="font-mono text-sm"
+                                />
+                              ) : isSensitiveField ? (
+                                <Input
+                                  type="password"
+                                  value={currentValue}
+                                  onChange={(e) => handleFieldChange(setting.key, e.target.value)}
+                                />
+                              ) : (
+                                <Input
+                                  value={currentValue}
+                                  onChange={(e) => handleFieldChange(setting.key, e.target.value)}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </Card>
+                  </TabsContent>
+                );
+              })}
+            </div>
+          </div>
         </Tabs>
       )}
 

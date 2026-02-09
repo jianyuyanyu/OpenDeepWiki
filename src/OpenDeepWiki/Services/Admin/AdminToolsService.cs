@@ -78,16 +78,21 @@ public class AdminToolsService : IAdminToolsService
 
     public async Task<List<SkillConfigDto>> GetSkillConfigsAsync()
     {
-        return await _context.SkillConfigs.Where(s => !s.IsDeleted).OrderBy(s => s.SortOrder).ThenBy(s => s.Name)
-            .Select(s => new SkillConfigDto
-            {
-                Id = s.Id, Name = s.Name, Description = s.Description, License = s.License,
-                Compatibility = s.Compatibility, AllowedTools = s.AllowedTools, FolderPath = s.FolderPath,
-                IsActive = s.IsActive, SortOrder = s.SortOrder, Author = s.Author, Version = s.Version,
-                Source = s.Source.ToString().ToLower(), SourceUrl = s.SourceUrl,
-                HasScripts = s.HasScripts, HasReferences = s.HasReferences, HasAssets = s.HasAssets,
-                SkillMdSize = s.SkillMdSize, TotalSize = s.TotalSize, CreatedAt = s.CreatedAt
-            }).ToListAsync();
+        var skills = await _context.SkillConfigs
+            .Where(s => !s.IsDeleted)
+            .OrderBy(s => s.SortOrder)
+            .ThenBy(s => s.Name)
+            .ToListAsync();
+
+        var result = new List<SkillConfigDto>(skills.Count);
+        foreach (var skill in skills)
+        {
+            var dto = MapSkillConfig(skill);
+            dto.Frontmatter = await LoadSkillFrontmatterAsync(skill);
+            result.Add(dto);
+        }
+
+        return result;
     }
 
     public async Task<SkillDetailDto?> GetSkillDetailAsync(string id)
@@ -95,21 +100,61 @@ public class AdminToolsService : IAdminToolsService
         var skill = await _context.SkillConfigs.FirstOrDefaultAsync(s => s.Id == id && !s.IsDeleted);
         if (skill == null) return null;
         var skillPath = Path.Combine(_skillsBasePath, skill.FolderPath);
-        var detail = new SkillDetailDto
-        {
-            Id = skill.Id, Name = skill.Name, Description = skill.Description, License = skill.License,
-            Compatibility = skill.Compatibility, AllowedTools = skill.AllowedTools, FolderPath = skill.FolderPath,
-            IsActive = skill.IsActive, SortOrder = skill.SortOrder, Author = skill.Author, Version = skill.Version,
-            Source = skill.Source.ToString().ToLower(), SourceUrl = skill.SourceUrl,
-            HasScripts = skill.HasScripts, HasReferences = skill.HasReferences, HasAssets = skill.HasAssets,
-            SkillMdSize = skill.SkillMdSize, TotalSize = skill.TotalSize, CreatedAt = skill.CreatedAt
-        };
+        var detail = new SkillDetailDto(MapSkillConfig(skill));
+        detail.Frontmatter = await LoadSkillFrontmatterAsync(skill);
         var skillMdPath = Path.Combine(skillPath, "SKILL.md");
         if (File.Exists(skillMdPath)) detail.SkillMdContent = await File.ReadAllTextAsync(skillMdPath);
         detail.Scripts = ListDirectoryFiles(Path.Combine(skillPath, "scripts"));
         detail.References = ListDirectoryFiles(Path.Combine(skillPath, "references"));
         detail.Assets = ListDirectoryFiles(Path.Combine(skillPath, "assets"));
         return detail;
+    }
+
+    private SkillConfigDto MapSkillConfig(SkillConfig skill)
+    {
+        return new SkillConfigDto
+        {
+            Id = skill.Id,
+            Name = skill.Name,
+            Description = skill.Description,
+            License = skill.License,
+            Compatibility = skill.Compatibility,
+            AllowedTools = skill.AllowedTools,
+            FolderPath = skill.FolderPath,
+            IsActive = skill.IsActive,
+            SortOrder = skill.SortOrder,
+            Author = skill.Author,
+            Version = skill.Version,
+            Source = skill.Source.ToString().ToLower(),
+            SourceUrl = skill.SourceUrl,
+            HasScripts = skill.HasScripts,
+            HasReferences = skill.HasReferences,
+            HasAssets = skill.HasAssets,
+            SkillMdSize = skill.SkillMdSize,
+            TotalSize = skill.TotalSize,
+            CreatedAt = skill.CreatedAt
+        };
+    }
+
+    private async Task<Dictionary<string, object?>> LoadSkillFrontmatterAsync(SkillConfig skill)
+    {
+        try
+        {
+            var skillMdPath = Path.Combine(_skillsBasePath, skill.FolderPath, "SKILL.md");
+            if (!File.Exists(skillMdPath))
+            {
+                return new Dictionary<string, object?>();
+            }
+
+            var content = await File.ReadAllTextAsync(skillMdPath);
+            var (frontmatter, _) = ParseSkillMd(content);
+            return frontmatter;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load SKILL.md frontmatter for {Skill}", skill.Name);
+            return new Dictionary<string, object?>();
+        }
     }
 
 

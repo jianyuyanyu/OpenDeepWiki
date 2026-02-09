@@ -109,8 +109,8 @@ namespace OpenDeepWiki.Agents
             {
                 AnthropicClient client = new()
                 {
-                    BaseUrl = new Uri(option.Endpoint ?? DefaultEndpoint),
-                    APIKey = option.ApiKey ?? string.Empty,
+                    BaseUrl = option.Endpoint ?? DefaultEndpoint,
+                    ApiKey = option.ApiKey,
                     HttpClient = httpClient,
                 };
 

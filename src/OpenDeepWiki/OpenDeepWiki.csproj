@@ -42,6 +42,8 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\framework\OpenDeepWiki.Cache.DependencyInjection\OpenDeepWiki.Cache.DependencyInjection.csproj" />
+        <ProjectReference Include="..\..\framework\OpenDeepWiki.Cache.Memory\OpenDeepWiki.Cache.Memory.csproj" />
         <ProjectReference Include="..\EFCore\OpenDeepWiki.Postgresql\OpenDeepWiki.Postgresql.csproj" />
         <ProjectReference Include="..\OpenDeepWiki.EFCore\OpenDeepWiki.EFCore.csproj" />
         <ProjectReference Include="..\OpenDeepWiki.Entities\OpenDeepWiki.Entities.csproj" />
@@ -52,6 +54,7 @@
       <Content Include="..\..\.dockerignore">
         <Link>.dockerignore</Link>
       </Content>
+      <Content Include="skills\**\*" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
 </Project>

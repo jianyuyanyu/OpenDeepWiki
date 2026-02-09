@@ -186,6 +186,7 @@ public class ChatAssistantService : IChatAssistantService
     private readonly IContext _context;
     private readonly AgentFactory _agentFactory;
     private readonly IMcpToolConverter _mcpToolConverter;
+    private readonly ISkillToolConverter _skillToolConverter;
     private readonly RepositoryAnalyzerOptions _repoOptions;
     private readonly ILogger<ChatAssistantService> _logger;
 
@@ -193,12 +194,14 @@ public class ChatAssistantService : IChatAssistantService
         IContext context,
         AgentFactory agentFactory,
         IMcpToolConverter mcpToolConverter,
+        ISkillToolConverter skillToolConverter,
         IOptions<RepositoryAnalyzerOptions> repoOptions,
         ILogger<ChatAssistantService> logger)
     {
         _context = context;
         _agentFactory = agentFactory;
         _mcpToolConverter = mcpToolConverter;
+        _skillToolConverter = skillToolConverter;
         _repoOptions = repoOptions.Value;
         _logger = logger;
     }
@@ -335,6 +338,14 @@ public class ChatAssistantService : IChatAssistantService
             tools.AddRange(mcpTools);
         }
 
+        // Add Skill tools
+        if (config.EnabledSkillIds.Count > 0)
+        {
+            var skillTools = await _skillToolConverter.ConvertSkillConfigsToToolsAsync(
+                config.EnabledSkillIds, cancellationToken);
+            tools.AddRange(skillTools);
+        }
+
         // Build system prompt
         var systemPrompt = BuildSystemPrompt(request.Context, gitTool != null);
 
@@ -383,7 +394,7 @@ public class ChatAssistantService : IChatAssistantService
         // OpenAI 格式的 tool call 跟踪
         var openAiToolCalls = new Dictionary<int, (string Id, string Name, System.Text.StringBuilder Args)>();
 
-        var thread = await agent.GetNewSessionAsync(cancellationToken);
+        var thread = await agent.CreateSessionAsync(cancellationToken);
 
         await foreach (var update in
                        agent.RunStreamingAsync(chatMessages, thread, cancellationToken: cancellationToken))
