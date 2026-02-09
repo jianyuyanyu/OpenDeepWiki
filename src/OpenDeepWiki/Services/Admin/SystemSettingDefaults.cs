@@ -125,18 +125,16 @@ public static class SystemSettingDefaults
     /// <summary>
     /// 将系统设置应用到WikiGeneratorOptions
     /// </summary>
-    public static void ApplyToWikiGeneratorOptions(WikiGeneratorOptions options, IAdminSettingsService settingsService)
+    public static async Task ApplyToWikiGeneratorOptions(WikiGeneratorOptions options, IAdminSettingsService settingsService)
     {
-        var tasks = WikiGeneratorDefaults.Select(async def =>
+        foreach (var def in WikiGeneratorDefaults)
         {
             var setting = await settingsService.GetSettingByKeyAsync(def.Key);
             if (setting?.Value != null)
             {
                 ApplySettingToOption(options, def.Key, setting.Value);
             }
-        });
-
-        Task.WaitAll(tasks);
+        }
     }
 
     /// <summary>
