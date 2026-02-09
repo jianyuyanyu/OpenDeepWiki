@@ -100,6 +100,15 @@ JWT 发行者、受众和过期时间通过 `appsettings.json` 的 `Jwt` 部分�
 | `WIKI_PARALLEL_COUNT` | 否 | `5` | 并行文档生成任务数。更高的值加快生成但使用更多资源 |
 | `WIKI_LANGUAGES` | 否 | `en,zh` | 多语言 wiki 生成的目标语言逗号分隔列表（例如 `en,zh,ja,ko`） |
 | `REPOSITORIES_DIRECTORY` | 否 | `/data` | 用于存储克隆仓库文件的目录 |
+| `WIKI_MAX_OUTPUT_TOKENS` | 否 | `32000` | 单次 AI 生成的最大输出 Token 数，防止回复过长 |
+| `WIKI_DOCUMENT_GENERATION_TIMEOUT_MINUTES` | 否 | `60` | 单篇文档生成任务的超时时间（分钟） |
+| `WIKI_TRANSLATION_TIMEOUT_MINUTES` | 否 | `45` | 翻译任务允许的最长执行时间（分钟） |
+| `WIKI_TITLE_TRANSLATION_TIMEOUT_MINUTES` | 否 | `2` | 目录标题翻译的超时时间（分钟） |
+| `WIKI_README_MAX_LENGTH` | 否 | `4000` | README 摘要在生成前的最大字符长度 |
+| `WIKI_DIRECTORY_TREE_MAX_DEPTH` | 否 | `2` | 扫描仓库目录结构时的最大深度 |
+| `WIKI_MAX_RETRY_ATTEMPTS` | 否 | `3` | 调用 AI 接口失败时的最大重试次数 |
+| `WIKI_RETRY_DELAY_MS` | 否 | `1000` | AI 调用重试之间的等待时间（毫秒） |
+| `WIKI_PROMPTS_DIRECTORY` | 否 | `prompts` | 自定义 wiki 生成提示模板所在目录 |
 
 ## 增量更新
 

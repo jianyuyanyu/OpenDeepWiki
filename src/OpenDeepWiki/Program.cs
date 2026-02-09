@@ -366,7 +366,7 @@ try
     {
         var settingsService = scope.ServiceProvider.GetRequiredService<IAdminSettingsService>();
         var wikiOptions = scope.ServiceProvider.GetRequiredService<IOptions<WikiGeneratorOptions>>();
-        SystemSettingDefaults.ApplyToWikiGeneratorOptions(wikiOptions.Value, settingsService);
+        await SystemSettingDefaults.ApplyToWikiGeneratorOptions(wikiOptions.Value, settingsService);
     }
 
     // 启用 CORS
