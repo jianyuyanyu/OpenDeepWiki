@@ -4,18 +4,18 @@ metadata:
   name: OpenDeepWiki
 spec:
   title: 'OpenDeepWiki'
-  url: 'https://opendeep.wiki'                             #Your app's official website
-  gitRepo: 'https://github.com/AIDotNet/OpenDeepWiki'                          #Your app's github url
-  author: 'ifzzh'                         #Your name
-  description: 'OpenDeepWiki 是参考DeepWiki 作为灵感，基于 .NET 9 和 Semantic Kernel 开发的开源项目。它旨在帮助开发者更好地理解和使用代码库，提供代码分析、文档生成、知识图谱等功能。'                     #Descrip your app
-  readme:  'https://raw.githubusercontent.com/AIDotNet/OpenDeepWiki/refs/heads/main/README.zh-CN.md'                         #Your app's readme.md url
-  icon: 'https://opendeep.wiki/logo.png'                             #Your app's icon url
+  url: 'https://opendeep.wiki'
+  gitRepo: 'https://github.com/AIDotNet/OpenDeepWiki'
+  author: 'AIDotNet'
+  description: 'OpenDeepWiki 是基于 .NET 9 和 Semantic Kernel 开发的开源项目，提供代码分析、文档生成、知识图谱等功能，帮助开发者更好地理解和使用代码库。'
+  readme: 'https://raw.githubusercontent.com/AIDotNet/OpenDeepWiki/refs/heads/main/README.zh-CN.md'
+  icon: 'https://opendeep.wiki/logo.png'
   templateType: inline
   defaults:
     web_port_name:
       type: string
       value: ${{ random(12) }}
-    wiki_port_name:
+    api_port_name:
       type: string
       value: ${{ random(12) }}
     app_host:
@@ -30,78 +30,110 @@ spec:
     web_name:
       type: string
       value: opendeepwiki-web-${{ random(8) }}
-    model:
+    default_model:
       type: string
-      value: DeepSeek-V3
-    api_server:
+      value: gpt-4o
+    default_endpoint:
       type: string
-      value: https://api.token-ai.cn/v1
+      value: https://api.openai.com/v1
   inputs:
-    chat_model:
-      description: '必须要支持function的模型'
+    # 数据库配置
+    db_type:
+      description: '数据库类型 (sqlite 或 postgresql)'
       type: string
-      default: ${{ defaults.model }}
+      default: 'sqlite'
       required: true
-    analysis_model:
-      description: '分析模型，用于生成仓库目录结构，建议gpt-4.1'
+    connection_string:
+      description: '数据库连接字符串'
       type: string
-      default: ${{ defaults.model }}
+      default: 'Data Source=/data/opendeepwiki.db'
       required: true
-    api_endpoint:
-      description: '输入你的API接口'
+    
+    # JWT 配置
+    jwt_secret_key:
+      description: 'JWT 密钥（生产环境请务必修改）'
       type: string
-      default: ${{ defaults.api_server }}
+      default: 'OpenDeepWiki-Default-Secret-Key-Please-Change-In-Production-Environment-2024'
       required: true
-    api_key:
-      description: '输入API Key'
+    
+    # 全局 AI 配置（用于 Chat 等功能）
+    chat_api_key:
+      description: 'Chat API Key'
       type: string
       default: ''
       required: true
-    LANGUAGE:
-      description: '中文 或 English'
+    chat_endpoint:
+      description: 'Chat API 端点'
       type: string
-      default: '中文'
-    KOALAWIKI_REPOSITORIES:
-      description: '存放仓库的位置'
-      type: string
-      default: '/repositories'
-    TASK_MAX_SIZE_PER_USER:
-      description: '每个用户AI处理文档生成的最大数量'
-      type: string
-      default: '5'
-    REPAIR_MERMAID:
-      description: '是否修复Mermaid，1为修复，其他为不修复'
-      type: string
-      default: '1'
-    DB_TYPE:
-      description: '数据库类型'
-      type: string
-      default: 'sqlite'
-    DB_CONNECTION_STRING:
-      description: ''
-      type: string
-      default: 'Data Source=/data/KoalaWiki.db'
-    UPDATE_INTERVAL:
-      description: '仓库增量更新间隔'
-      type: string
-      default: '5'
-    EnableSmartFilter:
-      description: '是否启用智能过滤，这可能影响AI得到仓库的文件目录'
-      type: string
-      default: 'true'
-    ENABLE_INCREMENTAL_UPDATE:
-      description: '是否启用增量更新'
-      type: string
-      default: 'true'
-    volume_size_repositories:
-      description: '保存仓库 (Gi)'
-      type: string
-      default: '3'
+      default: ${{ defaults.default_endpoint }}
       required: true
-    volume_size_data:
-      description: '保存文档（Gi）'
+    chat_request_type:
+      description: 'Chat 请求类型 (OpenAI/AzureOpenAI)'
       type: string
-      default: '1'
+      default: 'OpenAI'
+      required: true
+    
+    # Wiki 目录生成配置
+    wiki_catalog_model:
+      description: 'Wiki 目录生成模型'
+      type: string
+      default: ${{ defaults.default_model }}
+      required: true
+    wiki_catalog_endpoint:
+      description: 'Wiki 目录生成 API 端点'
+      type: string
+      default: ${{ defaults.default_endpoint }}
+      required: true
+    wiki_catalog_api_key:
+      description: 'Wiki 目录生成 API Key'
+      type: string
+      default: ''
+      required: true
+    wiki_catalog_request_type:
+      description: 'Wiki 目录请求类型 (OpenAI/AzureOpenAI)'
+      type: string
+      default: 'OpenAI'
+      required: true
+    
+    # Wiki 内容生成配置
+    wiki_content_model:
+      description: 'Wiki 内容生成模型'
+      type: string
+      default: ${{ defaults.default_model }}
+      required: true
+    wiki_content_endpoint:
+      description: 'Wiki 内容生成 API 端点'
+      type: string
+      default: ${{ defaults.default_endpoint }}
+      required: true
+    wiki_content_api_key:
+      description: 'Wiki 内容生成 API Key'
+      type: string
+      default: ''
+      required: true
+    wiki_content_request_type:
+      description: 'Wiki 内容请求类型 (OpenAI/AzureOpenAI)'
+      type: string
+      default: 'OpenAI'
+      required: true
+    
+    # Wiki 生成配置
+    wiki_parallel_count:
+      description: 'Wiki 生成并行数'
+      type: string
+      default: '5'
+      required: true
+    wiki_languages:
+      description: '支持的语言（逗号分隔，如: en,zh,ja,ko）'
+      type: string
+      default: 'en,zh'
+      required: true
+    
+    # 存储配置
+    volume_size_data:
+      description: '数据存储容量 (Gi)'
+      type: string
+      default: '5'
       required: true
 ---
 apiVersion: apps/v1
@@ -109,7 +141,7 @@ kind: StatefulSet
 metadata:
   name: ${{ defaults.app_name }}
   annotations:
-    originImageName: crpi-j9ha7sxwhatgtvj4.cn-shenzhen.personal.cr.aliyuncs.com/koala-ai/koala-wiki                      #Your app's Docker image url
+    originImageName: crpi-j9ha7sxwhatgtvj4.cn-shenzhen.personal.cr.aliyuncs.com/open-deepwiki/opendeepwiki
     deploy.cloud.sealos.io/minReplicas: '1'
     deploy.cloud.sealos.io/maxReplicas: '1'
   labels:
@@ -136,54 +168,97 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
         - name: ${{ defaults.app_name }}
-          image: crpi-j9ha7sxwhatgtvj4.cn-shenzhen.personal.cr.aliyuncs.com/koala-ai/koala-wiki                                #Your app's Docker image url
-          env: 
-            - name: KOALAWIKI_REPOSITORIES
-              value: ${{ inputs.KOALAWIKI_REPOSITORIES }}
-            - name: TASK_MAX_SIZE_PER_USER
-              value: ${{ inputs.TASK_MAX_SIZE_PER_USER }}
-            - name: REPAIR_MERMAID
-              value: ${{ inputs.REPAIR_MERMAID }}
-            - name: CHAT_MODEL
-              value: ${{ inputs.chat_model }}
-            - name: ANALYSIS_MODEL
-              value: ${{ inputs.analysis_model }}
-            - name: CHAT_API_KEY
-              value: ${{ inputs.api_key }}
-            - name: ENDPOINT
-              value: ${{ inputs.api_endpoint }}
+          image: crpi-j9ha7sxwhatgtvj4.cn-shenzhen.personal.cr.aliyuncs.com/open-deepwiki/opendeepwiki
+          env:
+            # ASP.NET Core 环境
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: URLS
+              value: http://+:8080
+            
+            # 数据库配置
             - name: DB_TYPE
-              value: ${{ inputs.DB_TYPE }}
-            - name: DB_CONNECTION_STRING
-              value: ${{ inputs.DB_CONNECTION_STRING }}
-            - name: UPDATE_INTERVAL
-              value: ${{ inputs.UPDATE_INTERVAL }}
-            - name: EnableSmartFilter
-              value: ${{ inputs.EnableSmartFilter }}
+              value: ${{ inputs.db_type }}
+            - name: CONNECTION_STRING
+              value: ${{ inputs.connection_string }}
+            
+            # JWT 认证配置
+            - name: JWT_SECRET_KEY
+              value: ${{ inputs.jwt_secret_key }}
+            
+            # 仓库存储目录
+            - name: REPOSITORIES_DIRECTORY
+              value: /data
+            
+            # AI 服务配置（全局默认，用于 Chat 等功能）
+            - name: CHAT_API_KEY
+              value: ${{ inputs.chat_api_key }}
+            - name: ENDPOINT
+              value: ${{ inputs.chat_endpoint }}
+            - name: CHAT_REQUEST_TYPE
+              value: ${{ inputs.chat_request_type }}
+            
+            # Wiki 生成器配置 - 目录生成
+            - name: WIKI_CATALOG_MODEL
+              value: ${{ inputs.wiki_catalog_model }}
+            - name: WIKI_CATALOG_ENDPOINT
+              value: ${{ inputs.wiki_catalog_endpoint }}
+            - name: WIKI_CATALOG_API_KEY
+              value: ${{ inputs.wiki_catalog_api_key }}
+            - name: WIKI_CATALOG_REQUEST_TYPE
+              value: ${{ inputs.wiki_catalog_request_type }}
+            
+            # Wiki 生成器配置 - 内容生成
+            - name: WIKI_CONTENT_MODEL
+              value: ${{ inputs.wiki_content_model }}
+            - name: WIKI_CONTENT_ENDPOINT
+              value: ${{ inputs.wiki_content_endpoint }}
+            - name: WIKI_CONTENT_API_KEY
+              value: ${{ inputs.wiki_content_api_key }}
+            - name: WIKI_CONTENT_REQUEST_TYPE
+              value: ${{ inputs.wiki_content_request_type }}
+            
+            # Wiki 生成配置
+            - name: WIKI_PARALLEL_COUNT
+              value: ${{ inputs.wiki_parallel_count }}
+            - name: WIKI_LANGUAGES
+              value: ${{ inputs.wiki_languages }}
           resources:
             requests:
-              cpu: 20m
-              memory: 204Mi
+              cpu: 50m
+              memory: 512Mi
             limits:
-              cpu: 200m
+              cpu: 1000m
               memory: 2048Mi
-          command: []
-          args: []
           ports:
             - containerPort: 8080
-              name: ${{ defaults.wiki_port_name }}
+              name: ${{ defaults.api_port_name }}
           imagePullPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           volumeMounts:
             - name: vn-data
               mountPath: /data
-            - name: vn-appvn-repositories
-              mountPath: /app/repositories
       volumes: []
   volumeClaimTemplates:
     - metadata:
         annotations:
           path: /data
-          value: '1'
+          value: '5'
         name: vn-data
       spec:
         accessModes:
@@ -191,17 +266,6 @@ spec:
         resources:
           requests:
             storage: ${{ inputs.volume_size_data }}Gi
-    - metadata:
-        annotations:
-          path: /app/repositories
-          value: '3'
-        name: vn-appvn-repositories
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: ${{ inputs.volume_size_repositories }}Gi
 
 ---
 apiVersion: v1
@@ -214,7 +278,7 @@ spec:
   ports:
   - port: 8080
     targetPort: 8080
-    name: ${{ defaults.wiki_port_name }}
+    name: ${{ defaults.api_port_name }}
     protocol: TCP
   selector:
     app: ${{ defaults.app_name }}
@@ -279,7 +343,7 @@ kind: Deployment
 metadata:
   name: ${{ defaults.web_name }}
   annotations:
-    originImageName: crpi-j9ha7sxwhatgtvj4.cn-shenzhen.personal.cr.aliyuncs.com/koala-ai/koala-wiki-web
+    originImageName: crpi-j9ha7sxwhatgtvj4.cn-shenzhen.personal.cr.aliyuncs.com/open-deepwiki/opendeepwiki-web
     deploy.cloud.sealos.io/minReplicas: '1'
     deploy.cloud.sealos.io/maxReplicas: '1'
   labels:
@@ -304,21 +368,39 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: ${{ defaults.web_name }}
-          image: crpi-j9ha7sxwhatgtvj4.cn-shenzhen.personal.cr.aliyuncs.com/koala-ai/koala-wiki-web
+          image: crpi-j9ha7sxwhatgtvj4.cn-shenzhen.personal.cr.aliyuncs.com/open-deepwiki/opendeepwiki-web
           env:
-            - name: API_URL
-              value: https://${{ defaults.app_host }}.${{ SEALOS_CLOUD_DOMAIN }}
+            - name: NODE_ENV
+              value: production
+            - name: API_PROXY_URL
+              value: http://${{ defaults.app_name }}:8080
           resources:
             requests:
-              cpu: 20m
-              memory: 25Mi
+              cpu: 50m
+              memory: 128Mi
             limits:
-              cpu: 200m
-              memory: 256Mi
+              cpu: 500m
+              memory: 512Mi
           ports:
             - containerPort: 3000
               name: ${{ defaults.web_port_name }}
           imagePullPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           volumeMounts: []
       volumes: []
 
