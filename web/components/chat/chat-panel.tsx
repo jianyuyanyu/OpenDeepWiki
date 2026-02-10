@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useTranslations } from "next-intl"
-import { Send, Loader2, X, ImagePlus, Trash2, RefreshCw, GripVertical } from "lucide-react"
+import { Send, Loader2, X, ImagePlus, Trash2, RefreshCw, GripVertical, Share2, Copy, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -13,7 +13,9 @@ import {
   streamChat,
   getAvailableModels,
   getChatConfig,
+  createChatShare,
   toChatMessageDto,
+  toChatShareMessage,
   DocContext,
   ModelConfig,
   ToolCall,
@@ -24,10 +26,13 @@ import {
   isRetryableError,
   ThinkingEvent,
   ToolCallEvent,
+  ChatShareResponse,
 } from "@/lib/chat-api"
 import { ContentBlock } from "@/hooks/use-chat-history"
 import { ModelSelector } from "./model-selector"
 import { ChatMessageItem } from "./chat-message"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 
 const MIN_WIDTH = 320
 const MAX_WIDTH = 800
@@ -83,6 +88,14 @@ export function ChatPanel({
   const [isEnabled, setIsEnabled] = React.useState(true)
   const [enableImageUpload, setEnableImageUpload] = React.useState(false)
   const [error, setError] = React.useState<ErrorState | null>(null)
+  const [isShareDialogOpen, setIsShareDialogOpen] = React.useState(false)
+  const [shareTitle, setShareTitle] = React.useState("")
+  const [shareDescription, setShareDescription] = React.useState("")
+  const [shareExpireMinutes, setShareExpireMinutes] = React.useState(60 * 24 * 7)
+  const [shareLoading, setShareLoading] = React.useState(false)
+  const [shareResult, setShareResult] = React.useState<ChatShareResponse | null>(null)
+  const [shareError, setShareError] = React.useState<string | null>(null)
+  const [shareCopied, setShareCopied] = React.useState(false)
   // 引用的选中文本（包含标题）
   const [quotedText, setQuotedText] = React.useState<{ title?: string; text: string } | null>(null)
   const [lastRequest, setLastRequest] = React.useState<{
@@ -101,6 +114,92 @@ export function ChatPanel({
   const inputRef = React.useRef<HTMLTextAreaElement>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const abortControllerRef = React.useRef<AbortController | null>(null)
+
+  const resetShareState = React.useCallback(() => {
+    setShareDescription("")
+    setShareResult(null)
+    setShareError(null)
+    setShareCopied(false)
+    setShareLoading(false)
+  }, [])
+
+  const getSuggestedShareTitle = React.useCallback(() => {
+    const lastUserMessage = [...messages].reverse().find(m => m.role === "user" && m.content?.trim())
+    if (lastUserMessage?.content) {
+      const trimmed = lastUserMessage.content.trim()
+      return trimmed.length > 40 ? `${trimmed.slice(0, 40)}…` : trimmed
+    }
+    return context.currentDocPath || t("assistant.title")
+  }, [messages, context.currentDocPath, t])
+
+  const handleOpenShareDialog = React.useCallback(() => {
+    if (messages.length === 0) return
+    resetShareState()
+    setShareTitle(getSuggestedShareTitle())
+    setShareExpireMinutes(60 * 24 * 7)
+    setIsShareDialogOpen(true)
+  }, [messages.length, resetShareState, getSuggestedShareTitle])
+
+  const handleShareDialogChange = React.useCallback((open: boolean) => {
+    setIsShareDialogOpen(open)
+    if (!open) {
+      resetShareState()
+    }
+  }, [resetShareState])
+
+  const shareLink = React.useMemo(() => {
+    if (!shareResult) return ""
+    if (typeof window === "undefined") {
+      return `https://opendeepwiki.com/share/${shareResult.shareId}`
+    }
+    return `${window.location.origin}/share/${shareResult.shareId}`
+  }, [shareResult])
+
+  const handleCopyShareLink = React.useCallback(async () => {
+    if (!shareLink) return
+    try {
+      await navigator.clipboard.writeText(shareLink)
+      setShareCopied(true)
+      setTimeout(() => setShareCopied(false), 1800)
+    } catch {
+      // ignore
+    }
+  }, [shareLink])
+
+  const handleCreateShare = React.useCallback(async () => {
+    if (messages.length === 0) {
+      setShareError("暂无可分享的对话")
+      return
+    }
+
+    const shareModelId = selectedModelId || models.find(m => m.isEnabled)?.id || models[0]?.id
+    if (!shareModelId) {
+      setShareError("请先选择模型")
+      return
+    }
+
+    setShareLoading(true)
+    setShareError(null)
+    try {
+      const payload = {
+        messages: messages.map(toChatShareMessage),
+        context: {
+          ...context,
+          userLanguage: locale,
+        },
+        modelId: shareModelId,
+        title: shareTitle.trim() || undefined,
+        description: shareDescription.trim() || undefined,
+        expireMinutes: shareExpireMinutes,
+      }
+      const result = await createChatShare(payload)
+      setShareResult(result)
+    } catch (err) {
+      setShareError(err instanceof Error ? err.message : "分享失败，请稍后重试")
+    } finally {
+      setShareLoading(false)
+    }
+  }, [messages, selectedModelId, models, context, locale, shareTitle, shareDescription, shareExpireMinutes])
 
   // 从 localStorage 加载保存的宽度
   React.useEffect(() => {
@@ -586,6 +685,15 @@ export function ChatPanel({
             <Button
               variant="ghost"
               size="icon"
+              onClick={handleOpenShareDialog}
+              title="分享当前对话"
+              disabled={messages.length === 0}
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={clearHistory}
               title={t("panel.clearHistory")}
               disabled={messages.length === 0}
@@ -793,6 +901,103 @@ export function ChatPanel({
           </div>
         </div>
       </div>
+      <Dialog open={isShareDialogOpen} onOpenChange={handleShareDialogChange}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>分享当前对话</DialogTitle>
+            <DialogDescription>
+              生成一个只读链接，公开展示当前对话的即时快照。
+            </DialogDescription>
+          </DialogHeader>
+
+          {shareResult ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
+                <div className="text-muted-foreground">分享链接</div>
+                <p className="mt-1 break-all text-foreground">{shareLink}</p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  分享ID：{shareResult.shareId} · 模型：{shareResult.modelId}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={handleCopyShareLink} className="gap-2">
+                  {shareCopied ? (
+                    <>
+                      <Check className="h-4 w-4" /> 已复制
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" /> 复制链接
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => window.open(shareLink, "_blank", "noopener,noreferrer")}
+                  disabled={!shareLink}
+                >
+                  打开分享页
+                </Button>
+                <Button variant="ghost" onClick={() => handleShareDialogChange(false)}>
+                  关闭
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">分享标题</label>
+                  <Input
+                    value={shareTitle}
+                    placeholder="给分享起个标题"
+                    onChange={(e) => setShareTitle(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">补充说明（可选）</label>
+                  <Textarea
+                    value={shareDescription}
+                    rows={3}
+                    placeholder="为查看者说明分享背景"
+                    onChange={(e) => setShareDescription(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">有效期（分钟）</label>
+                  <Input
+                    type="number"
+                    min={10}
+                    max={60 * 24 * 30}
+                    value={shareExpireMinutes}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value, 10)
+                      if (!Number.isNaN(value)) {
+                        setShareExpireMinutes(Math.min(Math.max(value, 10), 60 * 24 * 30))
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">默认 7 天，最长 30 天。</p>
+                </div>
+                {shareError && (
+                  <p className="text-sm text-destructive">{shareError}</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => handleShareDialogChange(false)}>
+                  取消
+                </Button>
+                <Button onClick={handleCreateShare} disabled={shareLoading}>
+                  {shareLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {shareLoading ? "生成中..." : "生成分享链接"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

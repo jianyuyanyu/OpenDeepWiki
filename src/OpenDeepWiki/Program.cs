@@ -339,6 +339,7 @@ try
     builder.Services.AddScoped<IMcpToolConverter, McpToolConverter>();
     builder.Services.AddScoped<ISkillToolConverter, SkillToolConverter>();
     builder.Services.AddScoped<IChatAssistantService, ChatAssistantService>();
+    builder.Services.AddScoped<IChatShareService, ChatShareService>();
 
     // 注册用户应用管理服务
     // Requirements: 12.2, 12.6, 12.7 - 用户应用CRUD和密钥管理
