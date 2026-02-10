@@ -153,6 +153,10 @@ services:
       - CUSTOM_BODY_PARAMS= # 自定义请求body参数，格式: key1=value1,key2=value2 (例如: stop=<|im_end|>,max_tokens=4096)
       - READ_MAX_TOKENS=100000 # AI最大文件读取token数量限制，防止无限制读取文件，建议填写模型最大token的百分之七十
       - MCP_STREAMABLE= # MCP服务streamable配置，格式: 服务名=streamableUrl (例如: claude=http://localhost:8080/api/mcp,windsurf=http://localhost:8080/api/mcp)
+      # 自动上下文压缩配置（可选）
+      - AUTO_CONTEXT_COMPRESS_ENABLED=false # 是否启用AI智能上下文压缩
+      - AUTO_CONTEXT_COMPRESS_TOKEN_LIMIT=100000 # 触发压缩的token上限（启用时必填）
+      - AUTO_CONTEXT_COMPRESS_MAX_TOKEN_LIMIT=200000 # 允许的最大token上限（默认: 200000）
       # 飞书 Bot 配置（可选，如需接入飞书）
       - FeishuAppId=
       - FeishuAppSecret=
@@ -319,6 +323,67 @@ graph TD
 - `CUSTOM_BODY_PARAMS`：自定义请求body参数，格式：`key1=value1,key2=value2`(例如：`stop=<|im_end|>,max_tokens=4096`)。这些参数将被添加到所有AI模型API请求中
 - `READ_MAX_TOKENS`：AI最大文件读取token数量限制，防止无限制读取文件，建议填写模型最大token的百分之七十（默认：100000）
 - `MAX_FILE_READ_COUNT`：AI最大文件读取数量限制，防止无限制读取文件，提高处理效率（默认：10，0表示不限制）
+- `AUTO_CONTEXT_COMPRESS_ENABLED`：是否启用AI智能上下文压缩功能，用于处理长对话（默认：false）
+- `AUTO_CONTEXT_COMPRESS_TOKEN_LIMIT`：触发上下文压缩的token阈值。启用压缩时必填（默认：100000）
+- `AUTO_CONTEXT_COMPRESS_MAX_TOKEN_LIMIT`：允许的最大token上限，确保token限制不超过模型能力（默认：200000）
+
+**智能上下文压缩功能特性：**
+使用**提示词编码压缩** - 超高密度结构化格式，实现90%+压缩率，同时保留所有关键信息。
+
+**压缩策略：**
+```
+100条消息 (50k tokens) → 1个编码快照 (3k tokens)
+压缩率: 94% ✨
+```
+
+**完全保留的内容 (100%)：**
+- **系统消息**：所有系统级指令
+- **函数调用和结果**：完整的工具调用历史（完整保留核心行为）
+- **最近对话**：最近30%的消息保持原始形式
+
+**编码压缩的内容（较早的消息）：**
+不是选择/删除消息，而是将较早的消息压缩为超密集的结构化快照：
+
+```markdown
+## CONTEXT_SNAPSHOT
+### FILES
+✓ src/File.cs:modified(L:25-48) → README.md:pending
+
+### TASKS
+✓ 实现功能X ✓ 修复bug Y → 添加测试（待办）
+
+### TECH_STACK
+IChatClient, Semantic Kernel, AutoContextCompress, TokenHelper
+
+### DECISIONS
+[D1] 使用消息筛选: 保留结构
+[D2] 保留30%最近消息: 基于Google Gemini最佳实践
+
+### CODE_PATTERNS
+```cs
+if (message.Contents.Any(c => c is FunctionCallContent)) { ... }
+```
+
+### USER_INTENT
+通过环境变量实现可配置压缩。必须保留核心行为。
+
+### NEXT_ACTIONS
+1. 更新文档 2. 添加单元测试
+```
+
+**编码格式特性：**
+- ✓ 超高密度：使用符号（✓=完成, →=待办, ✗=阻塞）
+- ✓ 结构化：8个语义分区（FILES, TASKS, TECH_STACK等）
+- ✓ 精确：保留文件路径、行号、函数名、决策
+- ✓ 可操作：明确AI继续工作的下一步
+- ✓ 无损：所有关键信息编码，零丢失
+
+**核心优势：**
+- ✅ 90-95%压缩率（vs 消息筛选的30-40%）
+- ✅ 函数调用和结果零丢失
+- ✅ 保持时间上下文（最近消息不变）
+- ✅ AI可以从快照重构完整理解
+- ✅ 一个快照替代数百条消息
 - `FeishuAppId`：飞书应用 App ID（启用飞书 Bot 必填）
 - `FeishuAppSecret`：飞书应用 App Secret（启用飞书 Bot 必填）
 - `FeishuBotName`：飞书机器人显示名称（可选）

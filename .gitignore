@@ -494,3 +494,9 @@ $RECYCLE.BIN/
 *lock.json
 seo-web
 /src/KoalaWiki/wwwroot
+
+*.db
+src/OpenDeepWiki/opendeepwiki.db-shm
+src/OpenDeepWiki/opendeepwiki.db-wal
+src/OpenDeepWiki/opendeepwiki.db
+src/OpenDeepWiki/Properties/launchSettings.json
