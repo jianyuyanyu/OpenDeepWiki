@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using OpenDeepWiki.Chat.Exceptions;
+using OpenDeepWiki.Services.Auth;
 using OpenDeepWiki.Services.Chat;
 
 namespace OpenDeepWiki.Endpoints;
@@ -40,6 +41,24 @@ public static class ChatAssistantEndpoints
             .WithName("StreamChat")
             .WithSummary("SSE流式对话");
 
+        // 创建分享
+        group.MapPost("/share", CreateChatShareAsync)
+            .WithName("CreateChatShare")
+            .WithSummary("创建对话分享")
+            .RequireAuthorization();
+
+        // 获取分享详情
+        group.MapGet("/share/{shareId}", GetChatShareAsync)
+            .WithName("GetChatShare")
+            .WithSummary("获取对话分享详情")
+            .AllowAnonymous();
+
+        // 撤销分享
+        group.MapDelete("/share/{shareId}", RevokeChatShareAsync)
+            .WithName("RevokeChatShare")
+            .WithSummary("撤销对话分享")
+            .RequireAuthorization();
+
         return app;
     }
 
@@ -63,6 +82,65 @@ public static class ChatAssistantEndpoints
     {
         var models = await chatAssistantService.GetAvailableModelsAsync(cancellationToken);
         return Results.Ok(models);
+    }
+
+    /// <summary>
+    /// 创建对话分享
+    /// </summary>
+    private static async Task<IResult> CreateChatShareAsync(
+        [FromBody] CreateChatShareRequest request,
+        [FromServices] IChatShareService chatShareService,
+        [FromServices] IUserContext userContext,
+        CancellationToken cancellationToken)
+    {
+        if (!userContext.IsAuthenticated || string.IsNullOrWhiteSpace(userContext.UserId))
+        {
+            return Results.Unauthorized();
+        }
+
+        request.CreatedBy = userContext.UserId;
+        var share = await chatShareService.CreateShareAsync(request, cancellationToken);
+        return Results.Ok(share);
+    }
+
+    /// <summary>
+    /// 获取对话分享
+    /// </summary>
+    private static async Task<IResult> GetChatShareAsync(
+        string shareId,
+        [FromServices] IChatShareService chatShareService,
+        CancellationToken cancellationToken)
+    {
+        var share = await chatShareService.GetShareAsync(shareId, cancellationToken);
+        if (share == null)
+        {
+            return Results.NotFound(new { message = "分享不存在或已失效" });
+        }
+
+        return Results.Ok(share);
+    }
+
+    /// <summary>
+    /// 撤销对话分享
+    /// </summary>
+    private static async Task<IResult> RevokeChatShareAsync(
+        string shareId,
+        [FromServices] IChatShareService chatShareService,
+        [FromServices] IUserContext userContext,
+        CancellationToken cancellationToken)
+    {
+        if (!userContext.IsAuthenticated || string.IsNullOrWhiteSpace(userContext.UserId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var success = await chatShareService.RevokeShareAsync(shareId, userContext.UserId, cancellationToken);
+        if (!success)
+        {
+            return Results.NotFound(new { message = "分享不存在或无权限撤销" });
+        }
+
+        return Results.NoContent();
     }
 
 

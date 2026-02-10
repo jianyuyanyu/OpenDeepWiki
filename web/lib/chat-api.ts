@@ -7,7 +7,7 @@
 
 import { getApiProxyUrl } from './env'
 import { getToken } from './auth-api'
-import { ChatMessage, ToolCall, ToolResult, QuotedText } from '@/hooks/use-chat-history'
+import { ChatMessage, ToolCall, ToolResult, QuotedText, ContentBlock, TokenUsage } from '@/hooks/use-chat-history'
 
 // 重新导出类型以便其他模块使用
 export type { ChatMessage, ToolCall, ToolResult, QuotedText }
@@ -66,6 +66,49 @@ export interface ChatMessageDto {
   quotedText?: QuotedText
   toolCalls?: ToolCall[]
   toolResult?: ToolResult
+}
+
+/**
+ * 分享消息 DTO
+ */
+export interface ChatShareMessage {
+  id: string
+  role: 'user' | 'assistant' | 'tool'
+  content: string
+  thinking?: string
+  contentBlocks?: ContentBlock[]
+  images?: string[]
+  quotedText?: QuotedText
+  toolCalls?: ToolCall[]
+  toolResult?: ToolResult
+  tokenUsage?: TokenUsage
+  timestamp: number
+}
+
+/**
+ * 创建分享请求载荷
+ */
+export interface CreateChatSharePayload {
+  messages: ChatShareMessage[]
+  context: DocContext
+  modelId: string
+  title?: string
+  description?: string
+  expireMinutes?: number
+}
+
+/**
+ * 分享响应
+ */
+export interface ChatShareResponse {
+  shareId: string
+  title: string
+  description?: string | null
+  createdAt: string
+  expiresAt?: string | null
+  context: DocContext
+  modelId: string
+  messages: ChatShareMessage[]
 }
 
 /**
@@ -569,6 +612,110 @@ export async function getChatConfig(): Promise<ChatAssistantConfig> {
   }
   
   return response.json()
+}
+
+/**
+ * 将 ChatMessage 转换为 ChatShareMessage
+ */
+export function toChatShareMessage(message: ChatMessage): ChatShareMessage {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    thinking: message.thinking,
+    contentBlocks: message.contentBlocks ? message.contentBlocks.map(block => ({ ...block })) : undefined,
+    images: message.images ? [...message.images] : undefined,
+    quotedText: message.quotedText ? { ...message.quotedText } : undefined,
+    toolCalls: message.toolCalls ? message.toolCalls.map(call => ({ ...call })) : undefined,
+    toolResult: message.toolResult ? { ...message.toolResult } : undefined,
+    tokenUsage: message.tokenUsage ? { ...message.tokenUsage } : undefined,
+    timestamp: message.timestamp,
+  }
+}
+
+/**
+ * 创建对话分享
+ */
+export async function createChatShare(payload: CreateChatSharePayload): Promise<ChatShareResponse> {
+  const url = buildApiUrl('/api/v1/chat/share')
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
+  const token = getToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorMessage(response, '创建分享失败'))
+  }
+
+  return response.json()
+}
+
+/**
+ * 获取分享详情
+ */
+export async function getChatShare(shareId: string, init?: RequestInit): Promise<ChatShareResponse> {
+  const url = buildApiUrl(`/api/v1/chat/share/${shareId}`)
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers,
+    cache: 'no-store',
+    ...init,
+  })
+
+  if (!response.ok) {
+    throw new Error(await extractErrorMessage(response, '分享不存在或已失效'))
+  }
+
+  return response.json()
+}
+
+/**
+ * 撤销分享
+ */
+export async function revokeChatShare(shareId: string): Promise<void> {
+  const url = buildApiUrl(`/api/v1/chat/share/${shareId}`)
+  const headers: Record<string, string> = {}
+  const token = getToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers,
+  })
+
+  if (!response.ok && response.status !== 404) {
+    throw new Error(await extractErrorMessage(response, '撤销分享失败'))
+  }
+}
+
+async function extractErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const data = await response.json()
+    return data?.message || data?.error || fallback
+  } catch {
+    try {
+      const text = await response.text()
+      return text || fallback
+    } catch {
+      return fallback
+    }
+  }
 }
 
 /**
