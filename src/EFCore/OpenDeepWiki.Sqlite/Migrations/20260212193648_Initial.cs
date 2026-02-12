@@ -179,6 +179,30 @@ namespace OpenDeepWiki.Sqlite.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ChatShareSnapshots",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    ShareId = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
+                    Title = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
+                    Description = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
+                    CreatedBy = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
+                    SnapshotJson = table.Column<string>(type: "TEXT", nullable: false),
+                    Metadata = table.Column<string>(type: "TEXT", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    RevokedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    UpdatedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    DeletedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Version = table.Column<byte[]>(type: "BLOB", rowVersion: true, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ChatShareSnapshots", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Departments",
                 columns: table => new
                 {
@@ -1094,6 +1118,17 @@ namespace OpenDeepWiki.Sqlite.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_ChatShareSnapshots_ExpiresAt",
+                table: "ChatShareSnapshots",
+                column: "ExpiresAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ChatShareSnapshots_ShareId",
+                table: "ChatShareSnapshots",
+                column: "ShareId",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Departments_ParentId",
                 table: "Departments",
                 column: "ParentId");
@@ -1340,6 +1375,9 @@ namespace OpenDeepWiki.Sqlite.Migrations
 
             migrationBuilder.DropTable(
                 name: "ChatProviderConfigs");
+
+            migrationBuilder.DropTable(
+                name: "ChatShareSnapshots");
 
             migrationBuilder.DropTable(
                 name: "DocCatalogs");
