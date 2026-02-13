@@ -184,6 +184,7 @@ public interface IChatAssistantService
 public class ChatAssistantService : IChatAssistantService
 {
     private readonly IContext _context;
+    private readonly IContextFactory _contextFactory;
     private readonly AgentFactory _agentFactory;
     private readonly IMcpToolConverter _mcpToolConverter;
     private readonly ISkillToolConverter _skillToolConverter;
@@ -193,6 +194,7 @@ public class ChatAssistantService : IChatAssistantService
 
     public ChatAssistantService(
         IContext context,
+        IContextFactory contextFactory,
         AgentFactory agentFactory,
         IMcpToolConverter mcpToolConverter,
         ISkillToolConverter skillToolConverter,
@@ -201,6 +203,7 @@ public class ChatAssistantService : IChatAssistantService
         ILogger<ChatAssistantService> logger)
     {
         _context = context;
+        _contextFactory = contextFactory;
         _agentFactory = agentFactory;
         _mcpToolConverter = mcpToolConverter;
         _skillToolConverter = skillToolConverter;
@@ -709,12 +712,74 @@ public class ChatAssistantService : IChatAssistantService
         }
 
         // send final done event with token usage
+        await RecordTokenUsageAsync(
+            inputTokens,
+            outputTokens,
+            modelConfig.ModelId,
+            request.Context,
+            cancellationToken);
+
+        // Send done event
         yield return new SSEEvent
         {
             Type = SSEEventType.Done,
             Data = new { inputTokens, outputTokens }
         };
 
+    private async Task RecordTokenUsageAsync(
+        int inputTokens,
+        int outputTokens,
+        string modelName,
+        DocContextDto context,
+        CancellationToken cancellationToken)
+    {
+        if (inputTokens <= 0 && outputTokens <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            using var dbContext = _contextFactory.CreateContext();
+            var repositoryId = await TryResolveRepositoryIdAsync(dbContext, context, cancellationToken);
+            var usage = new TokenUsage
+            {
+                Id = Guid.NewGuid().ToString(),
+                RepositoryId = repositoryId,
+                InputTokens = inputTokens,
+                OutputTokens = outputTokens,
+                ModelName = modelName,
+                Operation = "ChatAssistant",
+                RecordedAt = DateTime.UtcNow
+            };
+
+            dbContext.TokenUsages.Add(usage);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to record token usage for chat assistant.");
+        }
+    }
+
+    private static async Task<string?> TryResolveRepositoryIdAsync(
+        IContext context,
+        DocContextDto docContext,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(docContext.Owner) || string.IsNullOrWhiteSpace(docContext.Repo))
+        {
+            return null;
+        }
+
+        var repositoryIds = await context.Repositories
+            .Where(r => !r.IsDeleted && r.OrgName == docContext.Owner && r.RepoName == docContext.Repo)
+            .Select(r => r.Id)
+            .Take(2)
+            .ToListAsync(cancellationToken);
+
+        return repositoryIds.Count == 1 ? repositoryIds[0] : null;
+    }
 
     }
     /// <summary>

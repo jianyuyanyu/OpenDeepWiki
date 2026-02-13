@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using Anthropic.Models.Messages;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,6 +8,8 @@ using OpenDeepWiki.Agents;
 using OpenDeepWiki.Chat.Abstractions;
 using OpenDeepWiki.Chat.Exceptions;
 using OpenDeepWiki.Chat.Sessions;
+using OpenDeepWiki.EFCore;
+using OpenDeepWiki.Entities;
 using ChatRole = Microsoft.Extensions.AI.ChatRole;
 using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
 
@@ -21,15 +24,18 @@ public class AgentExecutor : IAgentExecutor
     private readonly ILogger<AgentExecutor> _logger;
     private readonly AgentExecutorOptions _options;
     private readonly AgentFactory _agentFactory;
+    private readonly IContextFactory _contextFactory;
 
     public AgentExecutor(
         ILogger<AgentExecutor> logger,
         IOptions<AgentExecutorOptions> options,
-        AgentFactory agentFactory)
+        AgentFactory agentFactory,
+        IContextFactory contextFactory)
     {
         _logger = logger;
         _options = options.Value;
         _agentFactory = agentFactory;
+        _contextFactory = contextFactory;
     }
 
     /// <inheritdoc />
@@ -62,12 +68,37 @@ public class AgentExecutor : IAgentExecutor
             // 使用流式 API 收集完整响应
             var thread = await agent.CreateSessionAsync(cts.Token);
             var contentBuilder = new StringBuilder();
+            var inputTokens = 0;
+            var outputTokens = 0;
             
             await foreach (var update in agent.RunStreamingAsync(chatMessages, thread, cancellationToken: cts.Token))
             {
                 if (!string.IsNullOrEmpty(update.Text))
                 {
                     contentBuilder.Append(update.Text);
+                }
+
+                // Track token usage if available
+                if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
+                {
+                    if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
+                        {
+                            Value: RawMessageDeltaEvent deltaEvent
+                        })
+                    {
+                        inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
+                            deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
+                        outputTokens = (int)(deltaEvent.Usage.OutputTokens);
+                    }
+                }
+                else
+                {
+                    var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
+                    if (usage != null)
+                    {
+                        inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
+                        outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
+                    }
                 }
             }
             
@@ -84,9 +115,24 @@ public class AgentExecutor : IAgentExecutor
                 Timestamp = DateTimeOffset.UtcNow
             };
 
-            _logger.LogInformation(
-                "Agent execution completed for session {SessionId}",
-                session.SessionId);
+            var operationName = BuildOperationName(session);
+            await RecordTokenUsageAsync(inputTokens, outputTokens, _options.DefaultModel, operationName, cts.Token);
+
+            if (inputTokens > 0 || outputTokens > 0)
+            {
+                _logger.LogInformation(
+                    "Agent execution completed for session {SessionId}. InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}",
+                    session.SessionId,
+                    inputTokens,
+                    outputTokens,
+                    inputTokens + outputTokens);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Agent execution completed for session {SessionId}",
+                    session.SessionId);
+            }
 
             return AgentResponse.CreateSuccess(responseMessage);
         }
@@ -157,6 +203,8 @@ public class AgentExecutor : IAgentExecutor
         // 收集所有响应块到列表中
         var chunks = new List<AgentResponseChunk>();
         string? streamError = null;
+        var inputTokens = 0;
+        var outputTokens = 0;
         
         try
         {
@@ -166,12 +214,50 @@ public class AgentExecutor : IAgentExecutor
                 {
                     chunks.Add(AgentResponseChunk.CreateContent(update.Text));
                 }
+
+                // Track token usage if available
+                if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
+                {
+                    if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
+                        {
+                            Value: RawMessageDeltaEvent deltaEvent
+                        })
+                    {
+                        inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
+                            deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
+                        outputTokens = (int)(deltaEvent.Usage.OutputTokens);
+                    }
+                }
+                else
+                {
+                    var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
+                    if (usage != null)
+                    {
+                        inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
+                        outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
+                    }
+                }
             }
             chunks.Add(AgentResponseChunk.CreateComplete());
-            
-            _logger.LogInformation(
-                "Streaming agent execution completed for session {SessionId}",
-                session.SessionId);
+
+            var operationName = BuildOperationName(session);
+            await RecordTokenUsageAsync(inputTokens, outputTokens, _options.DefaultModel, operationName, cts.Token);
+
+            if (inputTokens > 0 || outputTokens > 0)
+            {
+                _logger.LogInformation(
+                    "Streaming agent execution completed for session {SessionId}. InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}",
+                    session.SessionId,
+                    inputTokens,
+                    outputTokens,
+                    inputTokens + outputTokens);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Streaming agent execution completed for session {SessionId}",
+                    session.SessionId);
+            }
         }
         catch (Exception ex)
         {
@@ -230,6 +316,47 @@ public class AgentExecutor : IAgentExecutor
         }
         
         return chatMessages;
+    }
+
+    private static string BuildOperationName(IChatSession session)
+    {
+        return string.IsNullOrWhiteSpace(session.Platform)
+            ? "chat"
+            : $"chat:{session.Platform}";
+    }
+
+    private async Task RecordTokenUsageAsync(
+        int inputTokens,
+        int outputTokens,
+        string modelName,
+        string operation,
+        CancellationToken cancellationToken)
+    {
+        if (inputTokens <= 0 && outputTokens <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            using var context = _contextFactory.CreateContext();
+            var usage = new TokenUsage
+            {
+                Id = Guid.NewGuid().ToString(),
+                InputTokens = inputTokens,
+                OutputTokens = outputTokens,
+                ModelName = modelName,
+                Operation = operation,
+                RecordedAt = DateTime.UtcNow
+            };
+
+            context.TokenUsages.Add(usage);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to record token usage. Operation: {Operation}", operation);
+        }
     }
 
     /// <summary>

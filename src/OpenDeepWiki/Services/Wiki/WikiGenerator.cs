@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
+using Anthropic.Models.Messages;
 using AIDotNet.Toon;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
@@ -324,7 +325,8 @@ Execute the workflow now. Read entry point files to understand the architecture,
 
         var successCount = 0;
         var failCount = 0;
-        var processedCount = 0;
+        var startedCount = 0;
+        var completedCount = 0;
 
         // Use Parallel.ForEachAsync for better parallel control with timeout protection
         var parallelOptions = new ParallelOptions
@@ -335,24 +337,37 @@ Execute the workflow now. Read entry point files to understand the architecture,
 
         await Parallel.ForEachAsync(catalogItems, parallelOptions, async (item, ct) =>
         {
-            var currentIndex = Interlocked.Increment(ref processedCount);
+            var startedIndex = Interlocked.Increment(ref startedCount);
+            var completionStatus = "成功";
+            var shouldLogCompletion = false;
 
             try
             {
-                await LogProcessingAsync(ProcessingStep.Content, $"正在生成文档 ({currentIndex}/{catalogItems.Count}): {item.Title}", ct);
+                await LogProcessingAsync(ProcessingStep.Content, $"开始生成文档 ({startedIndex}/{catalogItems.Count}): {item.Title}", ct);
 
                 // Add timeout protection for each document generation
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(_options.DocumentGenerationTimeoutMinutes));
+                var generationTimeout = TimeSpan.FromMinutes(_options.DocumentGenerationTimeoutMinutes);
+                using var timeoutCts = new CancellationTokenSource(generationTimeout);
                 using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
 
-                await GenerateDocumentContentAsync(
-                    workspace, branchLanguage, item.Path, item.Title, linkedCts.Token);
+                try
+                {
+                    await GenerateDocumentContentAsync(
+                            workspace, branchLanguage, item.Path, item.Title, linkedCts.Token)
+                        .WaitAsync(generationTimeout, ct);
+                }
+                catch (TimeoutException)
+                {
+                    linkedCts.Cancel();
+                    throw;
+                }
 
                 Interlocked.Increment(ref successCount);
+                shouldLogCompletion = true;
 
                 _logger.LogDebug(
                     "Document generated successfully. Path: {Path}, Title: {Title}, Progress: {Current}/{Total}",
-                    item.Path, item.Title, currentIndex, catalogItems.Count);
+                    item.Path, item.Title, startedIndex, catalogItems.Count);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -363,10 +378,23 @@ Execute the workflow now. Read entry point files to understand the architecture,
                     item.Path, item.Title);
                 throw; // Re-throw to stop the parallel loop
             }
+            catch (TimeoutException)
+            {
+                // Hard timeout occurred (SDK may ignore cancellation)
+                Interlocked.Increment(ref failCount);
+                completionStatus = "超时";
+                shouldLogCompletion = true;
+                _logger.LogError(
+                    "Document generation hard timeout after {Timeout} minutes. Path: {Path}, Title: {Title}, Repository: {Org}/{Repo}",
+                    _options.DocumentGenerationTimeoutMinutes, item.Path, item.Title, workspace.Organization, workspace.RepositoryName);
+                await LogProcessingAsync(ProcessingStep.Content, $"文档生成超时 ({_options.DocumentGenerationTimeoutMinutes}分钟): {item.Title}", ct);
+            }
             catch (OperationCanceledException)
             {
                 // Timeout occurred
                 Interlocked.Increment(ref failCount);
+                completionStatus = "超时";
+                shouldLogCompletion = true;
                 _logger.LogError(
                     "Document generation timed out after {Timeout} minutes. Path: {Path}, Title: {Title}, Repository: {Org}/{Repo}",
                     _options.DocumentGenerationTimeoutMinutes, item.Path, item.Title, workspace.Organization, workspace.RepositoryName);
@@ -375,11 +403,24 @@ Execute the workflow now. Read entry point files to understand the architecture,
             catch (Exception ex)
             {
                 Interlocked.Increment(ref failCount);
+                completionStatus = "失败";
+                shouldLogCompletion = true;
                 _logger.LogError(ex,
                     "Failed to generate document. Path: {Path}, Title: {Title}, Repository: {Org}/{Repo}",
                     item.Path, item.Title, workspace.Organization, workspace.RepositoryName);
                 await LogProcessingAsync(ProcessingStep.Content, $"文档生成失败: {item.Title} - {ex.Message}", ct);
                 // Continue with other documents - don't throw
+            }
+            finally
+            {
+                if (shouldLogCompletion)
+                {
+                    var completedIndex = Interlocked.Increment(ref completedCount);
+                    await LogProcessingAsync(
+                        ProcessingStep.Content,
+                        $"文档完成 ({completedIndex}/{catalogItems.Count}): {item.Title} - {completionStatus}",
+                        ct);
+                }
             }
         });
 
@@ -776,6 +817,8 @@ Please start executing the task.";
                 // Use streaming response for real-time output
                 var contentBuilder = new StringBuilder();
                 UsageDetails? usageDetails = null;
+                var inputTokens = 0;
+                var outputTokens = 0;
                 var toolCallCount = 0;
 
                 _logger.LogDebug("Starting streaming response. Operation: {Operation}", operationName);
@@ -822,11 +865,26 @@ Please start executing the task.";
                         }
                     }
 
-                    // Check for usage information in the update contents (typically in the final update)
-                    var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
-                    if (usage != null)
+                    // Track token usage if available
+                    if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
                     {
-                        usageDetails = usage;
+                        if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
+                            {
+                                Value: RawMessageDeltaEvent deltaEvent
+                            })
+                        {
+                            inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
+                                deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
+                            outputTokens = (int)(deltaEvent.Usage.OutputTokens);
+                        }
+                    }
+                    else
+                    {
+                        var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
+                        if (usage != null)
+                        {
+                            usageDetails = usage;
+                        }
                     }
                 }
 
@@ -847,12 +905,32 @@ Please start executing the task.";
                         toolCallCount,
                         attemptStopwatch.ElapsedMilliseconds);
                 }
+                else if (inputTokens > 0 || outputTokens > 0)
+                {
+                    _logger.LogInformation(
+                        "AI agent completed. Operation: {Operation}, Model: {Model}, InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}, ToolCalls: {ToolCalls}, Duration: {Duration}ms",
+                        operationName, model,
+                        inputTokens,
+                        outputTokens,
+                        inputTokens + outputTokens,
+                        toolCallCount,
+                        attemptStopwatch.ElapsedMilliseconds);
+                }
                 else
                 {
                     _logger.LogInformation(
                         "AI agent completed. Operation: {Operation}, Model: {Model}, ToolCalls: {ToolCalls}, Duration: {Duration}ms (no usage data)",
                         operationName, model, toolCallCount, attemptStopwatch.ElapsedMilliseconds);
                 }
+
+                var recordedInputTokens = (int)(usageDetails?.InputTokenCount ?? inputTokens);
+                var recordedOutputTokens = (int)(usageDetails?.OutputTokenCount ?? outputTokens);
+                await RecordTokenUsageAsync(
+                    recordedInputTokens,
+                    recordedOutputTokens,
+                    model,
+                    operationName,
+                    cancellationToken);
 
                 _logger.LogDebug(
                     "Streaming response completed. Operation: {Operation}, ContentLength: {Length}",
@@ -1026,6 +1104,41 @@ Please start executing the task.";
     private Task LogProcessingAsync(ProcessingStep step, string message, CancellationToken cancellationToken)
     {
         return LogProcessingAsync(step, message, false, null, cancellationToken);
+    }
+
+    private async Task RecordTokenUsageAsync(
+        int inputTokens,
+        int outputTokens,
+        string modelName,
+        string operation,
+        CancellationToken cancellationToken)
+    {
+        if (inputTokens <= 0 && outputTokens <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            using var context = _contextFactory.CreateContext();
+            var usage = new TokenUsage
+            {
+                Id = Guid.NewGuid().ToString(),
+                RepositoryId = _currentRepositoryId.Value,
+                InputTokens = inputTokens,
+                OutputTokens = outputTokens,
+                ModelName = modelName,
+                Operation = operation,
+                RecordedAt = DateTime.UtcNow
+            };
+
+            context.TokenUsages.Add(usage);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to record token usage. Operation: {Operation}", operation);
+        }
     }
 
     /// <summary>
@@ -1399,12 +1512,62 @@ Translation:";
         };
 
         var chatClient = _agentFactory.CreateSimpleChatClient(
-            _options.GetTranslationModel(), 
-            _options.MaxOutputTokens, 
+            _options.GetTranslationModel(),
+            _options.MaxOutputTokens,
             _options.GetTranslationRequestOptions());
-        var response = await chatClient.RunAsync(messages, cancellationToken: cancellationToken);
-        
-        var translatedTitle = response.Text?.Trim() ?? string.Empty;
+        var thread = await chatClient.CreateSessionAsync(cancellationToken);
+
+        var contentBuilder = new StringBuilder();
+        var inputTokens = 0;
+        var outputTokens = 0;
+
+        await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
+        {
+            if (!string.IsNullOrEmpty(update.Text))
+            {
+                contentBuilder.Append(update.Text);
+            }
+
+            if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
+            {
+                if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
+                    {
+                        Value: RawMessageDeltaEvent deltaEvent
+                    })
+                {
+                    inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
+                        deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
+                    outputTokens = (int)(deltaEvent.Usage.OutputTokens);
+                }
+            }
+            else
+            {
+                var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
+                if (usage != null)
+                {
+                    inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
+                    outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
+                }
+            }
+        }
+
+        var translatedTitle = contentBuilder.ToString().Trim();
+
+        if (inputTokens > 0 || outputTokens > 0)
+        {
+            _logger.LogDebug(
+                "TranslateSingleTitleAsync token usage. InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}",
+                inputTokens,
+                outputTokens,
+                inputTokens + outputTokens);
+        }
+
+        await RecordTokenUsageAsync(
+            inputTokens,
+            outputTokens,
+            _options.GetTranslationModel(),
+            "Translation:CatalogTitle",
+            cancellationToken);
 
         // 清理可能的<think>标签及其内容
         translatedTitle = RemoveThinkTags(translatedTitle);
@@ -1457,15 +1620,57 @@ Translated document:";
                 var thread = await chatClient.CreateSessionAsync(cancellationToken);
                 
                 var contentBuilder = new StringBuilder();
+                var inputTokens = 0;
+                var outputTokens = 0;
                 await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
                 {
                     if (!string.IsNullOrEmpty(update.Text))
                     {
                         contentBuilder.Append(update.Text);
                     }
+
+                    // Track token usage if available
+                    if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
+                    {
+                        if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
+                            {
+                                Value: RawMessageDeltaEvent deltaEvent
+                            })
+                        {
+                            inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
+                                deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
+                            outputTokens = (int)(deltaEvent.Usage.OutputTokens);
+                        }
+                    }
+                    else
+                    {
+                        var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
+                        if (usage != null)
+                        {
+                            inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
+                            outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
+                        }
+                    }
                 }
 
-                return contentBuilder.ToString().Trim();
+                var result = contentBuilder.ToString().Trim();
+                if (inputTokens > 0 || outputTokens > 0)
+                {
+                    _logger.LogDebug(
+                        "TranslateContentAsync token usage. InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}",
+                        inputTokens,
+                        outputTokens,
+                        inputTokens + outputTokens);
+                }
+
+                await RecordTokenUsageAsync(
+                    inputTokens,
+                    outputTokens,
+                    _options.GetTranslationModel(),
+                    "Translation:Content",
+                    cancellationToken);
+
+                return result;
             }
             catch (Exception ex) when (ex is not OperationCanceledException && IsTransientException(ex))
             {
@@ -1543,11 +1748,36 @@ Translated mind map:";
                 var thread = await chatClient.CreateSessionAsync(cancellationToken);
 
                 var contentBuilder = new StringBuilder();
+                var inputTokens = 0;
+                var outputTokens = 0;
                 await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
                 {
                     if (!string.IsNullOrEmpty(update.Text))
                     {
                         contentBuilder.Append(update.Text);
+                    }
+
+                    // Track token usage if available
+                    if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
+                    {
+                        if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
+                            {
+                                Value: RawMessageDeltaEvent deltaEvent
+                            })
+                        {
+                            inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
+                                deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
+                            outputTokens = (int)(deltaEvent.Usage.OutputTokens);
+                        }
+                    }
+                    else
+                    {
+                        var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
+                        if (usage != null)
+                        {
+                            inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
+                            outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
+                        }
                     }
                 }
 
@@ -1555,6 +1785,22 @@ Translated mind map:";
 
                 // 清理可能的 <think> 标签
                 result = RemoveThinkTags(result);
+
+                if (inputTokens > 0 || outputTokens > 0)
+                {
+                    _logger.LogDebug(
+                        "TranslateMindMapAsync token usage. InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}",
+                        inputTokens,
+                        outputTokens,
+                        inputTokens + outputTokens);
+                }
+
+                await RecordTokenUsageAsync(
+                    inputTokens,
+                    outputTokens,
+                    _options.GetTranslationModel(),
+                    "Translation:MindMap",
+                    cancellationToken);
 
                 return result;
             }
