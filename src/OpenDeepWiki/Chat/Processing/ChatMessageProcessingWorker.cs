@@ -43,11 +43,13 @@ public class ChatMessageProcessingWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("消息处理 Worker 已启动，并发数: {Concurrency}", _options.MaxConcurrency);
+        var concurrency = Math.Max(1, _options.MaxConcurrency);
+
+        _logger.LogInformation("消息处理 Worker 已启动，并发数: {Concurrency}", concurrency);
 
         var producer = ProduceMessagesAsync(stoppingToken);
 
-        var consumers = Enumerable.Range(0, _options.MaxConcurrency)
+        var consumers = Enumerable.Range(0, concurrency)
             .Select(_ => ConsumeMessagesAsync(stoppingToken))
             .ToArray();
 
