@@ -98,6 +98,95 @@ public class BatchDeleteResult
 }
 
 /// <summary>
+/// 管理端仓库深度管理信息
+/// </summary>
+public class AdminRepositoryManagementDto
+{
+    public string RepositoryId { get; set; } = string.Empty;
+    public string OrgName { get; set; } = string.Empty;
+    public string RepoName { get; set; } = string.Empty;
+    public int Status { get; set; }
+    public string StatusText { get; set; } = string.Empty;
+    public List<AdminRepositoryBranchDto> Branches { get; set; } = new();
+    public List<AdminIncrementalTaskDto> RecentIncrementalTasks { get; set; } = new();
+}
+
+/// <summary>
+/// 管理端分支信息
+/// </summary>
+public class AdminRepositoryBranchDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? LastCommitId { get; set; }
+    public DateTime? LastProcessedAt { get; set; }
+    public List<AdminBranchLanguageDto> Languages { get; set; } = new();
+}
+
+/// <summary>
+/// 管理端分支语言信息
+/// </summary>
+public class AdminBranchLanguageDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string LanguageCode { get; set; } = string.Empty;
+    public bool IsDefault { get; set; }
+    public int CatalogCount { get; set; }
+    public int DocumentCount { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// 管理端增量更新任务信息
+/// </summary>
+public class AdminIncrementalTaskDto
+{
+    public string TaskId { get; set; } = string.Empty;
+    public string BranchId { get; set; } = string.Empty;
+    public string? BranchName { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public int Priority { get; set; }
+    public bool IsManualTrigger { get; set; }
+    public int RetryCount { get; set; }
+    public string? PreviousCommitId { get; set; }
+    public string? TargetCommitId { get; set; }
+    public string? ErrorMessage { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+/// <summary>
+/// 管理端文档重生成请求
+/// </summary>
+public class RegenerateRepositoryDocumentRequest
+{
+    public string BranchId { get; set; } = string.Empty;
+    public string LanguageCode { get; set; } = string.Empty;
+    public string DocumentPath { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 管理端文档内容更新请求
+/// </summary>
+public class UpdateRepositoryDocumentContentRequest
+{
+    public string BranchId { get; set; } = string.Empty;
+    public string LanguageCode { get; set; } = string.Empty;
+    public string DocumentPath { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 管理端操作统一响应
+/// </summary>
+public class AdminRepositoryOperationResult
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// 批量操作请求
 /// </summary>
 public class BatchOperationRequest

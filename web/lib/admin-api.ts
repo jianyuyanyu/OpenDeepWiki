@@ -208,6 +208,159 @@ export async function batchDeleteRepositories(ids: string[]): Promise<BatchDelet
   return result.data;
 }
 
+export interface AdminBranchLanguage {
+  id: string;
+  languageCode: string;
+  isDefault: boolean;
+  catalogCount: number;
+  documentCount: number;
+  createdAt: string;
+}
+
+export interface AdminRepositoryBranch {
+  id: string;
+  name: string;
+  lastCommitId?: string;
+  lastProcessedAt?: string;
+  languages: AdminBranchLanguage[];
+}
+
+export interface AdminIncrementalTask {
+  taskId: string;
+  branchId: string;
+  branchName?: string;
+  status: string;
+  priority: number;
+  isManualTrigger: boolean;
+  retryCount: number;
+  previousCommitId?: string;
+  targetCommitId?: string;
+  errorMessage?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface AdminRepositoryManagement {
+  repositoryId: string;
+  orgName: string;
+  repoName: string;
+  status: number;
+  statusText: string;
+  branches: AdminRepositoryBranch[];
+  recentIncrementalTasks: AdminIncrementalTask[];
+}
+
+export interface AdminRepositoryOperationResult {
+  success: boolean;
+  message: string;
+}
+
+export interface RegenerateRepositoryDocumentPayload {
+  branchId: string;
+  languageCode: string;
+  documentPath: string;
+}
+
+export interface UpdateRepositoryDocumentContentPayload {
+  branchId: string;
+  languageCode: string;
+  documentPath: string;
+  content: string;
+}
+
+export async function getRepositoryManagement(id: string): Promise<AdminRepositoryManagement> {
+  const url = buildApiUrl(`/api/admin/repositories/${id}/management`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function regenerateRepository(id: string): Promise<AdminRepositoryOperationResult> {
+  const url = buildApiUrl(`/api/admin/repositories/${id}/regenerate`);
+  const result = await fetchWithAuth(url, { method: "POST" });
+  return result.data;
+}
+
+export async function regenerateRepositoryDocument(
+  id: string,
+  data: RegenerateRepositoryDocumentPayload
+): Promise<AdminRepositoryOperationResult> {
+  const url = buildApiUrl(`/api/admin/repositories/${id}/documents/regenerate`);
+  const result = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return result.data;
+}
+
+export async function updateRepositoryDocumentContent(
+  id: string,
+  data: UpdateRepositoryDocumentContentPayload
+): Promise<AdminRepositoryOperationResult> {
+  const url = buildApiUrl(`/api/admin/repositories/${id}/documents/content`);
+  const result = await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+  return result.data;
+}
+
+export interface IncrementalUpdateTriggerResult {
+  success: boolean;
+  taskId: string;
+  status: string;
+  message: string;
+}
+
+export interface IncrementalUpdateTaskStatus {
+  success: boolean;
+  taskId: string;
+  repositoryId: string;
+  repositoryName?: string;
+  branchId: string;
+  branchName?: string;
+  status: string;
+  priority: number;
+  isManualTrigger: boolean;
+  previousCommitId?: string;
+  targetCommitId?: string;
+  retryCount: number;
+  errorMessage?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface IncrementalUpdateRetryResult {
+  success: boolean;
+  taskId: string;
+  status: string;
+  retryCount: number;
+  message: string;
+}
+
+export async function triggerRepositoryIncrementalUpdate(
+  repositoryId: string,
+  branchId: string
+): Promise<IncrementalUpdateTriggerResult> {
+  const url = buildApiUrl(`/api/v1/repositories/${repositoryId}/branches/${branchId}/incremental-update`);
+  return fetchWithAuth(url, { method: "POST" });
+}
+
+export async function getIncrementalUpdateTask(
+  taskId: string
+): Promise<IncrementalUpdateTaskStatus> {
+  const url = buildApiUrl(`/api/v1/incremental-updates/${taskId}`);
+  return fetchWithAuth(url);
+}
+
+export async function retryIncrementalUpdateTask(
+  taskId: string
+): Promise<IncrementalUpdateRetryResult> {
+  const url = buildApiUrl(`/api/v1/incremental-updates/${taskId}/retry`);
+  return fetchWithAuth(url, { method: "POST" });
+}
+
 // ==================== User API ====================
 
 export interface AdminUser {

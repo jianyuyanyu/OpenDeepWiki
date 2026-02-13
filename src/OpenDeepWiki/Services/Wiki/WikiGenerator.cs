@@ -434,6 +434,54 @@ Execute the workflow now. Read entry point files to understand the architecture,
     }
 
     /// <inheritdoc />
+    public async Task RegenerateDocumentAsync(
+        RepositoryWorkspace workspace,
+        BranchLanguage branchLanguage,
+        string documentPath,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(documentPath))
+        {
+            throw new ArgumentException("Document path cannot be empty.", nameof(documentPath));
+        }
+
+        var normalizedPath = documentPath.Trim().Trim('/');
+        var catalog = await _context.DocCatalogs
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                c => c.BranchLanguageId == branchLanguage.Id &&
+                     c.Path == normalizedPath &&
+                     !c.IsDeleted,
+                cancellationToken);
+
+        if (catalog == null)
+        {
+            throw new InvalidOperationException($"Catalog not found for path: {normalizedPath}");
+        }
+
+        var catalogTitle = catalog.Title;
+        var stopwatch = Stopwatch.StartNew();
+
+        await LogProcessingAsync(
+            ProcessingStep.Content,
+            $"开始重生成指定文档: {catalogTitle} ({normalizedPath})",
+            cancellationToken);
+
+        await GenerateDocumentContentAsync(
+            workspace,
+            branchLanguage,
+            normalizedPath,
+            catalogTitle,
+            cancellationToken);
+
+        stopwatch.Stop();
+        await LogProcessingAsync(
+            ProcessingStep.Content,
+            $"指定文档重生成完成: {catalogTitle}，耗时 {stopwatch.ElapsedMilliseconds}ms",
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task IncrementalUpdateAsync(
         RepositoryWorkspace workspace,
         BranchLanguage branchLanguage,

@@ -34,10 +34,34 @@ interface CustomTooltipProps {
   payload?: TooltipPayload[];
   label?: string;
   totalLabel?: string;
+  valueFormatter?: (value: number) => string;
 }
 
-function CustomTooltip({ active, payload, label, totalLabel }: CustomTooltipProps) {
+function formatNumberWithUnits(value: number) {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+
+  const formatCompact = (num: number, unit: "K" | "M" | "B") => {
+    const fixed = num >= 100 ? num.toFixed(0) : num.toFixed(1);
+    return `${sign}${fixed.replace(/\\.0$/, "")}${unit}`;
+  };
+
+  if (abs >= 1_000_000_000) return formatCompact(abs / 1_000_000_000, "B");
+  if (abs >= 1_000_000) return formatCompact(abs / 1_000_000, "M");
+  if (abs >= 1_000) return formatCompact(abs / 1_000, "K");
+
+  return value.toLocaleString();
+}
+
+function CustomTooltip({
+  active,
+  payload,
+  label,
+  totalLabel,
+  valueFormatter,
+}: CustomTooltipProps) {
   if (!active || !payload?.length) return null;
+  const formatValue = valueFormatter ?? ((value: number) => value.toLocaleString());
 
   return (
     <div className="rounded-xl border bg-background/95 backdrop-blur-sm p-4 shadow-xl">
@@ -53,7 +77,7 @@ function CustomTooltip({ active, payload, label, totalLabel }: CustomTooltipProp
               <span className="text-sm text-muted-foreground">{entry.name}</span>
             </div>
             <span className="text-sm font-semibold tabular-nums">
-              {(entry.value ?? 0).toLocaleString()}
+              {formatValue(entry.value ?? 0)}
             </span>
           </div>
         ))}
@@ -62,7 +86,7 @@ function CustomTooltip({ active, payload, label, totalLabel }: CustomTooltipProp
         <div className="mt-3 pt-3 border-t flex items-center justify-between">
           <span className="text-sm text-muted-foreground">{totalLabel}</span>
           <span className="text-sm font-bold tabular-nums">
-            {payload.reduce((sum: number, entry) => sum + (entry.value ?? 0), 0).toLocaleString()}
+            {formatValue(payload.reduce((sum: number, entry) => sum + (entry.value ?? 0), 0))}
           </span>
         </div>
       )}
@@ -257,10 +281,16 @@ export default function AdminDashboardPage() {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: '#888', fontSize: 12 }}
+                tickFormatter={formatNumberWithUnits}
               />
               <Tooltip
                 cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-                content={<CustomTooltip totalLabel={t('admin.dashboard.total')} />}
+                content={
+                  <CustomTooltip
+                    totalLabel={t('admin.dashboard.total')}
+                    valueFormatter={formatNumberWithUnits}
+                  />
+                }
               />
               <Legend wrapperStyle={{ paddingTop: 16 }} />
               <Bar dataKey={t('admin.dashboard.inputToken')} fill="#f97316" radius={[4, 4, 0, 0]} />

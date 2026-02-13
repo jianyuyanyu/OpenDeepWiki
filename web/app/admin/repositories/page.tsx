@@ -1,10 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -30,12 +33,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   getRepositories,
   deleteRepository,
   updateRepositoryStatus,
@@ -56,8 +53,6 @@ import {
   Globe,
   Lock,
   RotateCcw,
-  MoreHorizontal,
-  CheckSquare,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
@@ -70,7 +65,15 @@ const statusColors: Record<number, string> = {
   3: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
 
+const statusBarColors: Record<number, string> = {
+  0: "bg-slate-400/90",
+  1: "bg-blue-500/90",
+  2: "bg-emerald-500/90",
+  3: "bg-red-500/90",
+};
+
 export default function AdminRepositoriesPage() {
+  const router = useRouter();
   const [data, setData] = useState<RepositoryListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -94,12 +97,15 @@ export default function AdminRepositoriesPage() {
     { value: "3", label: t('admin.repositories.failed') },
   ];
 
-  const statusLabels: Record<number, string> = {
-    0: t('admin.repositories.pending'),
-    1: t('admin.repositories.processing'),
-    2: t('admin.repositories.completed'),
-    3: t('admin.repositories.failed'),
-  };
+  const statusLabels: Record<number, string> = useMemo(
+    () => ({
+      0: t('admin.repositories.pending'),
+      1: t('admin.repositories.processing'),
+      2: t('admin.repositories.completed'),
+      3: t('admin.repositories.failed'),
+    }),
+    [t]
+  );
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -118,7 +124,7 @@ export default function AdminRepositoriesPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, status]);
+  }, [page, search, status, t]);
 
   useEffect(() => {
     fetchData();
@@ -136,7 +142,7 @@ export default function AdminRepositoriesPage() {
       toast.success(t('admin.toast.deleteSuccess'));
       setDeleteId(null);
       fetchData();
-    } catch (error) {
+    } catch {
       toast.error(t('admin.toast.deleteFailed'));
     }
   };
@@ -146,7 +152,7 @@ export default function AdminRepositoriesPage() {
       await updateRepositoryStatus(id, newStatus);
       toast.success(t('admin.toast.statusUpdateSuccess'));
       fetchData();
-    } catch (error) {
+    } catch {
       toast.error(t('admin.toast.statusUpdateFailed'));
     }
   };
@@ -161,7 +167,7 @@ export default function AdminRepositoriesPage() {
       } else {
         toast.error(result.message || t('admin.toast.syncFailed'));
       }
-    } catch (error) {
+    } catch {
       toast.error(t('admin.toast.syncFailed'));
     } finally {
       setSyncing(null);
@@ -178,7 +184,7 @@ export default function AdminRepositoriesPage() {
       const result = await batchSyncRepositoryStats(Array.from(selectedIds));
       toast.success(t('admin.repositories.batchSyncResult', { success: result.successCount, failed: result.failedCount }));
       fetchData();
-    } catch (error) {
+    } catch {
       toast.error(t('admin.toast.syncFailed'));
     } finally {
       setBatchSyncing(false);
@@ -192,7 +198,7 @@ export default function AdminRepositoriesPage() {
       toast.success(t('admin.repositories.batchDeleteResult', { success: result.successCount, failed: result.failedCount }));
       setShowBatchDeleteConfirm(false);
       fetchData();
-    } catch (error) {
+    } catch {
       toast.error(t('admin.toast.deleteFailed'));
     } finally {
       setBatchDeleting(false);
@@ -221,19 +227,52 @@ export default function AdminRepositoriesPage() {
   const totalPages = data ? Math.ceil(data.total / data.pageSize) : 0;
   const allSelected = data && data.items.length > 0 && selectedIds.size === data.items.length;
   const someSelected = selectedIds.size > 0 && !allSelected;
+  const overview = useMemo(() => {
+    const items = data?.items ?? [];
+    const pageCount = items.length;
+    const completedCount = items.filter((item) => item.status === 2).length;
+    const processingCount = items.filter((item) => item.status === 1).length;
+    const failedCount = items.filter((item) => item.status === 3).length;
+    const publicCount = items.filter((item) => item.isPublic).length;
+
+    return {
+      pageCount,
+      completedCount,
+      processingCount,
+      failedCount,
+      pendingCount: items.filter((item) => item.status === 0).length,
+      completedRate: pageCount > 0 ? Math.round((completedCount / pageCount) * 100) : 0,
+      publicRate: pageCount > 0 ? Math.round((publicCount / pageCount) * 100) : 0,
+      selectedRate: pageCount > 0 ? Math.round((selectedIds.size / pageCount) * 100) : 0,
+    };
+  }, [data, selectedIds.size]);
+
+  const statusSegments = useMemo(() => {
+    const total = overview.pageCount || 1;
+    const segments = [
+      { status: 0, label: statusLabels[0], count: overview.pendingCount },
+      { status: 1, label: statusLabels[1], count: overview.processingCount },
+      { status: 2, label: statusLabels[2], count: overview.completedCount },
+      { status: 3, label: statusLabels[3], count: overview.failedCount },
+    ];
+    return segments.map((segment) => ({
+      ...segment,
+      percent: Math.round((segment.count / total) * 100),
+    }));
+  }, [overview, statusLabels]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-0 duration-500">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t('admin.repositories.title')}</h1>
-        <Button variant="outline" onClick={fetchData}>
-          <RefreshCw className="mr-2 h-4 w-4" />
+        <Button variant="outline" onClick={fetchData} disabled={loading} className="transition-all duration-200 hover:-translate-y-0.5">
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           {t('admin.common.refresh')}
         </Button>
       </div>
 
       {/* 搜索和筛选 */}
-      <Card className="p-4">
+      <Card className="p-4 transition-all duration-300 hover:shadow-sm">
         <div className="flex flex-wrap gap-4">
           <div className="flex flex-1 gap-2">
             <Input
@@ -243,7 +282,7 @@ export default function AdminRepositoriesPage() {
               onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               className="max-w-md"
             />
-            <Button onClick={handleSearch}>
+            <Button onClick={handleSearch} className="transition-all duration-200">
               <Search className="mr-2 h-4 w-4" />
               {t('admin.common.search')}
             </Button>
@@ -263,9 +302,72 @@ export default function AdminRepositoriesPage() {
         </div>
       </Card>
 
+      <Card className="p-4 transition-all duration-300 hover:shadow-sm">
+        <div className="grid gap-3 md:grid-cols-3">
+          <Card className="p-3">
+            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>当前页完成率</span>
+              <span>{overview.completedRate}%</span>
+            </div>
+            <Progress value={overview.completedRate} className="h-2.5" />
+            <p className="mt-2 text-xs text-muted-foreground">
+              完成 {overview.completedCount} / {overview.pageCount}，处理中 {overview.processingCount}
+            </p>
+          </Card>
+          <Card className="p-3">
+            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>公开仓库占比</span>
+              <span>{overview.publicRate}%</span>
+            </div>
+            <Progress value={overview.publicRate} className="h-2.5" />
+            <p className="mt-2 text-xs text-muted-foreground">
+              失败仓库 {overview.failedCount}，建议优先排查
+            </p>
+          </Card>
+          <Card className="p-3">
+            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>当前页选中占比</span>
+              <span>{overview.selectedRate}%</span>
+            </div>
+            <Progress value={overview.selectedRate} className="h-2.5" />
+            <p className="mt-2 text-xs text-muted-foreground">
+              已选择 {selectedIds.size} 项用于批量操作
+            </p>
+          </Card>
+        </div>
+      </Card>
+
+      <Card className="p-4 transition-all duration-300 hover:shadow-sm">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold">当前页状态分布</p>
+            <Badge variant="outline">共 {overview.pageCount} 条</Badge>
+          </div>
+          <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
+            <div className="flex h-full w-full">
+              {statusSegments.map((segment) => (
+                <div
+                  key={segment.status}
+                  className={`h-full transition-all duration-500 ${statusBarColors[segment.status]}`}
+                  style={{ width: `${segment.percent}%` }}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {statusSegments.map((segment) => (
+              <Badge key={segment.status} variant="secondary" className="gap-1">
+                <span className={`inline-block h-2 w-2 rounded-full ${statusBarColors[segment.status]}`} />
+                {segment.label} {segment.count}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </Card>
+
       {/* 批量操作栏 */}
       {selectedIds.size > 0 && (
-        <Card className="p-3 bg-muted/50">
+        <Card className="p-3 bg-muted/50 animate-in fade-in-0 slide-in-from-top-1 duration-200">
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
               {t('admin.repositories.selectedCount', { count: selectedIds.size })}
@@ -276,6 +378,7 @@ export default function AdminRepositoriesPage() {
                 size="sm"
                 onClick={handleBatchSync}
                 disabled={batchSyncing}
+                className="transition-all duration-200"
               >
                 {batchSyncing ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -288,6 +391,7 @@ export default function AdminRepositoriesPage() {
                 variant="destructive"
                 size="sm"
                 onClick={() => setShowBatchDeleteConfirm(true)}
+                className="transition-all duration-200"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 {t('admin.repositories.batchDelete')}
@@ -296,6 +400,7 @@ export default function AdminRepositoriesPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelectedIds(new Set())}
+                className="transition-all duration-200"
               >
                 {t('admin.repositories.cancelSelect')}
               </Button>
@@ -305,9 +410,9 @@ export default function AdminRepositoriesPage() {
       )}
 
       {/* 仓库列表 */}
-      <Card>
+      <Card className="transition-all duration-300 hover:shadow-sm">
         {loading ? (
-          <div className="flex h-64 items-center justify-center">
+          <div className="flex h-64 items-center justify-center animate-in fade-in-0 duration-200">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
@@ -332,97 +437,121 @@ export default function AdminRepositoriesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {data?.items.map((repo) => (
-                    <tr key={repo.id} className={`hover:bg-muted/50 ${selectedIds.has(repo.id) ? "bg-muted/30" : ""}`}>
-                      <td className="px-4 py-3">
-                        <Checkbox
-                          checked={selectedIds.has(repo.id)}
-                          onCheckedChange={() => toggleSelect(repo.id)}
-                          aria-label={`Select ${repo.repoName}`}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="font-medium">{repo.orgName}/{repo.repoName}</p>
-                          <p className="text-sm text-muted-foreground truncate max-w-xs">
-                            {repo.gitUrl}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {repo.isPublic ? (
-                          <span className="inline-flex items-center gap-1 text-green-600">
-                            <Globe className="h-4 w-4" /> {t('admin.repositories.public')}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-gray-500">
-                            <Lock className="h-4 w-4" /> {t('admin.repositories.private')}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Select
-                          value={repo.status.toString()}
-                          onValueChange={(v) => handleStatusChange(repo.id, parseInt(v))}
-                        >
-                          <SelectTrigger className="w-[100px]">
-                            <span className={`px-2 py-1 rounded text-xs ${statusColors[repo.status]}`}>
-                              {statusLabels[repo.status]}
+                  {data?.items.length ? (
+                    data.items.map((repo, index) => (
+                      <tr
+                        key={repo.id}
+                        className={`animate-in fade-in-0 slide-in-from-bottom-1 transition-colors duration-200 hover:bg-muted/50 ${
+                          selectedIds.has(repo.id) ? "bg-muted/30" : ""
+                        }`}
+                        style={{ animationDelay: `${Math.min(index * 25, 220)}ms` }}
+                      >
+                        <td className="px-4 py-3">
+                          <Checkbox
+                            checked={selectedIds.has(repo.id)}
+                            onCheckedChange={() => toggleSelect(repo.id)}
+                            aria-label={`Select ${repo.repoName}`}
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div>
+                            <button
+                              type="button"
+                              className="font-medium text-left transition-all duration-200 hover:text-primary hover:underline underline-offset-4"
+                              onClick={() => router.push(`/${repo.id}`)}
+                              title="管理仓库"
+                            >
+                              {repo.orgName}/{repo.repoName}
+                            </button>
+                            <p className="text-sm text-muted-foreground truncate max-w-xs">
+                              {repo.gitUrl}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {repo.isPublic ? (
+                            <span className="inline-flex items-center gap-1 text-green-600">
+                              <Globe className="h-4 w-4" /> {t('admin.repositories.public')}
                             </span>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="0">{t('admin.repositories.pending')}</SelectItem>
-                            <SelectItem value="1">{t('admin.repositories.processing')}</SelectItem>
-                            <SelectItem value="2">{t('admin.repositories.completed')}</SelectItem>
-                            <SelectItem value="3">{t('admin.repositories.failed')}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="text-sm">
-                          <span className="text-muted-foreground">⭐ {repo.starCount}</span>
-                          <span className="ml-2 text-muted-foreground">🍴 {repo.forkCount}</span>
-                          <span className="ml-2 text-muted-foreground">👁 {repo.viewCount}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {new Date(repo.createdAt).toLocaleDateString(locale === 'zh' ? 'zh-CN' : locale)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleSyncStats(repo.id)}
-                            disabled={syncing === repo.id}
-                            title={t('admin.repositories.syncStats')}
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-gray-500">
+                              <Lock className="h-4 w-4" /> {t('admin.repositories.private')}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Select
+                            value={repo.status.toString()}
+                            onValueChange={(v) => handleStatusChange(repo.id, parseInt(v))}
                           >
-                            {syncing === repo.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <RotateCcw className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setSelectedRepo(repo)}
-                            title={t('admin.repositories.viewDetail')}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteId(repo.id)}
-                            title={t('admin.common.delete')}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                        </div>
+                            <SelectTrigger className="w-[100px] transition-all duration-200">
+                              <span className={`px-2 py-1 rounded text-xs ${statusColors[repo.status]}`}>
+                                {statusLabels[repo.status]}
+                              </span>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">{t('admin.repositories.pending')}</SelectItem>
+                              <SelectItem value="1">{t('admin.repositories.processing')}</SelectItem>
+                              <SelectItem value="2">{t('admin.repositories.completed')}</SelectItem>
+                              <SelectItem value="3">{t('admin.repositories.failed')}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">⭐ {repo.starCount}</span>
+                            <span className="ml-2 text-muted-foreground">🍴 {repo.forkCount}</span>
+                            <span className="ml-2 text-muted-foreground">👁 {repo.viewCount}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">
+                          {new Date(repo.createdAt).toLocaleDateString(locale === 'zh' ? 'zh-CN' : locale)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleSyncStats(repo.id)}
+                              disabled={syncing === repo.id}
+                              title={t('admin.repositories.syncStats')}
+                              className="transition-all duration-200 hover:-translate-y-0.5"
+                            >
+                              {syncing === repo.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <RotateCcw className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setSelectedRepo(repo)}
+                              title={t('admin.repositories.viewDetail')}
+                              className="transition-all duration-200 hover:-translate-y-0.5"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteId(repo.id)}
+                              title={t('admin.common.delete')}
+                              className="transition-all duration-200 hover:-translate-y-0.5"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-16 text-center text-sm text-muted-foreground animate-in fade-in-0 duration-200">
+                        当前筛选条件下暂无仓库数据
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
@@ -439,6 +568,7 @@ export default function AdminRepositoriesPage() {
                     size="sm"
                     disabled={page === 1}
                     onClick={() => setPage(page - 1)}
+                    className="transition-all duration-200"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
@@ -450,6 +580,7 @@ export default function AdminRepositoriesPage() {
                     size="sm"
                     disabled={page === totalPages}
                     onClick={() => setPage(page + 1)}
+                    className="transition-all duration-200"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>

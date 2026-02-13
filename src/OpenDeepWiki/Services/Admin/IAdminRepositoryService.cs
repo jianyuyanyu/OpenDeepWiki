@@ -27,4 +27,24 @@ public interface IAdminRepositoryService
     /// 批量删除仓库
     /// </summary>
     Task<BatchDeleteResult> BatchDeleteRepositoriesAsync(string[] ids);
+
+    /// <summary>
+    /// 获取仓库深度管理信息（分支、语言、增量任务）
+    /// </summary>
+    Task<AdminRepositoryManagementDto?> GetRepositoryManagementAsync(string id);
+
+    /// <summary>
+    /// 管理端触发全量重生成
+    /// </summary>
+    Task<AdminRepositoryOperationResult> RegenerateRepositoryAsync(string id);
+
+    /// <summary>
+    /// 管理端触发指定文档重生成
+    /// </summary>
+    Task<AdminRepositoryOperationResult> RegenerateDocumentAsync(string id, RegenerateRepositoryDocumentRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 管理端手动更新指定文档内容
+    /// </summary>
+    Task<AdminRepositoryOperationResult> UpdateDocumentContentAsync(string id, UpdateRepositoryDocumentContentRequest request, CancellationToken cancellationToken = default);
 }

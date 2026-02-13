@@ -47,6 +47,19 @@ public interface IWikiGenerator
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Regenerates a specific document by catalog path using the original document generation flow.
+    /// </summary>
+    /// <param name="workspace">The prepared repository workspace.</param>
+    /// <param name="branchLanguage">The branch language to regenerate document for.</param>
+    /// <param name="documentPath">The catalog path of target document.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task RegenerateDocumentAsync(
+        RepositoryWorkspace workspace,
+        BranchLanguage branchLanguage,
+        string documentPath,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Performs incremental update of wiki content based on changed files.
     /// Only regenerates documents affected by the changes.
     /// </summary>
