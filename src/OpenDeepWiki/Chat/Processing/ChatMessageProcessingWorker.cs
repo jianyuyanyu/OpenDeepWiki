@@ -21,12 +21,7 @@ public class ChatMessageProcessingWorker : BackgroundService
     private readonly ILogger<ChatMessageProcessingWorker> _logger;
     private readonly ChatProcessingOptions _options;
 
-    private readonly Channel<QueuedMessage> _channel = Channel.CreateBounded<QueuedMessage>(new BoundedChannelOptions(100)
-    {
-        SingleWriter = false,
-        SingleReader = false,
-        FullMode = BoundedChannelFullMode.Wait
-    });
+    private readonly Channel<QueuedMessage> _channel;
 
     public ChatMessageProcessingWorker(
         IServiceProvider serviceProvider,
@@ -36,16 +31,24 @@ public class ChatMessageProcessingWorker : BackgroundService
         _serviceProvider = serviceProvider;
         _logger = logger;
         _options = options.Value;
+
+        var capacity = Math.Max(1, _options.MaxConcurrency) * 100;
+        _channel = Channel.CreateBounded<QueuedMessage>(new BoundedChannelOptions(capacity)
+        {
+            SingleWriter = false,
+            SingleReader = false,
+            FullMode = BoundedChannelFullMode.Wait
+        });
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("消息处理 Worker 已启动，并发数: {Concurrency}", _options.MaxConcurrency);
 
-        var producer = Task.Run(() => ProduceMessagesAsync(stoppingToken), stoppingToken);
+        var producer = ProduceMessagesAsync(stoppingToken);
 
         var consumers = Enumerable.Range(0, _options.MaxConcurrency)
-            .Select(_ => Task.Run(() => ConsumeMessagesAsync(stoppingToken), stoppingToken))
+            .Select(_ => ConsumeMessagesAsync(stoppingToken))
             .ToArray();
 
         await Task.WhenAll(consumers.Prepend(producer));
