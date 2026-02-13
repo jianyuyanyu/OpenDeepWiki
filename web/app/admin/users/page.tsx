@@ -5,6 +5,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -52,6 +58,8 @@ import {
   Plus,
   Key,
   Shield,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
@@ -64,6 +72,7 @@ export default function AdminUsersPage() {
   const locale = useLocale();
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -132,13 +141,17 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: number) => {
+  const handleStatusChange = async (id: string, newStatus: number, currentStatus?: number) => {
+    if (currentStatus === newStatus) return;
+    setStatusUpdatingId(id);
     try {
       await updateUserStatus(id, newStatus);
       toast.success(t('admin.toast.statusUpdateSuccess'));
       fetchData();
     } catch (error) {
       toast.error(t('admin.toast.statusUpdateFailed'));
+    } finally {
+      setStatusUpdatingId((prev) => (prev === id ? null : prev));
     }
   };
 
@@ -172,6 +185,18 @@ export default function AdminUsersPage() {
   };
 
   const totalPages = data ? Math.ceil(data.total / data.pageSize) : 0;
+  const userStatusLabels: Record<number, string> = {
+    1: t('admin.users.normal'),
+    0: t('admin.users.disabled'),
+  };
+  const userStatusColors: Record<number, string> = {
+    1: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    0: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  };
+  const userStatusDots: Record<number, string> = {
+    1: "bg-green-500",
+    0: "bg-red-500",
+  };
 
   return (
     <div className="space-y-6">
@@ -269,24 +294,42 @@ export default function AdminUsersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Select
-                          value={user.status.toString()}
-                          onValueChange={(v) => handleStatusChange(user.id, parseInt(v))}
-                        >
-                          <SelectTrigger className="w-[100px]">
-                            <span className={`px-2 py-1 rounded text-xs ${
-                              user.status === 1
-                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                            }`}>
-                              {user.status === 1 ? t('admin.users.normal') : t('admin.users.disabled')}
-                            </span>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1">{t('admin.users.normal')}</SelectItem>
-                            <SelectItem value="0">{t('admin.users.disabled')}</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={statusUpdatingId === user.id}
+                              className="h-8 w-[112px] justify-between px-2"
+                            >
+                              <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs ${userStatusColors[user.status]}`}>
+                                <span className="h-1.5 w-1.5 rounded-full bg-current/80" />
+                                {userStatusLabels[user.status]}
+                              </span>
+                              {statusUpdatingId === user.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-[150px]">
+                            {[1, 0].map((statusValue) => (
+                              <DropdownMenuItem
+                                key={statusValue}
+                                disabled={user.status === statusValue}
+                                onClick={() => handleStatusChange(user.id, statusValue, user.status)}
+                                className="justify-between"
+                              >
+                                <span className="inline-flex items-center gap-2">
+                                  <span className={`h-2 w-2 rounded-full ${userStatusDots[statusValue]}`} />
+                                  {userStatusLabels[statusValue]}
+                                </span>
+                                {user.status === statusValue ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground">
                         {new Date(user.createdAt).toLocaleDateString(locale === 'zh' ? 'zh-CN' : locale)}

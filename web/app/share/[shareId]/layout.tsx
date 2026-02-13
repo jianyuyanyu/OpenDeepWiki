@@ -13,7 +13,7 @@ export default function ShareLayout({ children }: { children: React.ReactNode })
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(236,72,153,0.2),_transparent_60%)]" />
         <div className="absolute inset-0 bg-slate-950/80 backdrop-blur" />
       </div>
-      <main className="relative z-10 flex min-h-screen w-full flex-col items-center justify-start pb-16 pt-12">
+      <main >
         {children}
       </main>
     </div>

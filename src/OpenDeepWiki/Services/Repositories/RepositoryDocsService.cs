@@ -482,7 +482,7 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
             using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
             {
                 // 构建目录结构并添加文件
-                await AddFilesToArchive(archive, catalogs, null);
+                await AddFilesToArchive(archive, catalogs, null, null);
             }
 
             // 设置文件名
@@ -546,29 +546,30 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     /// <summary>
     /// 递归添加文件到压缩包
     /// </summary>
-    private static async Task AddFilesToArchive(ZipArchive archive, List<DocCatalog> catalogs, string? parentPath)
+    private static async Task AddFilesToArchive(
+        ZipArchive archive,
+        List<DocCatalog> catalogs,
+        string? parentCatalogId,
+        string? parentZipPath)
     {
         // 获取当前层级的目录项
         var currentLevelItems = catalogs
-            .Where(c => c.ParentId == parentPath)
+            .Where(c => c.ParentId == parentCatalogId)
             .OrderBy(c => c.Order)
             .ToList();
 
+        var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var catalog in currentLevelItems)
         {
-            // 构建当前项的完整路径
-            var currentPath = string.IsNullOrEmpty(parentPath) 
-                ? catalog.Title 
-                : Path.Combine(parentPath, catalog.Title);
+            var itemName = EnsureUniqueName(SanitizeZipNameSegment(catalog.Title), usedNames);
 
             // 如果有文档文件，创建文件条目
             if (catalog.DocFile != null)
             {
                 // 使用 .md 扩展名
-                var fileName = $"{catalog.Title}.md";
-                var fullPath = string.IsNullOrEmpty(parentPath) 
-                    ? fileName 
-                    : Path.Combine(parentPath, fileName);
+                var fileName = $"{itemName}.md";
+                var fullPath = CombineZipPath(parentZipPath, fileName);
 
                 var entry = archive.CreateEntry(fullPath);
                 using var entryStream = entry.Open();
@@ -580,7 +581,52 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
             var children = catalogs.Where(c => c.ParentId == catalog.Id).ToList();
             if (children.Count > 0)
             {
-                await AddFilesToArchive(archive, catalogs, catalog.Id);
+                var nextParentZipPath = CombineZipPath(parentZipPath, itemName);
+                await AddFilesToArchive(archive, catalogs, catalog.Id, nextParentZipPath);
+            }
+        }
+    }
+
+    private static string CombineZipPath(string? parentZipPath, string entryName)
+    {
+        return string.IsNullOrEmpty(parentZipPath)
+            ? entryName
+            : $"{parentZipPath}/{entryName}";
+    }
+
+    private static string SanitizeZipNameSegment(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "untitled";
+        }
+
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = new string(value
+            .Trim()
+            .Select(ch => invalidChars.Contains(ch) ? '_' : ch)
+            .ToArray());
+
+        sanitized = sanitized.TrimEnd('.', ' ');
+
+        return string.IsNullOrWhiteSpace(sanitized)
+            ? "untitled"
+            : sanitized;
+    }
+
+    private static string EnsureUniqueName(string baseName, ISet<string> usedNames)
+    {
+        if (usedNames.Add(baseName))
+        {
+            return baseName;
+        }
+
+        for (var index = 2; ; index++)
+        {
+            var candidate = $"{baseName} ({index})";
+            if (usedNames.Add(candidate))
+            {
+                return candidate;
             }
         }
     }

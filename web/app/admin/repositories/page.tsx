@@ -9,6 +9,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -53,6 +59,10 @@ import {
   Globe,
   Lock,
   RotateCcw,
+  Star,
+  GitFork,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
@@ -83,6 +93,7 @@ export default function AdminRepositoriesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [batchSyncing, setBatchSyncing] = useState(false);
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
@@ -147,13 +158,17 @@ export default function AdminRepositoriesPage() {
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: number) => {
+  const handleStatusChange = async (id: string, newStatus: number, currentStatus?: number) => {
+    if (currentStatus === newStatus) return;
+    setStatusUpdatingId(id);
     try {
       await updateRepositoryStatus(id, newStatus);
       toast.success(t('admin.toast.statusUpdateSuccess'));
       fetchData();
     } catch {
       toast.error(t('admin.toast.statusUpdateFailed'));
+    } finally {
+      setStatusUpdatingId((prev) => (prev === id ? null : prev));
     }
   };
 
@@ -162,7 +177,9 @@ export default function AdminRepositoriesPage() {
     try {
       const result = await syncRepositoryStats(id);
       if (result.success) {
-        toast.success(`${t('admin.toast.syncSuccess')}: ⭐ ${result.starCount} 🍴 ${result.forkCount}`);
+        toast.success(
+          `${t('admin.toast.syncSuccess')}: ${t('admin.repositories.star')} ${result.starCount}, ${t('admin.repositories.fork')} ${result.forkCount}`
+        );
         fetchData();
       } else {
         toast.error(result.message || t('admin.toast.syncFailed'));
@@ -480,28 +497,57 @@ export default function AdminRepositoriesPage() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          <Select
-                            value={repo.status.toString()}
-                            onValueChange={(v) => handleStatusChange(repo.id, parseInt(v))}
-                          >
-                            <SelectTrigger className="w-[100px] transition-all duration-200">
-                              <span className={`px-2 py-1 rounded text-xs ${statusColors[repo.status]}`}>
-                                {statusLabels[repo.status]}
-                              </span>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="0">{t('admin.repositories.pending')}</SelectItem>
-                              <SelectItem value="1">{t('admin.repositories.processing')}</SelectItem>
-                              <SelectItem value="2">{t('admin.repositories.completed')}</SelectItem>
-                              <SelectItem value="3">{t('admin.repositories.failed')}</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={statusUpdatingId === repo.id}
+                                className="h-8 w-[124px] justify-between px-2 transition-all duration-200"
+                              >
+                                <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs ${statusColors[repo.status]}`}>
+                                  <span className="h-1.5 w-1.5 rounded-full bg-current/80" />
+                                  {statusLabels[repo.status]}
+                                </span>
+                                {statusUpdatingId === repo.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                                ) : (
+                                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                )}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-[160px]">
+                              {[0, 1, 2, 3].map((statusValue) => (
+                                <DropdownMenuItem
+                                  key={statusValue}
+                                  disabled={repo.status === statusValue}
+                                  onClick={() => handleStatusChange(repo.id, statusValue, repo.status)}
+                                  className="justify-between"
+                                >
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className={`h-2 w-2 rounded-full ${statusBarColors[statusValue]}`} />
+                                    {statusLabels[statusValue]}
+                                  </span>
+                                  {repo.status === statusValue ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">⭐ {repo.starCount}</span>
-                            <span className="ml-2 text-muted-foreground">🍴 {repo.forkCount}</span>
-                            <span className="ml-2 text-muted-foreground">👁 {repo.viewCount}</span>
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                              <Star className="h-3.5 w-3.5" />
+                              {repo.starCount}
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              <GitFork className="h-3.5 w-3.5" />
+                              {repo.forkCount}
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              <Eye className="h-3.5 w-3.5" />
+                              {repo.viewCount}
+                            </span>
                           </div>
                         </td>
                         <td className="px-4 py-3 text-sm text-muted-foreground">

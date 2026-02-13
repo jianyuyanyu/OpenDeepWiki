@@ -151,6 +151,22 @@
     "settingsCount": "{count} 项设置",
     "pendingCount": "{count} 项待提交",
     "pendingChange": "待提交",
+    "groupTitles": {
+      "default": "基础配置",
+      "aiContent": "内容模型与接口",
+      "aiCatalog": "目录与文档策略",
+      "aiTranslation": "翻译配置",
+      "aiRuntime": "运行与重试策略",
+      "aiOther": "其他配置"
+    },
+    "groupDescriptions": {
+      "default": "按当前分类集中展示配置项。",
+      "aiContent": "内容生成模型、请求类型、接口地址与输出上限。",
+      "aiCatalog": "目录树、文档结构、语言与提示词目录等规则。",
+      "aiTranslation": "翻译模型、请求类型、接口与翻译超时参数。",
+      "aiRuntime": "并发、超时、重试次数与重试间隔等执行控制。",
+      "aiOther": "未归类的 AI 配置项。"
+    },
     "requestTypeOptions": {
       "OpenAI": "OpenAI",
       "OpenAIResponses": "OpenAI Responses",

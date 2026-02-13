@@ -151,6 +151,22 @@
     "settingsCount": "{count} 件の設定",
     "pendingCount": "{count} 件保留",
     "pendingChange": "保留中",
+    "groupTitles": {
+      "default": "基本設定",
+      "aiContent": "コンテンツモデルとエンドポイント",
+      "aiCatalog": "カタログと文書戦略",
+      "aiTranslation": "翻訳設定",
+      "aiRuntime": "実行とリトライ制御",
+      "aiOther": "その他の設定"
+    },
+    "groupDescriptions": {
+      "default": "現在のカテゴリ内の設定をまとめて表示します。",
+      "aiContent": "コンテンツ生成モデル、リクエスト種別、API 接続先、出力上限。",
+      "aiCatalog": "ディレクトリ深さ、文書構成、言語、プロンプトパスなどの規則。",
+      "aiTranslation": "翻訳モデル、リクエスト種別、接続先、翻訳タイムアウト。",
+      "aiRuntime": "並列数、タイムアウト、リトライ回数、リトライ間隔など。",
+      "aiOther": "定義済みグループに当てはまらない AI 設定。"
+    },
     "requestTypeOptions": {
       "OpenAI": "OpenAI",
       "OpenAIResponses": "OpenAI Responses",

@@ -31,6 +31,13 @@ import {
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
 
+type SettingGroupId = "default" | "aiContent" | "aiCatalog" | "aiTranslation" | "aiRuntime" | "aiOther";
+
+interface SettingGroup {
+  id: SettingGroupId;
+  settings: SystemSetting[];
+}
+
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SystemSetting[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +59,70 @@ export default function AdminSettingsPage() {
   };
 
   const requestTypeOptions = ["OpenAI", "OpenAIResponses", "Anthropic"];
+
+  const resolveAiGroupId = useCallback((key: string): SettingGroupId => {
+    const upperKey = key.toUpperCase();
+    if (upperKey.includes("TRANSLATION")) return "aiTranslation";
+    if (upperKey.includes("CONTENT_") || upperKey === "WIKI_MAX_OUTPUT_TOKENS") return "aiContent";
+    if (
+      upperKey.includes("CATALOG") ||
+      upperKey.includes("DIRECTORY_TREE") ||
+      upperKey === "WIKI_LANGUAGES" ||
+      upperKey === "WIKI_PROMPTS_DIRECTORY" ||
+      upperKey === "WIKI_README_MAX_LENGTH"
+    ) {
+      return "aiCatalog";
+    }
+    if (upperKey.includes("PARALLEL") || upperKey.includes("RETRY") || upperKey.includes("TIMEOUT")) {
+      return "aiRuntime";
+    }
+    return "aiOther";
+  }, []);
+
+  const getGroupMeta = useCallback(
+    (category: string, groupId: SettingGroupId) => {
+      if (category !== "ai") {
+        return {
+          title: t("admin.settings.groupTitles.default"),
+          description: t("admin.settings.groupDescriptions.default"),
+        };
+      }
+
+      switch (groupId) {
+        case "aiContent":
+          return {
+            title: t("admin.settings.groupTitles.aiContent"),
+            description: t("admin.settings.groupDescriptions.aiContent"),
+          };
+        case "aiCatalog":
+          return {
+            title: t("admin.settings.groupTitles.aiCatalog"),
+            description: t("admin.settings.groupDescriptions.aiCatalog"),
+          };
+        case "aiTranslation":
+          return {
+            title: t("admin.settings.groupTitles.aiTranslation"),
+            description: t("admin.settings.groupDescriptions.aiTranslation"),
+          };
+        case "aiRuntime":
+          return {
+            title: t("admin.settings.groupTitles.aiRuntime"),
+            description: t("admin.settings.groupDescriptions.aiRuntime"),
+          };
+        case "aiOther":
+          return {
+            title: t("admin.settings.groupTitles.aiOther"),
+            description: t("admin.settings.groupDescriptions.aiOther"),
+          };
+        default:
+          return {
+            title: t("admin.settings.groupTitles.default"),
+            description: t("admin.settings.groupDescriptions.default"),
+          };
+      }
+    },
+    [t]
+  );
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -106,14 +177,14 @@ export default function AdminSettingsPage() {
       await updateSettings(changedSettings);
       toast.success(t('admin.toast.saveSuccess'));
       fetchData();
-    } catch (error) {
+    } catch {
       toast.error(t('admin.toast.saveFailed'));
     } finally {
       setSaving(false);
     }
   };
 
-  const categories = [...new Set(settings.map((s) => s.category))];
+  const categories = useMemo(() => [...new Set(settings.map((s) => s.category))], [settings]);
 
   const settingsByCategory = useMemo(() => {
     return categories.reduce<Record<string, SystemSetting[]>>((acc, cat) => {
@@ -121,6 +192,34 @@ export default function AdminSettingsPage() {
       return acc;
     }, {});
   }, [categories, settings]);
+
+  const groupedSettingsByCategory = useMemo(() => {
+    return categories.reduce<Record<string, SettingGroup[]>>((acc, cat) => {
+      const categorySettings = settingsByCategory[cat] ?? [];
+      if (cat !== "ai") {
+        acc[cat] = [{ id: "default", settings: categorySettings }];
+        return acc;
+      }
+
+      const bucket: Record<SettingGroupId, SystemSetting[]> = {
+        aiContent: [],
+        aiCatalog: [],
+        aiTranslation: [],
+        aiRuntime: [],
+        aiOther: [],
+        default: [],
+      };
+
+      categorySettings.forEach((setting) => {
+        const groupId = resolveAiGroupId(setting.key);
+        bucket[groupId].push(setting);
+      });
+
+      const order: SettingGroupId[] = ["aiContent", "aiCatalog", "aiTranslation", "aiRuntime", "aiOther"];
+      acc[cat] = order.filter((id) => bucket[id].length > 0).map((id) => ({ id, settings: bucket[id] }));
+      return acc;
+    }, {});
+  }, [categories, settingsByCategory, resolveAiGroupId]);
 
   const activeSettings = settingsByCategory[activeCategory] ?? [];
 
@@ -250,6 +349,7 @@ export default function AdminSettingsPage() {
             <div className="space-y-6">
               {categories.map((cat) => {
                 const categorySettings = settingsByCategory[cat] ?? [];
+                const groupedSettings = groupedSettingsByCategory[cat] ?? [{ id: "default", settings: categorySettings }];
                 return (
                   <TabsContent key={cat} value={cat} className="mt-0">
                     <Card className="p-6">
@@ -274,80 +374,99 @@ export default function AdminSettingsPage() {
                         </div>
                       </div>
 
-                      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {categorySettings.map((setting) => {
-                          const lowerKey = setting.key.toLowerCase();
-                          const isTemplateField = (setting.value?.length || 0) > 100 || lowerKey.includes("template");
-                          const isSensitiveField =
-                            lowerKey.includes("key") ||
-                            lowerKey.includes("secret") ||
-                            lowerKey.includes("password");
-                          const isSelectField = setting.key.endsWith("_REQUEST_TYPE");
-                          const currentValue = editedValues[setting.key] || "";
-                          const hasPendingChange = currentValue !== (setting.value || "");
-
+                      <div className="mt-6 space-y-6">
+                        {groupedSettings.map((group) => {
+                          const groupMeta = getGroupMeta(cat, group.id);
                           return (
-                            <div
-                              key={setting.key}
-                              className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card/50 p-4 shadow-sm backdrop-blur"
-                            >
-                              <div className="flex items-start justify-between gap-3">
+                            <section key={`${cat}-${group.id}`} className="space-y-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div>
-                                  <p className="text-sm font-semibold text-foreground">
-                                    {formatSettingLabel(setting.key)}
-                                  </p>
-                                  <p className="text-[11px] font-mono uppercase tracking-wide text-muted-foreground">
-                                    {setting.key}
-                                  </p>
-                                  {setting.description && (
-                                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-                                      {setting.description}
-                                    </p>
-                                  )}
+                                  <h3 className="text-sm font-semibold">{groupMeta.title}</h3>
+                                  <p className="text-xs text-muted-foreground">{groupMeta.description}</p>
                                 </div>
-                                {hasPendingChange && (
-                                  <Badge className="shrink-0 text-[11px]">
-                                    {t('admin.settings.pendingChange')}
-                                  </Badge>
-                                )}
+                                <Badge variant="secondary" className="text-[11px] uppercase tracking-wide">
+                                  {t('admin.settings.settingsCount', { count: group.settings.length })}
+                                </Badge>
                               </div>
 
-                              {isSelectField ? (
-                                <Select
-                                  value={currentValue || undefined}
-                                  onValueChange={(value) => handleFieldChange(setting.key, value)}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder={t('admin.settings.selectRequestType')} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {requestTypeOptions.map((option) => (
-                                      <SelectItem key={option} value={option}>
-                                        {t(`admin.settings.requestTypeOptions.${option}`)}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : isTemplateField ? (
-                                <Textarea
-                                  value={currentValue}
-                                  onChange={(e) => handleFieldChange(setting.key, e.target.value)}
-                                  rows={4}
-                                  className="font-mono text-sm"
-                                />
-                              ) : isSensitiveField ? (
-                                <Input
-                                  type="password"
-                                  value={currentValue}
-                                  onChange={(e) => handleFieldChange(setting.key, e.target.value)}
-                                />
-                              ) : (
-                                <Input
-                                  value={currentValue}
-                                  onChange={(e) => handleFieldChange(setting.key, e.target.value)}
-                                />
-                              )}
-                            </div>
+                              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                {group.settings.map((setting) => {
+                                  const lowerKey = setting.key.toLowerCase();
+                                  const isTemplateField = (setting.value?.length || 0) > 100 || lowerKey.includes("template");
+                                  const isSensitiveField =
+                                    lowerKey.includes("key") ||
+                                    lowerKey.includes("secret") ||
+                                    lowerKey.includes("password");
+                                  const isSelectField = setting.key.endsWith("_REQUEST_TYPE");
+                                  const currentValue = editedValues[setting.key] || "";
+                                  const hasPendingChange = currentValue !== (setting.value || "");
+
+                                  return (
+                                    <div
+                                      key={setting.key}
+                                      className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card/50 p-4 shadow-sm backdrop-blur"
+                                    >
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                          <p className="text-sm font-semibold text-foreground">
+                                            {formatSettingLabel(setting.key)}
+                                          </p>
+                                          <p className="text-[11px] font-mono uppercase tracking-wide text-muted-foreground">
+                                            {setting.key}
+                                          </p>
+                                          {setting.description && (
+                                            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                                              {setting.description}
+                                            </p>
+                                          )}
+                                        </div>
+                                        {hasPendingChange && (
+                                          <Badge className="shrink-0 text-[11px]">
+                                            {t('admin.settings.pendingChange')}
+                                          </Badge>
+                                        )}
+                                      </div>
+
+                                      {isSelectField ? (
+                                        <Select
+                                          value={currentValue || undefined}
+                                          onValueChange={(value) => handleFieldChange(setting.key, value)}
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder={t('admin.settings.selectRequestType')} />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {requestTypeOptions.map((option) => (
+                                              <SelectItem key={option} value={option}>
+                                                {t(`admin.settings.requestTypeOptions.${option}`)}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      ) : isTemplateField ? (
+                                        <Textarea
+                                          value={currentValue}
+                                          onChange={(e) => handleFieldChange(setting.key, e.target.value)}
+                                          rows={4}
+                                          className="font-mono text-sm"
+                                        />
+                                      ) : isSensitiveField ? (
+                                        <Input
+                                          type="password"
+                                          value={currentValue}
+                                          onChange={(e) => handleFieldChange(setting.key, e.target.value)}
+                                        />
+                                      ) : (
+                                        <Input
+                                          value={currentValue}
+                                          onChange={(e) => handleFieldChange(setting.key, e.target.value)}
+                                        />
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </section>
                           );
                         })}
                       </div>

@@ -151,6 +151,22 @@
     "settingsCount": "{count} settings",
     "pendingCount": "{count} pending",
     "pendingChange": "Pending",
+    "groupTitles": {
+      "default": "Core Settings",
+      "aiContent": "Content Model & Endpoints",
+      "aiCatalog": "Catalog & Document Strategy",
+      "aiTranslation": "Translation Settings",
+      "aiRuntime": "Runtime & Retry Control",
+      "aiOther": "Other Settings"
+    },
+    "groupDescriptions": {
+      "default": "Settings are grouped under the current category.",
+      "aiContent": "Content model, request type, endpoints, and output limits.",
+      "aiCatalog": "Directory tree depth, structure, languages, and prompt paths.",
+      "aiTranslation": "Translation model, request type, endpoints, and timeouts.",
+      "aiRuntime": "Concurrency, timeout, retry count, and retry interval.",
+      "aiOther": "AI settings that do not match a predefined group."
+    },
     "requestTypeOptions": {
       "OpenAI": "OpenAI",
       "OpenAIResponses": "OpenAI Responses",
