@@ -189,6 +189,7 @@ public class ChatAssistantService : IChatAssistantService
     private readonly IMcpToolConverter _mcpToolConverter;
     private readonly ISkillToolConverter _skillToolConverter;
     private readonly RepositoryAnalyzerOptions _repoOptions;
+    private readonly IChatLogService _chatLogService;
     private readonly ILogger<ChatAssistantService> _logger;
 
     public ChatAssistantService(
@@ -198,6 +199,7 @@ public class ChatAssistantService : IChatAssistantService
         IMcpToolConverter mcpToolConverter,
         ISkillToolConverter skillToolConverter,
         IOptions<RepositoryAnalyzerOptions> repoOptions,
+        IChatLogService chatLogService,
         ILogger<ChatAssistantService> logger)
     {
         _context = context;
@@ -206,6 +208,7 @@ public class ChatAssistantService : IChatAssistantService
         _mcpToolConverter = mcpToolConverter;
         _skillToolConverter = skillToolConverter;
         _repoOptions = repoOptions.Value;
+        _chatLogService = chatLogService;
         _logger = logger;
     }
 
@@ -263,6 +266,65 @@ public class ChatAssistantService : IChatAssistantService
         ChatRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        var sessionId = Guid.NewGuid();
+        IAsyncEnumerable<SSEEvent>? stream = null;
+        Exception? capturedException = null;
+
+        try
+        {
+            // Start streaming the chat response
+            stream = InternalStreamChatAsync(request, sessionId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            capturedException = ex;
+        }
+        if (capturedException != null)
+        {
+            yield return new SSEEvent
+            {
+                // Log the error and return a structured error response to the client
+                Type = SSEEventType.Error,
+                Data = SSEErrorResponse.CreateNonRetryable(
+                    ChatErrorCodes.INTERNAL_ERROR,
+                    "An error occurred while initializing the request")
+            };
+            yield break;
+        }
+        // If stream is null for some reason, return an error event
+        if (stream != null)
+        {
+            Exception? streamException = null;
+            var enumerator = stream.WithCancellation(cancellationToken).GetAsyncEnumerator();
+            while (true)
+            {
+                try
+                {
+                    if (!await enumerator.MoveNextAsync()) break;
+                }
+                catch (Exception ex)
+                {
+                    streamException = ex;
+                    break;
+                }
+                yield return enumerator.Current;
+            }
+
+            if (streamException != null)
+            {
+                await _chatLogService.LogChatErrorAsync(sessionId, streamException, request.ModelId, cancellationToken);
+                _logger.LogError(streamException, "Error during streaming for session {SessionId}", sessionId);
+                yield return new SSEEvent { Type = SSEEventType.Error, Data = "Stream interrupted" };
+            }
+        }
+    }
+    
+
+    private async IAsyncEnumerable<SSEEvent> InternalStreamChatAsync(
+    ChatRequest request,
+    Guid sessionId,
+    [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
         // Get configuration
         var config = await GetConfigAsync(cancellationToken);
 
@@ -278,6 +340,7 @@ public class ChatAssistantService : IChatAssistantService
             yield break;
         }
 
+
         // Validate model
         var modelConfig = await GetModelConfigAsync(request.ModelId, config, cancellationToken);
         if (modelConfig == null)
@@ -291,7 +354,6 @@ public class ChatAssistantService : IChatAssistantService
             };
             yield break;
         }
-
         // Build tools
         var tools = new List<AITool>();
 
@@ -306,7 +368,7 @@ public class ChatAssistantService : IChatAssistantService
             {
                 // Checkout to the specified branch before initializing GitTool
                 CheckoutBranch(repositoryPath, request.Context.Branch);
-                
+
                 gitTool = new GitTool(repositoryPath);
                 tools.AddRange(gitTool.GetTools());
                 _logger.LogInformation("GitTool initialized for {Owner}/{Repo}@{Branch} with path {RepoPath}",
@@ -349,6 +411,7 @@ public class ChatAssistantService : IChatAssistantService
             tools.AddRange(skillTools);
         }
 
+
         // Build system prompt
         var systemPrompt = BuildSystemPrompt(request.Context, gitTool != null);
 
@@ -376,31 +439,31 @@ public class ChatAssistantService : IChatAssistantService
             agentOptions,
             requestOptions);
 
+
         // Build chat messages with system prompt
         var chatMessages = new List<ChatMessage>
         {
-            new(ChatRole.System, systemPrompt)
+           new(ChatRole.System, systemPrompt)
         };
         chatMessages.AddRange(BuildChatMessages(request.Messages));
 
         // Stream response
         var inputTokens = 0;
         var outputTokens = 0;
-        
-        // 跟踪当前内容块
+
+        // Track tool calls with a stack to handle nested calls
         var currentBlockIndex = -1;
         var currentBlockType = "";
         var currentToolId = "";
         var currentToolName = "";
         var toolInputJson = new System.Text.StringBuilder();
-        
-        // OpenAI 格式的 tool call 跟踪
+
         var openAiToolCalls = new Dictionary<int, (string Id, string Name, System.Text.StringBuilder Args)>();
 
         var thread = await agent.CreateSessionAsync(cancellationToken);
 
         await foreach (var update in
-                       agent.RunStreamingAsync(chatMessages, thread, cancellationToken: cancellationToken))
+                          agent.RunStreamingAsync(chatMessages, thread, cancellationToken: cancellationToken))
         {
             if (!string.IsNullOrEmpty(update.Text))
             {
@@ -410,22 +473,22 @@ public class ChatAssistantService : IChatAssistantService
                     Data = update.Text
                 };
             }
-
-            // Handle tool calls if present in raw representation (OpenAI format)
+            
+            // handle tool results
             if (update.RawRepresentation is OpenAI.Chat.StreamingChatCompletionUpdate chatCompletionUpdate &&
                 chatCompletionUpdate.ToolCallUpdates.Count > 0)
             {
                 foreach (var toolCall in chatCompletionUpdate.ToolCallUpdates)
                 {
                     var index = toolCall.Index;
-                    
-                    // 如果是新的 tool call（有 FunctionName）
+
+                    // if this is the start of a tool call, initialize tracking
                     if (!string.IsNullOrEmpty(toolCall.FunctionName))
                     {
                         var toolId = toolCall.ToolCallId ?? Guid.NewGuid().ToString();
                         openAiToolCalls[index] = (toolId, toolCall.FunctionName, new System.Text.StringBuilder());
-                        
-                        // 发送 tool_call 开始事件
+
+                       // send initial tool call event with empty arguments
                         yield return new SSEEvent
                         {
                             Type = SSEEventType.ToolCall,
@@ -437,29 +500,29 @@ public class ChatAssistantService : IChatAssistantService
                             }
                         };
                     }
-                    
+
                     var str = Encoding.UTF8.GetString(toolCall.FunctionArgumentsUpdate);
-                    // 累积参数
+                    // concatenate argument updates for this tool call
                     if (!string.IsNullOrEmpty(str) && openAiToolCalls.ContainsKey(index))
                     {
                         openAiToolCalls[index].Args.Append(str);
                     }
                 }
             }
-            
-            // 检查 OpenAI finish_reason 是否为 tool_calls，发送完整参数
+
+            // handle tool call completions for OpenAI streaming format (based on finish reason)
             if (update.RawRepresentation is OpenAI.Chat.StreamingChatCompletionUpdate finishUpdate)
             {
                 var finishReason = finishUpdate.FinishReason;
                 if (finishReason == OpenAI.Chat.ChatFinishReason.ToolCalls)
                 {
-                    // 发送所有累积的 tool calls 的完整参数
+                    // send tool call events for all completed tool calls
                     foreach (var kvp in openAiToolCalls)
                     {
                         var (id, name, args) = kvp.Value;
                         var argsStr = args.ToString();
                         Dictionary<string, object>? arguments = null;
-                        
+
                         if (!string.IsNullOrEmpty(argsStr))
                         {
                             try
@@ -468,10 +531,10 @@ public class ChatAssistantService : IChatAssistantService
                             }
                             catch
                             {
-                                // 解析失败
+                                // failed to parse arguments, keep as null
                             }
                         }
-                        
+
                         yield return new SSEEvent
                         {
                             Type = SSEEventType.ToolCall,
@@ -500,28 +563,28 @@ public class ChatAssistantService : IChatAssistantService
                 }
                 else if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent rawMessageStreamEvent)
                 {
-                    // 解析 Anthropic SSE 事件
+                     // handle custom streaming format with content block events for more granular tool call tracking
                     if (rawMessageStreamEvent.Json.TryGetProperty("type", out var typeElement))
                     {
                         var eventType = typeElement.GetString();
-                        
-                        // 处理 content_block_start 事件
+
+                        // handle content block start event to track new tool calls 
                         if (eventType == "content_block_start")
                         {
-                            // 获取 block index
+                           // reset current block tracking
                             if (rawMessageStreamEvent.Json.TryGetProperty("index", out var indexElement))
                             {
                                 currentBlockIndex = indexElement.GetInt32();
                             }
-                            
+
                             if (rawMessageStreamEvent.Json.TryGetProperty("content_block", out var contentBlock))
                             {
-                                var blockType = contentBlock.TryGetProperty("type", out var blockTypeElement) 
+                                var blockType = contentBlock.TryGetProperty("type", out var blockTypeElement)
                                     ? blockTypeElement.GetString() ?? ""
                                     : "";
                                 currentBlockType = blockType;
-                                
-                                // 处理 thinking 块开始
+
+                               // handle start of thinking block
                                 if (blockType == "thinking")
                                 {
                                     yield return new SSEEvent
@@ -530,18 +593,18 @@ public class ChatAssistantService : IChatAssistantService
                                         Data = new { type = "start", index = currentBlockIndex }
                                     };
                                 }
-                                // 处理 tool_use 块开始
+                                // handle start of tool_use block
                                 else if (blockType == "tool_use")
                                 {
-                                    currentToolId = contentBlock.TryGetProperty("id", out var idElement) 
-                                        ? idElement.GetString() ?? "" 
+                                    currentToolId = contentBlock.TryGetProperty("id", out var idElement)
+                                        ? idElement.GetString() ?? ""
                                         : "";
-                                    currentToolName = contentBlock.TryGetProperty("name", out var nameElement) 
-                                        ? nameElement.GetString() ?? "" 
+                                    currentToolName = contentBlock.TryGetProperty("name", out var nameElement)
+                                        ? nameElement.GetString() ?? ""
                                         : "";
                                     toolInputJson.Clear();
-                                    
-                                    // 发送 tool_call 开始事件
+
+                                    // send initial tool call event with empty arguments
                                     yield return new SSEEvent
                                     {
                                         Type = SSEEventType.ToolCall,
@@ -555,22 +618,22 @@ public class ChatAssistantService : IChatAssistantService
                                 }
                             }
                         }
-                        // 处理 content_block_delta 事件
+                        // handle content block delta events to capture thinking text and tool input updates
                         else if (eventType == "content_block_delta")
                         {
                             if (rawMessageStreamEvent.Json.TryGetProperty("delta", out var delta))
                             {
-                                var deltaType = delta.TryGetProperty("type", out var deltaTypeElement) 
-                                    ? deltaTypeElement.GetString() 
+                                var deltaType = delta.TryGetProperty("type", out var deltaTypeElement)
+                                    ? deltaTypeElement.GetString()
                                     : null;
-                                
-                                // 处理 thinking 内容增量
+
+                                 // handle thinking delta updates
                                 if (deltaType == "thinking_delta")
                                 {
-                                    var thinkingText = delta.TryGetProperty("thinking", out var thinkingElement) 
-                                        ? thinkingElement.GetString() ?? "" 
+                                    var thinkingText = delta.TryGetProperty("thinking", out var thinkingElement)
+                                        ? thinkingElement.GetString() ?? ""
                                         : "";
-                                    
+
                                     if (!string.IsNullOrEmpty(thinkingText))
                                     {
                                         yield return new SSEEvent
@@ -580,22 +643,23 @@ public class ChatAssistantService : IChatAssistantService
                                         };
                                     }
                                 }
-                                // 处理 tool_use 输入增量
+                                // handle tool input delta updates
                                 else if (deltaType == "input_json_delta")
                                 {
-                                    var partialJson = delta.TryGetProperty("partial_json", out var jsonElement) 
-                                        ? jsonElement.GetString() ?? "" 
+                                    var partialJson = delta.TryGetProperty("partial_json", out var jsonElement)
+                                        ? jsonElement.GetString() ?? ""
                                         : "";
-                                    
-                                    // 累积 JSON 片段
+
+                                    // append partial JSON updates for the current tool call
                                     toolInputJson.Append(partialJson);
                                 }
                             }
                         }
-                        // 处理 content_block_stop 事件
+                        
+                       
                         else if (eventType == "content_block_stop")
                         {
-                            // 如果是 tool_use 块结束，发送完整的参数
+                            // handle end of thinking block
                             if (currentBlockType == "tool_use" && !string.IsNullOrEmpty(currentToolId))
                             {
                                 Dictionary<string, object>? arguments = null;
@@ -608,11 +672,11 @@ public class ChatAssistantService : IChatAssistantService
                                     }
                                     catch
                                     {
-                                        // 解析失败，保持 null
+                                        // failed to parse arguments, keep as null
                                     }
                                 }
-                                
-                                // 发送带完整参数的 tool_call 事件
+
+                                // send final tool call event with complete arguments when tool_use block ends
                                 yield return new SSEEvent
                                 {
                                     Type = SSEEventType.ToolCall,
@@ -623,13 +687,13 @@ public class ChatAssistantService : IChatAssistantService
                                         Arguments = arguments
                                     }
                                 };
-                                
-                                // 重置状态
+
+                                // reset tool call tracking
                                 currentToolId = "";
                                 currentToolName = "";
                                 toolInputJson.Clear();
                             }
-                            
+
                             currentBlockType = "";
                         }
                     }
@@ -637,7 +701,7 @@ public class ChatAssistantService : IChatAssistantService
             }
             else
             {
-                // Track token usage if available
+                // try to extract token usage from other response formats
                 var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
                 if (usage != null)
                 {
@@ -647,6 +711,7 @@ public class ChatAssistantService : IChatAssistantService
             }
         }
 
+        // send final done event with token usage
         await RecordTokenUsageAsync(
             inputTokens,
             outputTokens,
@@ -660,7 +725,6 @@ public class ChatAssistantService : IChatAssistantService
             Type = SSEEventType.Done,
             Data = new { inputTokens, outputTokens }
         };
-    }
 
     private async Task RecordTokenUsageAsync(
         int inputTokens,
@@ -717,6 +781,7 @@ public class ChatAssistantService : IChatAssistantService
         return repositoryIds.Count == 1 ? repositoryIds[0] : null;
     }
 
+    }
     /// <summary>
     /// Gets the model configuration by ID.
     /// </summary>
@@ -980,8 +1045,8 @@ public class ChatAssistantService : IChatAssistantService
             // Add quoted text as reference block (if present)
             if (msg.QuotedText != null && !string.IsNullOrEmpty(msg.QuotedText.Text))
             {
-                var title = !string.IsNullOrEmpty(msg.QuotedText.Title) 
-                    ? msg.QuotedText.Title 
+                var title = !string.IsNullOrEmpty(msg.QuotedText.Title)
+                    ? msg.QuotedText.Title
                     : "引用内容";
                 var quotedContent = $"引用来源：{title}\n<select_text>\n{msg.QuotedText.Text}\n</select_text>";
                 contents.Add(new TextContent(quotedContent));
@@ -1068,26 +1133,26 @@ public class ChatAssistantService : IChatAssistantService
         try
         {
             using var repo = new GitRepository(repositoryPath);
-            
+
             // Find the branch (local or remote tracking)
-            var branch = repo.Branches[branchName] 
+            var branch = repo.Branches[branchName]
                 ?? repo.Branches[$"origin/{branchName}"];
-            
+
             // If specified branch not found, fallback to "tree" branch
             if (branch == null)
             {
-                _logger.LogWarning("Branch {Branch} not found, falling back to 'tree' branch in {RepoPath}", 
+                _logger.LogWarning("Branch {Branch} not found, falling back to 'tree' branch in {RepoPath}",
                     branchName, repositoryPath);
-                
+
                 branch = repo.Branches["tree"] ?? repo.Branches["origin/tree"];
-                
+
                 if (branch == null)
                 {
-                    _logger.LogWarning("Fallback branch 'tree' also not found in {RepoPath}, using current HEAD", 
+                    _logger.LogWarning("Fallback branch 'tree' also not found in {RepoPath}, using current HEAD",
                         repositoryPath);
                     return;
                 }
-                
+
                 branchName = "tree";
             }
 
@@ -1109,7 +1174,7 @@ public class ChatAssistantService : IChatAssistantService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to checkout branch {Branch} in {RepoPath}", 
+            _logger.LogWarning(ex, "Failed to checkout branch {Branch} in {RepoPath}",
                 branchName, repositoryPath);
         }
     }

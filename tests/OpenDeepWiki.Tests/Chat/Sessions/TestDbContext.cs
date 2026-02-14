@@ -49,6 +49,8 @@ public class TestDbContext : DbContext, IContext
     public DbSet<ChatLog> ChatLogs { get; set; } = null!;
     public DbSet<TranslationTask> TranslationTasks { get; set; } = null!;
     public DbSet<IncrementalUpdateTask> IncrementalUpdateTasks { get; set; } = null!;
+    public DbSet<ChatShareSnapshot> ChatShareSnapshots { get; set; } = default!;
+    
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
