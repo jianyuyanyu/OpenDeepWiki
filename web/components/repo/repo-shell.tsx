@@ -11,6 +11,7 @@ import { fetchRepoTree, fetchRepoBranches } from "@/lib/repository-api";
 import { Network, Download } from "lucide-react";
 import { ChatAssistant, buildCatalogMenu } from "@/components/chat";
 import { useTranslations } from "@/hooks/use-translations";
+import { buildRepoBasePath, buildRepoDocPath, buildRepoMindMapPath } from "@/lib/repo-route";
 
 interface RepoShellProps {
   owner: string;
@@ -31,7 +32,7 @@ function convertToPageTreeNode(
   repo: string,
   queryString: string
 ): PageTree.Node {
-  const baseUrl = `/${owner}/${repo}/${node.slug}`;
+  const baseUrl = buildRepoDocPath(owner, repo, node.slug);
   // 链接需要带上查询参数以保持 branch 和 lang 状态
   const url = queryString ? `${baseUrl}?${queryString}` : baseUrl;
 
@@ -82,6 +83,7 @@ export function RepoShell({
   const urlBranch = searchParams.get("branch");
   const urlLang = searchParams.get("lang");
   const t = useTranslations();
+  const repoBasePath = buildRepoBasePath(owner, repo);
   
   const [nodes, setNodes] = useState<RepoTreeNode[]>(initialNodes);
   const [branches, setBranches] = useState<RepoBranchesResponse | undefined>(initialBranches);
@@ -93,12 +95,17 @@ export function RepoShell({
   // 从pathname提取当前文档路径
   const currentDocPath = React.useMemo(() => {
     // pathname格式: /owner/repo/slug 或 /owner/repo/path/to/doc
-    const prefix = `/${owner}/${repo}/`;
-    if (pathname.startsWith(prefix)) {
-      return pathname.slice(prefix.length);
+    const encodedPrefix = `${repoBasePath}/`;
+    if (pathname.startsWith(encodedPrefix)) {
+      return pathname.slice(encodedPrefix.length);
+    }
+
+    const rawPrefix = `/${owner}/${repo}/`;
+    if (pathname.startsWith(rawPrefix)) {
+      return pathname.slice(rawPrefix.length);
     }
     return "";
-  }, [pathname, owner, repo]);
+  }, [pathname, owner, repo, repoBasePath]);
 
   // 当 URL 参数变化时，重新获取数据
   useEffect(() => {
@@ -146,8 +153,8 @@ export function RepoShell({
 
   // 构建思维导图链接
   const mindMapUrl = queryString 
-    ? `/${owner}/${repo}/mindmap?${queryString}` 
-    : `/${owner}/${repo}/mindmap`;
+    ? `${buildRepoMindMapPath(owner, repo)}?${queryString}`
+    : buildRepoMindMapPath(owner, repo);
 
   // 导出功能处理
   const handleExport = async () => {

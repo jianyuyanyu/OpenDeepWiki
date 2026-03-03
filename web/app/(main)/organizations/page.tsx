@@ -24,6 +24,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { buildRepoBasePath } from "@/lib/repo-route";
 
 const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
   Pending: { icon: Clock, color: "text-yellow-500", label: "等待处理" },
@@ -160,7 +161,7 @@ export default function OrganizationsPage() {
                     </div>
                     <div className="mt-4 flex gap-2">
                       {repo.statusName === "Completed" && (
-                        <Link href={`/${repo.orgName}/${repo.repoName}`}>
+                        <Link href={buildRepoBasePath(repo.orgName, repo.repoName)}>
                           <Button size="sm" variant="outline">
                             <ExternalLink className="mr-1 h-3 w-3" />
                             查看文档

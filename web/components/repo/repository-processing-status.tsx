@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "@/hooks/use-translations";
 import { fetchRepoStatus, fetchProcessingLogs, regenerateRepository } from "@/lib/repository-api";
+import { buildRepoDocPath } from "@/lib/repo-route";
 import type { RepositoryStatus, ProcessingStep, ProcessingLogItem } from "@/types/repository";
 
 // 虚拟化列表项类型
@@ -190,7 +191,7 @@ export function RepositoryProcessingStatus({
         setIsPolling(false);
         setCurrentStep("Complete");
         setTimeout(() => {
-          window.location.href = `/${owner}/${repo}/${statusResponse.defaultSlug}`;
+          window.location.href = buildRepoDocPath(owner, repo, statusResponse.defaultSlug);
         }, 2000);
       }
 

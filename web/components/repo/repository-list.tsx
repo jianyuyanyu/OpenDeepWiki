@@ -24,6 +24,7 @@ import {
   GitBranch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { buildRepoBasePath } from "@/lib/repo-route";
 import { VisibilityToggle } from "@/components/repo/visibility-toggle";
 
 interface RepositoryListProps {
@@ -90,7 +91,7 @@ function RepositoryCard({
 
   // 生成正确编码的Wiki导航URL
   // 使用encodeURIComponent处理特殊字符，确保URL安全
-  const wikiUrl = `/${encodeURIComponent(repo.orgName)}/${encodeURIComponent(repo.repoName)}`;
+  const wikiUrl = buildRepoBasePath(repo.orgName, repo.repoName);
 
   const handleVisibilityChange = (newIsPublic: boolean) => {
     onVisibilityChange(repo.id, newIsPublic);

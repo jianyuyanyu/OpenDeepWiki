@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Infrastructure;
 using OpenDeepWiki.Models;
 
 namespace OpenDeepWiki.Services.Wiki;
@@ -18,6 +19,7 @@ public class WikiService(IContext context)
     [HttpGet("/{org}/{repo}/catalog")]
     public async Task<WikiCatalogResponse> GetCatalogAsync(string org, string repo)
     {
+        (org, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(org, repo);
         var repository = await GetRepositoryAsync(org, repo);
         var branch = await GetDefaultBranchAsync(repository.Id);
         var language = await GetDefaultLanguageAsync(branch.Id);
@@ -51,6 +53,7 @@ public class WikiService(IContext context)
     [HttpGet("/{org}/{repo}/doc/{*path}")]
     public async Task<WikiDocResponse> GetDocAsync(string org, string repo, string path)
     {
+        (org, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(org, repo);
         var repository = await GetRepositoryAsync(org, repo);
         var branch = await GetDefaultBranchAsync(repository.Id);
         var language = await GetDefaultLanguageAsync(branch.Id);
@@ -170,4 +173,5 @@ public class WikiService(IContext context)
     {
         return path.Trim().Trim('/');
     }
+
 }

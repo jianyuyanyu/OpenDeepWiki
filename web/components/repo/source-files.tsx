@@ -3,6 +3,7 @@
 import { FileCode2, ExternalLink } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
+import { decodeRouteSegment } from "@/lib/repo-route";
 
 interface SourceFilesProps {
   files: string[];
@@ -44,8 +45,8 @@ export function SourceFiles({ files, gitUrl, branch }: SourceFilesProps) {
   const searchParams = useSearchParams();
   
   // 从 URL 参数获取仓库信息
-  const owner = params.owner as string;
-  const repo = params.repo as string;
+  const owner = decodeRouteSegment(params.owner as string);
+  const repo = decodeRouteSegment(params.repo as string);
   const currentBranch = searchParams.get("branch") || branch || "main";
   
   // 构建默认的 Git URL
