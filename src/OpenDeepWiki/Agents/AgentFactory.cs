@@ -78,7 +78,8 @@ namespace OpenDeepWiki.Agents
                 var clientOptions = new OpenAIClientOptions()
                 {
                     Endpoint = new Uri(option.Endpoint ?? DefaultEndpoint),
-                    Transport = new System.ClientModel.Primitives.HttpClientPipelineTransport(httpClient)
+                    Transport = new System.ClientModel.Primitives.HttpClientPipelineTransport(httpClient),
+                    NetworkTimeout = = httpClient.Timeout
                 };
 
                 var openAiClient = new OpenAIClient(
@@ -94,7 +95,8 @@ namespace OpenDeepWiki.Agents
                 var clientOptions = new OpenAIClientOptions()
                 {
                     Endpoint = new Uri(option.Endpoint ?? DefaultEndpoint),
-                    Transport = new System.ClientModel.Primitives.HttpClientPipelineTransport(httpClient)
+                    Transport = new System.ClientModel.Primitives.HttpClientPipelineTransport(httpClient),
+                    NetworkTimeout = = httpClient.Timeout
                 };
 
                 var openAiClient = new OpenAIClient(
