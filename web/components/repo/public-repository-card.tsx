@@ -20,6 +20,7 @@ import {
   GitFork,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { buildRepoBasePath } from "@/lib/repo-route";
 import { addBookmark, removeBookmark, getBookmarkStatus } from "@/lib/bookmark-api";
 import { addSubscription, removeSubscription, getSubscriptionStatus } from "@/lib/subscription-api";
 import { toast } from "sonner";
@@ -80,6 +81,7 @@ export function PublicRepositoryCard({ repository }: PublicRepositoryCardProps) 
   const t = useTranslations();
   const { user } = useAuth();
   const createdDate = new Date(repository.createdAt).toLocaleDateString();
+  const wikiUrl = buildRepoBasePath(repository.orgName, repository.repoName);
 
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -153,7 +155,7 @@ export function PublicRepositoryCard({ repository }: PublicRepositoryCardProps) 
   }, [user, repository.id, isSubscribed, subscribeLoading, t]);
 
   return (
-    <Link href={`/${repository.orgName}/${repository.repoName}`}>
+    <Link href={wikiUrl}>
       <Card className="h-full transition-all hover:shadow-md hover:border-primary/50 cursor-pointer">
         <CardContent className="p-4">
           <div className="flex flex-col gap-3">

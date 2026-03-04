@@ -31,16 +31,17 @@ const SUPPORTED_LANGUAGES = [
 ];
 
 function parseGitUrl(url: string): { orgName: string; repoName: string } | null {
-  const httpsMatch = url.match(/https?:\/\/[^/]+\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
+  // Support multi-level paths (e.g. codeup.aliyun.com/org-id/project/repo.git)
+  const httpsMatch = url.match(/https?:\/\/[^/]+\/(.+?)\/([^/]+?)(?:\.git)?$/i);
   if (httpsMatch) {
     return { orgName: httpsMatch[1], repoName: httpsMatch[2] };
   }
-  
-  const sshMatch = url.match(/git@[^:]+:([^/]+)\/([^/]+?)(?:\.git)?$/i);
+
+  const sshMatch = url.match(/git@[^:]+:(.+?)\/([^/]+?)(?:\.git)?$/i);
   if (sshMatch) {
     return { orgName: sshMatch[1], repoName: sshMatch[2] };
   }
-  
+
   return null;
 }
 

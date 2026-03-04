@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.Cache.Abstractions;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Infrastructure;
 using OpenDeepWiki.Models;
 using System.IO.Compression;
 using System.Text;
@@ -27,9 +28,9 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     [HttpGet("/{owner}/{repo}/branches")]
     public async Task<RepositoryBranchesResponse> GetBranchesAsync(string owner, string repo)
     {
-        var repository = await context.Repositories
-            .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.OrgName == owner && item.RepoName == repo);
+        (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
+
+        var repository = await GetRepositoryAsync(owner, repo);
 
         if (repository is null)
         {
@@ -100,9 +101,9 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     [HttpGet("/{owner}/{repo}/tree")]
     public async Task<RepositoryTreeResponse> GetTreeAsync(string owner, string repo, [FromQuery] string? branch = null, [FromQuery] string? lang = null)
     {
-        var repository = await context.Repositories
-            .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.OrgName == owner && item.RepoName == repo);
+        (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
+
+        var repository = await GetRepositoryAsync(owner, repo);
 
         // 仓库不存在
         if (repository is null)
@@ -194,6 +195,7 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     [HttpGet("/{owner}/{repo}/docs/{*slug}")]
     public async Task<RepositoryDocResponse> GetDocAsync(string owner, string repo, string slug, [FromQuery] string? branch = null, [FromQuery] string? lang = null)
     {
+        (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
         var normalizedSlug = NormalizePath(slug);
 
         var repository = await GetRepositoryAsync(owner, repo);
@@ -261,6 +263,7 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     [HttpGet("/{owner}/{repo}/check")]
     public async Task<GitRepoCheckResponse> CheckRepoAsync(string owner, string repo)
     {
+        (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
         var repoInfo = await gitPlatformService.CheckRepoExistsAsync(owner, repo);
         
         return new GitRepoCheckResponse
@@ -421,6 +424,7 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     [Authorize]
     public async Task<IActionResult> ExportAsync(string owner, string repo, [FromQuery] string? branch = null, [FromQuery] string? lang = null)
     {
+        (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
         var repository = await GetRepositoryAsync(owner, repo);
         if (repository is null)
         {

@@ -5,6 +5,7 @@ import { DocNotFound } from "@/components/repo/doc-not-found";
 import { SourceFiles } from "@/components/repo/source-files";
 import { DocsPage, DocsBody } from "fumadocs-ui/page";
 import type { TOCItemType } from "fumadocs-core/toc";
+import { decodeRouteSegment } from "@/lib/repo-route";
 
 interface RepoDocPageProps {
   params: Promise<{
@@ -33,12 +34,14 @@ async function getDocData(owner: string, repo: string, slug: string, branch?: st
 
 export default async function RepoDocPage({ params, searchParams }: RepoDocPageProps) {
   const { owner, repo, slug: slugParts } = await params;
+  const decodedOwner = decodeRouteSegment(owner);
+  const decodedRepo = decodeRouteSegment(repo);
   const resolvedSearchParams = await searchParams;
   const branch = resolvedSearchParams?.branch;
   const lang = resolvedSearchParams?.lang;
   const slug = slugParts.join("/");
 
-  const data = await getDocData(owner, repo, slug, branch, lang);
+  const data = await getDocData(decodedOwner, decodedRepo, slug, branch, lang);
   
   // 文档不存在，但保留侧边栏（由layout提供）
   if (!data) {

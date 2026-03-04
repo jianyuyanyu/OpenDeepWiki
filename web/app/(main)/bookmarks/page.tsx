@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Bookmark, Star, GitFork, Trash2, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { getUserBookmarks, removeBookmark, BookmarkItemResponse } from "@/lib/bookmark-api";
+import { buildRepoBasePath } from "@/lib/repo-route";
 
 export default function BookmarksPage() {
   const t = useTranslations();
@@ -128,7 +129,7 @@ export default function BookmarksPage() {
               {bookmarks.map((repo) => (
                 <Link 
                   key={repo.bookmarkId} 
-                  href={`/${encodeURIComponent(repo.orgName)}/${encodeURIComponent(repo.repoName)}`}
+                  href={buildRepoBasePath(repo.orgName, repo.repoName)}
                   className="block"
                 >
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">

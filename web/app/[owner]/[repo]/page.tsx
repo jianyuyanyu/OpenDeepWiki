@@ -2,19 +2,13 @@ import { redirect } from "next/navigation";
 import { fetchRepoTree } from "@/lib/repository-api";
 import { DocNotFound } from "@/components/repo/doc-not-found";
 import { DocsPage, DocsBody } from "fumadocs-ui/page";
+import { buildRepoDocPath, decodeRouteSegment } from "@/lib/repo-route";
 
 interface RepoIndexProps {
   params: Promise<{
     owner: string;
     repo: string;
   }>;
-}
-
-function encodeSlug(slug: string) {
-  return slug
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
 }
 
 async function getTreeData(owner: string, repo: string) {
@@ -27,8 +21,10 @@ async function getTreeData(owner: string, repo: string) {
 
 export default async function RepoIndex({ params }: RepoIndexProps) {
   const { owner, repo } = await params;
+  const decodedOwner = decodeRouteSegment(owner);
+  const decodedRepo = decodeRouteSegment(repo);
   
-  const tree = await getTreeData(owner, repo);
+  const tree = await getTreeData(decodedOwner, decodedRepo);
   
   // API错误，layout会处理
   if (!tree) {
@@ -47,7 +43,7 @@ export default async function RepoIndex({ params }: RepoIndexProps) {
 
   // 有默认文档，重定向
   if (tree.defaultSlug) {
-    redirect(`/${owner}/${repo}/${encodeSlug(tree.defaultSlug)}`);
+    redirect(buildRepoDocPath(decodedOwner, decodedRepo, tree.defaultSlug));
   }
 
   // 没有默认文档但有目录，显示提示
