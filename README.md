@@ -19,7 +19,7 @@ Our enterprise service offers comprehensive support and flexibility for business
 
 # Features
 
-- **Quick Conversion**: Supports converting all GitHub, GitLab,AtomGit, Gitee, Gitea and other code repositories into knowledge bases within minutes.
+- **Quick Conversion**: Supports converting all GitHub, GitLab, AtomGit, Gitee, Gitea and other code repositories into knowledge bases within minutes.
 - **Multi-language Support**: Supports code analysis and documentation generation for all programming languages.
 - **Code Structure Diagrams**: Automatically generates Mermaid diagrams to help understand code structure.
 - **Custom Model Support**: Supports custom models and custom APIs for flexible extension.
@@ -31,7 +31,7 @@ Our enterprise service offers comprehensive support and flexibility for business
 
 # Feature List
 
-- [x] Support multiple code repositories (GitHub, GitLab,AtomGit, Gitee, Gitea, etc.)
+- [x] Support multiple code repositories (GitHub, GitLab, AtomGit, Gitee, Gitea, etc.)
 - [x] Support multiple programming languages (Python, Java, C#, JavaScript, etc.)
 - [x] Support repository management (CRUD operations on repositories)
 - [x] Support multiple AI providers (OpenAI, AzureOpenAI, Anthropic, etc.)
