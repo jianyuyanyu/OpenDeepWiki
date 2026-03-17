@@ -51,6 +51,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
     try {
       setIsLoading(true);
       setError(null);
+
       const response = await fetchRepositoryList({
         isPublic: true,
         sortBy: "status",
@@ -59,21 +60,21 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
         page,
         pageSize: PAGE_SIZE,
       });
+
       setRepositories(response.items);
       setTotal(response.total);
     } catch (err) {
-      setError("Failed to load repositories");
+      setError(t("home.publicRepository.loadError"));
       console.error("Failed to fetch public repositories:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [keyword, selectedLanguage, page]);
+  }, [keyword, page, selectedLanguage, t]);
 
   useEffect(() => {
     loadRepositories();
   }, [loadRepositories]);
 
-  // 当筛选条件变化时重置页码
   useEffect(() => {
     setPage(1);
   }, [keyword, selectedLanguage]);
@@ -83,11 +84,15 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
   };
 
   const handlePrevPage = () => {
-    if (page > 1) setPage(page - 1);
+    if (page > 1) {
+      setPage(page - 1);
+    }
   };
 
   const handleNextPage = () => {
-    if (page < totalPages) setPage(page + 1);
+    if (page < totalPages) {
+      setPage(page + 1);
+    }
   };
 
   if (isLoading && repositories.length === 0) {
@@ -116,7 +121,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
         </h2>
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <XCircle className="h-12 w-12 text-destructive mb-4" />
-          <p className="text-muted-foreground mb-4">{t("home.publicRepository.loadError")}</p>
+          <p className="text-muted-foreground mb-4">{error}</p>
           <Button variant="outline" onClick={loadRepositories}>
             <RefreshCw className="mr-2 h-4 w-4" />
             {t("home.repository.retry")}
@@ -142,7 +147,6 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
         </Button>
       </div>
 
-      {/* 语言标签筛选 */}
       <LanguageTags
         selectedLanguage={selectedLanguage}
         onLanguageChange={handleLanguageChange}
@@ -171,7 +175,6 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
             ))}
           </div>
 
-          {/* 分页控件 */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-4 mt-8">
               <Button

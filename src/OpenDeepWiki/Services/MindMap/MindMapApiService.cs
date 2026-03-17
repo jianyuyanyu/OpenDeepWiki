@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Infrastructure;
 
 namespace OpenDeepWiki.Services.MindMap;
 
@@ -22,6 +23,8 @@ public class MindMapApiService(IContext context)
         [FromQuery] string? branch,
         [FromQuery] string? lang)
     {
+        (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
+
         var repository = await context.Repositories
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.OrgName == owner && r.RepoName == repo);
@@ -76,6 +79,7 @@ public class MindMapApiService(IContext context)
             Content = branchLanguage.MindMapContent
         });
     }
+
 }
 
 /// <summary>

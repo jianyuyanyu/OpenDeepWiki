@@ -5,17 +5,19 @@ import { ShareConversation } from "./share-conversation"
 export const dynamic = "force-dynamic"
 
 interface SharePageProps {
-  params: { shareId: string }
+  params: Promise<{ shareId: string }>
 }
 
 export default async function SharePage({ params }: SharePageProps) {
-  const { shareId } = params
-
-  try {
-    const share = await getChatShare(shareId)
-    return <ShareConversation share={share} />
-  } catch (error) {
-    console.error("Failed to load share", error)
+  const { shareId } = await params
+  if (!shareId) {
     notFound()
   }
+
+  const share = await getChatShare(shareId).catch((error) => {
+    console.error("Failed to load share", error)
+    notFound()
+  })
+
+  return <ShareConversation share={share} />
 }

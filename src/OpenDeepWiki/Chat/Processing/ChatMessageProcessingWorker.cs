@@ -6,6 +6,7 @@ using OpenDeepWiki.Chat.Callbacks;
 using OpenDeepWiki.Chat.Execution;
 using OpenDeepWiki.Chat.Queue;
 using OpenDeepWiki.Chat.Sessions;
+using System.Threading.Channels;
 
 namespace OpenDeepWiki.Chat.Processing;
 
@@ -20,6 +21,8 @@ public class ChatMessageProcessingWorker : BackgroundService
     private readonly ILogger<ChatMessageProcessingWorker> _logger;
     private readonly ChatProcessingOptions _options;
 
+    private readonly Channel<QueuedMessage> _channel;
+
     public ChatMessageProcessingWorker(
         IServiceProvider serviceProvider,
         ILogger<ChatMessageProcessingWorker> logger,
@@ -28,88 +31,90 @@ public class ChatMessageProcessingWorker : BackgroundService
         _serviceProvider = serviceProvider;
         _logger = logger;
         _options = options.Value;
+
+        var capacity = Math.Max(1, _options.MaxConcurrency) * 100;
+        _channel = Channel.CreateBounded<QueuedMessage>(new BoundedChannelOptions(capacity)
+        {
+            SingleWriter = false,
+            SingleReader = false,
+            FullMode = BoundedChannelFullMode.Wait
+        });
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("消息处理 Worker 已启动，并发数: {Concurrency}", _options.MaxConcurrency);
+        var concurrency = Math.Max(1, _options.MaxConcurrency);
 
-        // 使用信号量控制并发
-        using var semaphore = new SemaphoreSlim(_options.MaxConcurrency);
-        var tasks = new List<Task>();
+        _logger.LogInformation("消息处理 Worker 已启动，并发数: {Concurrency}", concurrency);
 
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                await semaphore.WaitAsync(stoppingToken);
+        var producer = ProduceMessagesAsync(stoppingToken);
 
-                var task = ProcessNextMessageAsync(semaphore, stoppingToken);
-                tasks.Add(task);
+        var consumers = Enumerable.Range(0, concurrency)
+            .Select(_ => ConsumeMessagesAsync(stoppingToken))
+            .ToArray();
 
-                // 清理已完成的任务
-                tasks.RemoveAll(t => t.IsCompleted);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "消息处理循环发生错误");
-                semaphore.Release();
-                await Task.Delay(_options.ErrorDelayMs, stoppingToken);
-            }
-        }
+        await Task.WhenAll(consumers.Prepend(producer));
 
-        // 等待所有正在处理的任务完成
-        await Task.WhenAll(tasks);
         _logger.LogInformation("消息处理 Worker 已停止");
     }
 
-    private async Task ProcessNextMessageAsync(SemaphoreSlim semaphore, CancellationToken stoppingToken)
+    private async Task ProduceMessagesAsync(CancellationToken stoppingToken)
     {
+        using var scope = _serviceProvider.CreateScope();
+        var messageQueue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+
         try
         {
-            using var scope = _serviceProvider.CreateScope();
-            var messageQueue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
-            var sessionManager = scope.ServiceProvider.GetRequiredService<ISessionManager>();
-            var agentExecutor = scope.ServiceProvider.GetRequiredService<IAgentExecutor>();
-            var messageCallback = scope.ServiceProvider.GetRequiredService<IMessageCallback>();
-
-            var queuedMessage = await messageQueue.DequeueAsync(stoppingToken);
-            if (queuedMessage == null)
+            while (!stoppingToken.IsCancellationRequested)
             {
-                // 队列为空，等待一段时间后重试
-                await Task.Delay(_options.PollingIntervalMs, stoppingToken);
-                return;
+                var msg = await messageQueue.DequeueAsync(stoppingToken);
+                if (msg != null)
+                    await _channel.Writer.WriteAsync(msg, stoppingToken);
+                else
+                    await Task.Delay(_options.PollingIntervalMs, stoppingToken);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // ignore cancellation
+        }
+        finally
+        {
+            _channel.Writer.TryComplete();
+        }
+    }
 
-            _logger.LogDebug("开始处理消息: {MessageId}, 类型: {Type}", 
-                queuedMessage.Id, queuedMessage.Type);
+    private async Task ConsumeMessagesAsync(CancellationToken stoppingToken)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var messageQueue = scope.ServiceProvider.GetRequiredService<IMessageQueue>();
+        var sessionManager = scope.ServiceProvider.GetRequiredService<ISessionManager>();
+        var agentExecutor = scope.ServiceProvider.GetRequiredService<IAgentExecutor>();
+        var messageCallback = scope.ServiceProvider.GetRequiredService<IMessageCallback>();
+
+        await foreach (var message in _channel.Reader.ReadAllAsync(stoppingToken))
+        {
+            _logger.LogDebug("开始处理消息: {MessageId}, 类型: {Type}",
+            message.Id, message.Type);
 
             try
             {
                 await ProcessMessageAsync(
-                    queuedMessage, 
-                    messageQueue, 
-                    sessionManager, 
-                    agentExecutor, 
-                    messageCallback, 
+                    message,
+                    messageQueue,
+                    sessionManager,
+                    agentExecutor,
+                    messageCallback,
                     stoppingToken);
 
-                await messageQueue.CompleteAsync(queuedMessage.Id, stoppingToken);
-                _logger.LogDebug("消息处理完成: {MessageId}", queuedMessage.Id);
+                await messageQueue.CompleteAsync(message.Id, stoppingToken);
+                _logger.LogDebug("消息处理完成: {MessageId}", message.Id);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "消息处理失败: {MessageId}", queuedMessage.Id);
-                await HandleMessageFailureAsync(queuedMessage, messageQueue, ex.Message, stoppingToken);
+                _logger.LogError(ex, "消息处理失败: {MessageId}", message.Id);
+                await HandleMessageFailureAsync(message, messageQueue, ex.Message, stoppingToken);
             }
-        }
-        finally
-        {
-            semaphore.Release();
         }
     }
 
@@ -163,15 +168,37 @@ public class ChatMessageProcessingWorker : BackgroundService
         var response = await agentExecutor.ExecuteAsync(
             queuedMessage.Message, session, stoppingToken);
 
+        // Reply target: use ReceiverId (channel) when available, fall back to SenderId (DM)
+        var replyTarget = !string.IsNullOrEmpty(queuedMessage.Message.ReceiverId)
+            ? queuedMessage.Message.ReceiverId
+            : queuedMessage.Message.SenderId;
+
         if (response.Success && response.Messages.Any())
         {
             // 发送响应消息
             foreach (var responseMessage in response.Messages)
             {
+                // Propagate metadata from original message (e.g. thread_ts for Slack threading)
+                var messageToSend = responseMessage;
+                if (queuedMessage.Message.Metadata != null && responseMessage.Metadata == null)
+                {
+                    messageToSend = new ChatMessage
+                    {
+                        MessageId = responseMessage.MessageId,
+                        SenderId = responseMessage.SenderId,
+                        ReceiverId = responseMessage.ReceiverId,
+                        Content = responseMessage.Content,
+                        MessageType = responseMessage.MessageType,
+                        Platform = responseMessage.Platform,
+                        Timestamp = responseMessage.Timestamp,
+                        Metadata = new Dictionary<string, object>(queuedMessage.Message.Metadata)
+                    };
+                }
+
                 var sendResult = await messageCallback.SendAsync(
                     queuedMessage.Message.Platform,
-                    queuedMessage.Message.SenderId,
-                    responseMessage,
+                    replyTarget,
+                    messageToSend,
                     stoppingToken);
 
                 if (!sendResult.Success)
@@ -190,16 +217,19 @@ public class ChatMessageProcessingWorker : BackgroundService
             {
                 MessageId = Guid.NewGuid().ToString(),
                 SenderId = "system",
-                ReceiverId = queuedMessage.Message.SenderId,
-                Content = response.ErrorMessage ?? "处理消息时发生错误，请稍后重试。",
+                ReceiverId = replyTarget,
+                Content = response.ErrorMessage ?? "An error occurred while processing your message, please try again later.",
                 MessageType = ChatMessageType.Text,
                 Platform = queuedMessage.Message.Platform,
-                Timestamp = DateTimeOffset.UtcNow
+                Timestamp = DateTimeOffset.UtcNow,
+                Metadata = queuedMessage.Message.Metadata != null
+                    ? new Dictionary<string, object>(queuedMessage.Message.Metadata)
+                    : null
             };
 
             await messageCallback.SendAsync(
                 queuedMessage.Message.Platform,
-                queuedMessage.Message.SenderId,
+                replyTarget,
                 errorMessage,
                 stoppingToken);
         }
@@ -236,14 +266,14 @@ public class ChatMessageProcessingWorker : BackgroundService
             // 加入重试队列
             var delaySeconds = CalculateRetryDelay(queuedMessage.RetryCount);
             await messageQueue.RetryAsync(queuedMessage.Id, delaySeconds, stoppingToken);
-            _logger.LogInformation("消息已加入重试队列: {MessageId}, 延迟: {Delay}秒", 
+            _logger.LogInformation("消息已加入重试队列: {MessageId}, 延迟: {Delay}秒",
                 queuedMessage.Id, delaySeconds);
         }
         else
         {
             // 移入死信队列
             await messageQueue.FailAsync(queuedMessage.Id, reason, stoppingToken);
-            _logger.LogWarning("消息已移入死信队列: {MessageId}, 原因: {Reason}", 
+            _logger.LogWarning("消息已移入死信队列: {MessageId}, 原因: {Reason}",
                 queuedMessage.Id, reason);
         }
     }

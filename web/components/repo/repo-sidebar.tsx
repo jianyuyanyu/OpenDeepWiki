@@ -16,6 +16,7 @@ import {
 } from "@/components/animate-ui/components/radix/sidebar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { RepoTreeNode } from "@/types/repository";
+import { buildRepoBasePath, encodeSlugPath } from "@/lib/repo-route";
 
 interface RepoSidebarProps {
   owner: string;
@@ -23,23 +24,16 @@ interface RepoSidebarProps {
   nodes: RepoTreeNode[];
 }
 
-function encodeSlug(slug: string) {
-  return slug
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
-}
-
 export function RepoSidebar({ owner, repo, nodes }: RepoSidebarProps) {
   const params = useParams<{ slug?: string | string[] }>();
   const searchParams = useSearchParams();
   const slugParam = params?.slug;
   const activeSlug = Array.isArray(slugParam) ? slugParam.join("/") : slugParam ?? "";
-  const basePath = `/${owner}/${repo}`;
+  const basePath = buildRepoBasePath(owner, repo);
 
   // 构建带查询参数的链接
   const buildHref = (slug: string) => {
-    const path = `${basePath}/${encodeSlug(slug)}`;
+    const path = `${basePath}/${encodeSlugPath(slug)}`;
     const queryString = searchParams.toString();
     return queryString ? `${path}?${queryString}` : path;
   };

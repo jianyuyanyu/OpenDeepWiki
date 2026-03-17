@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.Cache.Abstractions;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Infrastructure;
 using OpenDeepWiki.Models;
 using System.IO.Compression;
 using System.Text;
@@ -27,9 +28,9 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     [HttpGet("/{owner}/{repo}/branches")]
     public async Task<RepositoryBranchesResponse> GetBranchesAsync(string owner, string repo)
     {
-        var repository = await context.Repositories
-            .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.OrgName == owner && item.RepoName == repo);
+        (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
+
+        var repository = await GetRepositoryAsync(owner, repo);
 
         if (repository is null)
         {
@@ -100,9 +101,9 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     [HttpGet("/{owner}/{repo}/tree")]
     public async Task<RepositoryTreeResponse> GetTreeAsync(string owner, string repo, [FromQuery] string? branch = null, [FromQuery] string? lang = null)
     {
-        var repository = await context.Repositories
-            .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.OrgName == owner && item.RepoName == repo);
+        (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
+
+        var repository = await GetRepositoryAsync(owner, repo);
 
         // 仓库不存在
         if (repository is null)
@@ -194,6 +195,7 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     [HttpGet("/{owner}/{repo}/docs/{*slug}")]
     public async Task<RepositoryDocResponse> GetDocAsync(string owner, string repo, string slug, [FromQuery] string? branch = null, [FromQuery] string? lang = null)
     {
+        (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
         var normalizedSlug = NormalizePath(slug);
 
         var repository = await GetRepositoryAsync(owner, repo);
@@ -261,6 +263,7 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     [HttpGet("/{owner}/{repo}/check")]
     public async Task<GitRepoCheckResponse> CheckRepoAsync(string owner, string repo)
     {
+        (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
         var repoInfo = await gitPlatformService.CheckRepoExistsAsync(owner, repo);
         
         return new GitRepoCheckResponse
@@ -273,6 +276,7 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
             ForkCount = repoInfo.ForkCount,
             Language = repoInfo.Language,
             AvatarUrl = repoInfo.AvatarUrl,
+            IsPrivate = repoInfo.IsPrivate,
             GitUrl = $"https://github.com/{owner}/{repo}"
         };
     }
@@ -420,6 +424,7 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     [Authorize]
     public async Task<IActionResult> ExportAsync(string owner, string repo, [FromQuery] string? branch = null, [FromQuery] string? lang = null)
     {
+        (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
         var repository = await GetRepositoryAsync(owner, repo);
         if (repository is null)
         {
@@ -482,17 +487,18 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
             using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
             {
                 // 构建目录结构并添加文件
-                await AddFilesToArchive(archive, catalogs, null);
+                await AddFilesToArchive(archive, catalogs, null, null);
             }
 
             // 设置文件名
             var fileName = $"{owner}-{repo}-{branchEntity.BranchName}-{language.LanguageCode}.zip";
-            
+
+            // 重置内存流并获取字节数组
+            memoryStream.Seek(0, SeekOrigin.Begin);
+            var zipBytes = memoryStream.ToArray();
+
             // 返回压缩包
-            return new FileContentResult(memoryStream.ToArray(), "application/zip")
-            {
-                FileDownloadName = fileName
-            };
+            return new FileContentResult(zipBytes, "application/zip") { FileDownloadName = fileName };
         }
         finally
         {
@@ -546,29 +552,30 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
     /// <summary>
     /// 递归添加文件到压缩包
     /// </summary>
-    private static async Task AddFilesToArchive(ZipArchive archive, List<DocCatalog> catalogs, string? parentPath)
+    private static async Task AddFilesToArchive(
+        ZipArchive archive,
+        List<DocCatalog> catalogs,
+        string? parentCatalogId,
+        string? parentZipPath)
     {
         // 获取当前层级的目录项
         var currentLevelItems = catalogs
-            .Where(c => c.ParentId == parentPath)
+            .Where(c => c.ParentId == parentCatalogId)
             .OrderBy(c => c.Order)
             .ToList();
 
+        var usedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var catalog in currentLevelItems)
         {
-            // 构建当前项的完整路径
-            var currentPath = string.IsNullOrEmpty(parentPath) 
-                ? catalog.Title 
-                : Path.Combine(parentPath, catalog.Title);
+            var itemName = EnsureUniqueName(SanitizeZipNameSegment(catalog.Title), usedNames);
 
             // 如果有文档文件，创建文件条目
             if (catalog.DocFile != null)
             {
                 // 使用 .md 扩展名
-                var fileName = $"{catalog.Title}.md";
-                var fullPath = string.IsNullOrEmpty(parentPath) 
-                    ? fileName 
-                    : Path.Combine(parentPath, fileName);
+                var fileName = $"{itemName}.md";
+                var fullPath = CombineZipPath(parentZipPath, fileName);
 
                 var entry = archive.CreateEntry(fullPath);
                 using var entryStream = entry.Open();
@@ -580,7 +587,52 @@ public class RepositoryDocsService(IContext context, IGitPlatformService gitPlat
             var children = catalogs.Where(c => c.ParentId == catalog.Id).ToList();
             if (children.Count > 0)
             {
-                await AddFilesToArchive(archive, catalogs, catalog.Id);
+                var nextParentZipPath = CombineZipPath(parentZipPath, itemName);
+                await AddFilesToArchive(archive, catalogs, catalog.Id, nextParentZipPath);
+            }
+        }
+    }
+
+    private static string CombineZipPath(string? parentZipPath, string entryName)
+    {
+        return string.IsNullOrEmpty(parentZipPath)
+            ? entryName
+            : $"{parentZipPath}/{entryName}";
+    }
+
+    private static string SanitizeZipNameSegment(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "untitled";
+        }
+
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var sanitized = new string(value
+            .Trim()
+            .Select(ch => invalidChars.Contains(ch) ? '_' : ch)
+            .ToArray());
+
+        sanitized = sanitized.TrimEnd('.', ' ');
+
+        return string.IsNullOrWhiteSpace(sanitized)
+            ? "untitled"
+            : sanitized;
+    }
+
+    private static string EnsureUniqueName(string baseName, ISet<string> usedNames)
+    {
+        if (usedNames.Add(baseName))
+        {
+            return baseName;
+        }
+
+        for (var index = 2; ; index++)
+        {
+            var candidate = $"{baseName} ({index})";
+            if (usedNames.Add(candidate))
+            {
+                return candidate;
             }
         }
     }

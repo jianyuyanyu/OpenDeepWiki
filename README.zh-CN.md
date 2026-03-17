@@ -18,7 +18,7 @@
 
 # 功能 Features
 
-- **快速转换**：支持将所有GitHub、GitLab、Gitee、Gitea等代码仓库几分钟内转换为知识库。
+- **快速转换**：支持将所有GitHub、GitLab、AtomGit、Gitee、Gitea等代码仓库几分钟内转换为知识库。
 - **多语言支持**：支持所有编程语言的代码分析和文档生成。
 - **代码结构图**：自动生成Mermaid图，帮助理解代码结构。
 - **自定义模型支持**：支持自定义模型和自定义API，灵活扩展。
@@ -30,7 +30,7 @@
 
 # 特性清单 Feature List
 
-- [x] 支持多代码仓库（GitHub、GitLab、Gitee、Gitea等）
+- [x] 支持多代码仓库（GitHub、GitLab、AtomGit、Gitee、Gitea等）
 - [x] 支持多编程语言（Python、Java、C#、JavaScript等）
 - [x] 支持仓库管理（增删改查仓库）
 - [x] 支持多AI提供商（OpenAI、AzureOpenAI、Anthropic等）

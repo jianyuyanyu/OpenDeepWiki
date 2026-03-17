@@ -1,15 +1,18 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Models;
 using OpenDeepWiki.Services.Auth;
+using OpenDeepWiki.Services.GitHub;
+using OpenDeepWiki.Services.Organizations;
 
 namespace OpenDeepWiki.Services.Repositories;
 
 [MiniApi(Route = "/api/v1/repositories")]
 [Tags("仓库")]
-public class RepositoryService(IContext context, IGitPlatformService gitPlatformService, IUserContext userContext)
+public class RepositoryService(IContext context, IGitPlatformService gitPlatformService, IUserContext userContext, IGitHubAppService gitHubAppService, IOrganizationService organizationService)
 {
     [HttpPost("/submit")]
     public async Task<Repository> SubmitAsync([FromBody] RepositorySubmitRequest request)
@@ -51,6 +54,17 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
             }
         }
 
+        // Server-side visibility verification: check actual GitHub repo visibility
+        var effectiveIsPublic = request.IsPublic;
+        if (IsPublicPlatform(request.GitUrl) && !string.IsNullOrWhiteSpace(request.OrgName) && !string.IsNullOrWhiteSpace(request.RepoName))
+        {
+            var repoInfo = await gitPlatformService.CheckRepoExistsAsync(request.OrgName, request.RepoName);
+            if (repoInfo.Exists)
+            {
+                effectiveIsPublic = !repoInfo.IsPrivate;
+            }
+        }
+
         var repositoryId = Guid.NewGuid().ToString();
         var repository = new Repository
         {
@@ -61,7 +75,7 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
             OrgName = request.OrgName,
             AuthAccount = request.AuthAccount,
             AuthPassword = request.AuthPassword,
-            IsPublic = request.IsPublic,
+            IsPublic = effectiveIsPublic,
             Status = RepositoryStatus.Pending,
             StarCount = starCount,
             ForkCount = forkCount
@@ -136,7 +150,7 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
 
         if (!string.IsNullOrWhiteSpace(ownerId))
         {
-            query = query.Where(r => r.OwnerUserId == ownerId);
+            query = query.Where(r => r.OwnerUserId == ownerId && !r.IsDepartmentOwned);
         }
 
         if (status.HasValue)
@@ -252,13 +266,31 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
             // 验证所有权
             if (repository.OwnerUserId != currentUserId)
             {
-                return Results.Json(new UpdateVisibilityResponse
+                // Allow admin to manage department-owned repos in their departments
+                var allowed = false;
+                if (repository.IsDepartmentOwned)
                 {
-                    Id = request.RepositoryId,
-                    IsPublic = repository.IsPublic,
-                    Success = false,
-                    ErrorMessage = "无权限修改此仓库"
-                }, statusCode: StatusCodes.Status403Forbidden);
+                    var isAdmin = userContext.User?.IsInRole("Admin") == true;
+                    if (isAdmin)
+                    {
+                        var deptRepos = await organizationService.GetDepartmentRepositoriesAsync(currentUserId);
+                        if (deptRepos.Any(r => r.RepositoryId == repository.Id))
+                        {
+                            allowed = true;
+                        }
+                    }
+                }
+
+                if (!allowed)
+                {
+                    return Results.Json(new UpdateVisibilityResponse
+                    {
+                        Id = request.RepositoryId,
+                        IsPublic = repository.IsPublic,
+                        Success = false,
+                        ErrorMessage = "无权限修改此仓库"
+                    }, statusCode: StatusCodes.Status403Forbidden);
+                }
             }
 
             // 无密码仓库不能设为私有
@@ -345,11 +377,29 @@ public class RepositoryService(IContext context, IGitPlatformService gitPlatform
         // 验证所有权
         if (repository.OwnerUserId != currentUserId)
         {
-            return new RegenerateResponse
+            // Allow admin to manage department-owned repos in their departments
+            var allowed = false;
+            if (repository.IsDepartmentOwned)
             {
-                Success = false,
-                ErrorMessage = "无权限操作此仓库"
-            };
+                var isAdmin = userContext.User?.IsInRole("Admin") == true;
+                if (isAdmin)
+                {
+                    var deptRepos = await organizationService.GetDepartmentRepositoriesAsync(currentUserId);
+                    if (deptRepos.Any(r => r.RepositoryId == repository.Id))
+                    {
+                        allowed = true;
+                    }
+                }
+            }
+
+            if (!allowed)
+            {
+                return new RegenerateResponse
+                {
+                    Success = false,
+                    ErrorMessage = "无权限操作此仓库"
+                };
+            }
         }
 
         // 只有失败或完成状态才能重新生成

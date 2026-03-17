@@ -135,7 +135,7 @@ cd ..
 
 :: 复制前端 standalone 构建产物
 echo 复制前端构建产物...
-xcopy /E /I /Y "web\.next\standalone\web\*" "%FRONTEND_DIR%\"
+xcopy /E /I /Y "web\.next\standalone\*" "%FRONTEND_DIR%\"
 xcopy /E /I /Y "web\.next\static" "%FRONTEND_DIR%\.next\static"
 xcopy /E /I /Y "web\public" "%FRONTEND_DIR%\public"
 

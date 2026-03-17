@@ -81,6 +81,11 @@ public interface IChatLogService
     /// Gets a single chat log by ID.
     /// </summary>
     Task<ChatLogDto?> GetLogByIdAsync(Guid id, string appId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records a diagnostic error log when an AI provider fails.
+    /// </summary>
+    Task LogChatErrorAsync(Guid sessionId, Exception ex, string modelUsed = "", CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -178,6 +183,27 @@ public class ChatLogService : IChatLogService
 
         return log != null ? MapToDto(log) : null;
     }
+
+    /// <inheritdoc />
+    public async Task LogChatErrorAsync(Guid sessionId, Exception ex, string modelUsed = "", CancellationToken cancellationToken = default)
+    { 
+        // Log the error details in a structured way
+        var category = ex.GetType().Name; 
+        
+        // Create a special chat log entry for this error
+        var errorDto = new RecordChatLogDto
+        {
+           AppId = "System_Error",
+           UserIdentifier = "Diagnostic",
+           Question = $"AI_FAILURE_SESSION_{sessionId}",
+           AnswerSummary = $"Error: {category} | Message: {ex.Message}",
+           ModelUsed = modelUsed
+     };
+        
+        await RecordChatLogAsync(errorDto, cancellationToken);
+
+       _logger.LogError(ex, "Critical AI Provider error recorded for session {SessionId}", sessionId);
+    } 
 
     /// <summary>
     /// Maps a ChatLog entity to a DTO.

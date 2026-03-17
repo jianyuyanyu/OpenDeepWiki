@@ -121,15 +121,27 @@ public class ProcessingLogService : IProcessingLogService
                 continue;
             }
 
-            // 匹配 "正在生成文档 (X/Y)" 格式
-            var progressMatch = System.Text.RegularExpressions.Regex.Match(
-                log.Message, @"正在生成文档\s*\((\d+)/(\d+)\)");
-            if (progressMatch.Success)
+            // 匹配 "文档完成 (X/Y)" 格式（以完成为准）
+            var completedMatch = System.Text.RegularExpressions.Regex.Match(
+                log.Message, @"文档完成\s*\((\d+)/(\d+)\)");
+            if (completedMatch.Success)
             {
-                completed = int.Parse(progressMatch.Groups[1].Value);
+                completed = Math.Max(completed, int.Parse(completedMatch.Groups[1].Value));
                 if (total == 0)
                 {
-                    total = int.Parse(progressMatch.Groups[2].Value);
+                    total = int.Parse(completedMatch.Groups[2].Value);
+                }
+                continue;
+            }
+
+            // 匹配 "开始生成文档 (X/Y)" 或旧格式 "正在生成文档 (X/Y)" - 仅用于补全总数
+            var progressMatch = System.Text.RegularExpressions.Regex.Match(
+                log.Message, @"(开始生成文档|正在生成文档)\s*\((\d+)/(\d+)\)");
+            if (progressMatch.Success)
+            {
+                if (total == 0)
+                {
+                    total = int.Parse(progressMatch.Groups[3].Value);
                 }
                 continue;
             }

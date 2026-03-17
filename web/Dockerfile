@@ -4,7 +4,7 @@ WORKDIR /app
 
 # 安装依赖
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 # 构建阶段
 FROM node:20-alpine AS builder

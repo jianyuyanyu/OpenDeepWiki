@@ -43,6 +43,19 @@ public static class AdminRepositoryEndpoints
         .WithName("AdminGetRepository")
         .WithSummary("获取仓库详情");
 
+        // 获取仓库深度管理信息（分支、语言、增量任务）
+        repoGroup.MapGet("/{id}/management", async (
+            string id,
+            [FromServices] IAdminRepositoryService repositoryService) =>
+        {
+            var result = await repositoryService.GetRepositoryManagementAsync(id);
+            if (result == null)
+                return Results.NotFound(new { success = false, message = "仓库不存在" });
+            return Results.Ok(new { success = true, data = result });
+        })
+        .WithName("AdminGetRepositoryManagement")
+        .WithSummary("获取仓库深度管理信息");
+
         // 更新仓库
         repoGroup.MapPut("/{id}", async (
             string id,
@@ -94,6 +107,43 @@ public static class AdminRepositoryEndpoints
         })
         .WithName("AdminSyncRepositoryStats")
         .WithSummary("同步仓库统计信息");
+
+        // 触发仓库全量重生成
+        repoGroup.MapPost("/{id}/regenerate", async (
+            string id,
+            [FromServices] IAdminRepositoryService repositoryService) =>
+        {
+            var result = await repositoryService.RegenerateRepositoryAsync(id);
+            return Results.Ok(new { success = result.Success, message = result.Message, data = result });
+        })
+        .WithName("AdminRegenerateRepository")
+        .WithSummary("触发仓库全量重生成");
+
+        // 触发指定文档重生成
+        repoGroup.MapPost("/{id}/documents/regenerate", async (
+            string id,
+            [FromBody] RegenerateRepositoryDocumentRequest request,
+            [FromServices] IAdminRepositoryService repositoryService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await repositoryService.RegenerateDocumentAsync(id, request, cancellationToken);
+            return Results.Ok(new { success = result.Success, message = result.Message, data = result });
+        })
+        .WithName("AdminRegenerateRepositoryDocument")
+        .WithSummary("触发指定文档重生成");
+
+        // 手动更新指定文档内容
+        repoGroup.MapPut("/{id}/documents/content", async (
+            string id,
+            [FromBody] UpdateRepositoryDocumentContentRequest request,
+            [FromServices] IAdminRepositoryService repositoryService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await repositoryService.UpdateDocumentContentAsync(id, request, cancellationToken);
+            return Results.Ok(new { success = result.Success, message = result.Message, data = result });
+        })
+        .WithName("AdminUpdateRepositoryDocumentContent")
+        .WithSummary("手动更新指定文档内容");
 
         // 批量同步仓库统计信息
         repoGroup.MapPost("/batch/sync-stats", async (

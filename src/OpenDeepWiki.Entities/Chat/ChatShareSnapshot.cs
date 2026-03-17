@@ -49,7 +49,7 @@ public class ChatShareSnapshot : AggregateRoot<Guid>
     /// <summary>
     /// 分享创建时间（UTC）
     /// </summary>
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public new DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
     /// 分享过期时间（UTC）

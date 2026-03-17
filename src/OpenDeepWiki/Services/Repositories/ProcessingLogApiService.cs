@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Infrastructure;
 
 namespace OpenDeepWiki.Services.Repositories;
 
@@ -22,6 +23,8 @@ public class ProcessingLogApiService(IContext context, IProcessingLogService pro
         [FromQuery] DateTime? since,
         [FromQuery] int limit = 100)
     {
+        (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
+
         if (limit <= 0) limit = 100;
         if (limit > 500) limit = 500;
 
@@ -57,6 +60,7 @@ public class ProcessingLogApiService(IContext context, IProcessingLogService pro
             }).ToList()
         });
     }
+
 }
 
 /// <summary>

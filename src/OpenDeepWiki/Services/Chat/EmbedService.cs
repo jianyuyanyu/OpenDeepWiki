@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using Anthropic.Models.Messages;
 using LibGit2Sharp;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,7 @@ using OpenDeepWiki.Agents;
 using OpenDeepWiki.Agents.Tools;
 using OpenDeepWiki.Chat.Exceptions;
 using OpenDeepWiki.EFCore;
+using OpenDeepWiki.Entities;
 using OpenDeepWiki.Services.Repositories;
 using GitRepository = LibGit2Sharp.Repository;
 
@@ -100,6 +102,7 @@ public interface IEmbedService
 public class EmbedService : IEmbedService
 {
     private readonly IContext _context;
+    private readonly IContextFactory _contextFactory;
     private readonly IChatAppService _chatAppService;
     private readonly IAppStatisticsService _statisticsService;
     private readonly IChatLogService _chatLogService;
@@ -109,6 +112,7 @@ public class EmbedService : IEmbedService
 
     public EmbedService(
         IContext context,
+        IContextFactory contextFactory,
         IChatAppService chatAppService,
         IAppStatisticsService statisticsService,
         IChatLogService chatLogService,
@@ -117,6 +121,7 @@ public class EmbedService : IEmbedService
         ILogger<EmbedService> logger)
     {
         _context = context;
+        _contextFactory = contextFactory;
         _chatAppService = chatAppService;
         _statisticsService = statisticsService;
         _chatLogService = chatLogService;
@@ -419,11 +424,26 @@ public class EmbedService : IEmbedService
             }
 
             // Track token usage if available
-            var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
-            if (usage != null)
+            if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
             {
-                inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
-                outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
+                if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
+                    {
+                        Value: RawMessageDeltaEvent deltaEvent
+                    })
+                {
+                    inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
+                        deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
+                    outputTokens = (int)(deltaEvent.Usage.OutputTokens);
+                }
+            }
+            else
+            {
+                var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
+                if (usage != null)
+                {
+                    inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
+                    outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
+                }
             }
         }
 
@@ -434,6 +454,14 @@ public class EmbedService : IEmbedService
             InputTokens = inputTokens,
             OutputTokens = outputTokens
         }, cancellationToken);
+
+        await RecordTokenUsageAsync(
+            inputTokens,
+            outputTokens,
+            modelId,
+            request.Owner,
+            request.Repo,
+            cancellationToken);
 
         // Record chat log
         var answerSummary = responseBuilder.Length > 500
@@ -458,6 +486,54 @@ public class EmbedService : IEmbedService
             Type = SSEEventType.Done,
             Data = new { inputTokens, outputTokens }
         };
+    }
+
+    private async Task RecordTokenUsageAsync(
+        int inputTokens,
+        int outputTokens,
+        string modelName,
+        string? owner,
+        string? repo,
+        CancellationToken cancellationToken)
+    {
+        if (inputTokens <= 0 && outputTokens <= 0)
+        {
+            return;
+        }
+
+        try
+        {
+            using var context = _contextFactory.CreateContext();
+            string? repositoryId = null;
+
+            if (!string.IsNullOrWhiteSpace(owner) && !string.IsNullOrWhiteSpace(repo))
+            {
+                var repositoryIds = await context.Repositories
+                    .Where(r => !r.IsDeleted && r.OrgName == owner && r.RepoName == repo)
+                    .Select(r => r.Id)
+                    .Take(2)
+                    .ToListAsync(cancellationToken);
+                repositoryId = repositoryIds.Count == 1 ? repositoryIds[0] : null;
+            }
+
+            var usage = new TokenUsage
+            {
+                Id = Guid.NewGuid().ToString(),
+                RepositoryId = repositoryId,
+                InputTokens = inputTokens,
+                OutputTokens = outputTokens,
+                ModelName = modelName,
+                Operation = "EmbedChat",
+                RecordedAt = DateTime.UtcNow
+            };
+
+            context.TokenUsages.Add(usage);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to record token usage for embed chat.");
+        }
     }
 
     /// <summary>

@@ -47,6 +47,7 @@ import {
 } from "@/lib/recommendation-api";
 import { useAuth } from "@/contexts/auth-context";
 import Link from "next/link";
+import { buildRepoBasePath } from "@/lib/repo-route";
 
 type Strategy = "default" | "popular" | "personalized" | "explore";
 
@@ -254,7 +255,7 @@ export default function RecommendPage() {
             {repos.map((repo) => (
               <Link 
                 key={repo.id} 
-                href={`/${repo.orgName}/${repo.repoName}`}
+                href={buildRepoBasePath(repo.orgName, repo.repoName)}
                 className="block"
                 onClick={() => handleRepoClick(repo)}
               >

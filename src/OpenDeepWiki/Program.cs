@@ -5,11 +5,13 @@ using Microsoft.IdentityModel.Tokens;
 using OpenDeepWiki.Agents;
 using OpenDeepWiki.Cache.DependencyInjection;
 using OpenDeepWiki.Chat;
+using OpenDeepWiki.MCP;
 using OpenDeepWiki.Endpoints;
 using OpenDeepWiki.Endpoints.Admin;
 using OpenDeepWiki.Infrastructure;
 using OpenDeepWiki.Services.Admin;
 using OpenDeepWiki.Services.Auth;
+using OpenDeepWiki.Services.GitHub;
 using OpenDeepWiki.Services.Chat;
 using OpenDeepWiki.Services.MindMap;
 using OpenDeepWiki.Services.Notifications;
@@ -19,6 +21,7 @@ using OpenDeepWiki.Services.Prompts;
 using OpenDeepWiki.Services.Recommendation;
 using OpenDeepWiki.Services.Repositories;
 using OpenDeepWiki.Services.Translation;
+using OpenDeepWiki.Services.Mcp;
 using OpenDeepWiki.Services.UserProfile;
 using OpenDeepWiki.Services.Wiki;
 using Scalar.AspNetCore;
@@ -121,6 +124,14 @@ try
 
     // 添加HttpClient
     builder.Services.AddHttpClient();
+
+    var mcpOAuthEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["GOOGLE_CLIENT_ID"] ?? builder.Configuration["Google:ClientId"])
+                          && !string.IsNullOrWhiteSpace(builder.Configuration["GOOGLE_CLIENT_SECRET"] ?? builder.Configuration["Google:ClientSecret"]);
+    if (mcpOAuthEnabled)
+    {
+        builder.Services.AddSingleton<McpOAuthServer>();
+        builder.Services.AddHostedService<McpOAuthCleanupService>();
+    }
 
     // 注册Git平台服务
     builder.Services.AddScoped<IGitPlatformService, GitPlatformService>();
@@ -286,6 +297,12 @@ try
     // 注册处理日志服务（使用 Singleton，因为它内部使用 IServiceScopeFactory 创建独立 scope）
     builder.Services.AddSingleton<IProcessingLogService, ProcessingLogService>();
 
+    // Register GitHub App services
+    builder.Services.AddSingleton<GitHubAppCredentialCache>();
+    builder.Services.AddScoped<IGitHubAppService, GitHubAppService>();
+    builder.Services.AddScoped<IAdminGitHubImportService, AdminGitHubImportService>();
+    builder.Services.AddScoped<IUserGitHubImportService, UserGitHubImportService>();
+
     // 注册管理端服务
     builder.Services.AddScoped<IAdminStatisticsService, AdminStatisticsService>();
     builder.Services.AddScoped<IAdminRepositoryService, AdminRepositoryService>();
@@ -357,26 +374,72 @@ try
     // Requirements: 13.5, 13.6, 14.2, 14.7, 17.1, 17.2, 17.4 - 嵌入脚本验证和对话
     builder.Services.AddScoped<IEmbedService, EmbedService>();
 
-    var app = builder.Build();
+    // 注册 MCP 提供商管理服务
+    builder.Services.AddScoped<IAdminMcpProviderService, AdminMcpProviderService>();
+    builder.Services.AddScoped<IMcpUsageLogService, McpUsageLogService>();
+    builder.Services.AddHostedService<McpStatisticsAggregationService>();
 
-    // 初始化数据库
-    await DbInitializer.InitializeAsync(app.Services);
-
-    // 应用数据库中的系统设置到配置（覆盖环境变量和appsettings.json的值）
-    using (var scope = app.Services.CreateScope())
+    // MCP server registration (official MCP server + scope via ConfigureSessionOptions)
+    var mcpEnabled = builder.Configuration.GetValue("MCP_ENABLED", true);
+    if (mcpEnabled)
     {
-        var settingsService = scope.ServiceProvider.GetRequiredService<IAdminSettingsService>();
-        var wikiOptions = scope.ServiceProvider.GetRequiredService<IOptions<WikiGeneratorOptions>>();
-        await SystemSettingDefaults.ApplyToWikiGeneratorOptions(wikiOptions.Value, settingsService);
+        builder.Services.AddMcpServer()
+            .WithHttpTransport(options =>
+            {
+                options.ConfigureSessionOptions = (httpContext, mcpServer, _) =>
+                {
+                    var segments = httpContext.Request.Path.Value?.Split('/', StringSplitOptions.RemoveEmptyEntries)
+                                   ?? Array.Empty<string>();
+                    string? owner = null;
+                    string? repo = null;
+                    if (segments.Length >= 4
+                        && string.Equals(segments[0], "api", StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(segments[1], "mcp", StringComparison.OrdinalIgnoreCase))
+                    {
+                        owner = Uri.UnescapeDataString(segments[2]);
+                        repo = Uri.UnescapeDataString(segments[3]);
+                    }
+
+                    if (string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(repo))
+                    {
+                        var query = httpContext.Request.Query;
+                        var queryOwner = query["owner"].FirstOrDefault();
+                        var queryRepo = query["repo"].FirstOrDefault() ?? query["name"].FirstOrDefault();
+
+                        if (!string.IsNullOrWhiteSpace(queryOwner))
+                        {
+                            owner = Uri.UnescapeDataString(queryOwner);
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(queryRepo))
+                        {
+                            repo = Uri.UnescapeDataString(queryRepo);
+                        }
+                    }
+
+                    McpRepositoryScopeAccessor.SetScope(mcpServer, owner, repo);
+                    return Task.CompletedTask;
+                };
+            })
+            .WithTools<McpRepositoryTools>();
     }
 
-    // 启用 CORS
-    app.UseCors("AllowAll");
-
-    // Add Serilog request logging
-    app.UseSerilogLogging();
+    var app = builder.Build();
 
     // Configure the HTTP request pipeline.
+    app.UseCors("AllowAll");
+
+    // 添加静态文件支持（用于 Skill assets 等）
+    app.UseStaticFiles();
+
+    // Configure forwarded headers for reverse proxy scenarios
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                           | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+                           | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost
+    });
+
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
@@ -386,10 +449,26 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
+    // MCP server endpoints (official MCP server + scope via ConfigureSessionOptions)
+    if (mcpEnabled)
+    {
+        app.UseMcpUsageLogging("/api/mcp");
+        app.UseSseKeepAlive("/api/mcp");
+        app.MapMcp("/api/mcp");
+        app.MapMcp("/api/mcp/{owner}/{repo}");
+
+        if (mcpOAuthEnabled)
+        {
+            app.MapProtectedResourceMetadata();
+            app.MapMcpOAuthEndpoints();
+        }
+    }
+
     app.MapMiniApis();
     app.MapAuthEndpoints();
     app.MapOAuthEndpoints();
     app.MapAdminEndpoints();
+    app.MapGitHubImportEndpoints();
     app.MapOrganizationEndpoints();
     app.MapChatAssistantEndpoints();
     app.MapChatAppEndpoints();
@@ -397,6 +476,13 @@ try
 
     app.MapSystemEndpoints();
     app.MapIncrementalUpdateEndpoints();
+    app.MapMcpProviderEndpoints();
+
+    // 初始化数据库（创建默认数据）
+    using (var scope = app.Services.CreateScope())
+    {
+        await DbInitializer.InitializeAsync(scope.ServiceProvider);
+    }
 
     app.Run();
 }
@@ -419,7 +505,8 @@ static void LoadEnvFile(IConfigurationBuilder configuration)
     var envPaths = new[]
     {
         Path.Combine(Directory.GetCurrentDirectory(), ".env"),
-        Path.Combine(AppContext.BaseDirectory, ".env")
+        Path.Combine(AppContext.BaseDirectory, ".env"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".env"),
     };
 
     foreach (var envPath in envPaths)

@@ -1,5 +1,3 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Entities.Tools;
@@ -21,6 +19,7 @@ public interface IContext : IDisposable
     DbSet<DocFile> DocFiles { get; set; }
     DbSet<DocCatalog> DocCatalogs { get; set; }
     DbSet<RepositoryAssignment> RepositoryAssignments { get; set; }
+    DbSet<GitHubAppInstallation> GitHubAppInstallations { get; set; }
     DbSet<UserBookmark> UserBookmarks { get; set; }
     DbSet<UserSubscription> UserSubscriptions { get; set; }
     DbSet<RepositoryProcessingLog> RepositoryProcessingLogs { get; set; }
@@ -44,6 +43,9 @@ public interface IContext : IDisposable
     DbSet<ChatLog> ChatLogs { get; set; }
     DbSet<TranslationTask> TranslationTasks { get; set; }
     DbSet<IncrementalUpdateTask> IncrementalUpdateTasks { get; set; }
+    DbSet<McpProvider> McpProviders { get; set; }
+    DbSet<McpUsageLog> McpUsageLogs { get; set; }
+    DbSet<McpDailyStatistics> McpDailyStatistics { get; set; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
@@ -68,6 +70,7 @@ public abstract class MasterDbContext : DbContext, IContext
     public DbSet<DocFile> DocFiles { get; set; } = null!;
     public DbSet<DocCatalog> DocCatalogs { get; set; } = null!;
     public DbSet<RepositoryAssignment> RepositoryAssignments { get; set; } = null!;
+    public DbSet<GitHubAppInstallation> GitHubAppInstallations { get; set; } = null!;
     public DbSet<UserBookmark> UserBookmarks { get; set; } = null!;
     public DbSet<UserSubscription> UserSubscriptions { get; set; } = null!;
     public DbSet<RepositoryProcessingLog> RepositoryProcessingLogs { get; set; } = null!;
@@ -91,6 +94,9 @@ public abstract class MasterDbContext : DbContext, IContext
     public DbSet<ChatLog> ChatLogs { get; set; } = null!;
     public DbSet<TranslationTask> TranslationTasks { get; set; } = null!;
     public DbSet<IncrementalUpdateTask> IncrementalUpdateTasks { get; set; } = null!;
+    public DbSet<McpProvider> McpProviders { get; set; } = null!;
+    public DbSet<McpUsageLog> McpUsageLogs { get; set; } = null!;
+    public DbSet<McpDailyStatistics> McpDailyStatistics { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -102,7 +108,7 @@ public abstract class MasterDbContext : DbContext, IContext
             .HasForeignKey(department => department.ParentId);
 
         modelBuilder.Entity<Repository>()
-            .HasIndex(repository => new { repository.OwnerUserId, repository.OrgName, repository.RepoName })
+            .HasIndex(repository => new { repository.OrgName, repository.RepoName })
             .IsUnique();
 
         modelBuilder.Entity<RepositoryBranch>()
@@ -277,5 +283,116 @@ public abstract class MasterDbContext : DbContext, IContext
         // IncrementalUpdateTask 优先级和创建时间索引（用于按优先级排序处理）
         modelBuilder.Entity<IncrementalUpdateTask>()
             .HasIndex(t => new { t.Priority, t.CreatedAt });
+
+        // McpProvider 表配置
+        modelBuilder.Entity<McpProvider>(builder =>
+        {
+            builder.Property(m => m.Name)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            builder.Property(m => m.Description)
+                .HasMaxLength(500);
+
+            builder.Property(m => m.ServerUrl)
+                .IsRequired()
+                .HasMaxLength(500);
+
+            builder.Property(m => m.TransportType)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            builder.Property(m => m.ApiKeyObtainUrl)
+                .HasMaxLength(500);
+
+            builder.Property(m => m.SystemApiKey)
+                .HasMaxLength(500);
+
+            builder.Property(m => m.RequestTypes)
+                .HasMaxLength(2000);
+
+            builder.Property(m => m.AllowedTools)
+                .HasMaxLength(2000);
+
+            builder.Property(m => m.IconUrl)
+                .HasMaxLength(500);
+
+            // 名称唯一索引
+            builder.HasIndex(m => m.Name)
+                .IsUnique();
+
+            // 排序索引
+            builder.HasIndex(m => m.SortOrder);
+
+            // 启用状态索引
+            builder.HasIndex(m => m.IsActive);
+        });
+
+        // McpUsageLog 表配置
+        modelBuilder.Entity<McpUsageLog>(builder =>
+        {
+            builder.Property(l => l.UserId)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            builder.Property(l => l.McpProviderId)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            builder.Property(l => l.ToolName)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            builder.Property(l => l.RequestSummary)
+                .HasMaxLength(1000);
+
+            builder.Property(l => l.ErrorMessage)
+                .HasMaxLength(2000);
+
+            builder.Property(l => l.IpAddress)
+                .HasMaxLength(45);
+
+            // 用户ID和创建时间索引
+            builder.HasIndex(l => new { l.UserId, l.CreatedAt });
+
+            // 提供商ID和创建时间索引
+            builder.HasIndex(l => new { l.McpProviderId, l.CreatedAt });
+
+            // 工具名索引
+            builder.HasIndex(l => l.ToolName);
+
+            // 状态索引（基于 HTTP 状态码判断成功）
+            builder.HasIndex(l => l.ResponseStatus);
+
+            // 创建时间索引
+            builder.HasIndex(l => l.CreatedAt);
+        });
+
+        // McpDailyStatistics 表配置
+        modelBuilder.Entity<McpDailyStatistics>(builder =>
+        {
+            builder.Property(s => s.McpProviderId)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            // 提供商ID和日期唯一索引
+            builder.HasIndex(s => new { s.McpProviderId, s.Date })
+                .IsUnique();
+
+            // 日期索引
+            builder.HasIndex(s => s.Date);
+        });
+
+        // GitHubAppInstallation unique index on InstallationId
+        modelBuilder.Entity<GitHubAppInstallation>()
+            .HasIndex(g => g.InstallationId)
+            .IsUnique();
+
+        // GitHubAppInstallation optional FK to Department
+        modelBuilder.Entity<GitHubAppInstallation>()
+            .HasOne<Department>()
+            .WithMany()
+            .HasForeignKey(g => g.DepartmentId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
