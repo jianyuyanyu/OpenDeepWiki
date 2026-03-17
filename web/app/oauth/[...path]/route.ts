@@ -6,10 +6,55 @@ import { NextRequest, NextResponse } from 'next/server';
  * at the origin during the OAuth flow. This route forwards them to the backend.
  */
 
+let cachedApiUrl: string | null = null;
+let lastLoadTime = 0;
+const CACHE_TTL = 5000;
+
 function getApiProxyUrl(): string {
   if (process.env.API_PROXY_URL) {
     return process.env.API_PROXY_URL;
   }
+
+  const now = Date.now();
+  if (cachedApiUrl !== null && now - lastLoadTime < CACHE_TTL) {
+    return cachedApiUrl;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require('path');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const dotenv = require('dotenv');
+
+    const rootDir = process.cwd();
+    const envLocalPath = path.resolve(rootDir, '.env.local');
+    const envPath = path.resolve(rootDir, '.env');
+
+    if (fs.existsSync(envLocalPath)) {
+      const result = dotenv.config({ path: envLocalPath });
+      if (result.parsed?.API_PROXY_URL) {
+        cachedApiUrl = result.parsed.API_PROXY_URL;
+        lastLoadTime = now;
+        return cachedApiUrl!;
+      }
+    }
+
+    if (fs.existsSync(envPath)) {
+      const result = dotenv.config({ path: envPath });
+      if (result.parsed?.API_PROXY_URL) {
+        cachedApiUrl = result.parsed.API_PROXY_URL;
+        lastLoadTime = now;
+        return cachedApiUrl!;
+      }
+    }
+  } catch {
+    // Ignore env loading failures and fall back to empty string
+  }
+
+  cachedApiUrl = '';
+  lastLoadTime = now;
   return '';
 }
 

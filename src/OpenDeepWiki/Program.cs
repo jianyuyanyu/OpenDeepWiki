@@ -125,6 +125,14 @@ try
     // 添加HttpClient
     builder.Services.AddHttpClient();
 
+    var mcpOAuthEnabled = !string.IsNullOrWhiteSpace(builder.Configuration["GOOGLE_CLIENT_ID"] ?? builder.Configuration["Google:ClientId"])
+                          && !string.IsNullOrWhiteSpace(builder.Configuration["GOOGLE_CLIENT_SECRET"] ?? builder.Configuration["Google:ClientSecret"]);
+    if (mcpOAuthEnabled)
+    {
+        builder.Services.AddSingleton<McpOAuthServer>();
+        builder.Services.AddHostedService<McpOAuthCleanupService>();
+    }
+
     // 注册Git平台服务
     builder.Services.AddScoped<IGitPlatformService, GitPlatformService>();
 
@@ -392,6 +400,23 @@ try
                         repo = Uri.UnescapeDataString(segments[3]);
                     }
 
+                    if (string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(repo))
+                    {
+                        var query = httpContext.Request.Query;
+                        var queryOwner = query["owner"].FirstOrDefault();
+                        var queryRepo = query["repo"].FirstOrDefault() ?? query["name"].FirstOrDefault();
+
+                        if (!string.IsNullOrWhiteSpace(queryOwner))
+                        {
+                            owner = Uri.UnescapeDataString(queryOwner);
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(queryRepo))
+                        {
+                            repo = Uri.UnescapeDataString(queryRepo);
+                        }
+                    }
+
                     McpRepositoryScopeAccessor.SetScope(mcpServer, owner, repo);
                     return Task.CompletedTask;
                 };
@@ -431,6 +456,12 @@ try
         app.UseSseKeepAlive("/api/mcp");
         app.MapMcp("/api/mcp");
         app.MapMcp("/api/mcp/{owner}/{repo}");
+
+        if (mcpOAuthEnabled)
+        {
+            app.MapProtectedResourceMetadata();
+            app.MapMcpOAuthEndpoints();
+        }
     }
 
     app.MapMiniApis();

@@ -1,15 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-/**
- * Proxies /.well-known/* requests to the backend API.
- * Claude.ai and other MCP clients fetch OAuth metadata from these paths at the origin,
- * but only /api/* is handled by the main proxy. This route bridges the gap.
- */
+let cachedApiUrl: string | null = null;
+let lastLoadTime = 0;
+const CACHE_TTL = 5000;
 
 function getApiProxyUrl(): string {
   if (process.env.API_PROXY_URL) {
     return process.env.API_PROXY_URL;
   }
+
+  const now = Date.now();
+  if (cachedApiUrl !== null && now - lastLoadTime < CACHE_TTL) {
+    return cachedApiUrl;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require('path');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const dotenv = require('dotenv');
+
+    const rootDir = process.cwd();
+    const envLocalPath = path.resolve(rootDir, '.env.local');
+    const envPath = path.resolve(rootDir, '.env');
+
+    if (fs.existsSync(envLocalPath)) {
+      const result = dotenv.config({ path: envLocalPath });
+      if (result.parsed?.API_PROXY_URL) {
+        cachedApiUrl = result.parsed.API_PROXY_URL;
+        lastLoadTime = now;
+        return cachedApiUrl!;
+      }
+    }
+
+    if (fs.existsSync(envPath)) {
+      const result = dotenv.config({ path: envPath });
+      if (result.parsed?.API_PROXY_URL) {
+        cachedApiUrl = result.parsed.API_PROXY_URL;
+        lastLoadTime = now;
+        return cachedApiUrl!;
+      }
+    }
+  } catch {
+    // Ignore env loading failures and fall back to empty string
+  }
+
+  cachedApiUrl = '';
+  lastLoadTime = now;
   return '';
 }
 
@@ -37,10 +76,15 @@ async function proxyRequest(request: NextRequest) {
     const response = await fetch(targetUrl, {
       method: request.method,
       headers,
-      body: request.body,
-      // @ts-expect-error duplex is required for streaming body
-      duplex: 'half',
+      redirect: 'manual',
     });
+
+    if (response.status === 302 || response.status === 301) {
+      const location = response.headers.get('location');
+      if (location) {
+        return NextResponse.redirect(location, response.status as 301 | 302);
+      }
+    }
 
     const responseHeaders = new Headers();
     response.headers.forEach((value, key) => {
@@ -64,9 +108,5 @@ async function proxyRequest(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  return proxyRequest(request);
-}
-
-export async function POST(request: NextRequest) {
   return proxyRequest(request);
 }
