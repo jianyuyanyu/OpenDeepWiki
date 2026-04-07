@@ -129,12 +129,12 @@ public class AdminRepositoryService : IAdminRepositoryService
     public async Task<bool> DeleteRepositoryAsync(string id)
     {
         var repo = await _context.Repositories
-            .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
+            .FirstOrDefaultAsync(r => r.Id == id);
 
         if (repo == null) return false;
 
-        repo.IsDeleted = true;
-        repo.UpdatedAt = DateTime.UtcNow;
+        await ClearRepositoryReferencesAsync([repo.Id]);
+        _context.Repositories.Remove(repo);
         await _context.SaveChangesAsync();
         return true;
     }
@@ -150,6 +150,34 @@ public class AdminRepositoryService : IAdminRepositoryService
         repo.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    private async Task ClearRepositoryReferencesAsync(IReadOnlyCollection<string> repositoryIds)
+    {
+        if (repositoryIds.Count == 0)
+        {
+            return;
+        }
+
+        var repositoryIdArray = repositoryIds.Distinct().ToArray();
+
+        var tokenUsages = await _context.TokenUsages
+            .Where(usage => usage.RepositoryId != null && repositoryIdArray.Contains(usage.RepositoryId))
+            .ToListAsync();
+        foreach (var tokenUsage in tokenUsages)
+        {
+            tokenUsage.RepositoryId = null;
+            tokenUsage.UpdateTimestamp();
+        }
+
+        var userActivities = await _context.UserActivities
+            .Where(activity => activity.RepositoryId != null && repositoryIdArray.Contains(activity.RepositoryId))
+            .ToListAsync();
+        foreach (var userActivity in userActivities)
+        {
+            userActivity.RepositoryId = null;
+            userActivity.UpdateTimestamp();
+        }
     }
 
     private static string GetStatusText(RepositoryStatus status) => status switch
@@ -264,14 +292,14 @@ public class AdminRepositoryService : IAdminRepositoryService
         };
 
         var repos = await _context.Repositories
-            .Where(r => ids.Contains(r.Id) && !r.IsDeleted)
+            .Where(r => ids.Contains(r.Id))
             .ToListAsync();
 
-        foreach (var repo in repos)
+        if (repos.Count > 0)
         {
-            repo.IsDeleted = true;
-            repo.UpdatedAt = DateTime.UtcNow;
-            result.SuccessCount++;
+            await ClearRepositoryReferencesAsync(repos.Select(r => r.Id).ToArray());
+            _context.Repositories.RemoveRange(repos);
+            result.SuccessCount = repos.Count;
         }
 
         // 记录不存在的仓库

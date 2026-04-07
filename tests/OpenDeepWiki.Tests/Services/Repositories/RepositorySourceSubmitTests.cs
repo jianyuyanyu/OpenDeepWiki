@@ -6,10 +6,12 @@ using Moq;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Models;
+using OpenDeepWiki.Services.Admin;
 using OpenDeepWiki.Services.Auth;
 using OpenDeepWiki.Services.GitHub;
 using OpenDeepWiki.Services.Organizations;
 using OpenDeepWiki.Services.Repositories;
+using OpenDeepWiki.Services.Wiki;
 using Xunit;
 
 namespace OpenDeepWiki.Tests.Services.Repositories;
@@ -156,6 +158,115 @@ public class RepositorySourceSubmitTests
         Assert.Equal(2, repository.ForkCount);
     }
 
+    [Fact]
+    public async Task DeleteRepositoryAsync_ShouldHardDeleteRepositoryAndClearOptionalReferences()
+    {
+        using var context = CreateContext();
+        var repository = new Repository
+        {
+            Id = Guid.NewGuid().ToString(),
+            OwnerUserId = "user-1",
+            GitUrl = "https://github.com/demo/repo.git",
+            OrgName = "demo",
+            RepoName = "repo"
+        };
+        context.Repositories.Add(repository);
+        context.TokenUsages.Add(new TokenUsage
+        {
+            Id = Guid.NewGuid().ToString(),
+            RepositoryId = repository.Id,
+            RecordedAt = DateTime.UtcNow
+        });
+        context.UserActivities.Add(new UserActivity
+        {
+            Id = Guid.NewGuid().ToString(),
+            UserId = "user-1",
+            RepositoryId = repository.Id,
+            ActivityType = UserActivityType.View,
+            Weight = 1
+        });
+        await context.SaveChangesAsync();
+
+        var adminService = CreateAdminService(context);
+
+        var deleted = await adminService.DeleteRepositoryAsync(repository.Id);
+
+        Assert.True(deleted);
+        Assert.False(await context.Repositories.AnyAsync(r => r.Id == repository.Id));
+        Assert.Null((await context.TokenUsages.SingleAsync()).RepositoryId);
+        Assert.Null((await context.UserActivities.SingleAsync()).RepositoryId);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_ShouldRemoveSoftDeletedDuplicateBeforeRecreate()
+    {
+        using var context = CreateContext();
+        var softDeletedRepositoryId = Guid.NewGuid().ToString();
+        var branchId = Guid.NewGuid().ToString();
+        context.Repositories.Add(new Repository
+        {
+            Id = softDeletedRepositoryId,
+            OwnerUserId = "user-1",
+            GitUrl = "https://github.com/AIDotNet/OpenDeepWiki.git",
+            OrgName = "AIDotNet",
+            RepoName = "OpenDeepWiki",
+            IsDeleted = true,
+            DeletedAt = DateTime.UtcNow
+        });
+        context.RepositoryBranches.Add(new RepositoryBranch
+        {
+            Id = branchId,
+            RepositoryId = softDeletedRepositoryId,
+            BranchName = "main"
+        });
+        context.BranchLanguages.Add(new BranchLanguage
+        {
+            Id = Guid.NewGuid().ToString(),
+            RepositoryBranchId = branchId,
+            LanguageCode = "zh",
+            IsDefault = true
+        });
+        context.TokenUsages.Add(new TokenUsage
+        {
+            Id = Guid.NewGuid().ToString(),
+            RepositoryId = softDeletedRepositoryId,
+            RecordedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+
+        var gitPlatformService = new Mock<IGitPlatformService>();
+        gitPlatformService
+            .Setup(s => s.GetRepoStatsAsync("https://github.com/AIDotNet/OpenDeepWiki.git"))
+            .ReturnsAsync(new GitRepoStats(10, 2));
+        gitPlatformService
+            .Setup(s => s.CheckRepoExistsAsync("AIDotNet", "OpenDeepWiki"))
+            .ReturnsAsync(new GitRepoInfo(true, "OpenDeepWiki", null, "main", 10, 2, "C#", null, false));
+
+        var service = CreateService(
+            context,
+            new RepositoryAnalyzerOptions
+            {
+                RepositoriesDirectory = CreateTempDirectory(),
+                AllowedLocalPathRoots = []
+            },
+            gitPlatformService: gitPlatformService.Object);
+
+        var repository = await service.SubmitAsync(new RepositorySubmitRequest
+        {
+            GitUrl = "https://github.com/AIDotNet/OpenDeepWiki.git",
+            OrgName = "AIDotNet",
+            RepoName = "OpenDeepWiki",
+            BranchName = "main",
+            LanguageCode = "zh",
+            IsPublic = true
+        });
+
+        Assert.NotEqual(softDeletedRepositoryId, repository.Id);
+        Assert.Single(await context.Repositories.ToListAsync());
+        Assert.False(await context.Repositories.AnyAsync(r => r.Id == softDeletedRepositoryId));
+        Assert.Null((await context.TokenUsages.SingleAsync()).RepositoryId);
+    }
+
     private static RepositoryService CreateService(
         TestDbContext context,
         RepositoryAnalyzerOptions analyzerOptions,
@@ -169,6 +280,15 @@ public class RepositorySourceSubmitTests
             Mock.Of<IGitHubAppService>(),
             Mock.Of<IOrganizationService>(),
             Options.Create(analyzerOptions));
+    }
+
+    private static AdminRepositoryService CreateAdminService(TestDbContext context)
+    {
+        return new AdminRepositoryService(
+            context,
+            Mock.Of<IGitPlatformService>(),
+            Mock.Of<IRepositoryAnalyzer>(),
+            Mock.Of<IWikiGenerator>());
     }
 
     private static TestDbContext CreateContext()

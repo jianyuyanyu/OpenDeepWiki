@@ -586,6 +586,17 @@ public class RepositoryService(
             throw new InvalidOperationException("该仓库的相同分支已存在，请勿重复提交");
         }
 
+        var softDeletedRepositories = await context.Repositories
+            .Where(r => r.OrgName == orgName && r.RepoName == repoName && r.IsDeleted)
+            .ToListAsync();
+
+        if (softDeletedRepositories.Count > 0)
+        {
+            await ClearRepositoryReferencesAsync(softDeletedRepositories.Select(r => r.Id).ToArray());
+            context.Repositories.RemoveRange(softDeletedRepositories);
+            await context.SaveChangesAsync();
+        }
+
         var repositoryId = Guid.NewGuid().ToString();
         var repository = new Repository
         {
@@ -625,6 +636,34 @@ public class RepositoryService(
 
         await context.SaveChangesAsync();
         return repository;
+    }
+
+    private async Task ClearRepositoryReferencesAsync(IReadOnlyCollection<string> repositoryIds)
+    {
+        if (repositoryIds.Count == 0)
+        {
+            return;
+        }
+
+        var repositoryIdArray = repositoryIds.Distinct().ToArray();
+
+        var tokenUsages = await context.TokenUsages
+            .Where(usage => usage.RepositoryId != null && repositoryIdArray.Contains(usage.RepositoryId))
+            .ToListAsync();
+        foreach (var tokenUsage in tokenUsages)
+        {
+            tokenUsage.RepositoryId = null;
+            tokenUsage.UpdateTimestamp();
+        }
+
+        var userActivities = await context.UserActivities
+            .Where(activity => activity.RepositoryId != null && repositoryIdArray.Contains(activity.RepositoryId))
+            .ToListAsync();
+        foreach (var userActivity in userActivities)
+        {
+            userActivity.RepositoryId = null;
+            userActivity.UpdateTimestamp();
+        }
     }
 
     private string GetArchiveUploadsDirectory(string currentUserId)
