@@ -1309,3 +1309,49 @@ export async function resetGitHubConfig(): Promise<void> {
   const url = buildApiUrl("/api/admin/github/config");
   await fetchWithAuth(url, { method: "DELETE" });
 }
+
+// ==================== API Key API ====================
+
+export interface ApiKeyCreateResult {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  scope: string;
+  expiresAt?: string;
+  plainTextKey: string;
+}
+
+export interface ApiKeyListItem {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  userId: string;
+  userEmail?: string;
+  scope: string;
+  expiresAt?: string;
+  lastUsedAt?: string;
+  createdAt: string;
+}
+
+export async function getApiKeys(): Promise<ApiKeyListItem[]> {
+  const url = buildApiUrl("/api/admin/api-keys");
+  return fetchWithAuth(url);
+}
+
+export async function createApiKey(data: {
+  name: string;
+  userId: string;
+  scope?: string;
+  expiresInDays?: number;
+}): Promise<ApiKeyCreateResult> {
+  const url = buildApiUrl("/api/admin/api-keys");
+  return fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function revokeApiKey(id: string): Promise<void> {
+  const url = buildApiUrl(`/api/admin/api-keys/${id}`);
+  await fetchWithAuth(url, { method: "DELETE" });
+}

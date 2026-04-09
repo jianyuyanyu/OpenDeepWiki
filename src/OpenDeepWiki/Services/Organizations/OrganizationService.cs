@@ -74,7 +74,12 @@ public class OrganizationService : IOrganizationService
                 Status = (int)repos[a.RepositoryId].Status,
                 StatusName = GetStatusName((int)repos[a.RepositoryId].Status),
                 DepartmentId = a.DepartmentId,
-                DepartmentName = depts[a.DepartmentId].Name
+                DepartmentName = depts[a.DepartmentId].Name,
+                CreatedAt = repos[a.RepositoryId].CreatedAt,
+                Description = repos[a.RepositoryId].Description,
+                PrimaryLanguage = repos[a.RepositoryId].PrimaryLanguage,
+                IsRestricted = a.IsDeleted,
+                IsPublic = repos[a.RepositoryId].IsPublic
             })
             .DistinctBy(r => r.RepositoryId)
             .ToList();

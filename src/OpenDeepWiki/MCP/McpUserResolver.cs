@@ -65,7 +65,9 @@ public class McpUserResolver : IMcpUserResolver
                 Name = repo.RepoName,
                 GitUrl = repo.GitUrl ?? string.Empty,
                 Status = repo.StatusName ?? string.Empty,
-                Department = repo.DepartmentName ?? string.Empty
+                Department = repo.DepartmentName ?? string.Empty,
+                Description = repo.Description,
+                PrimaryLanguage = repo.PrimaryLanguage
             });
         }
 
@@ -78,7 +80,9 @@ public class McpUserResolver : IMcpUserResolver
                 Name = r.RepoName,
                 GitUrl = r.GitUrl,
                 Status = r.Status.ToString(),
-                Department = "(owned)"
+                Department = "(owned)",
+                Description = r.Description,
+                PrimaryLanguage = r.PrimaryLanguage
             })
             .ToListAsync();
 
@@ -127,4 +131,6 @@ public class McpRepositoryInfo
     public required string GitUrl { get; set; }
     public required string Status { get; set; }
     public required string Department { get; set; }
+    public string? Description { get; set; }
+    public string? PrimaryLanguage { get; set; }
 }

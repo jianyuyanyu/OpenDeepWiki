@@ -124,6 +124,12 @@ public class Repository : AggregateRoot<string>
     public DateTime? LastUpdateCheckAt { get; set; }
 
     /// <summary>
+    /// Repository description (from GitHub)
+    /// </summary>
+    [StringLength(1000)]
+    public string? Description { get; set; }
+
+    /// <summary>
     /// Whether this repository is owned by a department (org import) rather than an individual user.
     /// When true, the repo appears in Organization view only, not in the importing user's "My Repos".
     /// </summary>

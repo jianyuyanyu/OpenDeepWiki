@@ -11,7 +11,18 @@ namespace OpenDeepWiki.MCP;
 public static class McpAuthConfiguration
 {
     public const string McpGoogleScheme = "McpGoogle";
+    public const string McpApiKeyScheme = "McpApiKey";
     public const string McpPolicyName = "McpAccess";
+
+    /// <summary>
+    /// Adds API Key authentication as a secondary authentication scheme for MCP.
+    /// </summary>
+    public static AuthenticationBuilder AddMcpApiKeyAuth(this AuthenticationBuilder builder)
+    {
+        builder.AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(
+            McpApiKeyScheme, options => { });
+        return builder;
+    }
 
     /// <summary>
     /// Adds Google OAuth token validation as a secondary authentication scheme for MCP.

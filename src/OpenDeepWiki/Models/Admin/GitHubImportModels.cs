@@ -66,6 +66,7 @@ public class BatchImportRepo
     public string CloneUrl { get; set; } = string.Empty;
     public string DefaultBranch { get; set; } = "main";
     public bool Private { get; set; }
+    public string? Description { get; set; }
     public string? Language { get; set; }
     public int StargazersCount { get; set; }
     public int ForksCount { get; set; }
