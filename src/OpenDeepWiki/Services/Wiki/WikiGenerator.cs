@@ -66,7 +66,8 @@ public class WikiGenerator : IWikiGenerator
 
     private readonly AgentFactory _agentFactory;
     private readonly IPromptPlugin _promptPlugin;
-    private readonly WikiGeneratorOptions _options;
+    private readonly IOptionsMonitor<WikiGeneratorOptions> _optionsMonitor;
+    private WikiGeneratorOptions _options => _optionsMonitor.CurrentValue;
     private readonly IContext _context;
     private readonly IContextFactory _contextFactory;
     private readonly ILogger<WikiGenerator> _logger;
@@ -82,7 +83,7 @@ public class WikiGenerator : IWikiGenerator
     public WikiGenerator(
         AgentFactory agentFactory,
         IPromptPlugin promptPlugin,
-        IOptions<WikiGeneratorOptions> options,
+        IOptionsMonitor<WikiGeneratorOptions> optionsMonitor,
         IContext context,
         IContextFactory contextFactory,
         ILogger<WikiGenerator> logger,
@@ -91,7 +92,7 @@ public class WikiGenerator : IWikiGenerator
     {
         _agentFactory = agentFactory ?? throw new ArgumentNullException(nameof(agentFactory));
         _promptPlugin = promptPlugin ?? throw new ArgumentNullException(nameof(promptPlugin));
-        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
+        _optionsMonitor = optionsMonitor ?? throw new ArgumentNullException(nameof(optionsMonitor));
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -831,6 +832,7 @@ Please start executing the task.";
                     {
                         ToolMode = ChatToolMode.Auto,
                         MaxOutputTokens = _options.MaxOutputTokens,
+                        Instructions = systemPrompt,
                         Tools = tools
                     }
                 };
@@ -845,7 +847,6 @@ Please start executing the task.";
                 // Build the conversation with system prompt and user message
                 var messages = new List<ChatMessage>
                 {
-                    new(ChatRole.System, systemPrompt),
                     new(ChatRole.User, new List<AIContent>()
                     {
                         new TextContent(userMessage),
@@ -1050,6 +1051,12 @@ Please start executing the task.";
             return true;
         }
 
+        // ClientResultException from OpenAI SDK — treat 429 and 5xx as transient
+        if (ex is System.ClientModel.ClientResultException clientEx)
+        {
+            return clientEx.Status is >= 500 or 429;
+        }
+
         // Check exception message for common transient error patterns
         var message = ex.Message.ToLowerInvariant();
         return message.Contains("timeout") ||
@@ -1059,7 +1066,9 @@ Please start executing the task.";
                message.Contains("temporarily unavailable") ||
                message.Contains("connection") ||
                message.Contains("network") ||
-               message.Contains("response ended prematurely");
+               message.Contains("response ended prematurely") ||
+               message.Contains("internal_error") ||
+               message.Contains("overloaded");
     }
 
     /// <summary>

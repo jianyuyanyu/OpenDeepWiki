@@ -401,6 +401,11 @@ try
     using (var scope = app.Services.CreateScope())
     {
         await DbInitializer.InitializeAsync(scope.ServiceProvider);
+
+        // 从数据库系统设置加载 AI 配置（覆盖环境变量/appsettings 的默认值）
+        var settingsService = scope.ServiceProvider.GetRequiredService<IAdminSettingsService>();
+        var wikiOptions = scope.ServiceProvider.GetRequiredService<IOptionsMonitor<WikiGeneratorOptions>>().CurrentValue;
+        await SystemSettingDefaults.ApplyToWikiGeneratorOptions(wikiOptions, settingsService);
     }
 
     app.Run();

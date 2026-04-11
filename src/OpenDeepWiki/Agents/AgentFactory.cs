@@ -4,11 +4,13 @@ using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Chat;
 using OpenAI.Responses;
+using Azure.AI.OpenAI;
 using System;
 using System.ClientModel;
 using Anthropic;
 
 #pragma warning disable OPENAI001
+#pragma warning disable MAAI001
 
 namespace OpenDeepWiki.Agents
 {
@@ -73,61 +75,77 @@ namespace OpenDeepWiki.Agents
             var option = ResolveOptions(options, true);
             var httpClient = CreateHttpClient();
 
-            if (option.RequestType == AiRequestType.OpenAI)
+            switch (option.RequestType)
             {
-                var apiKey = ResolveRequiredApiKey(option);
-                var clientOptions = new OpenAIClientOptions()
+                case AiRequestType.OpenAI:
                 {
-                    Endpoint = new Uri(option.Endpoint ?? DefaultEndpoint),
-                    Transport = new System.ClientModel.Primitives.HttpClientPipelineTransport(httpClient),
-                    NetworkTimeout = httpClient.Timeout
-                };
+                    var apiKey = ResolveRequiredApiKey(option);
+                    var clientOptions = new OpenAIClientOptions
+                    {
+                        Endpoint = new Uri(option.Endpoint ?? DefaultEndpoint),
+                        Transport = new System.ClientModel.Primitives.HttpClientPipelineTransport(httpClient),
+                        NetworkTimeout = httpClient.Timeout
+                    };
 
-                var openAiClient = new OpenAIClient(
-                    new ApiKeyCredential(apiKey),
-                    clientOptions);
+                    var chatClient = new OpenAIClient(new ApiKeyCredential(apiKey), clientOptions)
+                        .GetChatClient(model);
 
-                var openAIClient = openAiClient.GetChatClient(model);
+                    return chatClient.AsAIAgent(clientAgentOptions);
+                }
 
-                return openAIClient.AsAIAgent(clientAgentOptions);
-            }
-            else if (option.RequestType == AiRequestType.OpenAIResponses)
-            {
-                var apiKey = ResolveRequiredApiKey(option);
-                var clientOptions = new OpenAIClientOptions()
+                case AiRequestType.OpenAIResponses:
                 {
-                    Endpoint = new Uri(option.Endpoint ?? DefaultEndpoint),
-                    Transport = new System.ClientModel.Primitives.HttpClientPipelineTransport(httpClient),
-                    NetworkTimeout = httpClient.Timeout
-                };
+                    var apiKey = ResolveRequiredApiKey(option);
+                    var clientOptions = new OpenAIClientOptions
+                    {
+                        Endpoint = new Uri(option.Endpoint ?? DefaultEndpoint),
+                        Transport = new System.ClientModel.Primitives.HttpClientPipelineTransport(httpClient),
+                        NetworkTimeout = httpClient.Timeout
+                    };
 
-                var openAiClient = new OpenAIClient(
-                    new ApiKeyCredential(apiKey),
-                    clientOptions);
+                    var responsesClient = new OpenAIClient(new ApiKeyCredential(apiKey), clientOptions)
+                        .GetResponsesClient();
 
-                var openAIClient = openAiClient.GetResponsesClient();
-                clientAgentOptions.ChatOptions ??= new ChatOptions();
-                clientAgentOptions.ChatOptions.ModelId = model;
+                    // Use AsIChatClientWithStoredOutputDisabled to prevent the SDK from
+                    // sending previous_response_id, which third-party endpoints don't support.
+                    return responsesClient.AsAIAgent(clientAgentOptions, model: model,
+                        clientFactory: client => responsesClient.AsIChatClientWithStoredOutputDisabled(model));
+                }
 
-                return openAIClient.AsAIAgent(clientAgentOptions);
-            }
-            else if (option.RequestType == AiRequestType.Anthropic)
-            {
-                var apiKey = ResolveRequiredApiKey(option);
-                AnthropicClient client = new()
+                case AiRequestType.AzureOpenAI:
                 {
-                    BaseUrl = option.Endpoint ?? DefaultEndpoint,
-                    ApiKey = apiKey,
-                    HttpClient = httpClient,
-                };
+                    var apiKey = ResolveRequiredApiKey(option);
+                    var endpoint = option.Endpoint ?? throw new InvalidOperationException(
+                        "ENDPOINT is required for AzureOpenAI. Set it to your Azure OpenAI resource endpoint (e.g., https://your-resource.openai.azure.com/).");
 
-                clientAgentOptions.ChatOptions ??= new ChatOptions();
-                clientAgentOptions.ChatOptions.ModelId = model;
-                var anthropicClient = client.AsAIAgent(clientAgentOptions);
-                return anthropicClient;
+                    var azureClient = new AzureOpenAIClient(
+                        new Uri(endpoint),
+                        new ApiKeyCredential(apiKey));
+
+                    var chatClient = azureClient.GetChatClient(model);
+
+                    return chatClient.AsAIAgent(clientAgentOptions);
+                }
+
+                case AiRequestType.Anthropic:
+                {
+                    var apiKey = ResolveRequiredApiKey(option);
+                    var client = new AnthropicClient
+                    {
+                        BaseUrl = option.Endpoint ?? "https://api.anthropic.com",
+                        ApiKey = apiKey,
+                        HttpClient = httpClient,
+                    };
+
+                    clientAgentOptions.ChatOptions ??= new ChatOptions();
+                    clientAgentOptions.ChatOptions.ModelId = model;
+
+                    return client.AsAIAgent(clientAgentOptions);
+                }
+
+                default:
+                    throw new NotSupportedException($"Unsupported AI request type: {option.RequestType}");
             }
-
-            throw new NotSupportedException("Unknown AI request type.");
         }
 
         private static AiRequestOptions ResolveOptions(

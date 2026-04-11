@@ -422,6 +422,7 @@ public class ChatAssistantService : IChatAssistantService
             {
                 Tools = tools.ToArray(),
                 ToolMode = ChatToolMode.Auto,
+                Instructions = systemPrompt,
                 MaxOutputTokens = 32000
             }
         };
@@ -441,10 +442,7 @@ public class ChatAssistantService : IChatAssistantService
 
 
         // Build chat messages with system prompt
-        var chatMessages = new List<ChatMessage>
-        {
-           new(ChatRole.System, systemPrompt)
-        };
+        var chatMessages = new List<ChatMessage>( );
         chatMessages.AddRange(BuildChatMessages(request.Messages));
 
         // Stream response

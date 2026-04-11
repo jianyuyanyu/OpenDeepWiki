@@ -64,7 +64,8 @@ public class LoggingHttpHandler(HttpMessageHandler innerHandler) : DelegatingHan
             catch (Exception ex)
             {
                 var elapsed = DateTime.UtcNow - startTime;
-                Console.WriteLine($"[{requestId}] !!! Request error: {ex.Message} | time: {elapsed.TotalMilliseconds:F0}ms");
+                Console.WriteLine(
+                    $"[{requestId}] !!! Request error: {ex.Message} | time: {elapsed.TotalMilliseconds:F0}ms");
                 throw;
             }
         }
