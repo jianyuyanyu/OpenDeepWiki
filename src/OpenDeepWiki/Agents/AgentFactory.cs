@@ -105,7 +105,9 @@ namespace OpenDeepWiki.Agents
                     new ApiKeyCredential(apiKey),
                     clientOptions);
 
-                var openAIClient = openAiClient.GetResponsesClient(model);
+                var openAIClient = openAiClient.GetResponsesClient();
+                clientAgentOptions.ChatOptions ??= new ChatOptions();
+                clientAgentOptions.ChatOptions.ModelId = model;
 
                 return openAIClient.AsAIAgent(clientAgentOptions);
             }

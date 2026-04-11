@@ -22,7 +22,10 @@
       "mcp__MCP_DOCKER__code-mode",
       "Bash(List files in repo root)",
       "Bash(rg:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(dotnet build:*)",
+      "Bash(npx next:*)",
+      "Bash(docker compose:*)"
     ],
     "deny": [],
     "ask": []

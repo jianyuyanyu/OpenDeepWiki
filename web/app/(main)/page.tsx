@@ -88,7 +88,7 @@ export default function Home() {
                   <Plus className="h-4 w-4" />
                   {t("home.addPrivateRepo")}
                 </Button>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
                   {user && (
                     <RepositorySubmitForm
                       onSuccess={handleSubmitSuccess}

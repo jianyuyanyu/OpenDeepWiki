@@ -116,127 +116,98 @@ This way, OpenDeepWiki can serve as an MCPServer for other AI models to call, fa
 
 # 🚀 Quick Start
 
-1. Clone the repository
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose installed
+- An API key from an OpenAI-compatible LLM provider
+
+## 1. Clone the repository
 
 ```bash
 git clone https://github.com/AIDotNet/OpenDeepWiki.git
 cd OpenDeepWiki
 ```
 
-2. Modify environment variable configuration in `docker-compose.yml`:
+## 2. Configure environment variables
 
-- OpenAI example:
+Edit `compose.yaml` and fill in your AI provider settings. At minimum, set these variables:
 
 ```yaml
 services:
-  koalawiki:
+  opendeepwiki:
     environment:
-      - TASK_MAX_SIZE_PER_USER=2 # Maximum parallel document generation tasks per user for AI
-      - CHAT_MODEL=DeepSeek-V3 # Model must support function calling
-      - ANALYSIS_MODEL= # Analysis model for generating repository directory structure
-      - CHAT_API_KEY= # Your API Key
-      - LANGUAGE= # Default generation language, e.g., "Chinese"
-      - ENDPOINT=https://api.token-ai.cn/v1
-      - DB_TYPE=sqlite
-      - MODEL_PROVIDER=OpenAI # Model provider, supports OpenAI, AzureOpenAI
-      - DB_CONNECTION_STRING=Data Source=/data/KoalaWiki.db
-      - EnableSmartFilter=true # Whether to enable smart filtering, affects AI's ability to get repository file directories
-      - UPDATE_INTERVAL=5 # Repository incremental update interval in days
-      - MAX_FILE_LIMIT=100 # Maximum upload file limit in MB
-      - DEEP_RESEARCH_MODEL= # Deep research model, if empty uses CHAT_MODEL
-      - ENABLE_INCREMENTAL_UPDATE=true # Whether to enable incremental updates
-      - ENABLE_CODED_DEPENDENCY_ANALYSIS=false # Whether to enable code dependency analysis, may affect code quality
-      - ENABLE_WAREHOUSE_COMMIT=true # Whether to enable warehouse commit
-      - ENABLE_FILE_COMMIT=true # Whether to enable file commit
-      - REFINE_AND_ENHANCE_QUALITY=false # Whether to refine and enhance quality
-      - CATALOGUE_FORMAT=compact # Directory structure format (compact, json, pathlist, unix)
-      - CUSTOM_BODY_PARAMS= # Custom request body parameters, format: key1=value1,key2=value2 (e.g., stop=<|im_end|>,max_tokens=4096)
-      - READ_MAX_TOKENS=100000 # The maximum token limit for reading files in AI is set to prevent unlimited file reading. It is recommended to fill in 70% of the model's maximum token.
-      - MCP_STREAMABLE= # MCP service streamable configuration, format: serviceName=streamableUrl (e.g., claude=http://localhost:8080/api/mcp,windsurf=http://localhost:8080/api/mcp)
-      # Auto Context Compression configuration (optional)
-      - AUTO_CONTEXT_COMPRESS_ENABLED=false # Whether to enable AI-powered intelligent context compression
-      - AUTO_CONTEXT_COMPRESS_TOKEN_LIMIT=100000 # Token limit to trigger compression (required when enabled)
-      - AUTO_CONTEXT_COMPRESS_MAX_TOKEN_LIMIT=200000 # Maximum allowed token limit (default: 200000)
-      # Feishu Bot configuration (optional)
-      - FeishuAppId=
-      - FeishuAppSecret=
-      - FeishuBotName=KoalaWiki
+      # AI Chat (used for conversational features)
+      - CHAT_API_KEY=sk-xxx              # Your API key
+      - ENDPOINT=https://api.openai.com/v1
+      - CHAT_REQUEST_TYPE=OpenAI         # OpenAI | AzureOpenAI | Anthropic
+
+      # Wiki generator - catalog generation
+      - WIKI_CATALOG_MODEL=gpt-4o
+      - WIKI_CATALOG_API_KEY=sk-xxx
+      - WIKI_CATALOG_ENDPOINT=https://api.openai.com/v1
+      - WIKI_CATALOG_REQUEST_TYPE=OpenAI
+
+      # Wiki generator - content generation
+      - WIKI_CONTENT_MODEL=gpt-4o
+      - WIKI_CONTENT_API_KEY=sk-xxx
+      - WIKI_CONTENT_ENDPOINT=https://api.openai.com/v1
+      - WIKI_CONTENT_REQUEST_TYPE=OpenAI
 ```
 
-- AzureOpenAI and Anthropic configurations are similar, only need to adjust `ENDPOINT` and `MODEL_PROVIDER`.
+> All three key groups (CHAT, WIKI_CATALOG, WIKI_CONTENT) can share the same API key and endpoint.
+
+## 3. Build and start
+
+```bash
+# Build all images and start in background
+docker compose build
+docker compose up -d
+```
+
+Or use the Makefile shortcut:
+
+```bash
+make build   # Build all Docker images
+make up      # Start all services (detached)
+```
+
+## 4. Access the application
+
+| Service  | URL                    |
+|----------|------------------------|
+| Frontend | http://localhost:3000   |
+| Backend API | http://localhost:8080 |
+
+Default admin credentials: `admin@routin.ai` / `Admin@123`
 
 ## Database Configuration
 
-### SQLite (Default)
+SQLite is used by default with no extra setup. To use PostgreSQL, update `compose.yaml`:
+
 ```yaml
-- DB_TYPE=sqlite
-- DB_CONNECTION_STRING=Data Source=/data/KoalaWiki.db
-```
-
-### PostgreSQL
-```yaml
-- DB_TYPE=postgres
-- DB_CONNECTION_STRING=Host=localhost;Database=KoalaWiki;Username=postgres;Password=password
-```
-
-### SQL Server
-```yaml
-- DB_TYPE=sqlserver
-- DB_CONNECTION_STRING=Server=localhost;Database=KoalaWiki;Trusted_Connection=true;
-```
-
-### MySQL
-```yaml
-- DB_TYPE=mysql
-- DB_CONNECTION_STRING=Server=localhost;Database=KoalaWiki;Uid=root;Pwd=password;
-```
-
-3. Start services
-
-Using Makefile commands:
-
-```bash
-# Build all Docker images
-make build
-
-# Start all services in background
-make up
-
-# Start in development mode (with visible logs)
-make dev
-```
-
-Visit http://localhost:8090 to access the knowledge base page.
-
-For Windows users without make environment, use Docker Compose directly:
-
-```bash
-docker-compose build
-docker-compose up -d
-docker-compose up
-docker-compose down
-docker-compose logs -f
+- DB_TYPE=postgresql
+- CONNECTION_STRING=Host=your-host;Database=opendeepwiki;Username=postgres;Password=password
 ```
 
 ---
 
 # Deployment Recommendations
 
-- Build for specific architecture:
+Build for a specific architecture:
 
 ```bash
-docker-compose build --build-arg ARCH=arm64
-docker-compose build --build-arg ARCH=amd64
+docker compose build --build-arg ARCH=arm64
+docker compose build --build-arg ARCH=amd64
 ```
 
-- Build only backend or frontend:
+Build only backend or frontend:
 
 ```bash
-docker-compose build koalawiki
-docker-compose build koalawiki-web
+docker compose build opendeepwiki
+docker compose build web
 ```
 
-- One-click deployment to Sealos (supports public network access):
+One-click deployment to Sealos (supports public network access):
 
 [![Deploy on Sealos](https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg)](https://bja.sealos.run/?openapp=system-template%3FtemplateName%3DOpenDeepWiki)
 

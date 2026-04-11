@@ -8,10 +8,9 @@ import { Plus } from "lucide-react";
 import { RepositorySubmitForm } from "@/components/repo/repository-submit-form";
 import { RepositoryList } from "@/components/repo/repository-list";
 import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from "@/components/animate-ui/components/radix/sheet";
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/auth-context";
 import Link from "next/link";
 
@@ -53,21 +52,17 @@ export default function PrivatePage() {
                 {t("home.importFromGitHub")}
               </Button>
             </Link>
-            <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
-              <SheetTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  {t("home.addPrivateRepo")}
-                </Button>
-              </SheetTrigger>
-            <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
-              <div className="pt-6">
+            <Button className="gap-2" onClick={() => setIsFormOpen(true)}>
+              <Plus className="h-4 w-4" />
+              {t("home.addPrivateRepo")}
+            </Button>
+            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+              <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
                 <RepositorySubmitForm
                   onSuccess={handleSubmitSuccess}
                 />
-              </div>
-            </SheetContent>
-            </Sheet>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 

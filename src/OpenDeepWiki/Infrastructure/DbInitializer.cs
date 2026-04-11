@@ -37,39 +37,16 @@ public static class DbInitializer
         // Schema migrations for existing databases
         if (context is DbContext migrationCtx)
         {
-            // Create ApiKeys table if not exists
-            await migrationCtx.Database.ExecuteSqlRawAsync(@"
-                CREATE TABLE IF NOT EXISTS ApiKeys (
-                    Id TEXT NOT NULL PRIMARY KEY,
-                    Name TEXT NOT NULL,
-                    KeyPrefix TEXT NOT NULL,
-                    KeyHash TEXT NOT NULL,
-                    UserId TEXT NOT NULL,
-                    Scope TEXT NOT NULL DEFAULT 'mcp:read',
-                    ExpiresAt TEXT,
-                    LastUsedAt TEXT,
-                    LastUsedIp TEXT,
-                    CreatedAt TEXT NOT NULL,
-                    UpdatedAt TEXT,
-                    DeletedAt TEXT,
-                    IsDeleted INTEGER NOT NULL DEFAULT 0,
-                    Version BLOB,
-                    FOREIGN KEY (UserId) REFERENCES Users(Id)
-                )");
-            await migrationCtx.Database.ExecuteSqlRawAsync(@"
-                CREATE UNIQUE INDEX IF NOT EXISTS IX_ApiKeys_KeyPrefix ON ApiKeys (KeyPrefix)");
-            await migrationCtx.Database.ExecuteSqlRawAsync(@"
-                CREATE INDEX IF NOT EXISTS IX_ApiKeys_UserId ON ApiKeys (UserId)");
+            var isSqlite = migrationCtx.Database.ProviderName?.Contains("Sqlite",
+                StringComparison.OrdinalIgnoreCase) == true;
 
-            // Add Description column to Repositories if not exists
-            try
+            if (isSqlite)
             {
-                await migrationCtx.Database.ExecuteSqlRawAsync(
-                    "ALTER TABLE Repositories ADD COLUMN Description TEXT");
+                await MigrateSqliteAsync(migrationCtx);
             }
-            catch
+            else
             {
-                // Column already exists -- ignore
+                await MigratePostgresqlAsync(migrationCtx);
             }
         }
 
@@ -199,4 +176,82 @@ public static class DbInitializer
         await context.SaveChangesAsync();
     }
 
+    private static async Task MigrateSqliteAsync(DbContext ctx)
+    {
+        // Create ApiKeys table (SQLite types)
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ApiKeys (
+                Id TEXT NOT NULL PRIMARY KEY,
+                Name TEXT NOT NULL,
+                KeyPrefix TEXT NOT NULL,
+                KeyHash TEXT NOT NULL,
+                UserId TEXT NOT NULL,
+                Scope TEXT NOT NULL DEFAULT 'mcp:read',
+                ExpiresAt TEXT,
+                LastUsedAt TEXT,
+                LastUsedIp TEXT,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT,
+                DeletedAt TEXT,
+                IsDeleted INTEGER NOT NULL DEFAULT 0,
+                Version BLOB,
+                FOREIGN KEY (UserId) REFERENCES Users(Id)
+            )");
+        await ctx.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_ApiKeys_KeyPrefix ON ApiKeys (KeyPrefix)");
+        await ctx.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_ApiKeys_UserId ON ApiKeys (UserId)");
+
+        // Add Description column if not exists
+        var connection = ctx.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open)
+            await connection.OpenAsync();
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Repositories') WHERE name='Description'";
+        var result = await cmd.ExecuteScalarAsync();
+        if (Convert.ToInt64(result) == 0)
+        {
+            await ctx.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE Repositories ADD COLUMN Description TEXT");
+        }
+    }
+
+    private static async Task MigratePostgresqlAsync(DbContext ctx)
+    {
+        // Create ApiKeys table (PostgreSQL types)
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ""ApiKeys"" (
+                ""Id"" TEXT NOT NULL PRIMARY KEY,
+                ""Name"" TEXT NOT NULL,
+                ""KeyPrefix"" TEXT NOT NULL,
+                ""KeyHash"" TEXT NOT NULL,
+                ""UserId"" TEXT NOT NULL,
+                ""Scope"" TEXT NOT NULL DEFAULT 'mcp:read',
+                ""ExpiresAt"" TIMESTAMP WITH TIME ZONE,
+                ""LastUsedAt"" TIMESTAMP WITH TIME ZONE,
+                ""LastUsedIp"" TEXT,
+                ""CreatedAt"" TIMESTAMP WITH TIME ZONE NOT NULL,
+                ""UpdatedAt"" TIMESTAMP WITH TIME ZONE,
+                ""DeletedAt"" TIMESTAMP WITH TIME ZONE,
+                ""IsDeleted"" BOOLEAN NOT NULL DEFAULT FALSE,
+                ""Version"" BYTEA,
+                FOREIGN KEY (""UserId"") REFERENCES ""Users""(""Id"")
+            )");
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_ApiKeys_KeyPrefix"" ON ""ApiKeys"" (""KeyPrefix"")");
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE INDEX IF NOT EXISTS ""IX_ApiKeys_UserId"" ON ""ApiKeys"" (""UserId"")");
+
+        // Add Description column if not exists
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'Repositories' AND column_name = 'Description'
+                ) THEN
+                    ALTER TABLE ""Repositories"" ADD COLUMN ""Description"" TEXT;
+                END IF;
+            END $$;");
+    }
 }

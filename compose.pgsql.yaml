@@ -1,4 +1,4 @@
-﻿services:
+services:
   opendeepwiki:
     image: crpi-j9ha7sxwhatgtvj4.cn-shenzhen.personal.cr.aliyuncs.com/open-deepwiki/opendeepwiki
     build:
@@ -7,6 +7,9 @@
     ports:
       - "8080:8080"
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
       interval: 30s
@@ -20,9 +23,9 @@
       # 服务监听地址
       - URLS=http://+:8080
 
-      # 数据库配置 (支持: sqlite, postgresql)
-      - Database__Type=sqlite
-      - ConnectionStrings__Default=Data Source=/data/opendeepwiki.db
+      # 数据库配置 (PostgreSQL)
+      - Database__Type=postgresql
+      - ConnectionStrings__Default=Host=postgres;Port=5432;Database=opendeepwiki;Username=postgres;Password=opendeepwiki123
 
       # JWT 认证配置 (生产环境请修改)
       - JWT_SECRET_KEY=OpenDeepWiki-Default-Secret-Key-Please-Change-In-Production-Environment-2024
@@ -75,3 +78,24 @@
     environment:
       - NODE_ENV=production
       - API_PROXY_URL=http://opendeepwiki:8080
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    environment:
+      - POSTGRES_DB=opendeepwiki
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=opendeepwiki123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
