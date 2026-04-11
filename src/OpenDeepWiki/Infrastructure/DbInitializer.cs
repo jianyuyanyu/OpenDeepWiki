@@ -34,6 +34,45 @@ public static class DbInitializer
         // 初始化OAuth提供商
         await InitializeOAuthProvidersAsync(context);
 
+        // Schema migrations for existing databases
+        if (context is DbContext migrationCtx)
+        {
+            // Create ApiKeys table if not exists
+            await migrationCtx.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE IF NOT EXISTS ApiKeys (
+                    Id TEXT NOT NULL PRIMARY KEY,
+                    Name TEXT NOT NULL,
+                    KeyPrefix TEXT NOT NULL,
+                    KeyHash TEXT NOT NULL,
+                    UserId TEXT NOT NULL,
+                    Scope TEXT NOT NULL DEFAULT 'mcp:read',
+                    ExpiresAt TEXT,
+                    LastUsedAt TEXT,
+                    LastUsedIp TEXT,
+                    CreatedAt TEXT NOT NULL,
+                    UpdatedAt TEXT,
+                    DeletedAt TEXT,
+                    IsDeleted INTEGER NOT NULL DEFAULT 0,
+                    Version BLOB,
+                    FOREIGN KEY (UserId) REFERENCES Users(Id)
+                )");
+            await migrationCtx.Database.ExecuteSqlRawAsync(@"
+                CREATE UNIQUE INDEX IF NOT EXISTS IX_ApiKeys_KeyPrefix ON ApiKeys (KeyPrefix)");
+            await migrationCtx.Database.ExecuteSqlRawAsync(@"
+                CREATE INDEX IF NOT EXISTS IX_ApiKeys_UserId ON ApiKeys (UserId)");
+
+            // Add Description column to Repositories if not exists
+            try
+            {
+                await migrationCtx.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE Repositories ADD COLUMN Description TEXT");
+            }
+            catch
+            {
+                // Column already exists -- ignore
+            }
+        }
+
         // 初始化系统设置默认值（仅在首次运行时从环境变量创建）
         await SystemSettingDefaults.InitializeDefaultsAsync(configuration, context);
     }

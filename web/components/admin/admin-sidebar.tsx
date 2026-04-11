@@ -15,6 +15,7 @@ import {
   Building2,
   MessageCircle,
   ChevronRight,
+  KeyRound,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api-client";
@@ -92,6 +93,11 @@ const getNavItems = (t: (key: string) => string): NavItem[] => [
     href: "/admin/settings",
     icon: Cog,
     label: t("common.admin.settings"),
+  },
+  {
+    href: "/admin/api-keys",
+    icon: KeyRound,
+    label: t("admin.apiKeys.title"),
   },
 ];
 

@@ -229,6 +229,7 @@ try
     builder.Services.AddScoped<IAdminToolsService, AdminToolsService>();
     builder.Services.AddScoped<IAdminSettingsService, AdminSettingsService>();
     builder.Services.AddScoped<IAdminChatAssistantService, AdminChatAssistantService>();
+    builder.Services.AddScoped<IAdminApiKeyService, AdminApiKeyService>();
     builder.Services.AddScoped<IOrganizationService, OrganizationService>();
 
     // 注册动态配置管理器
@@ -383,6 +384,7 @@ try
 
     app.MapMiniApis();
     app.MapAuthEndpoints();
+    app.MapApiKeyEndpoints();
     app.MapOAuthEndpoints();
     app.MapAdminEndpoints();
     app.MapGitHubImportEndpoints();

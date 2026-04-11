@@ -47,7 +47,6 @@ public class McpRepositoryTools
             return JsonSerializer.Serialize(new { error = true, message = "Search query is required" });
 
         query = normalizedQuery;
-        var loweredQuery = normalizedQuery.ToLowerInvariant();
 
         var repository = await context.Repositories
             .FirstOrDefaultAsync(r => r.OrgName == resolvedOwner && r.RepoName == resolvedName && !r.IsDeleted, cancellationToken);
@@ -83,16 +82,18 @@ public class McpRepositoryTools
             }
         }
 
+        // Use EF.Functions.Like for SQLite-compatible case-insensitive search
+        var escapedQuery = query.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+        var pattern = $"%{escapedQuery}%";
+
         var matchingDocs = await context.DocCatalogs
             .Where(c => c.BranchLanguageId == branchLanguage.Id &&
                         !c.IsDeleted && !string.IsNullOrEmpty(c.DocFileId))
             .Join(context.DocFiles.Where(d => !d.IsDeleted),
                   c => c.DocFileId, d => d.Id,
                   (c, d) => new { Catalog = c, DocFile = d })
-            .Where(x => (!string.IsNullOrEmpty(x.DocFile.Content) &&
-                         x.DocFile.Content.ToLower().Contains(loweredQuery))
-                     || (!string.IsNullOrEmpty(x.Catalog.Title) &&
-                         x.Catalog.Title.ToLower().Contains(loweredQuery)))
+            .Where(x => EF.Functions.Like(x.DocFile.Content, pattern)
+                     || EF.Functions.Like(x.Catalog.Title, pattern))
             .Select(x => new
             {
                 x.Catalog.Title,

@@ -166,6 +166,7 @@ public class UserGitHubImportService : IUserGitHubImportService
                 OrgName = repo.Owner,
                 IsPublic = !repo.Private,
                 Status = RepositoryStatus.Pending,
+                Description = repo.Description,
                 PrimaryLanguage = repo.Language,
                 StarCount = repo.StargazersCount,
                 ForkCount = repo.ForksCount,

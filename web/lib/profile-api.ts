@@ -147,6 +147,88 @@ export interface SystemVersion {
   productName: string;
 }
 
+// ==================== API Key API ====================
+
+export interface UserApiKeyCreateResult {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  scope: string;
+  expiresAt?: string;
+  plainTextKey: string;
+}
+
+export interface UserApiKeyListItem {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  userId: string;
+  userEmail?: string;
+  scope: string;
+  expiresAt?: string;
+  lastUsedAt?: string;
+  createdAt: string;
+}
+
+export async function getUserApiKeys(): Promise<UserApiKeyListItem[]> {
+  const token = getToken();
+  if (!token) throw new Error("Not logged in");
+
+  const url = buildApiUrl("/api/auth/api-keys");
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to load API keys");
+  }
+
+  return (await response.json()) as UserApiKeyListItem[];
+}
+
+export async function createUserApiKey(data: {
+  name: string;
+  scope?: string;
+  expiresInDays?: number;
+}): Promise<UserApiKeyCreateResult> {
+  const token = getToken();
+  if (!token) throw new Error("Not logged in");
+
+  const url = buildApiUrl("/api/auth/api-keys");
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to create API key");
+  }
+
+  return (await response.json()) as UserApiKeyCreateResult;
+}
+
+export async function revokeUserApiKey(id: string): Promise<void> {
+  const token = getToken();
+  if (!token) throw new Error("Not logged in");
+
+  const url = buildApiUrl(`/api/auth/api-keys/${id}`);
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to revoke API key");
+  }
+}
+
 export async function getSystemVersion(): Promise<SystemVersion> {
   const url = buildApiUrl("/api/system/version");
   const response = await fetch(url);
