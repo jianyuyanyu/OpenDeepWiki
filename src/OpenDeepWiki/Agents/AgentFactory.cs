@@ -33,6 +33,7 @@ namespace OpenDeepWiki.Agents
         public string? ThinkingConfigJson { get; set; }
         public string? ProviderRequestOverridesJson { get; set; }
         public string? ModelRequestOverridesJson { get; set; }
+        public string? PromptCacheKey { get; set; }
     }
 
     /// <summary>
@@ -184,7 +185,8 @@ namespace OpenDeepWiki.Agents
                 ThinkingEnabled = options?.ThinkingEnabled,
                 ThinkingConfigJson = options?.ThinkingConfigJson,
                 ProviderRequestOverridesJson = options?.ProviderRequestOverridesJson,
-                ModelRequestOverridesJson = options?.ModelRequestOverridesJson
+                ModelRequestOverridesJson = options?.ModelRequestOverridesJson,
+                PromptCacheKey = options?.PromptCacheKey
             };
 
             if (string.IsNullOrWhiteSpace(resolved.Endpoint))

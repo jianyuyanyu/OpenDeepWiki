@@ -33,6 +33,10 @@ public class AiModelConfig : AggregateRoot<string>
 
     public decimal? OutputTokenPrice { get; set; }
 
+    public decimal? CacheHitTokenPrice { get; set; }
+
+    public decimal? CacheCreationTokenPrice { get; set; }
+
     public bool SupportsThinking { get; set; }
 
     public bool SupportsVision { get; set; }

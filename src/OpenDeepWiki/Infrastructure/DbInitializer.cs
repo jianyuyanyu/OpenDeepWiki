@@ -344,6 +344,8 @@ public static class DbInitializer
                 MaxOutputTokens INTEGER,
                 InputTokenPrice TEXT,
                 OutputTokenPrice TEXT,
+                CacheHitTokenPrice TEXT,
+                CacheCreationTokenPrice TEXT,
                 SupportsThinking INTEGER NOT NULL DEFAULT 0,
                 SupportsVision INTEGER NOT NULL DEFAULT 0,
                 SupportsTools INTEGER NOT NULL DEFAULT 1,
@@ -378,13 +380,18 @@ public static class DbInitializer
         await AddSqliteColumnIfMissingAsync(connection, ctx, "ModelConfigs", "AiProviderId", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "ChatApps", "AiProviderId", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "AiModelConfigs", "ProviderType", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "AiModelConfigs", "CacheHitTokenPrice", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "AiModelConfigs", "CacheCreationTokenPrice", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "ProviderId", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "ProviderName", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "ProviderType", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "ModelId", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "CachedInputTokens", "INTEGER NOT NULL DEFAULT 0");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "CacheCreationInputTokens", "INTEGER NOT NULL DEFAULT 0");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "InputTokenPrice", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "OutputTokenPrice", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "CacheHitTokenPrice", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "CacheCreationTokenPrice", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "InputCost", "TEXT NOT NULL DEFAULT '0'");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "OutputCost", "TEXT NOT NULL DEFAULT '0'");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "TotalCost", "TEXT NOT NULL DEFAULT '0'");
@@ -513,6 +520,8 @@ public static class DbInitializer
                 ""MaxOutputTokens"" INTEGER,
                 ""InputTokenPrice"" NUMERIC(18, 8),
                 ""OutputTokenPrice"" NUMERIC(18, 8),
+                ""CacheHitTokenPrice"" NUMERIC(18, 8),
+                ""CacheCreationTokenPrice"" NUMERIC(18, 8),
                 ""SupportsThinking"" BOOLEAN NOT NULL DEFAULT FALSE,
                 ""SupportsVision"" BOOLEAN NOT NULL DEFAULT FALSE,
                 ""SupportsTools"" BOOLEAN NOT NULL DEFAULT TRUE,
@@ -545,13 +554,18 @@ public static class DbInitializer
             ALTER TABLE ""ModelConfigs"" ADD COLUMN IF NOT EXISTS ""AiProviderId"" TEXT;
             ALTER TABLE ""ChatApps"" ADD COLUMN IF NOT EXISTS ""AiProviderId"" TEXT;
             ALTER TABLE ""AiModelConfigs"" ADD COLUMN IF NOT EXISTS ""ProviderType"" TEXT;
+            ALTER TABLE ""AiModelConfigs"" ADD COLUMN IF NOT EXISTS ""CacheHitTokenPrice"" NUMERIC(18, 8);
+            ALTER TABLE ""AiModelConfigs"" ADD COLUMN IF NOT EXISTS ""CacheCreationTokenPrice"" NUMERIC(18, 8);
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""ProviderId"" TEXT;
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""ProviderName"" TEXT;
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""ProviderType"" TEXT;
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""ModelId"" TEXT;
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""CachedInputTokens"" INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""CacheCreationInputTokens"" INTEGER NOT NULL DEFAULT 0;
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""InputTokenPrice"" NUMERIC(18, 8);
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""OutputTokenPrice"" NUMERIC(18, 8);
+            ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""CacheHitTokenPrice"" NUMERIC(18, 8);
+            ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""CacheCreationTokenPrice"" NUMERIC(18, 8);
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""InputCost"" NUMERIC(18, 8) NOT NULL DEFAULT 0;
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""OutputCost"" NUMERIC(18, 8) NOT NULL DEFAULT 0;
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""TotalCost"" NUMERIC(18, 8) NOT NULL DEFAULT 0;");

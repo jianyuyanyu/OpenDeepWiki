@@ -722,7 +722,7 @@ public class AdminRepositoryService : IAdminRepositoryService
 
         if (_wikiGenerator is WikiGenerator generator)
         {
-            generator.SetCurrentRepository(repository.Id);
+            generator.SetCurrentRepository(repository.Id, $"{repository.OrgName}/{repository.RepoName}");
         }
 
         try

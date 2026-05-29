@@ -76,6 +76,7 @@ public class AdminStatisticsService : IAdminStatisticsService
                 InputTokens = g.Sum(t => (long)t.InputTokens),
                 OutputTokens = g.Sum(t => (long)t.OutputTokens),
                 CachedInputTokens = g.Sum(t => (long)t.CachedInputTokens),
+                CacheCreationInputTokens = g.Sum(t => (long)t.CacheCreationInputTokens),
                 InputCost = g.Sum(t => t.InputCost),
                 OutputCost = g.Sum(t => t.OutputCost),
                 TotalCost = g.Sum(t => t.TotalCost)
@@ -89,6 +90,7 @@ public class AdminStatisticsService : IAdminStatisticsService
             var inputTokens = stat?.InputTokens ?? 0;
             var outputTokens = stat?.OutputTokens ?? 0;
             var cachedInputTokens = stat?.CachedInputTokens ?? 0;
+            var cacheCreationInputTokens = stat?.CacheCreationInputTokens ?? 0;
             var inputCost = stat?.InputCost ?? 0m;
             var outputCost = stat?.OutputCost ?? 0m;
             var totalCost = stat?.TotalCost ?? 0m;
@@ -99,6 +101,7 @@ public class AdminStatisticsService : IAdminStatisticsService
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
                 CachedInputTokens = cachedInputTokens,
+                CacheCreationInputTokens = cacheCreationInputTokens,
                 TotalTokens = inputTokens + outputTokens,
                 InputCacheHitRate = CalculateHitRate(cachedInputTokens, inputTokens),
                 InputCost = inputCost,
@@ -109,6 +112,7 @@ public class AdminStatisticsService : IAdminStatisticsService
             response.TotalInputTokens += inputTokens;
             response.TotalOutputTokens += outputTokens;
             response.TotalCachedInputTokens += cachedInputTokens;
+            response.TotalCacheCreationInputTokens += cacheCreationInputTokens;
             response.TotalInputCost += inputCost;
             response.TotalOutputCost += outputCost;
             response.TotalCost += totalCost;

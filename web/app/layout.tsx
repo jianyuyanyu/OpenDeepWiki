@@ -1,22 +1,37 @@
 import type { Metadata } from "next";
+import { getLocale } from "next-intl/server";
 import RouteProviders from "@/app/route-providers";
+import { getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from "@/lib/repo-seo";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "OpenDeepWiki",
-  description: "AI-powered code knowledge base for repository analysis and documentation generation",
+  metadataBase: getSiteUrl(),
+  applicationName: SITE_NAME,
+  title: {
+    default: SITE_NAME,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
   icons: {
     icon: "/favicon.png",
   },
+  openGraph: {
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    siteName: SITE_NAME,
+    type: "website",
+  },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <body className="antialiased">
         <RouteProviders>{children}</RouteProviders>
       </body>

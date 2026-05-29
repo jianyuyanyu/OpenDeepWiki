@@ -14,6 +14,7 @@ using OpenDeepWiki.Services.AI;
 using OpenDeepWiki.Agents;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
+using System.Globalization;
 
 namespace OpenDeepWiki.Services.Admin;
 
@@ -444,6 +445,8 @@ public class AdminToolsService : IAdminToolsService
             MaxOutputTokens = request.MaxOutputTokens,
             InputTokenPrice = request.InputTokenPrice,
             OutputTokenPrice = request.OutputTokenPrice,
+            CacheHitTokenPrice = request.CacheHitTokenPrice,
+            CacheCreationTokenPrice = request.CacheCreationTokenPrice,
             SupportsThinking = request.SupportsThinking,
             SupportsVision = request.SupportsVision,
             SupportsTools = request.SupportsTools,
@@ -479,6 +482,8 @@ public class AdminToolsService : IAdminToolsService
         model.MaxOutputTokens = request.MaxOutputTokens;
         model.InputTokenPrice = request.InputTokenPrice;
         model.OutputTokenPrice = request.OutputTokenPrice;
+        model.CacheHitTokenPrice = request.CacheHitTokenPrice;
+        model.CacheCreationTokenPrice = request.CacheCreationTokenPrice;
         model.SupportsThinking = request.SupportsThinking;
         model.SupportsVision = request.SupportsVision;
         model.SupportsTools = request.SupportsTools;
@@ -544,15 +549,19 @@ public class AdminToolsService : IAdminToolsService
         using var document = JsonDocument.Parse(json);
         var modelElements = EnumerateModelElements(document.RootElement);
         return modelElements
-            .Select(id => new AiModelConfigDto
+            .Select(model => new AiModelConfigDto
             {
                 ProviderId = provider.Id,
                 ProviderName = provider.DisplayName ?? provider.Name,
-                ModelId = id,
-                Name = id,
-                DisplayName = id,
+                ModelId = model.ModelId,
+                Name = model.Name ?? model.ModelId,
+                DisplayName = model.DisplayName ?? model.Name ?? model.ModelId,
                 ModelType = "chat",
-                ProviderType = AiProviderResolver.NormalizeModelProviderType(null, id) ?? provider.ProviderType,
+                ProviderType = AiProviderResolver.NormalizeModelProviderType(null, model.ModelId) ?? provider.ProviderType,
+                InputTokenPrice = model.InputTokenPrice,
+                OutputTokenPrice = model.OutputTokenPrice,
+                CacheHitTokenPrice = model.CacheHitTokenPrice,
+                CacheCreationTokenPrice = model.CacheCreationTokenPrice,
                 SupportsTools = true,
                 IsActive = true
             })
@@ -1020,6 +1029,8 @@ public class AdminToolsService : IAdminToolsService
             MaxOutputTokens = model.MaxOutputTokens,
             InputTokenPrice = model.InputTokenPrice,
             OutputTokenPrice = model.OutputTokenPrice,
+            CacheHitTokenPrice = model.CacheHitTokenPrice,
+            CacheCreationTokenPrice = model.CacheCreationTokenPrice,
             SupportsThinking = model.SupportsThinking,
             SupportsVision = model.SupportsVision,
             SupportsTools = model.SupportsTools,
@@ -1036,7 +1047,7 @@ public class AdminToolsService : IAdminToolsService
         };
     }
 
-    private static IEnumerable<string> EnumerateModelElements(JsonElement root)
+    private static IReadOnlyList<DiscoveredAiModel> EnumerateModelElements(JsonElement root)
     {
         var source = root;
         if (root.ValueKind == JsonValueKind.Object &&
@@ -1051,27 +1062,88 @@ public class AdminToolsService : IAdminToolsService
             return [];
         }
 
-        return source.EnumerateArray()
-            .Select(item =>
+        var models = new List<DiscoveredAiModel>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in source.EnumerateArray())
+        {
+            var model = ParseDiscoveredAiModel(item);
+            if (model == null || !seen.Add(model.ModelId))
             {
-                if (item.ValueKind == JsonValueKind.String)
-                {
-                    return item.GetString();
-                }
+                continue;
+            }
 
-                if (item.ValueKind == JsonValueKind.Object &&
-                    item.TryGetProperty("id", out var id) &&
-                    id.ValueKind == JsonValueKind.String)
-                {
-                    return id.GetString();
-                }
+            models.Add(model);
+        }
 
-                return null;
-            })
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Select(id => id!)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
+        return models;
     }
+
+    private static DiscoveredAiModel? ParseDiscoveredAiModel(JsonElement item)
+    {
+        if (item.ValueKind == JsonValueKind.String)
+        {
+            var stringModelId = item.GetString();
+            return string.IsNullOrWhiteSpace(stringModelId)
+                ? null
+                : new DiscoveredAiModel(stringModelId, null, null, null, null, null, null);
+        }
+
+        if (item.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var modelId = ReadOptionalString(item, "id");
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            return null;
+        }
+
+        return new DiscoveredAiModel(
+            modelId,
+            ReadOptionalString(item, "name"),
+            ReadOptionalString(item, "displayName"),
+            ReadOptionalDecimal(item, "inputPrice") ?? ReadOptionalDecimal(item, "promptPrice"),
+            ReadOptionalDecimal(item, "outputPrice") ?? ReadOptionalDecimal(item, "completionPrice"),
+            ReadOptionalDecimal(item, "cacheHitPrice"),
+            ReadOptionalDecimal(item, "cacheCreationPrice"));
+    }
+
+    private static string? ReadOptionalString(JsonElement item, string propertyName)
+    {
+        return item.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+    }
+
+    private static decimal? ReadOptionalDecimal(JsonElement item, string propertyName)
+    {
+        if (!item.TryGetProperty(propertyName, out var value))
+        {
+            return null;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.Number when value.TryGetDecimal(out var decimalValue) => decimalValue,
+            JsonValueKind.String when decimal.TryParse(
+                value.GetString(),
+                NumberStyles.Number,
+                CultureInfo.InvariantCulture,
+                out var stringValue) => stringValue,
+            _ => null
+        };
+    }
+
+    private sealed record DiscoveredAiModel(
+        string ModelId,
+        string? Name,
+        string? DisplayName,
+        decimal? InputTokenPrice,
+        decimal? OutputTokenPrice,
+        decimal? CacheHitTokenPrice,
+        decimal? CacheCreationTokenPrice);
 
     private static string? FindSkillMd(string directory)
     {

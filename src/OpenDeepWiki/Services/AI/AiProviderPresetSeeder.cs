@@ -261,6 +261,8 @@ public sealed class AiProviderPresetSeeder : IAiProviderPresetSeeder
         model.MaxOutputTokens = presetModel.MaxOutputTokens;
         model.InputTokenPrice = presetModel.InputPrice;
         model.OutputTokenPrice = presetModel.OutputPrice;
+        model.CacheHitTokenPrice = presetModel.CacheHitPrice;
+        model.CacheCreationTokenPrice = presetModel.CacheCreationPrice;
         model.SupportsThinking = presetModel.SupportsThinking ?? false;
         model.SupportsVision = presetModel.SupportsVision ?? modelType.Equals("image", StringComparison.OrdinalIgnoreCase);
         model.SupportsTools = presetModel.SupportsFunctionCall ?? modelType.Equals("chat", StringComparison.OrdinalIgnoreCase);

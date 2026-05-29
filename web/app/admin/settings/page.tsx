@@ -22,6 +22,7 @@ import {
   Eye,
   EyeOff,
   Globe,
+  Github,
   Loader2,
   RefreshCw,
   RotateCcw,
@@ -50,7 +51,7 @@ interface CategoryMeta {
   tone: string;
 }
 
-const CATEGORY_ORDER = ["general", "ai", "security"];
+const CATEGORY_ORDER = ["general", "ai", "github", "security"];
 
 const HIDDEN_AI_SETTING_KEYS = new Set([
   "WIKI_CATALOG_PROVIDER_ID",
@@ -92,6 +93,14 @@ function formatSettingLabel(key: string) {
     .split("_")
     .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
     .join(" ");
+}
+
+function getOptionalTranslation(
+  t: (key: string, params?: Record<string, string | number | boolean | Date | null | undefined>) => string,
+  key: string
+) {
+  const translated = t(key);
+  return translated === key ? undefined : translated;
 }
 
 function isTemplateSetting(setting: SystemSetting, value: string) {
@@ -144,6 +153,12 @@ export default function AdminSettingsPage() {
         icon: Bot,
         tone: "border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-300",
       },
+      github: {
+        label: t("admin.settings.github"),
+        description: t("admin.settings.githubDescription"),
+        icon: Github,
+        tone: "border-slate-500/20 bg-slate-500/10 text-slate-700 dark:text-slate-300",
+      },
       security: {
         label: t("admin.settings.security"),
         description: t("admin.settings.securityDescription"),
@@ -158,7 +173,7 @@ export default function AdminSettingsPage() {
     (category: string): CategoryMeta => {
       return (
         categoryMeta[category] ?? {
-          label: category,
+          label: formatSettingLabel(category),
           description: t("admin.settings.categoryFallbackDescription"),
           icon: Settings,
           tone: "border-border bg-muted/40 text-muted-foreground",
@@ -166,6 +181,20 @@ export default function AdminSettingsPage() {
       );
     },
     [categoryMeta, t]
+  );
+
+  const getSettingLabel = useCallback(
+    (setting: SystemSetting) => {
+      return getOptionalTranslation(t, `admin.settings.items.${setting.key}.label`) ?? formatSettingLabel(setting.key);
+    },
+    [t]
+  );
+
+  const getSettingDescription = useCallback(
+    (setting: SystemSetting) => {
+      return getOptionalTranslation(t, `admin.settings.items.${setting.key}.description`) ?? setting.description;
+    },
+    [t]
   );
 
   const resolveAiGroupId = useCallback((key: string): SettingGroupId => {
@@ -319,11 +348,19 @@ export default function AdminSettingsPage() {
     if (!normalizedSearchTerm) return settings;
 
     return settings.filter((setting) => {
-      return [setting.key, setting.description, setting.value, setting.category]
+      const localizedDescription = getSettingDescription(setting);
+      return [
+        setting.key,
+        setting.value,
+        setting.category,
+        getSettingLabel(setting),
+        localizedDescription,
+        getCategoryMeta(setting.category).label,
+      ]
         .filter(Boolean)
         .some((value) => value!.toLowerCase().includes(normalizedSearchTerm));
     });
-  }, [normalizedSearchTerm, settings]);
+  }, [getCategoryMeta, getSettingDescription, getSettingLabel, normalizedSearchTerm, settings]);
 
   const settingsByCategory = useMemo(() => groupSettingsByCategory(categories, settings), [categories, settings]);
   const visibleSettingsByCategory = useMemo(
@@ -393,7 +430,7 @@ export default function AdminSettingsPage() {
             {checked ? t("admin.settings.booleanOn") : t("admin.settings.booleanOff")}
           </span>
           <Switch
-            aria-label={formatSettingLabel(setting.key)}
+            aria-label={getSettingLabel(setting)}
             checked={checked}
             onCheckedChange={(nextChecked) => handleFieldChange(setting.key, String(nextChecked))}
           />
@@ -707,6 +744,7 @@ export default function AdminSettingsPage() {
                                 const currentValue = editedValues[setting.key] ?? "";
                                 const hasPendingChange = currentValue !== (setting.value ?? "");
                                 const isSensitive = isSensitiveSetting(setting);
+                                const localizedDescription = getSettingDescription(setting);
 
                                 return (
                                   <div
@@ -718,7 +756,7 @@ export default function AdminSettingsPage() {
                                   >
                                     <div className="min-w-0 space-y-2">
                                       <div className="flex flex-wrap items-center gap-2">
-                                        <p className="text-sm font-medium">{formatSettingLabel(setting.key)}</p>
+                                        <p className="text-sm font-medium">{getSettingLabel(setting)}</p>
                                         {isSensitive && (
                                           <Badge variant="outline" className="text-[11px]">
                                             {t("admin.settings.sensitiveValue")}
@@ -731,8 +769,8 @@ export default function AdminSettingsPage() {
                                       <p className="break-all font-mono text-[11px] uppercase tracking-wide text-muted-foreground">
                                         {setting.key}
                                       </p>
-                                      {setting.description && (
-                                        <p className="max-w-3xl text-sm text-muted-foreground">{setting.description}</p>
+                                      {localizedDescription && (
+                                        <p className="max-w-3xl text-sm text-muted-foreground">{localizedDescription}</p>
                                       )}
                                     </div>
 

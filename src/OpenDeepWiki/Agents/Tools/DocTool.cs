@@ -15,7 +15,7 @@ public class DocTool
 {
     private readonly IContext _context;
     private readonly string _branchLanguageId;
-    private readonly string _catalogPath;
+    private readonly string? _catalogPath;
     private readonly GitTool? _gitTool;
     private const int MaxDatabaseWriteAttempts = 3;
     private const int DatabaseWriteRetryBaseDelayMs = 250;
@@ -27,11 +27,11 @@ public class DocTool
     /// <param name="branchLanguageId">The branch language ID to operate on.</param>
     /// <param name="catalogPath">The catalog item path this tool operates on.</param>
     /// <param name="gitTool">Optional GitTool instance to track read files.</param>
-    public DocTool(IContext context, string branchLanguageId, string catalogPath, GitTool? gitTool = null)
+    public DocTool(IContext context, string branchLanguageId, string? catalogPath, GitTool? gitTool = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _branchLanguageId = branchLanguageId ?? throw new ArgumentNullException(nameof(branchLanguageId));
-        _catalogPath = catalogPath ?? throw new ArgumentNullException(nameof(catalogPath));
+        _catalogPath = NormalizeCatalogPath(catalogPath);
         _gitTool = gitTool;
     }
 
@@ -55,6 +55,8 @@ content: '# Overview\n\nThis is the overview section...'")]
     public async Task<string> WriteAsync(
         [Description("Document content in Markdown format")]
         string content,
+        [Description("Optional catalog path. Omit this when writing the current catalog item; provide it for incremental updates.")]
+        string path = "",
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -62,17 +64,23 @@ content: '# Overview\n\nThis is the overview section...'")]
             return "ERROR: Content cannot be empty. Please provide valid Markdown content for the document.";
         }
 
+        var catalogPath = ResolveCatalogPath(path);
+        if (catalogPath == null)
+        {
+            return "ERROR: Catalog path is required. Provide the path parameter for incremental updates.";
+        }
+
         try
         {
             // Find the catalog item
             var catalog = await _context.DocCatalogs
                 .FirstOrDefaultAsync(c => c.BranchLanguageId == _branchLanguageId &&
-                                          c.Path == _catalogPath &&
+                                          c.Path == catalogPath &&
                                           !c.IsDeleted, cancellationToken);
 
             if (catalog == null)
             {
-                return $"ERROR: Catalog item with path '{_catalogPath}' not found. Please ensure the catalog item exists before writing content.";
+                return $"ERROR: Catalog item with path '{catalogPath}' not found. Please ensure the catalog item exists before writing content.";
             }
 
             // 从 GitTool 获取读取的文件列表
@@ -99,7 +107,7 @@ content: '# Overview\n\nThis is the overview section...'")]
                     existingDoc.SourceFiles = sourceFilesJson;
                     existingDoc.UpdateTimestamp();
                     await SaveChangesWithRetryAsync(cancellationToken);
-                    return $"SUCCESS: Document '{_catalogPath}' has been updated successfully.";
+                    return $"SUCCESS: Document '{catalogPath}' has been updated successfully.";
                 }
             }
 
@@ -119,11 +127,11 @@ content: '# Overview\n\nThis is the overview section...'")]
             catalog.UpdateTimestamp();
 
             await SaveChangesWithRetryAsync(cancellationToken);
-            return $"SUCCESS: Document '{_catalogPath}' has been created successfully.";
+            return $"SUCCESS: Document '{catalogPath}' has been created successfully.";
         }
         catch (Exception ex)
         {
-            return $"ERROR: Failed to write document '{_catalogPath}': {ex.Message}";
+            return $"ERROR: Failed to write document '{catalogPath}': {ex.Message}";
         }
     }
 
@@ -149,6 +157,8 @@ newContent: '## New Section\n\nUpdated content here'")]
         string oldContent,
         [Description("New text to replace the old content with")]
         string newContent,
+        [Description("Optional catalog path. Omit this when editing the current catalog item; provide it for incremental updates.")]
+        string path = "",
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(oldContent))
@@ -156,22 +166,28 @@ newContent: '## New Section\n\nUpdated content here'")]
             return "ERROR: Old content cannot be empty. Please provide the exact text you want to replace.";
         }
 
+        var catalogPath = ResolveCatalogPath(path);
+        if (catalogPath == null)
+        {
+            return "ERROR: Catalog path is required. Provide the path parameter for incremental updates.";
+        }
+
         try
         {
             // Find the catalog item
             var catalog = await _context.DocCatalogs
                 .FirstOrDefaultAsync(c => c.BranchLanguageId == _branchLanguageId &&
-                                          c.Path == _catalogPath &&
+                                          c.Path == catalogPath &&
                                           !c.IsDeleted, cancellationToken);
 
             if (catalog == null)
             {
-                return $"ERROR: Catalog item with path '{_catalogPath}' not found.";
+                return $"ERROR: Catalog item with path '{catalogPath}' not found.";
             }
 
             if (string.IsNullOrEmpty(catalog.DocFileId))
             {
-                return $"ERROR: No document associated with catalog item '{_catalogPath}'. Use WriteAsync to create a document first.";
+                return $"ERROR: No document associated with catalog item '{catalogPath}'. Use WriteAsync to create a document first.";
             }
 
             // Find the document
@@ -180,7 +196,7 @@ newContent: '## New Section\n\nUpdated content here'")]
 
             if (docFile == null)
             {
-                return $"ERROR: Document not found for catalog item '{_catalogPath}'.";
+                return $"ERROR: Document not found for catalog item '{catalogPath}'.";
             }
 
             // Check if old content exists in the document
@@ -194,11 +210,11 @@ newContent: '## New Section\n\nUpdated content here'")]
             docFile.UpdateTimestamp();
 
             await SaveChangesWithRetryAsync(cancellationToken);
-            return $"SUCCESS: Document '{_catalogPath}' has been edited successfully.";
+            return $"SUCCESS: Document '{catalogPath}' has been edited successfully.";
         }
         catch (Exception ex)
         {
-            return $"ERROR: Failed to edit document '{_catalogPath}': {ex.Message}";
+            return $"ERROR: Failed to edit document '{catalogPath}': {ex.Message}";
         }
     }
 
@@ -217,12 +233,20 @@ Usage:
 - Use before EditAsync to see current content
 - Use to verify document was written correctly")]
     public async Task<string?> ReadAsync(
+        [Description("Optional catalog path. Omit this when reading the current catalog item; provide it for incremental updates.")]
+        string path = "",
         CancellationToken cancellationToken = default)
     {
+        var catalogPath = ResolveCatalogPath(path);
+        if (catalogPath == null)
+        {
+            return "ERROR: Catalog path is required. Provide the path parameter for incremental updates.";
+        }
+
         // Find the catalog item
         var catalog = await _context.DocCatalogs
             .FirstOrDefaultAsync(c => c.BranchLanguageId == _branchLanguageId && 
-                                      c.Path == _catalogPath && 
+                                      c.Path == catalogPath && 
                                       !c.IsDeleted, cancellationToken);
 
         if (catalog == null || string.IsNullOrEmpty(catalog.DocFileId))
@@ -252,11 +276,19 @@ Usage:
 - Quick check before writing to avoid overwriting
 - Verify document creation was successful")]
     public async Task<bool> ExistsAsync(
+        [Description("Optional catalog path. Omit this when checking the current catalog item; provide it for incremental updates.")]
+        string path = "",
         CancellationToken cancellationToken = default)
     {
+        var catalogPath = ResolveCatalogPath(path);
+        if (catalogPath == null)
+        {
+            return false;
+        }
+
         var catalog = await _context.DocCatalogs
             .FirstOrDefaultAsync(c => c.BranchLanguageId == _branchLanguageId && 
-                                      c.Path == _catalogPath && 
+                                      c.Path == catalogPath && 
                                       !c.IsDeleted, cancellationToken);
 
         if (catalog == null || string.IsNullOrEmpty(catalog.DocFileId))
@@ -293,6 +325,21 @@ Usage:
                 Name = "DocExists"
             })
         };
+    }
+
+    private string? ResolveCatalogPath(string? path)
+    {
+        return NormalizeCatalogPath(path) ?? _catalogPath;
+    }
+
+    private static string? NormalizeCatalogPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        return path.Trim().Trim('/');
     }
 
     private async Task SaveChangesWithRetryAsync(CancellationToken cancellationToken)

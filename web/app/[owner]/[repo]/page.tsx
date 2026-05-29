@@ -8,22 +8,29 @@ interface RepoIndexProps {
     owner: string;
     repo: string;
   }>;
+  searchParams: Promise<{
+    branch?: string;
+    lang?: string;
+  }>;
 }
 
-async function getTreeData(owner: string, repo: string) {
+async function getTreeData(owner: string, repo: string, branch?: string, lang?: string) {
   try {
-    return await fetchRepoTree(owner, repo);
+    return await fetchRepoTree(owner, repo, branch, lang);
   } catch {
     return null;
   }
 }
 
-export default async function RepoIndex({ params }: RepoIndexProps) {
+export default async function RepoIndex({ params, searchParams }: RepoIndexProps) {
   const { owner, repo } = await params;
   const decodedOwner = decodeRouteSegment(owner);
   const decodedRepo = decodeRouteSegment(repo);
+  const resolvedSearchParams = await searchParams;
+  const branch = resolvedSearchParams?.branch;
+  const lang = resolvedSearchParams?.lang;
   
-  const tree = await getTreeData(decodedOwner, decodedRepo);
+  const tree = await getTreeData(decodedOwner, decodedRepo, branch, lang);
   
   // API错误，layout会处理
   if (!tree) {
@@ -42,7 +49,12 @@ export default async function RepoIndex({ params }: RepoIndexProps) {
 
   // 有默认文档，重定向
   if (tree.defaultSlug) {
-    redirect(buildRepoDocPath(decodedOwner, decodedRepo, tree.defaultSlug));
+    const params = new URLSearchParams();
+    if (branch) params.set("branch", branch);
+    if (lang) params.set("lang", lang);
+    const query = params.toString();
+
+    redirect(`${buildRepoDocPath(decodedOwner, decodedRepo, tree.defaultSlug)}${query ? `?${query}` : ""}`);
   }
 
   // 没有默认文档但有目录，显示提示

@@ -121,7 +121,7 @@ public class MindMapWorker : BackgroundService
         // 设置当前仓库ID到WikiGenerator（用于日志记录）
         if (wikiGenerator is WikiGenerator generator)
         {
-            generator.SetCurrentRepository(repository.Id);
+            generator.SetCurrentRepository(repository.Id, $"{repository.OrgName}/{repository.RepoName}");
         }
 
         // 记录开始生成

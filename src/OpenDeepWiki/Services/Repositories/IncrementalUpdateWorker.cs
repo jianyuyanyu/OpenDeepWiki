@@ -6,8 +6,7 @@ using OpenDeepWiki.Entities;
 namespace OpenDeepWiki.Services.Repositories;
 
 /// <summary>
-/// 增量更新后台工作器
-/// 独立轮询和处理需要增量更新的仓库
+/// Background worker that processes manual incremental tasks and performs scheduled scans.
 /// </summary>
 public class IncrementalUpdateWorker : BackgroundService
 {
@@ -25,16 +24,14 @@ public class IncrementalUpdateWorker : BackgroundService
         _options = options.Value;
     }
 
-    /// <summary>
-    /// 执行后台任务
-    /// </summary>
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            "IncrementalUpdateWorker started. PollingInterval: {PollingInterval}s",
-            _options.PollingIntervalSeconds);
+            "IncrementalUpdateWorker started. PollingInterval: {PollingInterval}s, ScheduledEnabled: {Enabled}",
+            _options.PollingIntervalSeconds,
+            _options.Enabled);
 
-        // 等待应用启动完成
         await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
 
         while (!stoppingToken.IsCancellationRequested)
@@ -45,7 +42,6 @@ public class IncrementalUpdateWorker : BackgroundService
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                // 正常关闭，不记录错误
                 break;
             }
             catch (Exception ex)
@@ -53,7 +49,6 @@ public class IncrementalUpdateWorker : BackgroundService
                 _logger.LogError(ex, "Error occurred during incremental update polling");
             }
 
-            // 等待下一次轮询
             try
             {
                 await Task.Delay(
@@ -69,18 +64,14 @@ public class IncrementalUpdateWorker : BackgroundService
         _logger.LogInformation("IncrementalUpdateWorker stopped gracefully");
     }
 
-
-    /// <summary>
-    /// 处理待处理的任务
-    /// </summary>
     private async Task ProcessPendingTasksAsync(CancellationToken stoppingToken)
     {
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<IContext>();
         var updateService = scope.ServiceProvider.GetRequiredService<IIncrementalUpdateService>();
         var gitPlatformService = scope.ServiceProvider.GetRequiredService<IGitPlatformService>();
+        var repositoryAnalyzer = scope.ServiceProvider.GetRequiredService<IRepositoryAnalyzer>();
 
-        // 1. 优先处理高优先级任务（手动触发）
         var pendingTasks = await GetPendingTasksAsync(context, stoppingToken);
 
         foreach (var task in pendingTasks)
@@ -94,27 +85,20 @@ public class IncrementalUpdateWorker : BackgroundService
             await ProcessSingleTaskAsync(context, updateService, task, stoppingToken);
         }
 
-        // 2. 检查需要定期更新的仓库
-        await CheckScheduledUpdatesAsync(context, gitPlatformService, stoppingToken);
+        await CheckScheduledUpdatesAsync(context, gitPlatformService, repositoryAnalyzer, stoppingToken);
     }
 
-    /// <summary>
-    /// 获取待处理的任务（按优先级排序）
-    /// </summary>
     private async Task<List<IncrementalUpdateTask>> GetPendingTasksAsync(
         IContext context,
         CancellationToken stoppingToken)
     {
         return await context.IncrementalUpdateTasks
-            .Where(t => t.Status == IncrementalUpdateStatus.Pending)
+            .Where(t => !t.IsDeleted && t.Status == IncrementalUpdateStatus.Pending)
             .OrderByDescending(t => t.Priority)
             .ThenBy(t => t.CreatedAt)
             .ToListAsync(stoppingToken);
     }
 
-    /// <summary>
-    /// 处理单个任务
-    /// </summary>
     private async Task ProcessSingleTaskAsync(
         IContext context,
         IIncrementalUpdateService updateService,
@@ -127,17 +111,14 @@ public class IncrementalUpdateWorker : BackgroundService
 
         try
         {
-            // 更新状态为 Processing
             await UpdateTaskStatusAsync(
                 context, task, IncrementalUpdateStatus.Processing, null, stoppingToken);
 
-            // 执行增量更新
             var result = await updateService.ProcessIncrementalUpdateAsync(
                 task.RepositoryId, task.BranchId, stoppingToken);
 
             if (result.Success)
             {
-                // 更新状态为 Completed
                 task.TargetCommitId = result.CurrentCommitId;
                 await UpdateTaskStatusAsync(
                     context, task, IncrementalUpdateStatus.Completed, null, stoppingToken);
@@ -148,7 +129,6 @@ public class IncrementalUpdateWorker : BackgroundService
             }
             else
             {
-                // 更新状态为 Failed，保留上次 CommitId
                 await UpdateTaskStatusAsync(
                     context, task, IncrementalUpdateStatus.Failed, result.ErrorMessage, stoppingToken);
 
@@ -159,14 +139,11 @@ public class IncrementalUpdateWorker : BackgroundService
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            // 取消时保持任务状态为 Pending，以便下次重试
-            _logger.LogInformation(
-                "Task processing cancelled. TaskId: {TaskId}", task.Id);
+            _logger.LogInformation("Task processing cancelled. TaskId: {TaskId}", task.Id);
             throw;
         }
         catch (Exception ex)
         {
-            // 更新状态为 Failed
             await UpdateTaskStatusAsync(
                 context, task, IncrementalUpdateStatus.Failed, ex.Message, stoppingToken);
 
@@ -176,10 +153,6 @@ public class IncrementalUpdateWorker : BackgroundService
         }
     }
 
-
-    /// <summary>
-    /// 更新任务状态
-    /// </summary>
     private async Task UpdateTaskStatusAsync(
         IContext context,
         IncrementalUpdateTask task,
@@ -209,24 +182,33 @@ public class IncrementalUpdateWorker : BackgroundService
         await context.SaveChangesAsync(stoppingToken);
     }
 
-    /// <summary>
-    /// 检查需要定期更新的仓库
-    /// </summary>
     private async Task CheckScheduledUpdatesAsync(
         IContext context,
         IGitPlatformService gitPlatformService,
+        IRepositoryAnalyzer repositoryAnalyzer,
         CancellationToken stoppingToken)
     {
-        var now = DateTime.UtcNow;
+        if (!_options.Enabled)
+        {
+            _logger.LogDebug("Scheduled incremental scans are disabled");
+            return;
+        }
 
-        // 查询需要检查更新的仓库
-        // 条件：状态为 Completed 且距离上次检查时间超过配置的间隔
+        var now = DateTime.UtcNow;
+        var defaultInterval = Math.Max(_options.DefaultUpdateIntervalMinutes, _options.MinUpdateIntervalMinutes);
+        var maxRepositoriesPerPoll = Math.Max(1, _options.MaxRepositoriesPerPoll);
+
         var repositoriesToCheck = await context.Repositories
-            .Where(r => r.Status == RepositoryStatus.Completed)
+            .Where(r => !r.IsDeleted && r.Status == RepositoryStatus.Completed)
             .Where(r => r.LastUpdateCheckAt == null ||
                         r.LastUpdateCheckAt.Value.AddMinutes(
-                            r.UpdateIntervalMinutes ?? _options.DefaultUpdateIntervalMinutes) <= now)
-            .Take(10) // 每次最多检查10个仓库，避免单次处理过多
+                            r.UpdateIntervalMinutes == null
+                                ? defaultInterval
+                                : (r.UpdateIntervalMinutes.Value < _options.MinUpdateIntervalMinutes
+                                    ? _options.MinUpdateIntervalMinutes
+                                    : r.UpdateIntervalMinutes.Value)) <= now)
+            .OrderBy(r => r.LastUpdateCheckAt ?? DateTime.MinValue)
+            .Take(maxRepositoriesPerPoll)
             .ToListAsync(stoppingToken);
 
         foreach (var repository in repositoriesToCheck)
@@ -236,20 +218,16 @@ public class IncrementalUpdateWorker : BackgroundService
                 break;
             }
 
-            // Sync repository visibility before creating update tasks
-            await SyncRepositoryVisibilityAsync(context, gitPlatformService, repository);
-
-            await CreateScheduledUpdateTasksAsync(context, repository, stoppingToken);
+            await SyncRepositoryVisibilityAsync(context, gitPlatformService, repository, stoppingToken);
+            await CreateScheduledUpdateTasksAsync(context, repositoryAnalyzer, repository, stoppingToken);
         }
     }
 
-    /// <summary>
-    /// Sync repository visibility with the actual Git platform state
-    /// </summary>
     private async Task SyncRepositoryVisibilityAsync(
         IContext context,
         IGitPlatformService gitPlatformService,
-        Repository repository)
+        Repository repository,
+        CancellationToken stoppingToken)
     {
         try
         {
@@ -277,7 +255,7 @@ public class IncrementalUpdateWorker : BackgroundService
 
                 repository.IsPublic = shouldBePublic;
                 repository.UpdatedAt = DateTime.UtcNow;
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(stoppingToken);
             }
         }
         catch (Exception ex)
@@ -288,9 +266,6 @@ public class IncrementalUpdateWorker : BackgroundService
         }
     }
 
-    /// <summary>
-    /// Check if the git URL is from a supported public platform
-    /// </summary>
     private static bool IsPublicPlatform(string gitUrl)
     {
         try
@@ -305,28 +280,28 @@ public class IncrementalUpdateWorker : BackgroundService
         }
     }
 
-    /// <summary>
-    /// 为仓库创建定期更新任务
-    /// </summary>
     private async Task CreateScheduledUpdateTasksAsync(
         IContext context,
+        IRepositoryAnalyzer repositoryAnalyzer,
         Repository repository,
         CancellationToken stoppingToken)
     {
         try
         {
-            // 获取仓库的所有分支
             var branches = await context.RepositoryBranches
-                .Where(b => b.RepositoryId == repository.Id)
+                .Where(b => b.RepositoryId == repository.Id && !b.IsDeleted)
                 .ToListAsync(stoppingToken);
+
+            var isGitRepository = RepositorySource.IsGit(repository.GitUrl);
+            var saveChanges = false;
 
             foreach (var branch in branches)
             {
-                // 检查是否已存在待处理或处理中的任务
                 var existingTask = await context.IncrementalUpdateTasks
-                    .AnyAsync(t => t.RepositoryId == repository.Id
-                                   && t.BranchId == branch.Id
-                                   && (t.Status == IncrementalUpdateStatus.Pending
+                    .AnyAsync(t => !t.IsDeleted &&
+                                   t.RepositoryId == repository.Id &&
+                                   t.BranchId == branch.Id &&
+                                   (t.Status == IncrementalUpdateStatus.Pending
                                        || t.Status == IncrementalUpdateStatus.Processing),
                         stoppingToken);
 
@@ -338,29 +313,65 @@ public class IncrementalUpdateWorker : BackgroundService
                     continue;
                 }
 
-                // 创建定期更新任务（普通优先级）
-                var task = new IncrementalUpdateTask
+                if (!isGitRepository)
                 {
-                    Id = Guid.NewGuid().ToString(),
-                    RepositoryId = repository.Id,
-                    BranchId = branch.Id,
-                    PreviousCommitId = branch.LastCommitId,
-                    Status = IncrementalUpdateStatus.Pending,
-                    Priority = 0, // 普通优先级
-                    IsManualTrigger = false,
-                    CreatedAt = DateTime.UtcNow
-                };
+                    CreateScheduledTask(context, repository, branch, branch.LastCommitId, null);
+                    saveChanges = true;
+                    continue;
+                }
 
-                context.IncrementalUpdateTasks.Add(task);
+                string? remoteCommitId;
+                try
+                {
+                    remoteCommitId = await repositoryAnalyzer.GetRemoteBranchHeadCommitAsync(
+                        repository,
+                        branch.BranchName,
+                        stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Failed to query remote HEAD. Repository: {Org}/{Repo}, Branch: {Branch}",
+                        repository.OrgName,
+                        repository.RepoName,
+                        branch.BranchName);
+                    continue;
+                }
 
-                _logger.LogInformation(
-                    "Created scheduled update task. TaskId: {TaskId}, Repository: {Org}/{Repo}, Branch: {Branch}",
-                    task.Id, repository.OrgName, repository.RepoName, branch.BranchName);
+                if (string.IsNullOrWhiteSpace(remoteCommitId))
+                {
+                    _logger.LogWarning(
+                        "Remote HEAD was not found. Repository: {Org}/{Repo}, Branch: {Branch}",
+                        repository.OrgName,
+                        repository.RepoName,
+                        branch.BranchName);
+                    continue;
+                }
+
+                if (string.Equals(remoteCommitId, branch.LastCommitId, StringComparison.Ordinal))
+                {
+                    _logger.LogDebug(
+                        "Skipping scheduled update, remote HEAD unchanged. Repository: {Org}/{Repo}, Branch: {Branch}, Commit: {CommitId}",
+                        repository.OrgName,
+                        repository.RepoName,
+                        branch.BranchName,
+                        remoteCommitId);
+                    continue;
+                }
+
+                CreateScheduledTask(context, repository, branch, branch.LastCommitId, remoteCommitId);
+                saveChanges = true;
             }
 
-            // 更新仓库的 LastUpdateCheckAt
             repository.LastUpdateCheckAt = DateTime.UtcNow;
-            await context.SaveChangesAsync(stoppingToken);
+            repository.UpdatedAt = DateTime.UtcNow;
+            saveChanges = true;
+
+            if (saveChanges)
+            {
+                await context.SaveChangesAsync(stoppingToken);
+            }
         }
         catch (Exception ex)
         {
@@ -368,5 +379,32 @@ public class IncrementalUpdateWorker : BackgroundService
                 "Failed to create scheduled update tasks. Repository: {Org}/{Repo}",
                 repository.OrgName, repository.RepoName);
         }
+    }
+
+    private void CreateScheduledTask(
+        IContext context,
+        Repository repository,
+        RepositoryBranch branch,
+        string? previousCommitId,
+        string? targetCommitId)
+    {
+        var task = new IncrementalUpdateTask
+        {
+            Id = Guid.NewGuid().ToString(),
+            RepositoryId = repository.Id,
+            BranchId = branch.Id,
+            PreviousCommitId = previousCommitId,
+            TargetCommitId = targetCommitId,
+            Status = IncrementalUpdateStatus.Pending,
+            Priority = 0,
+            IsManualTrigger = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        context.IncrementalUpdateTasks.Add(task);
+
+        _logger.LogInformation(
+            "Created scheduled update task. TaskId: {TaskId}, Repository: {Org}/{Repo}, Branch: {Branch}, TargetCommit: {TargetCommit}",
+            task.Id, repository.OrgName, repository.RepoName, branch.BranchName, targetCommitId ?? "unknown");
     }
 }

@@ -36,6 +36,11 @@ public class TokenUsage : AggregateRoot<string>
     public int CachedInputTokens { get; set; }
 
     /// <summary>
+    /// Input tokens that provider used to create prompt cache entries.
+    /// </summary>
+    public int CacheCreationInputTokens { get; set; }
+
+    /// <summary>
     /// AI provider identifier used for the request.
     /// </summary>
     [StringLength(100)]
@@ -74,6 +79,16 @@ public class TokenUsage : AggregateRoot<string>
     /// Output token price per one million tokens.
     /// </summary>
     public decimal? OutputTokenPrice { get; set; }
+
+    /// <summary>
+    /// Cache hit input token price per one million tokens.
+    /// </summary>
+    public decimal? CacheHitTokenPrice { get; set; }
+
+    /// <summary>
+    /// Cache creation input token price per one million tokens.
+    /// </summary>
+    public decimal? CacheCreationTokenPrice { get; set; }
 
     /// <summary>
     /// Calculated input token cost.

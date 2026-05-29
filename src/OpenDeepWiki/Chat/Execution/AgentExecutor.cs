@@ -56,6 +56,16 @@ public class AgentExecutor : IAgentExecutor
         _logger.LogInformation(
             "Executing agent for session {SessionId}, message {MessageId}",
             session.SessionId, message.MessageId);
+        using var aiScope = AiExecutionScope.Begin(_logger, new AiExecutionContext
+        {
+            BusinessTag = "provider_chat_reply",
+            Description = "消息渠道智能回复",
+            SessionId = session.SessionId,
+            MessageId = message.MessageId,
+            Platform = message.Platform,
+            UserId = message.SenderId,
+            ModelId = _options.DefaultModel
+        });
 
         try
         {
@@ -112,6 +122,7 @@ public class AgentExecutor : IAgentExecutor
             var inputTokens = usageSnapshot.InputTokens;
             var outputTokens = usageSnapshot.OutputTokens;
             var cachedInputTokens = usageSnapshot.CachedInputTokens;
+            var cacheCreationInputTokens = usageSnapshot.CacheCreationInputTokens;
             var responseContent = contentBuilder.ToString();
 
             var responseMessage = new Abstractions.ChatMessage
@@ -130,6 +141,7 @@ public class AgentExecutor : IAgentExecutor
                 inputTokens,
                 outputTokens,
                 cachedInputTokens,
+                cacheCreationInputTokens,
                 _options.DefaultModel,
                 operationName,
                 cts.Token);
@@ -181,6 +193,16 @@ public class AgentExecutor : IAgentExecutor
         _logger.LogInformation(
             "Starting streaming agent execution for session {SessionId}, message {MessageId}",
             session.SessionId, message.MessageId);
+        using var aiScope = AiExecutionScope.Begin(_logger, new AiExecutionContext
+        {
+            BusinessTag = "provider_chat_stream_reply",
+            Description = "消息渠道流式智能回复",
+            SessionId = session.SessionId,
+            MessageId = message.MessageId,
+            Platform = message.Platform,
+            UserId = message.SenderId,
+            ModelId = _options.DefaultModel
+        });
 
         // Resolve platform user to DeepWiki user for permission-aware access
         var deepWikiUserId = await _userResolver.ResolveDeepWikiUserIdAsync(
@@ -265,11 +287,13 @@ public class AgentExecutor : IAgentExecutor
             var inputTokens = usageSnapshot.InputTokens;
             var outputTokens = usageSnapshot.OutputTokens;
             var cachedInputTokens = usageSnapshot.CachedInputTokens;
+            var cacheCreationInputTokens = usageSnapshot.CacheCreationInputTokens;
             var operationName = BuildOperationName(session);
             await RecordTokenUsageAsync(
                 inputTokens,
                 outputTokens,
                 cachedInputTokens,
+                cacheCreationInputTokens,
                 _options.DefaultModel,
                 operationName,
                 cts.Token);
@@ -410,6 +434,7 @@ public class AgentExecutor : IAgentExecutor
         int inputTokens,
         int outputTokens,
         int cachedInputTokens,
+        int cacheCreationInputTokens,
         string modelName,
         string operation,
         CancellationToken cancellationToken)
@@ -428,6 +453,7 @@ public class AgentExecutor : IAgentExecutor
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
                 CachedInputTokens = cachedInputTokens,
+                CacheCreationInputTokens = cacheCreationInputTokens,
                 ModelId = modelName,
                 ModelName = modelName,
                 Operation = operation,

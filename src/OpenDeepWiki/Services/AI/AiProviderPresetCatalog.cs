@@ -138,6 +138,12 @@ public sealed class AiModelPreset
     [JsonPropertyName("outputPrice")]
     public decimal? OutputPrice { get; init; }
 
+    [JsonPropertyName("cacheHitPrice")]
+    public decimal? CacheHitPrice { get; init; }
+
+    [JsonPropertyName("cacheCreationPrice")]
+    public decimal? CacheCreationPrice { get; init; }
+
     [JsonPropertyName("supportsThinking")]
     public bool? SupportsThinking { get; init; }
 

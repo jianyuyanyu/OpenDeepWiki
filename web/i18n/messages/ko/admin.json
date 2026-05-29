@@ -18,7 +18,37 @@
     "submitCount": "제출 수",
     "inputToken": "입력 토큰",
     "outputToken": "출력 토큰",
-    "total": "합계"
+    "total": "합계",
+    "overview": "운영 개요",
+    "subtitle": "최근 {days}일 동안의 저장소 유입, AI 토큰 사용량, 캐시 효율, MCP 트래픽을 확인합니다.",
+    "updatedAt": "업데이트",
+    "loading": "대시보드 지표를 불러오는 중...",
+    "repoSubmitDetail": "이 기간에 {count}건 처리됨",
+    "completionRate": "완료율 {rate}",
+    "newUsersDetail": "{days}일 동안 신규 계정",
+    "tokenUsageDetail": "예상 비용 {cost}",
+    "cacheHitRate": "캐시 적중률",
+    "cacheHitRateDetail": "{count} 캐시 적중 토큰",
+    "mcpSuccessRate": "성공률 {rate}",
+    "tokenTrendDescription": "일별 입력, 캐시 생성, 캐시 적중, 출력 토큰과 캐시 적중률을 표시합니다.",
+    "freshInputToken": "신규 입력 토큰",
+    "freshInputTokenDetail": "프롬프트 캐시에서 제공되지 않은 입력 토큰입니다.",
+    "cacheCreationToken": "캐시 생성 토큰",
+    "cacheCreationTokenDetail": "재사용 가능한 프롬프트 캐시를 만드는 데 사용된 입력 토큰입니다.",
+    "cacheHitToken": "캐시 적중 토큰",
+    "cacheHitTokenDetail": "기존 프롬프트 캐시에서 제공된 입력 토큰입니다.",
+    "tokenComposition": "토큰 구성",
+    "cacheEfficiencyDescription": "캐시 적중률 = 캐시 적중 입력 토큰 / 전체 입력 토큰입니다.",
+    "noData": "선택한 기간에 데이터가 없습니다",
+    "repoStatsDescription": "저장소 제출 수와 처리 완료 수를 비교합니다.",
+    "userGrowthDescription": "신규 사용자 등록을 일별로 표시합니다.",
+    "mcpTrendDescription": "MCP 요청 수와 오류 수를 일별로 표시합니다.",
+    "mcpUnavailable": "MCP 통계를 사용할 수 없습니다",
+    "totalWithCount": "합계 {count}",
+    "errorsWithCount": "오류 {count}건",
+    "outputTokenDetail": "이 기간에 모델이 생성한 응답 토큰입니다.",
+    "mcpRequestMix": "{success}건 성공, {errors}건 실패",
+    "windowHint": "모든 지표는 선택한 {days}일 기간을 사용합니다."
   },
   "departments": {
     "title": "부서 관리",
@@ -379,6 +409,66 @@
       "catalogModelHint": "문서 구조와 탐색 트리를 생성합니다. 빠르고 저렴한 모델로도 충분합니다.",
       "contentModelHint": "코드 분석이 포함된 실제 문서 콘텐츠를 생성합니다. 최고 품질을 위해 가장 강력한 모델을 사용하세요.",
       "translationModelHint": "생성된 문서를 다른 언어로 번역합니다. 빠르고 저렴한 모델로 충분합니다."
+    },
+    "github": "GitHub",
+    "githubDescription": "리포지토리 가져오기 흐름에서 사용하는 GitHub App 자격 증명과 연동 설정입니다.",
+    "items": {
+      "WIKI_LANGUAGES": {
+        "label": "Wiki 언어",
+        "description": "Wiki 생성 및 번역에 사용할 언어 코드입니다. 여러 값은 쉼표로 구분합니다."
+      },
+      "WIKI_PARALLEL_COUNT": {
+        "label": "병렬 생성 작업 수",
+        "description": "동시에 실행할 수 있는 문서 생성 작업의 최대 개수입니다."
+      },
+      "WIKI_MAX_OUTPUT_TOKENS": {
+        "label": "최대 출력 토큰",
+        "description": "한 번의 Wiki 콘텐츠 생성 요청에서 반환할 수 있는 최대 토큰 수입니다."
+      },
+      "WIKI_DOCUMENT_GENERATION_TIMEOUT_MINUTES": {
+        "label": "문서 생성 제한 시간(분)",
+        "description": "하나의 Wiki 문서 생성 작업을 취소하기 전까지 허용하는 최대 실행 시간입니다."
+      },
+      "WIKI_TRANSLATION_TIMEOUT_MINUTES": {
+        "label": "번역 제한 시간(분)",
+        "description": "생성된 문서를 다른 언어로 번역할 때 허용하는 최대 실행 시간입니다."
+      },
+      "WIKI_TITLE_TRANSLATION_TIMEOUT_MINUTES": {
+        "label": "제목 번역 제한 시간(분)",
+        "description": "생성된 문서 제목을 번역할 때 허용하는 최대 실행 시간입니다."
+      },
+      "WIKI_README_MAX_LENGTH": {
+        "label": "README 최대 길이",
+        "description": "Wiki 컨텍스트를 구성할 때 포함할 README 내용의 최대 길이입니다."
+      },
+      "WIKI_DIRECTORY_TREE_MAX_DEPTH": {
+        "label": "디렉터리 트리 최대 깊이",
+        "description": "디렉터리 구조 분석에 포함할 리포지토리 폴더 계층의 최대 깊이입니다."
+      },
+      "WIKI_MAX_RETRY_ATTEMPTS": {
+        "label": "최대 재시도 횟수",
+        "description": "Wiki 생성과 관련 AI 호출에 허용하는 최대 재시도 횟수입니다."
+      },
+      "WIKI_RETRY_DELAY_MS": {
+        "label": "재시도 지연(ms)",
+        "description": "Wiki 생성 요청을 다시 시도하기 전 대기하는 기본 지연 시간입니다."
+      },
+      "WIKI_PROMPTS_DIRECTORY": {
+        "label": "프롬프트 템플릿 디렉터리",
+        "description": "Wiki 프롬프트 템플릿 파일을 보관하는 상대 디렉터리 경로입니다."
+      },
+      "GITHUB_APP_ID": {
+        "label": "GitHub App ID",
+        "description": "설치 액세스 토큰을 발급할 때 사용하는 GitHub App 숫자 ID입니다."
+      },
+      "GITHUB_APP_PRIVATE_KEY": {
+        "label": "GitHub App 개인 키",
+        "description": "GitHub App JWT에 서명할 때 사용하는 Base64 인코딩 PEM 개인 키입니다."
+      },
+      "GITHUB_APP_NAME": {
+        "label": "GitHub App 이름",
+        "description": "설치 링크와 콜백 링크를 만들 때 사용하는 GitHub App 슬러그입니다."
+      }
     }
   },
   "chatAssistant": {

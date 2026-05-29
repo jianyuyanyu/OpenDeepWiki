@@ -288,6 +288,13 @@ public class McpRepositoryTools
 
         var resolvedModel = await aiProviderResolver.ResolveModelConfigAsync(modelConfig, cancellationToken);
         var requestOptions = resolvedModel.ToRequestOptions();
+        using var aiScope = AiExecutionScope.Begin(new AiExecutionContext
+        {
+            BusinessTag = "mcp_doc_search_summary",
+            Description = "MCP 文档检索总结",
+            Repository = $"{owner}/{repo}",
+            ModelId = resolvedModel.ModelId
+        });
 
         var agentOptions = new ChatClientAgentOptions
         {

@@ -18,7 +18,37 @@
     "submitCount": "提交数",
     "inputToken": "输入Token",
     "outputToken": "输出Token",
-    "total": "合计"
+    "total": "合计",
+    "overview": "运营总览",
+    "subtitle": "查看最近 {days} 天的仓库流入、AI Token 消耗、缓存效率和 MCP 流量。",
+    "updatedAt": "更新于",
+    "loading": "正在加载仪表盘指标...",
+    "repoSubmitDetail": "本窗口已处理 {count} 个",
+    "completionRate": "完成率 {rate}",
+    "newUsersDetail": "{days} 天内新增账号",
+    "tokenUsageDetail": "预估成本 {cost}",
+    "cacheHitRate": "缓存命中率",
+    "cacheHitRateDetail": "{count} 命中缓存",
+    "mcpSuccessRate": "成功率 {rate}",
+    "tokenTrendDescription": "按日展示输入、缓存创建、缓存命中、输出 Token 与缓存命中率。",
+    "freshInputToken": "新输入 Token",
+    "freshInputTokenDetail": "未从提示词缓存命中的输入 Token。",
+    "cacheCreationToken": "缓存创建 Token",
+    "cacheCreationTokenDetail": "用于创建可复用提示词缓存的输入 Token。",
+    "cacheHitToken": "缓存命中 Token",
+    "cacheHitTokenDetail": "从已有提示词缓存命中的输入 Token。",
+    "tokenComposition": "Token 构成",
+    "cacheEfficiencyDescription": "缓存命中率 = 缓存命中输入 Token / 总输入 Token。",
+    "noData": "当前时间范围暂无数据",
+    "repoStatsDescription": "对比仓库提交量和已完成处理量。",
+    "userGrowthDescription": "按日查看新增用户注册。",
+    "mcpTrendDescription": "按日查看 MCP 请求量和错误量。",
+    "mcpUnavailable": "MCP 统计暂不可用",
+    "totalWithCount": "合计 {count}",
+    "errorsWithCount": "{count} 个错误",
+    "outputTokenDetail": "本窗口内模型生成的响应 Token。",
+    "mcpRequestMix": "{success} 成功，{errors} 失败",
+    "windowHint": "所有指标均使用当前选择的 {days} 天窗口。"
   },
   "departments": {
     "title": "部门管理",
@@ -352,6 +382,8 @@
     "clearSearch": "清空搜索",
     "generalDescription": "应用全局使用的基础行为配置。",
     "aiDescription": "生成策略、运行限制和重试行为。",
+    "github": "GitHub",
+    "githubDescription": "用于仓库导入流程的 GitHub App 凭据与集成设置。",
     "securityDescription": "敏感凭据和访问相关配置。",
     "categoryFallbackDescription": "来自该模块的系统设置。",
     "sensitiveValue": "敏感值",
@@ -419,6 +451,64 @@
       "catalogModelHint": "生成文档结构和导航树。快速、低成本的模型即可胜任。",
       "contentModelHint": "生成包含代码分析的实际文档内容。建议使用最强大的模型以获得最佳质量。",
       "translationModelHint": "将生成的文档翻译为其他语言。快速、低成本的模型即可满足需求。"
+    },
+    "items": {
+      "WIKI_LANGUAGES": {
+        "label": "Wiki 语言",
+        "description": "生成和翻译 Wiki 内容时使用的语言代码，多个值用逗号分隔。"
+      },
+      "WIKI_PARALLEL_COUNT": {
+        "label": "并行生成任务数",
+        "description": "允许同时运行的文档生成任务上限。"
+      },
+      "WIKI_MAX_OUTPUT_TOKENS": {
+        "label": "单次输出 Token 上限",
+        "description": "单次 Wiki 内容生成请求允许返回的最大 Token 数。"
+      },
+      "WIKI_DOCUMENT_GENERATION_TIMEOUT_MINUTES": {
+        "label": "文档生成超时（分钟）",
+        "description": "单篇 Wiki 文档生成在被取消前允许执行的最长时间。"
+      },
+      "WIKI_TRANSLATION_TIMEOUT_MINUTES": {
+        "label": "翻译超时（分钟）",
+        "description": "将单篇已生成文档翻译为其他语言时允许执行的最长时间。"
+      },
+      "WIKI_TITLE_TRANSLATION_TIMEOUT_MINUTES": {
+        "label": "标题翻译超时（分钟）",
+        "description": "翻译文档标题时允许执行的最长时间。"
+      },
+      "WIKI_README_MAX_LENGTH": {
+        "label": "README 最大长度",
+        "description": "构建 Wiki 上下文时允许纳入的 README 内容最大长度。"
+      },
+      "WIKI_DIRECTORY_TREE_MAX_DEPTH": {
+        "label": "目录树最大深度",
+        "description": "目录结构分析时会纳入的仓库文件夹最大层级。"
+      },
+      "WIKI_MAX_RETRY_ATTEMPTS": {
+        "label": "最大重试次数",
+        "description": "Wiki 生成及相关 AI 调用允许的最大重试次数。"
+      },
+      "WIKI_RETRY_DELAY_MS": {
+        "label": "重试延迟（毫秒）",
+        "description": "Wiki 生成请求在重试之间等待的基础延迟。"
+      },
+      "WIKI_PROMPTS_DIRECTORY": {
+        "label": "提示词模板目录",
+        "description": "存放 Wiki 提示词模板文件的相对目录路径。"
+      },
+      "GITHUB_APP_ID": {
+        "label": "GitHub App ID",
+        "description": "用于签发安装访问令牌的 GitHub App 数值 ID。"
+      },
+      "GITHUB_APP_PRIVATE_KEY": {
+        "label": "GitHub App 私钥",
+        "description": "用于签名 GitHub App JWT 的 Base64 编码 PEM 私钥。"
+      },
+      "GITHUB_APP_NAME": {
+        "label": "GitHub App 名称",
+        "description": "构建安装链接和回调地址时使用的 GitHub App slug。"
+      }
     }
   },
   "chatAssistant": {

@@ -69,6 +69,48 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
     }
 
     /// <inheritdoc />
+    public async Task<string?> GetRemoteBranchHeadCommitAsync(
+        Entities.Repository repository,
+        string branchName,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(branchName))
+        {
+            throw new ArgumentException("Branch name cannot be empty.", nameof(branchName));
+        }
+
+        var sourceInfo = RepositorySource.Parse(repository.GitUrl);
+        if (sourceInfo.SourceType != RepositorySourceType.Git)
+        {
+            _logger.LogDebug(
+                "Skipping remote HEAD lookup for non-git source. Repository: {Org}/{Repo}, SourceType: {SourceType}",
+                repository.OrgName, repository.RepoName, sourceInfo.SourceType);
+            return null;
+        }
+
+        var credentials = BuildCredentials(repository);
+        var branchRefName = $"refs/heads/{branchName}";
+
+        _logger.LogDebug(
+            "Looking up remote HEAD. Repository: {Org}/{Repo}, Branch: {Branch}, Ref: {Ref}",
+            repository.OrgName, repository.RepoName, branchName, branchRefName);
+
+        return await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var references = credentials == null
+                ? GitRepository.ListRemoteReferences(sourceInfo.Location)
+                : GitRepository.ListRemoteReferences(sourceInfo.Location, (_, _, _) => credentials);
+
+            var branchReference = references.FirstOrDefault(reference =>
+                string.Equals(reference.CanonicalName, branchRefName, StringComparison.Ordinal));
+
+            return branchReference?.TargetIdentifier;
+        }, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<RepositoryWorkspace> PrepareWorkspaceAsync(
         Entities.Repository repository,
         string branchName,

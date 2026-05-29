@@ -535,6 +535,17 @@ public class ChatAssistantService : IChatAssistantService
 
         var resolvedModel = await _aiProviderResolver.ResolveModelConfigAsync(modelConfig, cancellationToken);
         var requestOptions = resolvedModel.ToRequestOptions();
+        using var aiScope = AiExecutionScope.Begin(_logger, new AiExecutionContext
+        {
+            BusinessTag = "chat_assistant",
+            Description = "仓库聊天助手",
+            Repository = BuildRepositoryLabel(request.Context.Owner, request.Context.Repo),
+            Branch = request.Context.Branch,
+            Language = request.Context.Language,
+            AppId = request.AppId,
+            SessionId = sessionId.ToString("N"),
+            ModelId = resolvedModel.ModelId
+        });
 
         var (agent, _) = _agentFactory.CreateChatClientWithTools(
             resolvedModel.ModelId,
@@ -795,12 +806,14 @@ public class ChatAssistantService : IChatAssistantService
         var inputTokens = usageSnapshot.InputTokens;
         var outputTokens = usageSnapshot.OutputTokens;
         var cachedInputTokens = usageSnapshot.CachedInputTokens;
+        var cacheCreationInputTokens = usageSnapshot.CacheCreationInputTokens;
 
         // send final done event with token usage
         await RecordTokenUsageAsync(
             inputTokens,
             outputTokens,
             cachedInputTokens,
+            cacheCreationInputTokens,
             resolvedModel,
             request.Context,
             cancellationToken);
@@ -809,7 +822,7 @@ public class ChatAssistantService : IChatAssistantService
         yield return new SSEEvent
         {
             Type = SSEEventType.Done,
-            Data = new { inputTokens, outputTokens, cachedInputTokens }
+            Data = new { inputTokens, outputTokens, cachedInputTokens, cacheCreationInputTokens }
         };
     }
 
@@ -817,6 +830,7 @@ public class ChatAssistantService : IChatAssistantService
         int inputTokens,
         int outputTokens,
         int cachedInputTokens,
+        int cacheCreationInputTokens,
         ResolvedAiModel model,
         DocContextDto context,
         CancellationToken cancellationToken)
@@ -837,6 +851,7 @@ public class ChatAssistantService : IChatAssistantService
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
                 CachedInputTokens = cachedInputTokens,
+                CacheCreationInputTokens = cacheCreationInputTokens,
                 ModelId = model.ModelId,
                 ModelName = model.ModelName,
                 Operation = "ChatAssistant",
@@ -872,6 +887,13 @@ public class ChatAssistantService : IChatAssistantService
             .ToListAsync(cancellationToken);
 
         return repositoryIds.Count == 1 ? repositoryIds[0] : null;
+    }
+
+    private static string? BuildRepositoryLabel(string? owner, string? repo)
+    {
+        return string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(repo)
+            ? null
+            : $"{owner}/{repo}";
     }
 
     /// <summary>

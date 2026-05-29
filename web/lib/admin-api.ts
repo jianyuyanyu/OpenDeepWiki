@@ -54,6 +54,7 @@ export interface DailyTokenUsage {
   inputTokens: number;
   outputTokens: number;
   cachedInputTokens: number;
+  cacheCreationInputTokens: number;
   totalTokens: number;
   inputCacheHitRate: number;
   inputCost: number;
@@ -66,6 +67,7 @@ export interface TokenUsageStatistics {
   totalInputTokens: number;
   totalOutputTokens: number;
   totalCachedInputTokens: number;
+  totalCacheCreationInputTokens: number;
   totalTokens: number;
   inputCacheHitRate: number;
   totalInputCost: number;
@@ -922,6 +924,8 @@ export interface AiModelConfig {
   maxOutputTokens?: number;
   inputTokenPrice?: number;
   outputTokenPrice?: number;
+  cacheHitTokenPrice?: number;
+  cacheCreationTokenPrice?: number;
   supportsThinking: boolean;
   supportsVision: boolean;
   supportsTools: boolean;

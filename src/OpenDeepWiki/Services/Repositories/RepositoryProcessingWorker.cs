@@ -99,7 +99,7 @@ public class RepositoryProcessingWorker(
             // 设置当前仓库ID到WikiGenerator
             if (wikiGenerator is WikiGenerator generator)
             {
-                generator.SetCurrentRepository(repository.Id);
+                generator.SetCurrentRepository(repository.Id, $"{repository.OrgName}/{repository.RepoName}");
             }
 
             // Transition to Processing status

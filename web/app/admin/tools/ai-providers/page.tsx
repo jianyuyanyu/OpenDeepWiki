@@ -155,6 +155,8 @@ const emptyModelForm = {
   maxOutputTokens: "",
   inputTokenPrice: "",
   outputTokenPrice: "",
+  cacheHitTokenPrice: "",
+  cacheCreationTokenPrice: "",
   supportsThinking: false,
   supportsVision: false,
   supportsTools: true,
@@ -280,7 +282,7 @@ function formatContextWindow(value?: number): string {
 }
 
 function formatModelPrice(value?: number): string {
-  if (value === undefined || value === null) return "$0";
+  if (value === undefined || value === null) return "-";
   return `$${Number(value.toFixed(4))}`;
 }
 
@@ -313,6 +315,8 @@ function toModelForm(model: AiModelConfig, provider: AiProviderConfig): ModelFor
     maxOutputTokens: model.maxOutputTokens?.toString() ?? "",
     inputTokenPrice: model.inputTokenPrice?.toString() ?? "",
     outputTokenPrice: model.outputTokenPrice?.toString() ?? "",
+    cacheHitTokenPrice: model.cacheHitTokenPrice?.toString() ?? "",
+    cacheCreationTokenPrice: model.cacheCreationTokenPrice?.toString() ?? "",
     supportsThinking: model.supportsThinking,
     supportsVision: model.supportsVision,
     supportsTools: model.supportsTools,
@@ -340,6 +344,8 @@ function buildModelFormPayload(form: ModelForm) {
     maxOutputTokens: parseOptionalNumber(form.maxOutputTokens),
     inputTokenPrice: parseOptionalNumber(form.inputTokenPrice),
     outputTokenPrice: parseOptionalNumber(form.outputTokenPrice),
+    cacheHitTokenPrice: parseOptionalNumber(form.cacheHitTokenPrice),
+    cacheCreationTokenPrice: parseOptionalNumber(form.cacheCreationTokenPrice),
     supportsThinking: form.supportsThinking,
     supportsVision: form.supportsVision,
     supportsTools: form.supportsTools,
@@ -368,6 +374,8 @@ function buildModelPayload(model: AiModelConfig, overrides: Partial<AiModelConfi
     maxOutputTokens: next.maxOutputTokens,
     inputTokenPrice: next.inputTokenPrice,
     outputTokenPrice: next.outputTokenPrice,
+    cacheHitTokenPrice: next.cacheHitTokenPrice,
+    cacheCreationTokenPrice: next.cacheCreationTokenPrice,
     supportsThinking: next.supportsThinking,
     supportsVision: next.supportsVision,
     supportsTools: next.supportsTools,
@@ -697,6 +705,8 @@ export default function AdminAiProvidersPage() {
           maxOutputTokens: model.maxOutputTokens,
           inputTokenPrice: model.inputTokenPrice,
           outputTokenPrice: model.outputTokenPrice,
+          cacheHitTokenPrice: model.cacheHitTokenPrice,
+          cacheCreationTokenPrice: model.cacheCreationTokenPrice,
           supportsThinking: model.supportsThinking,
           supportsVision: model.supportsVision,
           supportsTools: model.supportsTools ?? true,
@@ -1482,7 +1492,10 @@ export default function AdminAiProvidersPage() {
                                 <span>{getProviderTypeLabel(getModelProviderType(model, selectedProvider), providerTypes)}</span>
                                 <span>{formatContextWindow(model.contextWindow)}</span>
                                 <span>
-                                  {formatModelPrice(model.inputTokenPrice)} → {formatModelPrice(model.outputTokenPrice)}
+                                  IN {formatModelPrice(model.inputTokenPrice)} / OUT {formatModelPrice(model.outputTokenPrice)}
+                                </span>
+                                <span>
+                                  HIT {formatModelPrice(model.cacheHitTokenPrice)} / CREATE {formatModelPrice(model.cacheCreationTokenPrice)}
                                 </span>
                                 {model.supportsThinking && <span className="text-emerald-400">thinking</span>}
                                 {model.supportsVision && <span>vision</span>}
@@ -1716,7 +1729,7 @@ export default function AdminAiProvidersPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <label className="space-y-2">
                 <span className="text-sm font-medium">{t("admin.aiProviders.modelDialog.modelIdLabel")}</span>
                 <Input
@@ -1817,6 +1830,22 @@ export default function AdminAiProvidersPage() {
                   type="number"
                   value={modelForm.outputTokenPrice}
                   onChange={(event) => updateModelForm("outputTokenPrice", event.target.value)}
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Cache hit price / 1M</span>
+                <Input
+                  type="number"
+                  value={modelForm.cacheHitTokenPrice}
+                  onChange={(event) => updateModelForm("cacheHitTokenPrice", event.target.value)}
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Cache create price / 1M</span>
+                <Input
+                  type="number"
+                  value={modelForm.cacheCreationTokenPrice}
+                  onChange={(event) => updateModelForm("cacheCreationTokenPrice", event.target.value)}
                 />
               </label>
             </div>

@@ -17,7 +17,7 @@ public class AiProviderPresetSeederTests
         var catalog = new AiProviderPresetCatalog();
 
         Assert.Equal(26, catalog.Presets.Count);
-        Assert.Equal(426, catalog.Presets.Sum(p => p.DefaultModels.Count));
+        Assert.Equal(428, catalog.Presets.Sum(p => p.DefaultModels.Count));
         Assert.Contains(catalog.Presets, p => p.BuiltinId == "routin-ai" && p.DefaultEnabled == true);
         Assert.Contains(catalog.Presets, p => p.BuiltinId == "codex-oauth" && p.AuthMode == "oauth");
         Assert.Contains(catalog.Presets.Single(p => p.BuiltinId == "openai").DefaultModels,
@@ -34,7 +34,7 @@ public class AiProviderPresetSeederTests
         await seeder.EnsureBuiltInProvidersAsync();
 
         Assert.Equal(26, await context.AiProviderConfigs.CountAsync(p => !p.IsDeleted));
-        Assert.Equal(426, await context.AiModelConfigs.CountAsync(m => !m.IsDeleted));
+        Assert.Equal(428, await context.AiModelConfigs.CountAsync(m => !m.IsDeleted));
 
         var codex = await context.AiProviderConfigs.SingleAsync(p => p.Name == "codex-oauth");
         Assert.True(codex.IsBuiltIn);
@@ -48,6 +48,13 @@ public class AiProviderPresetSeederTests
         var routinDeepSeek = await context.AiModelConfigs.SingleAsync(m =>
             m.ProviderId == routin.Id && m.ModelId == "deepseek-v4-flash");
         Assert.Equal("DeepSeekOpenAI", routinDeepSeek.ProviderType);
+        var routinXiaomi = await context.AiModelConfigs.SingleAsync(m =>
+            m.ProviderId == routin.Id && m.ModelId == "mimo-v2.5-pro");
+        Assert.Equal("DeepSeekOpenAI", routinXiaomi.ProviderType);
+        Assert.Equal(3m, routinXiaomi.InputTokenPrice);
+        Assert.Equal(6m, routinXiaomi.OutputTokenPrice);
+        Assert.Equal(0.025m, routinXiaomi.CacheHitTokenPrice);
+        Assert.Equal(0m, routinXiaomi.CacheCreationTokenPrice);
 
         var openai = await context.AiProviderConfigs.SingleAsync(p => p.Name == "openai");
         var gpt52 = await context.AiModelConfigs.SingleAsync(m =>

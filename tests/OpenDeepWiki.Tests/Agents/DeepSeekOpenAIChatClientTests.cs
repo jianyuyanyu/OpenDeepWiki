@@ -76,6 +76,55 @@ public class DeepSeekOpenAIChatClientTests
 
         Assert.False(string.IsNullOrWhiteSpace(firstKey));
         Assert.Equal(firstKey, secondKey);
+        Assert.Equal("opendeepwiki", firstKey);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_UsesPromptCacheKeyFromRequestOptions()
+    {
+        var handler = new StubHttpMessageHandler(_ => JsonResponse("""
+            {"id":"chatcmpl-test","model":"deepseek-v4-flash","choices":[{"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}]}
+            """));
+        var client = CreateClient(
+            handler,
+            new AiRequestOptions
+            {
+                SupportsThinking = true,
+                PromptCacheKey = "odw:content:repo"
+            });
+
+        await client.GetResponseAsync([new ChatMessage(ChatRole.User, "ping")]);
+
+        using var document = JsonDocument.Parse(handler.RequestBodies.Single());
+        Assert.Equal("odw:content:repo", document.RootElement.GetProperty("prompt_cache_key").GetString());
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_ChatOptionsPromptCacheKeyOverridesRequestOptions()
+    {
+        var handler = new StubHttpMessageHandler(_ => JsonResponse("""
+            {"id":"chatcmpl-test","model":"deepseek-v4-flash","choices":[{"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}]}
+            """));
+        var client = CreateClient(
+            handler,
+            new AiRequestOptions
+            {
+                SupportsThinking = true,
+                PromptCacheKey = "request-key"
+            });
+
+        await client.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "ping")],
+            new ChatOptions
+            {
+                AdditionalProperties = new AdditionalPropertiesDictionary
+                {
+                    ["promptCacheKey"] = "chat-options-key"
+                }
+            });
+
+        using var document = JsonDocument.Parse(handler.RequestBodies.Single());
+        Assert.Equal("chat-options-key", document.RootElement.GetProperty("prompt_cache_key").GetString());
     }
 
     [Fact]
@@ -206,23 +255,27 @@ public class DeepSeekOpenAIChatClientTests
         Assert.True(assistant.TryGetProperty("tool_calls", out _));
     }
 
-    private static DeepSeekOpenAIChatClient CreateClient(StubHttpMessageHandler handler)
+    private static DeepSeekOpenAIChatClient CreateClient(
+        StubHttpMessageHandler handler,
+        AiRequestOptions? options = null)
     {
+        options ??= new AiRequestOptions
+        {
+            SupportsThinking = true,
+            ThinkingConfigJson = """
+                {
+                  "bodyParams":{"enable_thinking":true},
+                  "disabledBodyParams":{"enable_thinking":false}
+                }
+                """
+        };
+
         return new DeepSeekOpenAIChatClient(
             "deepseek-v4-flash",
             "https://api.deepseek.com/v1",
             "test-key",
             new HttpClient(handler),
-            new AiRequestOptions
-            {
-                SupportsThinking = true,
-                ThinkingConfigJson = """
-                    {
-                      "bodyParams":{"enable_thinking":true},
-                      "disabledBodyParams":{"enable_thinking":false}
-                    }
-                    """
-            },
+            options,
             disposeHttpClient: true);
     }
 

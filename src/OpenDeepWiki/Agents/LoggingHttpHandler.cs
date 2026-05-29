@@ -1,4 +1,5 @@
-﻿using System.Net;
+using System.Net;
+using Serilog;
 
 namespace OpenDeepWiki.Agents;
 
@@ -8,6 +9,7 @@ namespace OpenDeepWiki.Agents;
 /// </summary>
 public class LoggingHttpHandler(HttpMessageHandler innerHandler) : DelegatingHandler(innerHandler)
 {
+    private static readonly Serilog.ILogger Logger = Log.ForContext<LoggingHttpHandler>();
     private const int MaxRetryAttempts = 3;
     private static readonly TimeSpan DefaultRetryDelay = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan MaxRetryDelay = TimeSpan.FromSeconds(60);
@@ -22,8 +24,14 @@ public class LoggingHttpHandler(HttpMessageHandler innerHandler) : DelegatingHan
     {
         var requestId = Guid.NewGuid().ToString("N")[..8];
         var startTime = DateTime.UtcNow;
+        var aiContext = AiExecutionScope.Current?.ToSummary() ?? "tag=unlabeled | desc=未标记AI请求";
 
-        Console.WriteLine($"[{requestId}] >>> Request: {request.Method} {request.RequestUri}");
+        Logger.Information(
+            "[{RequestId}] [{AiContext}] >>> Request: {Method} {RequestUri}",
+            requestId,
+            aiContext,
+            request.Method,
+            request.RequestUri);
 
         var attempt = 0;
         HttpResponseMessage? response = null;
@@ -43,8 +51,13 @@ public class LoggingHttpHandler(HttpMessageHandler innerHandler) : DelegatingHan
                 if (ShouldRetry(response.StatusCode) && attempt < MaxRetryAttempts)
                 {
                     var retryDelay = GetRetryDelay(response, attempt);
-                    Console.WriteLine(
-                        $"[{requestId}] !!! Got response, retrying in {retryDelay.TotalSeconds:F0}s, attempt  {attempt + 1} retry...");
+                    Logger.Warning(
+                        "[{RequestId}] [{AiContext}] Retry scheduled after response. DelaySeconds: {DelaySeconds}, NextAttempt: {NextAttempt}, StatusCode: {StatusCode}",
+                        requestId,
+                        aiContext,
+                        retryDelay.TotalSeconds,
+                        attempt + 1,
+                        (int)response.StatusCode);
 
                     response.Dispose();
                     await Task.Delay(retryDelay, cancellationToken);
@@ -56,16 +69,25 @@ public class LoggingHttpHandler(HttpMessageHandler innerHandler) : DelegatingHan
             catch (Exception ex) when (attempt < MaxRetryAttempts && IsTransientException(ex))
             {
                 var retryDelay = GetExponentialDelay(attempt);
-                Console.WriteLine(
-                    $"[{requestId}] !!! Request error: {ex.Message}，{retryDelay.TotalSeconds:F0}s, attempt  {attempt + 1} retry...");
+                Logger.Warning(
+                    ex,
+                    "[{RequestId}] [{AiContext}] Transient request error, retrying. DelaySeconds: {DelaySeconds}, NextAttempt: {NextAttempt}",
+                    requestId,
+                    aiContext,
+                    retryDelay.TotalSeconds,
+                    attempt + 1);
 
                 await Task.Delay(retryDelay, cancellationToken);
             }
             catch (Exception ex)
             {
                 var elapsed = DateTime.UtcNow - startTime;
-                Console.WriteLine(
-                    $"[{requestId}] !!! Request error: {ex.Message} | time: {elapsed.TotalMilliseconds:F0}ms");
+                Logger.Error(
+                    ex,
+                    "[{RequestId}] [{AiContext}] Request failed. DurationMs: {DurationMs}",
+                    requestId,
+                    aiContext,
+                    elapsed.TotalMilliseconds);
                 throw;
             }
         }
@@ -74,13 +96,23 @@ public class LoggingHttpHandler(HttpMessageHandler innerHandler) : DelegatingHan
 
         if (response != null)
         {
-            Console.WriteLine(
-                $"[{requestId}] <<< Response: {(int)response.StatusCode} {response.StatusCode} | time: {totalElapsed.TotalMilliseconds:F0}ms | attempts: {attempt}");
+            Logger.Information(
+                "[{RequestId}] [{AiContext}] <<< Response: {StatusCode} {StatusName} | DurationMs: {DurationMs} | Attempts: {Attempts}",
+                requestId,
+                aiContext,
+                (int)response.StatusCode,
+                response.StatusCode,
+                totalElapsed.TotalMilliseconds,
+                attempt);
 
             if (!response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync(cancellationToken);
-                Console.WriteLine($"[{requestId}] !!! Error response: {content[..Math.Min(500, content.Length)]}");
+                Logger.Warning(
+                    "[{RequestId}] [{AiContext}] Error response body: {ErrorBody}",
+                    requestId,
+                    aiContext,
+                    content[..Math.Min(500, content.Length)]);
             }
         }
 

@@ -170,6 +170,8 @@ public abstract class MasterDbContext : DbContext, IContext
             builder.HasIndex(t => t.RecordedAt);
             builder.Property(t => t.InputTokenPrice).HasPrecision(18, 8);
             builder.Property(t => t.OutputTokenPrice).HasPrecision(18, 8);
+            builder.Property(t => t.CacheHitTokenPrice).HasPrecision(18, 8);
+            builder.Property(t => t.CacheCreationTokenPrice).HasPrecision(18, 8);
             builder.Property(t => t.InputCost).HasPrecision(18, 8);
             builder.Property(t => t.OutputCost).HasPrecision(18, 8);
             builder.Property(t => t.TotalCost).HasPrecision(18, 8);
@@ -204,6 +206,8 @@ public abstract class MasterDbContext : DbContext, IContext
             builder.Property(m => m.ProviderType).HasMaxLength(50);
             builder.Property(m => m.InputTokenPrice).HasPrecision(18, 8);
             builder.Property(m => m.OutputTokenPrice).HasPrecision(18, 8);
+            builder.Property(m => m.CacheHitTokenPrice).HasPrecision(18, 8);
+            builder.Property(m => m.CacheCreationTokenPrice).HasPrecision(18, 8);
         });
 
         modelBuilder.Entity<ModelConfig>()

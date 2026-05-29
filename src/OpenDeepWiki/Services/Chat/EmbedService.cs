@@ -386,6 +386,16 @@ public class EmbedService : IEmbedService
 
         var resolvedModel = await _aiProviderResolver.ResolveAsync(app.AiProviderId, modelId, cancellationToken);
         var requestOptions = resolvedModel.ToRequestOptions();
+        using var aiScope = AiExecutionScope.Begin(_logger, new AiExecutionContext
+        {
+            BusinessTag = "embed_chat",
+            Description = "嵌入式聊天",
+            Repository = BuildRepositoryLabel(request.Owner, request.Repo),
+            Branch = request.Branch,
+            AppId = request.AppId,
+            UserId = request.UserIdentifier,
+            ModelId = resolvedModel.ModelId
+        });
 
         var (agent, _) = _agentFactory.CreateChatClientWithTools(
             resolvedModel.ModelId,
@@ -430,6 +440,7 @@ public class EmbedService : IEmbedService
         var inputTokens = usageSnapshot.InputTokens;
         var outputTokens = usageSnapshot.OutputTokens;
         var cachedInputTokens = usageSnapshot.CachedInputTokens;
+        var cacheCreationInputTokens = usageSnapshot.CacheCreationInputTokens;
 
         // Record statistics
         await _statisticsService.RecordRequestAsync(new RecordRequestDto
@@ -443,6 +454,7 @@ public class EmbedService : IEmbedService
             inputTokens,
             outputTokens,
             cachedInputTokens,
+            cacheCreationInputTokens,
             resolvedModel,
             request.Owner,
             request.Repo,
@@ -469,7 +481,7 @@ public class EmbedService : IEmbedService
         yield return new SSEEvent
         {
             Type = SSEEventType.Done,
-            Data = new { inputTokens, outputTokens, cachedInputTokens }
+            Data = new { inputTokens, outputTokens, cachedInputTokens, cacheCreationInputTokens }
         };
     }
 
@@ -477,6 +489,7 @@ public class EmbedService : IEmbedService
         int inputTokens,
         int outputTokens,
         int cachedInputTokens,
+        int cacheCreationInputTokens,
         ResolvedAiModel model,
         string? owner,
         string? repo,
@@ -509,6 +522,7 @@ public class EmbedService : IEmbedService
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
                 CachedInputTokens = cachedInputTokens,
+                CacheCreationInputTokens = cacheCreationInputTokens,
                 ModelId = model.ModelId,
                 ModelName = model.ModelName,
                 Operation = "EmbedChat",
@@ -798,6 +812,13 @@ public class EmbedService : IEmbedService
         sb.AppendLine("</system>");
 
         return sb.ToString();
+    }
+
+    private static string? BuildRepositoryLabel(string? owner, string? repo)
+    {
+        return string.IsNullOrWhiteSpace(owner) || string.IsNullOrWhiteSpace(repo)
+            ? null
+            : $"{owner}/{repo}";
     }
 
     /// <summary>

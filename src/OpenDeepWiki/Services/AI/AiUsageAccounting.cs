@@ -9,7 +9,11 @@ using OpenDeepWiki.Entities;
 
 namespace OpenDeepWiki.Services.AI;
 
-public readonly record struct AiUsageSnapshot(int InputTokens, int OutputTokens, int CachedInputTokens = 0)
+public readonly record struct AiUsageSnapshot(
+    int InputTokens,
+    int OutputTokens,
+    int CachedInputTokens = 0,
+    int CacheCreationInputTokens = 0)
 {
     public int TotalTokens => InputTokens + OutputTokens;
     public bool HasUsage => InputTokens > 0 || OutputTokens > 0;
@@ -28,7 +32,9 @@ public sealed record AiUsageModelAccounting(
     string ModelId,
     string? ModelName,
     decimal? InputTokenPrice,
-    decimal? OutputTokenPrice);
+    decimal? OutputTokenPrice,
+    decimal? CacheHitTokenPrice,
+    decimal? CacheCreationTokenPrice);
 
 public sealed class AiUsageAccumulator
 {
@@ -45,15 +51,17 @@ public sealed class AiUsageAccumulator
             var inputTokens = _anonymousUsages.Sum(usage => usage.InputTokens);
             var outputTokens = _anonymousUsages.Sum(usage => usage.OutputTokens);
             var cachedInputTokens = _anonymousUsages.Sum(usage => usage.CachedInputTokens);
+            var cacheCreationInputTokens = _anonymousUsages.Sum(usage => usage.CacheCreationInputTokens);
 
             foreach (var usage in _usageByResponse.Values)
             {
                 inputTokens += usage.InputTokens;
                 outputTokens += usage.OutputTokens;
                 cachedInputTokens += usage.CachedInputTokens;
+                cacheCreationInputTokens += usage.CacheCreationInputTokens;
             }
 
-            return new AiUsageSnapshot(inputTokens, outputTokens, cachedInputTokens);
+            return new AiUsageSnapshot(inputTokens, outputTokens, cachedInputTokens, cacheCreationInputTokens);
         }
     }
 
@@ -154,6 +162,11 @@ public sealed class AiUsageAccumulator
         bool skipProviderUsageWhenAnonymous)
     {
         var json = rawMessageStreamEvent.Json;
+        if (json.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
         var eventType = json.TryGetProperty("type", out var typeElement)
             ? typeElement.GetString()
             : null;
@@ -173,6 +186,7 @@ public sealed class AiUsageAccumulator
         if (!skipProviderUsageWhenAnonymous || responseKey != null)
         {
             if (json.TryGetProperty("message", out var message) &&
+                message.ValueKind == JsonValueKind.Object &&
                 message.TryGetProperty("usage", out var messageUsage))
             {
                 AddSnapshot(ToAnthropicSnapshot(messageUsage), rawKey);
@@ -209,7 +223,9 @@ public sealed class AiUsageAccumulator
         {
             using var document = JsonDocument.Parse(rawJson);
             var root = document.RootElement;
-            if (!root.TryGetProperty("usage", out var usage))
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("usage", out var usage) ||
+                usage.ValueKind != JsonValueKind.Object)
             {
                 return;
             }
@@ -221,10 +237,7 @@ public sealed class AiUsageAccumulator
             }
 
             AddSnapshot(
-                new AiUsageSnapshot(
-                    ReadInt(usage, "prompt_tokens") ?? ReadInt(usage, "input_tokens") ?? 0,
-                    ReadInt(usage, "completion_tokens") ?? ReadInt(usage, "output_tokens") ?? 0,
-                    ReadCachedInputTokens(usage) ?? 0),
+                ToOpenAICompatibleSnapshot(usage),
                 key);
         }
         catch (JsonException)
@@ -248,10 +261,11 @@ public sealed class AiUsageAccumulator
 
         if (_usageByResponse.TryGetValue(responseKey, out var existing))
         {
-            _usageByResponse[responseKey] = new AiUsageSnapshot(
+            _usageByResponse[responseKey] = CreateSnapshot(
                 Math.Max(existing.InputTokens, snapshot.InputTokens),
                 Math.Max(existing.OutputTokens, snapshot.OutputTokens),
-                Math.Max(existing.CachedInputTokens, snapshot.CachedInputTokens));
+                Math.Max(existing.CachedInputTokens, snapshot.CachedInputTokens),
+                Math.Max(existing.CacheCreationInputTokens, snapshot.CacheCreationInputTokens));
             return;
         }
 
@@ -265,19 +279,54 @@ public sealed class AiUsageAccumulator
         var inputTokens = ToInt(usage.InputTokenCount);
         var outputTokens = ToInt(usage.OutputTokenCount);
         var cachedInputTokens = Math.Min(inputTokens, ToInt(usage.CachedInputTokenCount));
-        return new AiUsageSnapshot(inputTokens, outputTokens, cachedInputTokens);
+        return CreateSnapshot(inputTokens, outputTokens, cachedInputTokens);
     }
 
     private static AiUsageSnapshot ToAnthropicSnapshot(JsonElement usage)
     {
+        if (usage.ValueKind != JsonValueKind.Object)
+        {
+            return default;
+        }
+
         var cachedInputTokens = ReadInt(usage, "cache_read_input_tokens") ?? 0;
+        var cacheCreationInputTokens = ReadCacheCreationInputTokens(usage) ?? 0;
         var inputTokens =
             (ReadInt(usage, "input_tokens") ?? 0) +
-            (ReadInt(usage, "cache_creation_input_tokens") ?? 0) +
+            cacheCreationInputTokens +
             cachedInputTokens;
         var outputTokens = ReadInt(usage, "output_tokens") ?? 0;
 
-        return new AiUsageSnapshot(inputTokens, outputTokens, Math.Min(inputTokens, cachedInputTokens));
+        return CreateSnapshot(inputTokens, outputTokens, cachedInputTokens, cacheCreationInputTokens);
+    }
+
+    private static AiUsageSnapshot ToOpenAICompatibleSnapshot(JsonElement usage)
+    {
+        if (usage.ValueKind != JsonValueKind.Object)
+        {
+            return default;
+        }
+
+        var outputTokens = ReadInt(usage, "completion_tokens") ?? ReadInt(usage, "output_tokens") ?? 0;
+        var cacheCreationInputTokens = ReadCacheCreationInputTokens(usage) ?? 0;
+        var cachedInputTokens = ReadCachedInputTokens(usage) ?? 0;
+
+        if (usage.TryGetProperty("cache_creation_input_tokens", out _) ||
+            usage.TryGetProperty("cache_read_input_tokens", out _))
+        {
+            var inputTokens =
+                (ReadInt(usage, "prompt_tokens") ?? ReadInt(usage, "input_tokens") ?? 0) +
+                cacheCreationInputTokens +
+                cachedInputTokens;
+
+            return CreateSnapshot(inputTokens, outputTokens, cachedInputTokens, cacheCreationInputTokens);
+        }
+
+        return CreateSnapshot(
+            ReadInt(usage, "prompt_tokens") ?? ReadInt(usage, "input_tokens") ?? 0,
+            outputTokens,
+            cachedInputTokens,
+            cacheCreationInputTokens);
     }
 
     private static string? GetResponseKey(object? rawRepresentation)
@@ -300,7 +349,13 @@ public sealed class AiUsageAccumulator
 
     private static string? TryGetAnthropicMessageId(JsonElement json)
     {
+        if (json.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
         if (json.TryGetProperty("message", out var message) &&
+            message.ValueKind == JsonValueKind.Object &&
             message.TryGetProperty("id", out var idElement))
         {
             return idElement.GetString();
@@ -321,6 +376,11 @@ public sealed class AiUsageAccumulator
 
     private static int? ReadInt(JsonElement element, string propertyName)
     {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
         if (!element.TryGetProperty(propertyName, out var value))
         {
             return null;
@@ -336,6 +396,17 @@ public sealed class AiUsageAccumulator
 
     private static int? ReadCachedInputTokens(JsonElement usage)
     {
+        if (usage.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var cacheReadInputTokens = ReadInt(usage, "cache_read_input_tokens");
+        if (cacheReadInputTokens.HasValue)
+        {
+            return cacheReadInputTokens.Value;
+        }
+
         if (usage.TryGetProperty("prompt_tokens_details", out var promptTokensDetails))
         {
             return ReadInt(promptTokensDetails, "cached_tokens");
@@ -347,6 +418,53 @@ public sealed class AiUsageAccumulator
         }
 
         return null;
+    }
+
+    private static int? ReadCacheCreationInputTokens(JsonElement usage)
+    {
+        if (usage.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var direct = ReadInt(usage, "cache_creation_input_tokens") ?? ReadInt(usage, "cache_creation_tokens");
+        if (direct.HasValue)
+        {
+            return direct.Value;
+        }
+
+        if (usage.TryGetProperty("prompt_tokens_details", out var promptTokensDetails))
+        {
+            return ReadInt(promptTokensDetails, "cache_creation_tokens") ??
+                   ReadInt(promptTokensDetails, "cache_creation_input_tokens");
+        }
+
+        if (usage.TryGetProperty("input_tokens_details", out var inputTokensDetails))
+        {
+            return ReadInt(inputTokensDetails, "cache_creation_tokens") ??
+                   ReadInt(inputTokensDetails, "cache_creation_input_tokens");
+        }
+
+        return null;
+    }
+
+    private static AiUsageSnapshot CreateSnapshot(
+        int inputTokens,
+        int outputTokens,
+        int cachedInputTokens = 0,
+        int cacheCreationInputTokens = 0)
+    {
+        var safeInputTokens = Math.Max(inputTokens, 0);
+        var safeOutputTokens = Math.Max(outputTokens, 0);
+        var safeCachedInputTokens = Math.Min(safeInputTokens, Math.Max(cachedInputTokens, 0));
+        var remainingInputTokens = Math.Max(safeInputTokens - safeCachedInputTokens, 0);
+        var safeCacheCreationInputTokens = Math.Min(remainingInputTokens, Math.Max(cacheCreationInputTokens, 0));
+
+        return new AiUsageSnapshot(
+            safeInputTokens,
+            safeOutputTokens,
+            safeCachedInputTokens,
+            safeCacheCreationInputTokens);
     }
 
     private static int ToInt(long? value)
@@ -367,15 +485,27 @@ public static class AiUsageAccounting
     public static AiUsageCost CalculateCost(
         int inputTokens,
         int outputTokens,
+        int cachedInputTokens,
+        int cacheCreationInputTokens,
         decimal? inputTokenPrice,
-        decimal? outputTokenPrice)
+        decimal? outputTokenPrice,
+        decimal? cacheHitTokenPrice,
+        decimal? cacheCreationTokenPrice)
     {
-        var inputCost = inputTokenPrice.HasValue
-            ? inputTokens / TokensPerMillion * inputTokenPrice.Value
-            : 0m;
-        var outputCost = outputTokenPrice.HasValue
-            ? outputTokens / TokensPerMillion * outputTokenPrice.Value
-            : 0m;
+        var safeInputTokens = Math.Max(inputTokens, 0);
+        var safeOutputTokens = Math.Max(outputTokens, 0);
+        var safeCachedInputTokens = Math.Min(Math.Max(cachedInputTokens, 0), safeInputTokens);
+        var remainingInputTokens = Math.Max(safeInputTokens - safeCachedInputTokens, 0);
+        var safeCacheCreationInputTokens = Math.Min(Math.Max(cacheCreationInputTokens, 0), remainingInputTokens);
+        var uncachedInputTokens = Math.Max(
+            safeInputTokens - safeCachedInputTokens - safeCacheCreationInputTokens,
+            0);
+
+        var inputCost =
+            CalculateTokenCost(uncachedInputTokens, inputTokenPrice) +
+            CalculateTokenCost(safeCachedInputTokens, cacheHitTokenPrice ?? inputTokenPrice) +
+            CalculateTokenCost(safeCacheCreationInputTokens, cacheCreationTokenPrice ?? inputTokenPrice);
+        var outputCost = CalculateTokenCost(safeOutputTokens, outputTokenPrice);
 
         return new AiUsageCost(inputCost, outputCost);
     }
@@ -389,7 +519,9 @@ public static class AiUsageAccounting
             model.ModelId,
             model.ModelName,
             model.InputTokenPrice,
-            model.OutputTokenPrice);
+            model.OutputTokenPrice,
+            model.CacheHitTokenPrice,
+            model.CacheCreationTokenPrice);
     }
 
     public static async Task<AiUsageModelAccounting?> TryResolveModelAccountingAsync(
@@ -415,7 +547,9 @@ public static class AiUsageAccounting
                 model.DisplayName,
                 model.ProviderType,
                 model.InputTokenPrice,
-                model.OutputTokenPrice
+                model.OutputTokenPrice,
+                model.CacheHitTokenPrice,
+                model.CacheCreationTokenPrice
             })
             .Take(2)
             .ToListAsync(cancellationToken);
@@ -448,7 +582,9 @@ public static class AiUsageAccounting
             model.ModelId,
             model.DisplayName ?? model.Name,
             model.InputTokenPrice,
-            model.OutputTokenPrice);
+            model.OutputTokenPrice,
+            model.CacheHitTokenPrice,
+            model.CacheCreationTokenPrice);
     }
 
     public static void ApplyModelAccounting(
@@ -467,14 +603,27 @@ public static class AiUsageAccounting
         usage.ModelName = modelAccounting.ModelName ?? modelAccounting.ModelId;
         usage.InputTokenPrice = modelAccounting.InputTokenPrice;
         usage.OutputTokenPrice = modelAccounting.OutputTokenPrice;
+        usage.CacheHitTokenPrice = modelAccounting.CacheHitTokenPrice;
+        usage.CacheCreationTokenPrice = modelAccounting.CacheCreationTokenPrice;
 
         var cost = CalculateCost(
             usage.InputTokens,
             usage.OutputTokens,
+            usage.CachedInputTokens,
+            usage.CacheCreationInputTokens,
             modelAccounting.InputTokenPrice,
-            modelAccounting.OutputTokenPrice);
+            modelAccounting.OutputTokenPrice,
+            modelAccounting.CacheHitTokenPrice,
+            modelAccounting.CacheCreationTokenPrice);
         usage.InputCost = cost.InputCost;
         usage.OutputCost = cost.OutputCost;
         usage.TotalCost = cost.TotalCost;
+    }
+
+    private static decimal CalculateTokenCost(int tokenCount, decimal? tokenPrice)
+    {
+        return tokenPrice.HasValue
+            ? tokenCount / TokensPerMillion * tokenPrice.Value
+            : 0m;
     }
 }

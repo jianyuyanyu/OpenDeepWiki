@@ -78,6 +78,9 @@ public class WikiGenerator : IWikiGenerator
 
     // Use AsyncLocal for thread-safe repository ID tracking in concurrent scenarios
     private static readonly AsyncLocal<string?> _currentRepositoryId = new();
+    private static readonly AsyncLocal<string?> _currentRepositoryDisplayName = new();
+
+    private sealed record WikiToolSnapshot(IReadOnlyList<AITool> SkillTools, string ToolsetHash);
 
     /// <summary>
     /// Initializes a new instance of WikiGenerator.
@@ -111,9 +114,10 @@ public class WikiGenerator : IWikiGenerator
     /// <summary>
     /// 设置当前处理的仓库ID
     /// </summary>
-    public void SetCurrentRepository(string repositoryId)
+    public void SetCurrentRepository(string repositoryId, string? repositoryDisplayName = null)
     {
         _currentRepositoryId.Value = repositoryId;
+        _currentRepositoryDisplayName.Value = repositoryDisplayName;
     }
 
     /// <inheritdoc />
@@ -145,35 +149,45 @@ public class WikiGenerator : IWikiGenerator
             _logger.LogDebug("Loading mindmap-generator prompt template");
             var prompt = await _promptPlugin.LoadPromptAsync(
                 "mindmap-generator",
-                new Dictionary<string, string>
-                {
-                    ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
-                    ["language"] = branchLanguage.LanguageCode,
-                    ["project_type"] = repoContext.ProjectType,
-                    ["file_tree"] = repoContext.DirectoryTree,
-                    ["readme_content"] = repoContext.ReadmeContent,
-                    ["key_files"] = string.Join(", ", repoContext.KeyFiles),
-                    ["entry_points"] = string.Join("\n", repoContext.EntryPoints.Select(e => $"- {e}"))
-                },
-                cancellationToken);
+                cancellationToken: cancellationToken);
             _logger.LogDebug("Prompt template loaded. Length: {PromptLength} chars", prompt.Length);
 
             _logger.LogDebug("Initializing tools for mind map generation");
+            var toolSnapshot = await CreateToolSnapshotAsync(cancellationToken);
             var gitTool = new GitTool(workspace.WorkingDirectory);
             var mindMapTool = new MindMapTool(_context, branchLanguage.Id);
-            var tools = await BuildToolsAsync(
+            var tools = BuildTools(
                 gitTool.GetTools().Concat(mindMapTool.GetTools()),
-                cancellationToken);
+                toolSnapshot);
             _logger.LogDebug("Tools initialized. ToolCount: {ToolCount}, Tools: {ToolNames}",
                 tools.Length, string.Join(", ", tools.Select(t => t.Name)));
 
-            var userMessage = $@"Generate project architecture mind map for: {workspace.Organization}/{workspace.RepositoryName}
-
-Project Type: {repoContext.ProjectType}
-Entry Points: {string.Join(", ", repoContext.EntryPoints.Take(5))}
+            var userMessage = $@"Generate project architecture mind map for the repository described in the runtime context.
 
 Execute the workflow now. Read entry point files to understand the architecture, then generate a comprehensive mind map in {branchLanguage.LanguageCode}.
-Remember to call WriteMindMapAsync with the complete mind map content.";
+Remember to call WriteMindMapAsync with the complete mind map content.
+
+## Runtime Context
+
+- Repository: {workspace.Organization}/{workspace.RepositoryName}
+- Git URL: {workspace.GitUrl}
+- Branch: {workspace.BranchName}
+- Project Type: {repoContext.ProjectType}
+- Target Language: {branchLanguage.LanguageCode}
+- Key Files: {string.Join(", ", repoContext.KeyFiles)}
+- Entry Points: {string.Join(", ", repoContext.EntryPoints.Take(5))}
+
+## Entry Points
+
+{string.Join("\n", repoContext.EntryPoints.Select(e => $"- {e}"))}
+
+## Directory Structure (TOON)
+
+{repoContext.DirectoryTree}
+
+## README
+
+{repoContext.ReadmeContent}";
 
             var catalogAi = await ResolveCatalogModelAsync(cancellationToken);
             await ExecuteAgentWithRetryAsync(
@@ -183,6 +197,12 @@ Remember to call WriteMindMapAsync with the complete mind map content.";
                 tools,
                 "MindMapGeneration",
                 ProcessingStep.Catalog,
+                CreateWikiAiContext(
+                    "wiki_mindmap_generation",
+                    "仓库思维导图生成",
+                    workspace,
+                    branchLanguage,
+                    modelId: catalogAi.ModelId),
                 cancellationToken);
 
             stopwatch.Stop();
@@ -235,35 +255,47 @@ Remember to call WriteMindMapAsync with the complete mind map content.";
             _logger.LogDebug("Loading catalog-generator prompt template");
             var prompt = await _promptPlugin.LoadPromptAsync(
                 "catalog-generator",
-                new Dictionary<string, string>
-                {
-                    ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
-                    ["language"] = branchLanguage.LanguageCode,
-                    ["project_type"] = repoContext.ProjectType,
-                    ["file_tree"] = repoContext.DirectoryTree,
-                    ["readme_content"] = repoContext.ReadmeContent,
-                    ["key_files"] = string.Join(", ", repoContext.KeyFiles),
-                    ["entry_points"] = string.Join("\n", repoContext.EntryPoints.Select(e => $"- {e}"))
-                },
-                cancellationToken);
+                cancellationToken: cancellationToken);
             _logger.LogDebug("Prompt template loaded. Length: {PromptLength} chars", prompt.Length);
 
             _logger.LogDebug("Initializing tools for catalog generation");
+            var toolSnapshot = await CreateToolSnapshotAsync(cancellationToken);
             var gitTool = new GitTool(workspace.WorkingDirectory);
             var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
             var catalogTool = new CatalogTool(catalogStorage);
-            var tools = await BuildToolsAsync(
+            var tools = BuildTools(
                 gitTool.GetTools().Concat(catalogTool.GetTools()),
-                cancellationToken);
+                toolSnapshot);
             _logger.LogDebug("Tools initialized. ToolCount: {ToolCount}, Tools: {ToolNames}",
                 tools.Length, string.Join(", ", tools.Select(t => t.Name)));
 
-            var userMessage = $@"Generate Wiki catalog for: {workspace.Organization}/{workspace.RepositoryName}
-
-Project Type: {repoContext.ProjectType}
-Entry Points: {string.Join(", ", repoContext.EntryPoints.Take(5))}
+            var userMessage = $@"Generate Wiki catalog for the repository described in the runtime context.
 
 Execute the workflow now. Read entry point files to understand the architecture, then generate a comprehensive catalog in {branchLanguage.LanguageCode}.";
+
+            userMessage += $@"
+
+## Runtime Context
+
+- Repository: {workspace.Organization}/{workspace.RepositoryName}
+- Git URL: {workspace.GitUrl}
+- Branch: {workspace.BranchName}
+- Project Type: {repoContext.ProjectType}
+- Target Language: {branchLanguage.LanguageCode}
+- Key Files: {string.Join(", ", repoContext.KeyFiles)}
+- Entry Points: {string.Join(", ", repoContext.EntryPoints.Take(5))}
+
+## Entry Points
+
+{string.Join("\n", repoContext.EntryPoints.Select(e => $"- {e}"))}
+
+## Directory Structure (TOON)
+
+{repoContext.DirectoryTree}
+
+## README
+
+{repoContext.ReadmeContent}";
 
             var catalogAi = await ResolveCatalogModelAsync(cancellationToken);
             await ExecuteAgentWithRetryAsync(
@@ -273,6 +305,12 @@ Execute the workflow now. Read entry point files to understand the architecture,
                 tools,
                 "CatalogGeneration",
                 ProcessingStep.Catalog,
+                CreateWikiAiContext(
+                    "wiki_catalog_generation",
+                    "仓库目录生成",
+                    workspace,
+                    branchLanguage,
+                    modelId: catalogAi.ModelId),
                 cancellationToken);
 
             stopwatch.Stop();
@@ -377,15 +415,9 @@ Execute the workflow now. Read entry point files to understand the architecture,
         var failCount = 0;
         var startedCount = skippedCount;
         var completedCount = skippedCount;
+        var toolSnapshot = await CreateToolSnapshotAsync(cancellationToken);
 
-        // Use Parallel.ForEachAsync for better parallel control with timeout protection
-        var parallelOptions = new ParallelOptions
-        {
-            MaxDegreeOfParallelism = parallelCount,
-            CancellationToken = cancellationToken
-        };
-
-        await Parallel.ForEachAsync(itemsToGenerate, parallelOptions, async (item, ct) =>
+        async ValueTask GenerateItemAsync((string Path, string Title) item, CancellationToken ct)
         {
             var startedIndex = Interlocked.Increment(ref startedCount);
             var completionStatus = "success";
@@ -403,7 +435,7 @@ Execute the workflow now. Read entry point files to understand the architecture,
                 try
                 {
                     await GenerateDocumentContentAsync(
-                            workspace, branchLanguage, item.Path, item.Title, linkedCts.Token)
+                            workspace, branchLanguage, item.Path, item.Title, toolSnapshot, linkedCts.Token)
                         .WaitAsync(generationTimeout, ct);
                 }
                 catch (TimeoutException)
@@ -472,7 +504,33 @@ Execute the workflow now. Read entry point files to understand the architecture,
                         ct);
                 }
             }
-        });
+        }
+
+        var parallelItems = itemsToGenerate;
+        if (parallelCount > 1 && itemsToGenerate.Count > 1)
+        {
+            var warmupItem = itemsToGenerate[0];
+            _logger.LogInformation(
+                "Warming prompt cache with first document before parallel generation. Path: {Path}, Title: {Title}, Repository: {Org}/{Repo}",
+                warmupItem.Path, warmupItem.Title, workspace.Organization, workspace.RepositoryName);
+
+            await LogProcessingAsync(
+                ProcessingStep.Content,
+                $"Warming prompt cache with first document: {warmupItem.Title}",
+                cancellationToken);
+
+            await GenerateItemAsync(warmupItem, cancellationToken);
+            parallelItems = itemsToGenerate.Skip(1).ToList();
+        }
+
+        // Use Parallel.ForEachAsync for better parallel control with timeout protection
+        var parallelOptions = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = parallelCount,
+            CancellationToken = cancellationToken
+        };
+
+        await Parallel.ForEachAsync(parallelItems, parallelOptions, GenerateItemAsync);
 
         stopwatch.Stop();
         var successCount = skippedCount + generatedCount;
@@ -532,6 +590,7 @@ Execute the workflow now. Read entry point files to understand the architecture,
             branchLanguage,
             normalizedPath,
             catalogTitle,
+            await CreateToolSnapshotAsync(cancellationToken),
             cancellationToken);
 
         stopwatch.Stop();
@@ -575,26 +634,21 @@ Execute the workflow now. Read entry point files to understand the architecture,
         {
             var prompt = await _promptPlugin.LoadPromptAsync(
                 "incremental-updater",
-                new Dictionary<string, string>
-                {
-                    ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
-                    ["language"] = branchLanguage.LanguageCode,
-                    ["previous_commit"] = workspace.PreviousCommitId ?? "initial",
-                    ["current_commit"] = workspace.CommitId,
-                    ["changed_files"] = string.Join("\n", changedFiles.Select(f => $"- {f}"))
-                },
-                cancellationToken);
+                cancellationToken: cancellationToken);
 
             _logger.LogDebug("Initializing tools for incremental update");
+            var toolSnapshot = await CreateToolSnapshotAsync(cancellationToken);
             var gitTool = new GitTool(workspace.WorkingDirectory);
             var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
             var catalogTool = new CatalogTool(catalogStorage);
+            var docTool = new DocTool(_context, branchLanguage.Id, string.Empty, gitTool);
 
-            var tools = gitTool.GetTools()
+            var tools = BuildTools(gitTool.GetTools()
                 .Concat(catalogTool.GetTools())
-                .ToArray();
+                .Concat(docTool.GetTools()),
+                toolSnapshot);
 
-            var userMessage = $@"Please analyze code changes in repository {workspace.Organization}/{workspace.RepositoryName} and update relevant Wiki documentation.
+            var userMessage = $@"Please analyze code changes in the repository described in the runtime context and update relevant Wiki documentation.
 
 ## Change Information
 
@@ -614,9 +668,9 @@ Execute the workflow now. Read entry point files to understand the architecture,
 
 3. **Execute Updates**
    - Use ReadCatalog to get current catalog structure
-   - Use ReadDoc to read documents that need updating
-   - For minor changes, use EditDoc for precise replacements
-   - For major changes, use WriteDoc to rewrite entire document
+   - Use ReadDoc(path) to read documents that need updating
+   - For minor changes, use EditDoc(oldContent, newContent, path) for precise replacements
+   - For major changes, use WriteDoc(content, path) to rewrite entire document
    - If new catalog items needed, use EditCatalog or WriteCatalog
 
 4. **Quality Requirements**
@@ -632,6 +686,19 @@ Execute the workflow now. Read entry point files to understand the architecture,
 4. Execute necessary document updates
 5. Verify updates are complete
 
+## Runtime Context
+
+- Repository: {workspace.Organization}/{workspace.RepositoryName}
+- Git URL: {workspace.GitUrl}
+- Branch: {workspace.BranchName}
+- Target Language: {branchLanguage.LanguageCode}
+- Previous Commit: {workspace.PreviousCommitId ?? "initial"}
+- Current Commit: {workspace.CommitId}
+
+## Changed Files
+
+{string.Join("\n", changedFiles.Select(f => $"- {f}"))}
+
 Please start executing the task.";
 
             var contentAi = await ResolveContentModelAsync(cancellationToken);
@@ -642,6 +709,12 @@ Please start executing the task.";
                 tools,
                 "IncrementalUpdate",
                 ProcessingStep.Content,
+                CreateWikiAiContext(
+                    "wiki_incremental_update",
+                    "仓库增量文档更新",
+                    workspace,
+                    branchLanguage,
+                    modelId: contentAi.ModelId),
                 cancellationToken);
 
             stopwatch.Stop();
@@ -667,6 +740,7 @@ Please start executing the task.";
         BranchLanguage branchLanguage,
         string catalogPath,
         string catalogTitle,
+        WikiToolSnapshot toolSnapshot,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -681,29 +755,14 @@ Please start executing the task.";
 
             var prompt = await _promptPlugin.LoadPromptAsync(
                 "content-generator",
-                new Dictionary<string, string>
-                {
-                    ["repository_name"] = $"{workspace.Organization}/{workspace.RepositoryName}",
-                    ["language"] = branchLanguage.LanguageCode,
-                    ["catalog_path"] = catalogPath,
-                    ["catalog_title"] = catalogTitle
-                },
-                cancellationToken);
+                cancellationToken: cancellationToken);
 
-            var userMessage = $@"Please generate Wiki document content for catalog item ""{catalogTitle}"" (path: {catalogPath}).
-
-## Repository Information
-
-- Repository: {workspace.Organization}/{workspace.RepositoryName}
-- Git URL: {workspace.GitUrl}
-- Branch: {workspace.BranchName}
-- File Reference Base URL: {gitBaseUrl}
-- Target Language: {branchLanguage.LanguageCode}
+            var userMessage = $@"Please generate Wiki document content for the catalog item described in the runtime context.
 
 ## Task Requirements
 
 1. **Gather Source Material**
-   - Use ListFiles to find source files related to ""{catalogTitle}""
+   - Use ListFiles to find source files related to the runtime catalog title
    - Read key implementation files and configuration files
    - Read interface definitions only when they are directly used or necessary for this document (skip unused/irrelevant interfaces)
    - Use Grep to search for related classes, functions, API endpoints
@@ -719,9 +778,9 @@ Please start executing the task.";
    - Related Links: Links to related documentation and source files
 
 3. **File Reference Links** (IMPORTANT)
-   - When referencing source files, use the full URL format: {gitBaseUrl}/<file_path>
-   - Example: [{gitBaseUrl}/src/Example.cs]({gitBaseUrl}/src/Example.cs)
-   - For specific line references: {gitBaseUrl}/<file_path>#L<line_number>
+   - When referencing source files, use the runtime File Reference Base URL
+   - Example: [<file_base_url>/src/Example.cs](<file_base_url>/src/Example.cs)
+   - For specific line references: <file_base_url>/<file_path>#L<line_number>
    - Always provide clickable links to source files mentioned in the document
 
 4. **Mermaid Diagram Requirements** (IMPORTANT)
@@ -752,7 +811,7 @@ Please start executing the task.";
    - All information must be based on actual source code, do not fabricate
    - Code examples must be extracted from repository with syntax highlighting
    - Explain design intent (WHY), not just description (WHAT)
-   - Write document content in {branchLanguage.LanguageCode} language
+   - Write document content in the runtime target language
    - Keep code identifiers in original form, do not translate
 
 6. **Output Requirements**
@@ -769,6 +828,16 @@ Please start executing the task.";
 6. Ensure all file references use the correct URL format with branch
 7. Call WriteDoc(content) to write document
 
+## Runtime Context
+
+- Repository: {workspace.Organization}/{workspace.RepositoryName}
+- Git URL: {workspace.GitUrl}
+- Branch: {workspace.BranchName}
+- File Reference Base URL: {gitBaseUrl}
+- Target Language: {branchLanguage.LanguageCode}
+- Catalog Path: {catalogPath}
+- Catalog Title: {catalogTitle}
+
 Please start executing the task.";
 
             var contentAi = await ResolveContentModelAsync(cancellationToken);
@@ -784,9 +853,9 @@ Please start executing the task.";
                 using var context = _contextFactory.CreateContext();
                 var gitTool = new GitTool(workspace.WorkingDirectory);
                 var docTool = new DocTool(context, branchLanguage.Id, catalogPath, gitTool);
-                var tools = await BuildToolsAsync(
+                var tools = BuildTools(
                     gitTool.GetTools().Concat(docTool.GetTools()),
-                    cancellationToken);
+                    toolSnapshot);
 
                 _logger.LogDebug(
                     "Starting document persistence attempt {Attempt}/{MaxAttempts}. Path: {Path}, Title: {Title}",
@@ -800,6 +869,13 @@ Please start executing the task.";
                     tools,
                     $"DocumentContent:{catalogPath}",
                     ProcessingStep.Content,
+                    CreateWikiAiContext(
+                        "wiki_document_generation",
+                        "仓库文档生成",
+                        workspace,
+                        branchLanguage,
+                        catalogPath,
+                        contentAi.ModelId),
                     cancellationToken);
 
                 if (await HasPersistedDocumentContentAsync(branchLanguage.Id, catalogPath, attemptStartedAt, cancellationToken))
@@ -911,38 +987,45 @@ Please start executing the task.";
 
 
     /// <summary>
-    /// Combines base tools with configured Skill tools for wiki generation workflows.
+    /// Captures the configured Skill tools once per wiki workflow so tool schemas stay stable across requests.
     /// </summary>
-    private async Task<AITool[]> BuildToolsAsync(
-        IEnumerable<AITool> baseTools,
-        CancellationToken cancellationToken)
+    private async Task<WikiToolSnapshot> CreateToolSnapshotAsync(CancellationToken cancellationToken)
     {
-        var tools = baseTools.ToList();
-
+        var skillTools = new List<AITool>();
         var enabledSkillIds = await GetEnabledSkillIdsAsync(cancellationToken);
-        if (enabledSkillIds.Count == 0)
+        if (enabledSkillIds.Count > 0)
         {
-            return tools.ToArray();
-        }
-
-        try
-        {
-            var skillTools = await _skillToolConverter.ConvertSkillConfigsToToolsAsync(
-                enabledSkillIds,
-                cancellationToken);
-
-            if (skillTools.Count > 0)
+            try
             {
-                tools.AddRange(skillTools);
-                _logger.LogDebug("Added {SkillCount} skill tools to wiki generator", skillTools.Count);
+                skillTools = await _skillToolConverter.ConvertSkillConfigsToToolsAsync(
+                    enabledSkillIds,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load skill tools for wiki generator");
             }
         }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to load skill tools for wiki generator");
-        }
 
-        return tools.ToArray();
+        var toolsetHash = WikiPromptCacheKeyBuilder.BuildToolsetHash(skillTools);
+        _logger.LogDebug(
+            "Created wiki tool snapshot. SkillToolCount: {SkillToolCount}, ToolsetHash: {ToolsetHash}",
+            skillTools.Count,
+            toolsetHash);
+
+        return new WikiToolSnapshot(skillTools, toolsetHash);
+    }
+
+    /// <summary>
+    /// Combines workflow tools with the stable Skill snapshot.
+    /// </summary>
+    private static AITool[] BuildTools(
+        IEnumerable<AITool> baseTools,
+        WikiToolSnapshot toolSnapshot)
+    {
+        return baseTools
+            .Concat(toolSnapshot.SkillTools)
+            .ToArray();
     }
 
     private async Task<List<string>> GetEnabledSkillIdsAsync(CancellationToken cancellationToken)
@@ -993,16 +1076,21 @@ Please start executing the task.";
         AITool[] tools,
         string operationName,
         ProcessingStep step,
+        AiExecutionContext executionContext,
         CancellationToken cancellationToken)
     {
         var model = ai.ModelId;
         var requestOptions = ai.ToRequestOptions();
+        var toolsetHash = WikiPromptCacheKeyBuilder.BuildToolsetHash(tools);
+        var promptCacheKey = WikiPromptCacheKeyBuilder.Build(ai, executionContext, toolsetHash);
+        requestOptions.PromptCacheKey = promptCacheKey;
         var retryCount = 0;
         Exception? lastException = null;
+        using var aiScope = AiExecutionScope.Begin(_logger, executionContext);
 
         _logger.LogDebug(
-            "Starting AI agent execution. Operation: {Operation}, Model: {Model}, ToolCount: {ToolCount}",
-            operationName, model, tools.Length);
+            "Starting AI agent execution. Operation: {Operation}, Model: {Model}, ToolCount: {ToolCount}, PromptCacheKey: {PromptCacheKey}",
+            operationName, model, tools.Length, promptCacheKey);
 
         while (retryCount < _options.MaxRetryAttempts)
         {
@@ -1023,7 +1111,11 @@ Please start executing the task.";
                         ToolMode = ChatToolMode.Auto,
                         MaxOutputTokens = _options.MaxOutputTokens,
                         Instructions = systemPrompt,
-                        Tools = tools
+                        Tools = tools,
+                        AdditionalProperties = new AdditionalPropertiesDictionary
+                        {
+                            ["promptCacheKey"] = promptCacheKey
+                        }
                     }
                 };
 
@@ -1039,7 +1131,6 @@ Please start executing the task.";
                 {
                     new(ChatRole.User, new List<AIContent>()
                     {
-                        new TextContent(userMessage),
                         new TextContent("""
                                         <system-remind>
                                         IMPORTANT REMINDERS:
@@ -1049,7 +1140,8 @@ Please start executing the task.";
                                         4. If you encounter errors, retry with adjusted parameters or report the issue.
                                         5. Do NOT output the full document content in your response - write it using the tools instead.
                                         </system-remind>
-                                        """)
+                                        """),
+                        new TextContent(userMessage)
                     })
                 };
 
@@ -1128,8 +1220,9 @@ Please start executing the task.";
                     usageSnapshot.InputTokens,
                     usageSnapshot.OutputTokens,
                     usageSnapshot.CachedInputTokens,
+                    usageSnapshot.CacheCreationInputTokens,
                     ai,
-                    operationName,
+                    executionContext.BusinessTag,
                     cancellationToken);
 
                 _logger.LogDebug(
@@ -1314,10 +1407,35 @@ Please start executing the task.";
         return LogProcessingAsync(step, message, false, null, cancellationToken);
     }
 
+    private AiExecutionContext CreateWikiAiContext(
+        string businessTag,
+        string description,
+        RepositoryWorkspace? workspace = null,
+        BranchLanguage? branchLanguage = null,
+        string? documentPath = null,
+        string? modelId = null,
+        string? language = null)
+    {
+        return new AiExecutionContext
+        {
+            BusinessTag = businessTag,
+            Description = description,
+            RepositoryId = _currentRepositoryId.Value,
+            Repository = workspace == null
+                ? _currentRepositoryDisplayName.Value
+                : $"{workspace.Organization}/{workspace.RepositoryName}",
+            Branch = workspace?.BranchName,
+            Language = language ?? branchLanguage?.LanguageCode,
+            DocumentPath = documentPath,
+            ModelId = modelId
+        };
+    }
+
     private async Task RecordTokenUsageAsync(
         int inputTokens,
         int outputTokens,
         int cachedInputTokens,
+        int cacheCreationInputTokens,
         ResolvedAiModel ai,
         string operation,
         CancellationToken cancellationToken)
@@ -1337,6 +1455,7 @@ Please start executing the task.";
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
                 CachedInputTokens = cachedInputTokens,
+                CacheCreationInputTokens = cacheCreationInputTokens,
                 ModelId = ai.ModelId,
                 ModelName = ai.ModelName,
                 Operation = operation,
@@ -1726,10 +1845,21 @@ Translation:";
         };
 
         var translationAi = await ResolveTranslationModelAsync(cancellationToken);
+        var executionContext = CreateWikiAiContext(
+            "wiki_translation_catalog_title",
+            "目录标题翻译",
+            language: $"{sourceLanguage}->{targetLanguage}",
+            modelId: translationAi.ModelId);
+        using var aiScope = AiExecutionScope.Begin(_logger, executionContext);
+        var requestOptions = translationAi.ToRequestOptions();
+        requestOptions.PromptCacheKey = WikiPromptCacheKeyBuilder.Build(
+            translationAi,
+            executionContext,
+            WikiPromptCacheKeyBuilder.EmptyToolsetHash);
         var chatClient = _agentFactory.CreateSimpleChatClient(
             translationAi.ModelId,
             _options.MaxOutputTokens,
-            translationAi.ToRequestOptions());
+            requestOptions);
         var thread = await chatClient.CreateSessionAsync(cancellationToken);
 
         var contentBuilder = new StringBuilder();
@@ -1761,8 +1891,9 @@ Translation:";
             usageSnapshot.InputTokens,
             usageSnapshot.OutputTokens,
             usageSnapshot.CachedInputTokens,
+            usageSnapshot.CacheCreationInputTokens,
             translationAi,
-            "Translation:CatalogTitle",
+            executionContext.BusinessTag,
             cancellationToken);
 
         // 清理可能的<think>标签及其内容
@@ -1805,6 +1936,17 @@ Translated document:";
         var retryCount = 0;
         Exception? lastException = null;
         var translationAi = await ResolveTranslationModelAsync(cancellationToken);
+        var executionContext = CreateWikiAiContext(
+            "wiki_translation_content",
+            "文档内容翻译",
+            language: $"{sourceLanguage}->{targetLanguage}",
+            modelId: translationAi.ModelId);
+        using var aiScope = AiExecutionScope.Begin(_logger, executionContext);
+        var requestOptions = translationAi.ToRequestOptions();
+        requestOptions.PromptCacheKey = WikiPromptCacheKeyBuilder.Build(
+            translationAi,
+            executionContext,
+            WikiPromptCacheKeyBuilder.EmptyToolsetHash);
 
         while (retryCount < _options.MaxRetryAttempts)
         {
@@ -1813,7 +1955,7 @@ Translated document:";
                 var chatClient = _agentFactory.CreateSimpleChatClient(
                     translationAi.ModelId,
                     _options.MaxOutputTokens, 
-                    translationAi.ToRequestOptions());
+                    requestOptions);
                 var thread = await chatClient.CreateSessionAsync(cancellationToken);
                 
                 var contentBuilder = new StringBuilder();
@@ -1843,8 +1985,9 @@ Translated document:";
                     usageSnapshot.InputTokens,
                     usageSnapshot.OutputTokens,
                     usageSnapshot.CachedInputTokens,
+                    usageSnapshot.CacheCreationInputTokens,
                     translationAi,
-                    "Translation:Content",
+                    executionContext.BusinessTag,
                     cancellationToken);
 
                 return result;
@@ -1914,6 +2057,17 @@ Translated mind map:";
         var retryCount = 0;
         Exception? lastException = null;
         var translationAi = await ResolveTranslationModelAsync(cancellationToken);
+        var executionContext = CreateWikiAiContext(
+            "wiki_translation_mindmap",
+            "思维导图翻译",
+            language: $"{sourceLanguage}->{targetLanguage}",
+            modelId: translationAi.ModelId);
+        using var aiScope = AiExecutionScope.Begin(_logger, executionContext);
+        var requestOptions = translationAi.ToRequestOptions();
+        requestOptions.PromptCacheKey = WikiPromptCacheKeyBuilder.Build(
+            translationAi,
+            executionContext,
+            WikiPromptCacheKeyBuilder.EmptyToolsetHash);
 
         while (retryCount < _options.MaxRetryAttempts)
         {
@@ -1922,7 +2076,7 @@ Translated mind map:";
                 var chatClient = _agentFactory.CreateSimpleChatClient(
                     translationAi.ModelId,
                     _options.MaxOutputTokens,
-                    translationAi.ToRequestOptions());
+                    requestOptions);
                 var thread = await chatClient.CreateSessionAsync(cancellationToken);
 
                 var contentBuilder = new StringBuilder();
@@ -1956,8 +2110,9 @@ Translated mind map:";
                     usageSnapshot.InputTokens,
                     usageSnapshot.OutputTokens,
                     usageSnapshot.CachedInputTokens,
+                    usageSnapshot.CacheCreationInputTokens,
                     translationAi,
-                    "Translation:MindMap",
+                    executionContext.BusinessTag,
                     cancellationToken);
 
                 return result;

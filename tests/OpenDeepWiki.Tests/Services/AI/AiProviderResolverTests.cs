@@ -59,6 +59,8 @@ public class AiProviderResolverTests
         var model = CreateModel(provider.Id, "deepseek-v4-pro", null);
         model.InputTokenPrice = 0.5m;
         model.OutputTokenPrice = 2m;
+        model.CacheHitTokenPrice = 0.1m;
+        model.CacheCreationTokenPrice = 0.5m;
         context.AiProviderConfigs.Add(provider);
         context.AiModelConfigs.Add(model);
         await context.SaveChangesAsync();
@@ -68,6 +70,8 @@ public class AiProviderResolverTests
 
         Assert.Equal(0.5m, resolved.InputTokenPrice);
         Assert.Equal(2m, resolved.OutputTokenPrice);
+        Assert.Equal(0.1m, resolved.CacheHitTokenPrice);
+        Assert.Equal(0.5m, resolved.CacheCreationTokenPrice);
     }
 
     [Fact]

@@ -227,6 +227,8 @@ public class AiModelConfigRequest
     public int? MaxOutputTokens { get; set; }
     public decimal? InputTokenPrice { get; set; }
     public decimal? OutputTokenPrice { get; set; }
+    public decimal? CacheHitTokenPrice { get; set; }
+    public decimal? CacheCreationTokenPrice { get; set; }
     public bool SupportsThinking { get; set; }
     public bool SupportsVision { get; set; }
     public bool SupportsTools { get; set; } = true;

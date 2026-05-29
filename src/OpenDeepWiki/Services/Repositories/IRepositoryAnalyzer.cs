@@ -9,6 +9,19 @@ namespace OpenDeepWiki.Services.Repositories;
 public interface IRepositoryAnalyzer
 {
     /// <summary>
+    /// Gets the latest remote HEAD commit ID for a branch without updating the local workspace.
+    /// Returns null when the repository source does not support remote refs or the branch ref is absent.
+    /// </summary>
+    /// <param name="repository">The repository entity to inspect.</param>
+    /// <param name="branchName">The branch name to query.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The remote HEAD commit ID for the branch, or null.</returns>
+    Task<string?> GetRemoteBranchHeadCommitAsync(
+        Repository repository,
+        string branchName,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Clones or updates a repository to a local working directory.
     /// </summary>
     /// <param name="repository">The repository entity to process.</param>

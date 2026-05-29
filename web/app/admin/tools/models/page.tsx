@@ -109,6 +109,8 @@ const emptyModelForm = {
   maxOutputTokens: "",
   inputTokenPrice: "",
   outputTokenPrice: "",
+  cacheHitTokenPrice: "",
+  cacheCreationTokenPrice: "",
   supportsThinking: false,
   supportsVision: false,
   supportsTools: true,
@@ -269,7 +271,11 @@ export default function AdminAiModelsPage() {
   const thinkingModelCount = models.filter((model) => model.supportsThinking).length;
   const visionModelCount = models.filter((model) => model.supportsVision).length;
   const pricedModelCount = models.filter(
-    (model) => model.inputTokenPrice !== undefined || model.outputTokenPrice !== undefined
+    (model) =>
+      model.inputTokenPrice !== undefined ||
+      model.outputTokenPrice !== undefined ||
+      model.cacheHitTokenPrice !== undefined ||
+      model.cacheCreationTokenPrice !== undefined
   ).length;
   const statCards = [
     {
@@ -325,6 +331,8 @@ export default function AdminAiModelsPage() {
             maxOutputTokens: model.maxOutputTokens?.toString() ?? "",
             inputTokenPrice: model.inputTokenPrice?.toString() ?? "",
             outputTokenPrice: model.outputTokenPrice?.toString() ?? "",
+            cacheHitTokenPrice: model.cacheHitTokenPrice?.toString() ?? "",
+            cacheCreationTokenPrice: model.cacheCreationTokenPrice?.toString() ?? "",
             supportsThinking: model.supportsThinking,
             supportsVision: model.supportsVision,
             supportsTools: model.supportsTools,
@@ -367,6 +375,8 @@ export default function AdminAiModelsPage() {
         maxOutputTokens: parseOptionalNumber(modelForm.maxOutputTokens),
         inputTokenPrice: parseOptionalNumber(modelForm.inputTokenPrice),
         outputTokenPrice: parseOptionalNumber(modelForm.outputTokenPrice),
+        cacheHitTokenPrice: parseOptionalNumber(modelForm.cacheHitTokenPrice),
+        cacheCreationTokenPrice: parseOptionalNumber(modelForm.cacheCreationTokenPrice),
         supportsThinking: modelForm.supportsThinking,
         supportsVision: modelForm.supportsVision,
         supportsTools: modelForm.supportsTools,
@@ -591,7 +601,7 @@ export default function AdminAiModelsPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 border-y border-border/70 py-3 text-xs">
+                  <div className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 border-y border-border/70 py-3 text-xs lg:grid-cols-3">
                     <div className="min-w-0">
                       <p className="text-muted-foreground">{t("admin.models.metrics.context")}</p>
                       <p className="mt-1 truncate font-semibold">{formatCompact(model.contextWindow)}</p>
@@ -607,6 +617,14 @@ export default function AdminAiModelsPage() {
                     <div className="min-w-0">
                       <p className="text-muted-foreground">{t("admin.models.metrics.outputPerM")}</p>
                       <p className="mt-1 truncate font-semibold">{formatPrice(model.outputTokenPrice)}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-muted-foreground">Cache hit / 1M</p>
+                      <p className="mt-1 truncate font-semibold">{formatPrice(model.cacheHitTokenPrice)}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-muted-foreground">Cache create / 1M</p>
+                      <p className="mt-1 truncate font-semibold">{formatPrice(model.cacheCreationTokenPrice)}</p>
                     </div>
                   </div>
 
@@ -789,6 +807,16 @@ export default function AdminAiModelsPage() {
                   placeholder={t("admin.models.dialog.outputPricePlaceholder")}
                   value={modelForm.outputTokenPrice}
                   onChange={(event) => setModelForm({ ...modelForm, outputTokenPrice: event.target.value })}
+                />
+                <Input
+                  placeholder="Cache hit price / 1M"
+                  value={modelForm.cacheHitTokenPrice}
+                  onChange={(event) => setModelForm({ ...modelForm, cacheHitTokenPrice: event.target.value })}
+                />
+                <Input
+                  placeholder="Cache create price / 1M"
+                  value={modelForm.cacheCreationTokenPrice}
+                  onChange={(event) => setModelForm({ ...modelForm, cacheCreationTokenPrice: event.target.value })}
                 />
               </div>
               <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">

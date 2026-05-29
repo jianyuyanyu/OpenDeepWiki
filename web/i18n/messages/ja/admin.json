@@ -18,7 +18,37 @@
     "submitCount": "提出数",
     "inputToken": "入力トークン",
     "outputToken": "出力トークン",
-    "total": "合計"
+    "total": "合計",
+    "overview": "運用概要",
+    "subtitle": "直近 {days} 日間のリポジトリ投入、AI トークン消費、キャッシュ効率、MCP トラフィックを確認します。",
+    "updatedAt": "更新",
+    "loading": "ダッシュボード指標を読み込み中...",
+    "repoSubmitDetail": "この期間に {count} 件処理済み",
+    "completionRate": "完了率 {rate}",
+    "newUsersDetail": "{days} 日間の新規アカウント",
+    "tokenUsageDetail": "推定コスト {cost}",
+    "cacheHitRate": "キャッシュヒット率",
+    "cacheHitRateDetail": "{count} キャッシュヒット",
+    "mcpSuccessRate": "成功率 {rate}",
+    "tokenTrendDescription": "日別に入力、キャッシュ作成、キャッシュヒット、出力トークンとキャッシュヒット率を表示します。",
+    "freshInputToken": "新規入力トークン",
+    "freshInputTokenDetail": "プロンプトキャッシュから提供されなかった入力トークン。",
+    "cacheCreationToken": "キャッシュ作成トークン",
+    "cacheCreationTokenDetail": "再利用可能なプロンプトキャッシュを作成するための入力トークン。",
+    "cacheHitToken": "キャッシュヒットトークン",
+    "cacheHitTokenDetail": "既存のプロンプトキャッシュから提供された入力トークン。",
+    "tokenComposition": "トークン構成",
+    "cacheEfficiencyDescription": "キャッシュヒット率 = キャッシュヒット入力トークン / 総入力トークン。",
+    "noData": "選択した期間にデータがありません",
+    "repoStatsDescription": "リポジトリ提出数と処理完了数を比較します。",
+    "userGrowthDescription": "新規ユーザー登録を日別に表示します。",
+    "mcpTrendDescription": "MCP リクエスト数とエラー数を日別に表示します。",
+    "mcpUnavailable": "MCP 統計は利用できません",
+    "totalWithCount": "合計 {count}",
+    "errorsWithCount": "{count} 件のエラー",
+    "outputTokenDetail": "この期間にモデルが生成した応答トークン。",
+    "mcpRequestMix": "{success} 成功、{errors} 失敗",
+    "windowHint": "すべての指標は選択中の {days} 日間の期間を使用します。"
   },
   "departments": {
     "title": "部門管理",
@@ -379,6 +409,66 @@
       "catalogModelHint": "ドキュメント構造とナビゲーションツリーを生成します。高速で低コストなモデルで十分です。",
       "contentModelHint": "コード分析を含む実際のドキュメントコンテンツを生成します。最高品質のために最も高性能なモデルを使用してください。",
       "translationModelHint": "生成されたドキュメントを他の言語に翻訳します。高速で低コストなモデルで十分です。"
+    },
+    "github": "GitHub",
+    "githubDescription": "リポジトリ取り込みで使う GitHub App の資格情報と連携設定です。",
+    "items": {
+      "WIKI_LANGUAGES": {
+        "label": "Wiki 言語",
+        "description": "Wiki の生成と翻訳で使用する言語コードです。複数指定する場合はカンマ区切りで入力します。"
+      },
+      "WIKI_PARALLEL_COUNT": {
+        "label": "並列生成タスク数",
+        "description": "同時に実行できるドキュメント生成タスクの上限です。"
+      },
+      "WIKI_MAX_OUTPUT_TOKENS": {
+        "label": "最大出力トークン数",
+        "description": "1 回の Wiki コンテンツ生成リクエストで返せる最大トークン数です。"
+      },
+      "WIKI_DOCUMENT_GENERATION_TIMEOUT_MINUTES": {
+        "label": "ドキュメント生成タイムアウト（分）",
+        "description": "1 つの Wiki ドキュメント生成を中断するまでに許可する最大実行時間です。"
+      },
+      "WIKI_TRANSLATION_TIMEOUT_MINUTES": {
+        "label": "翻訳タイムアウト（分）",
+        "description": "生成済みドキュメントを別言語へ翻訳する際の最大実行時間です。"
+      },
+      "WIKI_TITLE_TRANSLATION_TIMEOUT_MINUTES": {
+        "label": "タイトル翻訳タイムアウト（分）",
+        "description": "生成されたドキュメントタイトルを翻訳する際の最大実行時間です。"
+      },
+      "WIKI_README_MAX_LENGTH": {
+        "label": "README 最大長",
+        "description": "Wiki コンテキスト構築時に取り込む README 内容の最大長です。"
+      },
+      "WIKI_DIRECTORY_TREE_MAX_DEPTH": {
+        "label": "ディレクトリツリー最大深度",
+        "description": "ディレクトリ構造解析に含めるリポジトリ階層の最大深さです。"
+      },
+      "WIKI_MAX_RETRY_ATTEMPTS": {
+        "label": "最大再試行回数",
+        "description": "Wiki 生成と関連 AI 呼び出しに許可する最大再試行回数です。"
+      },
+      "WIKI_RETRY_DELAY_MS": {
+        "label": "再試行待機時間（ミリ秒）",
+        "description": "Wiki 生成リクエストを再試行するまでの基本待機時間です。"
+      },
+      "WIKI_PROMPTS_DIRECTORY": {
+        "label": "プロンプトテンプレートディレクトリ",
+        "description": "Wiki 用プロンプトテンプレートファイルを保存する相対ディレクトリです。"
+      },
+      "GITHUB_APP_ID": {
+        "label": "GitHub App ID",
+        "description": "インストールアクセストークンを発行するために使う GitHub App の数値 ID です。"
+      },
+      "GITHUB_APP_PRIVATE_KEY": {
+        "label": "GitHub App 秘密鍵",
+        "description": "GitHub App JWT へ署名するための Base64 エンコード済み PEM 秘密鍵です。"
+      },
+      "GITHUB_APP_NAME": {
+        "label": "GitHub App 名",
+        "description": "インストール URL やコールバック URL の生成に使う GitHub App のスラッグです。"
+      }
     }
   },
   "chatAssistant": {

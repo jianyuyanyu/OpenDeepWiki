@@ -30,6 +30,8 @@ internal sealed class TestAiProviderResolver : IAiProviderResolver
             null,
             null,
             null,
+            null,
+            null,
             false,
             null,
             null,

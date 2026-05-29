@@ -18,7 +18,37 @@
     "submitCount": "Submissions",
     "inputToken": "Input Tokens",
     "outputToken": "Output Tokens",
-    "total": "Total"
+    "total": "Total",
+    "overview": "Operational overview",
+    "subtitle": "Monitor repository intake, AI token usage, cache efficiency, and MCP traffic over the last {days} days.",
+    "updatedAt": "Updated",
+    "loading": "Loading dashboard metrics...",
+    "repoSubmitDetail": "{count} processed in this window",
+    "completionRate": "{rate} completion rate",
+    "newUsersDetail": "New accounts in {days} days",
+    "tokenUsageDetail": "Estimated cost {cost}",
+    "cacheHitRate": "Cache Hit Rate",
+    "cacheHitRateDetail": "{count} cache-hit tokens",
+    "mcpSuccessRate": "{rate} success rate",
+    "tokenTrendDescription": "Stacked token volume with cache hits, cache creation, output, and daily cache hit rate.",
+    "freshInputToken": "Fresh Input",
+    "freshInputTokenDetail": "Input tokens not served by prompt cache.",
+    "cacheCreationToken": "Cache Creation",
+    "cacheCreationTokenDetail": "Input tokens used to create reusable prompt cache entries.",
+    "cacheHitToken": "Cache Hit",
+    "cacheHitTokenDetail": "Input tokens served from existing prompt cache entries.",
+    "tokenComposition": "Token Composition",
+    "cacheEfficiencyDescription": "Cache hit rate is calculated from cache-hit input tokens divided by total input tokens.",
+    "noData": "No data for the selected range",
+    "repoStatsDescription": "Submitted repositories compared with completed processing.",
+    "userGrowthDescription": "New user registrations by day.",
+    "mcpTrendDescription": "MCP request volume and errors by day.",
+    "mcpUnavailable": "MCP statistics are not available",
+    "totalWithCount": "Total {count}",
+    "errorsWithCount": "{count} errors",
+    "outputTokenDetail": "Model response tokens generated in this window.",
+    "mcpRequestMix": "{success} succeeded, {errors} failed",
+    "windowHint": "All metrics use the selected {days}-day window."
   },
   "departments": {
     "title": "Department Management",
@@ -352,6 +382,8 @@
     "clearSearch": "Clear search",
     "generalDescription": "Basic behavior used across the application.",
     "aiDescription": "Generation strategy, runtime limits, and retry behavior.",
+    "github": "GitHub",
+    "githubDescription": "GitHub App credentials and integration settings for repository import flows.",
     "securityDescription": "Sensitive credentials and access-related configuration.",
     "categoryFallbackDescription": "Settings from this module.",
     "sensitiveValue": "Sensitive",
@@ -419,6 +451,64 @@
       "catalogModelHint": "Generates document structure and navigation tree. A fast, cheaper model works well here.",
       "contentModelHint": "Generates actual document content with code analysis. Use the most capable model for best quality.",
       "translationModelHint": "Translates generated documents to other languages. A fast, cheaper model is sufficient."
+    },
+    "items": {
+      "WIKI_LANGUAGES": {
+        "label": "Wiki languages",
+        "description": "Comma-separated language codes used when generating and translating wiki content."
+      },
+      "WIKI_PARALLEL_COUNT": {
+        "label": "Parallel generation tasks",
+        "description": "Maximum number of document generation jobs that can run at the same time."
+      },
+      "WIKI_MAX_OUTPUT_TOKENS": {
+        "label": "Max output tokens",
+        "description": "Upper limit for tokens returned by a single wiki content generation request."
+      },
+      "WIKI_DOCUMENT_GENERATION_TIMEOUT_MINUTES": {
+        "label": "Document generation timeout (minutes)",
+        "description": "Time limit for one wiki document generation run before it is cancelled."
+      },
+      "WIKI_TRANSLATION_TIMEOUT_MINUTES": {
+        "label": "Translation timeout (minutes)",
+        "description": "Time limit for translating one generated document into another language."
+      },
+      "WIKI_TITLE_TRANSLATION_TIMEOUT_MINUTES": {
+        "label": "Title translation timeout (minutes)",
+        "description": "Time limit for translating generated document titles."
+      },
+      "WIKI_README_MAX_LENGTH": {
+        "label": "README max length",
+        "description": "Maximum README content length included when building wiki context."
+      },
+      "WIKI_DIRECTORY_TREE_MAX_DEPTH": {
+        "label": "Directory tree max depth",
+        "description": "Deepest repository folder level included in directory tree analysis."
+      },
+      "WIKI_MAX_RETRY_ATTEMPTS": {
+        "label": "Max retry attempts",
+        "description": "Maximum retry count for wiki generation and related AI operations."
+      },
+      "WIKI_RETRY_DELAY_MS": {
+        "label": "Retry delay (ms)",
+        "description": "Base delay between retry attempts for wiki generation requests."
+      },
+      "WIKI_PROMPTS_DIRECTORY": {
+        "label": "Prompt templates directory",
+        "description": "Relative directory path that stores wiki prompt template files."
+      },
+      "GITHUB_APP_ID": {
+        "label": "GitHub App ID",
+        "description": "Numeric GitHub App identifier used to issue installation access tokens."
+      },
+      "GITHUB_APP_PRIVATE_KEY": {
+        "label": "GitHub App private key",
+        "description": "Base64-encoded PEM private key used to sign GitHub App JWTs."
+      },
+      "GITHUB_APP_NAME": {
+        "label": "GitHub App name",
+        "description": "GitHub App slug used when building install and callback links."
+      }
     }
   },
   "chatAssistant": {

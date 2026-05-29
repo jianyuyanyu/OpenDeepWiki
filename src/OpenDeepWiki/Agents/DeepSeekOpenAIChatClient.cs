@@ -11,13 +11,12 @@ namespace OpenDeepWiki.Agents;
 public sealed class DeepSeekOpenAIChatClient : IChatClient
 {
     private const string DefaultEndpoint = "https://api.deepseek.com/v1";
+    private const string DefaultPromptCacheKey = "opendeepwiki";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
-
-    private static readonly string PromptCacheKey = $"opendeepwiki-{Guid.NewGuid():N}";
 
     private readonly string _model;
     private readonly string _apiKey;
@@ -243,7 +242,7 @@ public sealed class DeepSeekOpenAIChatClient : IChatClient
         {
             ["model"] = options?.ModelId ?? _model,
             ["stream"] = stream,
-            ["prompt_cache_key"] = PromptCacheKey,
+            ["prompt_cache_key"] = ResolvePromptCacheKey(options),
             ["messages"] = requestMessages
         };
 
@@ -517,6 +516,24 @@ public sealed class DeepSeekOpenAIChatClient : IChatClient
         }
 
         return _options.ThinkingEnabled ?? true;
+    }
+
+    private string ResolvePromptCacheKey(ChatOptions? options)
+    {
+        if (TryReadString(options?.AdditionalProperties, "promptCacheKey", out var promptCacheKey) ||
+            TryReadString(options?.AdditionalProperties, "prompt_cache_key", out promptCacheKey))
+        {
+            return NormalizePromptCacheKey(promptCacheKey);
+        }
+
+        return NormalizePromptCacheKey(_options.PromptCacheKey);
+    }
+
+    private static string NormalizePromptCacheKey(string? promptCacheKey)
+    {
+        return string.IsNullOrWhiteSpace(promptCacheKey)
+            ? DefaultPromptCacheKey
+            : promptCacheKey.Trim();
     }
 
     private static void ApplyRequestOverrides(

@@ -44,6 +44,7 @@ public class TokenUsageStatisticsResponse
     public long TotalInputTokens { get; set; }
     public long TotalOutputTokens { get; set; }
     public long TotalCachedInputTokens { get; set; }
+    public long TotalCacheCreationInputTokens { get; set; }
     public long TotalTokens { get; set; }
     public decimal InputCacheHitRate { get; set; }
     public decimal TotalInputCost { get; set; }
@@ -60,6 +61,7 @@ public class DailyTokenUsage
     public long InputTokens { get; set; }
     public long OutputTokens { get; set; }
     public long CachedInputTokens { get; set; }
+    public long CacheCreationInputTokens { get; set; }
     public long TotalTokens { get; set; }
     public decimal InputCacheHitRate { get; set; }
     public decimal InputCost { get; set; }
