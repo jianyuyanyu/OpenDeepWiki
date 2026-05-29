@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.AI;
 
 namespace OpenDeepWiki.Services.Chat;
 
@@ -16,6 +17,7 @@ public class CreateChatAppDto
     public string? IconUrl { get; set; }
     public bool EnableDomainValidation { get; set; }
     public List<string>? AllowedDomains { get; set; }
+    public string? AiProviderId { get; set; }
     public string ProviderType { get; set; } = "OpenAI";
     public string? ApiKey { get; set; }
     public string? BaseUrl { get; set; }
@@ -34,6 +36,7 @@ public class UpdateChatAppDto
     public string? IconUrl { get; set; }
     public bool? EnableDomainValidation { get; set; }
     public List<string>? AllowedDomains { get; set; }
+    public string? AiProviderId { get; set; }
     public string? ProviderType { get; set; }
     public string? ApiKey { get; set; }
     public string? BaseUrl { get; set; }
@@ -58,6 +61,7 @@ public class ChatAppDto
     public string? AppSecret { get; set; }
     public bool EnableDomainValidation { get; set; }
     public List<string> AllowedDomains { get; set; } = new();
+    public string? AiProviderId { get; set; }
     public string ProviderType { get; set; } = string.Empty;
     public string? ApiKey { get; set; }
     public string? BaseUrl { get; set; }
@@ -138,6 +142,14 @@ public class ChatAppService : IChatAppService
     /// <inheritdoc />
     public async Task<ChatAppDto> CreateAppAsync(string userId, CreateChatAppDto dto, CancellationToken cancellationToken = default)
     {
+        var aiProviderId = dto.AiProviderId ?? await CreateProviderFromLegacyAppConfigAsync(
+            dto.Name,
+            dto.ProviderType,
+            dto.BaseUrl,
+            dto.ApiKey,
+            dto.DefaultModel ?? dto.AvailableModels?.FirstOrDefault(),
+            cancellationToken);
+
         var app = new ChatApp
         {
             Id = Guid.NewGuid(),
@@ -149,6 +161,7 @@ public class ChatAppService : IChatAppService
             AppSecret = GenerateAppSecret(),
             EnableDomainValidation = dto.EnableDomainValidation,
             AllowedDomains = dto.AllowedDomains != null ? JsonSerializer.Serialize(dto.AllowedDomains) : null,
+            AiProviderId = aiProviderId,
             ProviderType = dto.ProviderType,
             ApiKey = dto.ApiKey,
             BaseUrl = dto.BaseUrl,
@@ -213,6 +226,18 @@ public class ChatAppService : IChatAppService
         if (dto.IconUrl != null) app.IconUrl = dto.IconUrl;
         if (dto.EnableDomainValidation.HasValue) app.EnableDomainValidation = dto.EnableDomainValidation.Value;
         if (dto.AllowedDomains != null) app.AllowedDomains = JsonSerializer.Serialize(dto.AllowedDomains);
+        if (dto.AiProviderId != null) app.AiProviderId = dto.AiProviderId;
+        else if (string.IsNullOrWhiteSpace(app.AiProviderId) &&
+                 (dto.ApiKey != null || dto.BaseUrl != null || dto.ProviderType != null))
+        {
+            app.AiProviderId = await CreateProviderFromLegacyAppConfigAsync(
+                app.Name,
+                dto.ProviderType ?? app.ProviderType,
+                dto.BaseUrl ?? app.BaseUrl,
+                dto.ApiKey ?? app.ApiKey,
+                dto.DefaultModel ?? app.DefaultModel,
+                cancellationToken);
+        }
         if (dto.ProviderType != null) app.ProviderType = dto.ProviderType;
         if (dto.ApiKey != null) app.ApiKey = dto.ApiKey;
         if (dto.BaseUrl != null) app.BaseUrl = dto.BaseUrl;
@@ -291,6 +316,65 @@ public class ChatAppService : IChatAppService
         return $"sk_{Convert.ToHexString(bytes).ToLowerInvariant()}";
     }
 
+    private async Task<string?> CreateProviderFromLegacyAppConfigAsync(
+        string appName,
+        string? providerType,
+        string? baseUrl,
+        string? apiKey,
+        string? modelId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey) && string.IsNullOrWhiteSpace(baseUrl))
+        {
+            return null;
+        }
+
+        providerType = string.IsNullOrWhiteSpace(providerType) ? "OpenAI" : providerType;
+        baseUrl = string.IsNullOrWhiteSpace(baseUrl)
+            ? providerType.Equals("Anthropic", StringComparison.OrdinalIgnoreCase)
+                ? "https://api.anthropic.com"
+                : "https://api.openai.com/v1"
+            : baseUrl.TrimEnd('/');
+
+        var provider = new AiProviderConfig
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = $"chat-app-{Guid.NewGuid():N}",
+            DisplayName = $"{appName} Provider",
+            ProviderType = providerType,
+            BaseUrl = baseUrl,
+            ApiKey = apiKey,
+            AuthType = "ApiKey",
+            IsActive = true,
+            SupportsModelDiscovery = true,
+            DefaultModelId = modelId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.AiProviderConfigs.Add(provider);
+
+        if (!string.IsNullOrWhiteSpace(modelId))
+        {
+            _context.AiModelConfigs.Add(new AiModelConfig
+            {
+                Id = Guid.NewGuid().ToString(),
+                ProviderId = provider.Id,
+                ModelId = modelId,
+                Name = modelId,
+                DisplayName = modelId,
+                ModelType = "chat",
+                ProviderType = AiProviderResolver.NormalizeModelProviderType(null, modelId) ?? providerType,
+                SupportsTools = true,
+                IsActive = true,
+                IsDefault = true,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+        return provider.Id;
+    }
+
     /// <summary>
     /// Maps a ChatApp entity to a DTO.
     /// </summary>
@@ -307,6 +391,7 @@ public class ChatAppService : IChatAppService
             AppSecret = includeSecret ? app.AppSecret : null,
             EnableDomainValidation = app.EnableDomainValidation,
             AllowedDomains = ParseJsonArray(app.AllowedDomains),
+            AiProviderId = app.AiProviderId,
             ProviderType = app.ProviderType,
             ApiKey = includeSecret ? app.ApiKey : MaskApiKey(app.ApiKey),
             BaseUrl = app.BaseUrl,

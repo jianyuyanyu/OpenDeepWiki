@@ -74,7 +74,11 @@ public class AdminStatisticsService : IAdminStatisticsService
             {
                 Date = g.Key,
                 InputTokens = g.Sum(t => (long)t.InputTokens),
-                OutputTokens = g.Sum(t => (long)t.OutputTokens)
+                OutputTokens = g.Sum(t => (long)t.OutputTokens),
+                CachedInputTokens = g.Sum(t => (long)t.CachedInputTokens),
+                InputCost = g.Sum(t => t.InputCost),
+                OutputCost = g.Sum(t => t.OutputCost),
+                TotalCost = g.Sum(t => t.TotalCost)
             })
             .ToListAsync();
 
@@ -84,20 +88,41 @@ public class AdminStatisticsService : IAdminStatisticsService
             var stat = tokenStats.FirstOrDefault(s => s.Date == date);
             var inputTokens = stat?.InputTokens ?? 0;
             var outputTokens = stat?.OutputTokens ?? 0;
+            var cachedInputTokens = stat?.CachedInputTokens ?? 0;
+            var inputCost = stat?.InputCost ?? 0m;
+            var outputCost = stat?.OutputCost ?? 0m;
+            var totalCost = stat?.TotalCost ?? 0m;
 
             response.DailyUsages.Add(new DailyTokenUsage
             {
                 Date = date,
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
-                TotalTokens = inputTokens + outputTokens
+                CachedInputTokens = cachedInputTokens,
+                TotalTokens = inputTokens + outputTokens,
+                InputCacheHitRate = CalculateHitRate(cachedInputTokens, inputTokens),
+                InputCost = inputCost,
+                OutputCost = outputCost,
+                TotalCost = totalCost
             });
 
             response.TotalInputTokens += inputTokens;
             response.TotalOutputTokens += outputTokens;
+            response.TotalCachedInputTokens += cachedInputTokens;
+            response.TotalInputCost += inputCost;
+            response.TotalOutputCost += outputCost;
+            response.TotalCost += totalCost;
         }
 
         response.TotalTokens = response.TotalInputTokens + response.TotalOutputTokens;
+        response.InputCacheHitRate = CalculateHitRate(response.TotalCachedInputTokens, response.TotalInputTokens);
         return response;
+    }
+
+    private static decimal CalculateHitRate(long cachedInputTokens, long inputTokens)
+    {
+        return inputTokens <= 0
+            ? 0m
+            : Math.Round((decimal)cachedInputTokens / inputTokens, 4);
     }
 }

@@ -19,6 +19,8 @@
   "user": "User",
   "backToHome": "Back to Home",
   "openMenu": "Open menu",
+  "toggleSidebar": "Toggle Sidebar",
+  "close": "Close",
   "submitting": "Submitting...",
   "submitFailed": "Submit failed",
   "pleaseLogin": "Please login first",
@@ -100,9 +102,17 @@
   },
   "repository": {
     "wikiTitle": "Repository Wiki",
+    "mindMap": "Project Architecture",
+    "graphify": "Graphify",
     "exportDocs": "Export Docs",
+    "exportSkill": "Export SKILL",
     "exporting": "Exporting...",
+    "expandSection": "Expand section",
+    "collapseSection": "Collapse section",
     "tableOfContents": "Table of Contents",
+    "graphifyNotAvailable": "Graphify report is not available yet.",
+    "graphifyGraph": "Graph",
+    "graphifyReport": "Report",
     "notFound": {
       "title": "Repository Not Found",
       "description": "Repository {owner}/{repo} not found",
@@ -133,8 +143,26 @@
   "branch": {
     "selectBranch": "Select branch"
   },
+  "organization": {
+    "title": "My Organizations",
+    "refresh": "Refresh",
+    "loginRequired": "Please log in to view your organizations",
+    "noDepartments": "You have not joined any departments yet",
+    "contactAdmin": "Please ask an administrator to add you to a department",
+    "myDepartments": "My Departments",
+    "departmentManager": "Department Manager",
+    "departmentRepositories": "Department Repositories",
+    "noRepositories": "No assigned repositories",
+    "unknown": "Unknown",
+    "fetchFailed": "Failed to fetch organization data",
+    "viewDocs": "View Docs"
+  },
   "language": {
     "selectLanguage": "Select language"
+  },
+  "sidebar": {
+    "title": "Sidebar",
+    "mobileDescription": "Displays the mobile sidebar."
   },
   "mcp": {
     "title": "MCP Providers",

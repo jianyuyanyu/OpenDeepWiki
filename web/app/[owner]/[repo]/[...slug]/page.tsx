@@ -4,7 +4,7 @@ import { MarkdownRenderer } from "@/components/repo/markdown-renderer";
 import { DocNotFound } from "@/components/repo/doc-not-found";
 import { SourceFiles } from "@/components/repo/source-files";
 import { decodeRouteSegment } from "@/lib/repo-route";
-import { cookies } from "next/headers";
+import { getLocale, getTranslations } from "next-intl/server";
 
 interface RepoDocPageProps {
   params: Promise<{
@@ -52,14 +52,11 @@ export default async function RepoDocPage({ params, searchParams }: RepoDocPageP
   }
 
   const { doc, headings } = data;
-  const cookieStore = await cookies();
-  const locale = cookieStore.get("NEXT_LOCALE")?.value === "en" ? "en" : "zh";
-  const repoCopy = locale === "en"
-    ? { tableOfContents: "Table of Contents" }
-    : { tableOfContents: "目录" };
+  const locale = await getLocale();
+  const t = await getTranslations("common");
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-8 xl:flex-row">
+    <div className="mx-auto flex max-w-6xl flex-col gap-6 xl:flex-row">
       <article className="min-w-0 flex-1">
         <MarkdownRenderer content={doc.content} language={locale} />
         <SourceFiles 
@@ -69,14 +66,14 @@ export default async function RepoDocPage({ params, searchParams }: RepoDocPageP
       </article>
       {headings.length > 0 && (
         <aside className="xl:w-64 xl:shrink-0">
-          <div className="rounded-xl border border-border/70 bg-muted/20 p-4 xl:sticky xl:top-6">
-            <div className="mb-3 text-sm font-semibold">{repoCopy.tableOfContents}</div>
-            <nav className="space-y-2">
+          <div className="wiki-scrollbar rounded-xl border border-border/70 bg-muted/20 p-3 xl:sticky xl:top-0 xl:max-h-full xl:overflow-y-auto">
+            <div className="mb-2 text-sm font-semibold">{t("repository.tableOfContents")}</div>
+            <nav className="space-y-1.5">
               {headings.map((heading) => (
                 <a
                   key={heading.id}
                   href={`#${heading.id}`}
-                  className="block text-sm text-muted-foreground hover:text-foreground"
+                  className="block text-[13px] leading-5 text-muted-foreground hover:text-foreground"
                   style={{ paddingLeft: `${(heading.level - 1) * 12}px` }}
                 >
                   {heading.text}

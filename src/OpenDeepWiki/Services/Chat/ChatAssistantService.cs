@@ -12,6 +12,7 @@ using OpenDeepWiki.Agents.Tools;
 using OpenDeepWiki.Chat.Exceptions;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.AI;
 using OpenDeepWiki.Services.Repositories;
 using GitRepository = LibGit2Sharp.Repository;
 
@@ -186,6 +187,7 @@ public class ChatAssistantService : IChatAssistantService
     private readonly IContext _context;
     private readonly IContextFactory _contextFactory;
     private readonly AgentFactory _agentFactory;
+    private readonly IAiProviderResolver _aiProviderResolver;
     private readonly IMcpToolConverter _mcpToolConverter;
     private readonly ISkillToolConverter _skillToolConverter;
     private readonly RepositoryAnalyzerOptions _repoOptions;
@@ -196,6 +198,7 @@ public class ChatAssistantService : IChatAssistantService
         IContext context,
         IContextFactory contextFactory,
         AgentFactory agentFactory,
+        IAiProviderResolver aiProviderResolver,
         IMcpToolConverter mcpToolConverter,
         ISkillToolConverter skillToolConverter,
         IOptions<RepositoryAnalyzerOptions> repoOptions,
@@ -205,6 +208,7 @@ public class ChatAssistantService : IChatAssistantService
         _context = context;
         _contextFactory = contextFactory;
         _agentFactory = agentFactory;
+        _aiProviderResolver = aiProviderResolver;
         _mcpToolConverter = mcpToolConverter;
         _skillToolConverter = skillToolConverter;
         _repoOptions = repoOptions.Value;
@@ -244,21 +248,123 @@ public class ChatAssistantService : IChatAssistantService
             return new List<ModelConfigDto>();
         }
 
-        var models = await _context.ModelConfigs
-            .Where(m => config.EnabledModelIds.Contains(m.Id) && m.IsActive && !m.IsDeleted)
-            .Select(m => new ModelConfigDto
+        var requestedModelIds = config.EnabledModelIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var directSelections = new List<(string SelectionId, string ProviderId, string ModelId)>();
+        var legacyModelIds = new List<string>();
+
+        foreach (var id in requestedModelIds)
+        {
+            if (AiModelSelectionIds.TryParse(id, out var providerId, out var modelId))
             {
-                Id = m.Id,
-                Name = m.Name,
-                Provider = m.Provider,
-                ModelId = m.ModelId,
-                Description = m.Description,
-                IsDefault = m.Id == config.DefaultModelId || m.IsDefault,
-                IsEnabled = true // 返回的模型都是启用的
-            })
+                directSelections.Add((id, providerId, modelId));
+            }
+            else
+            {
+                legacyModelIds.Add(id);
+            }
+        }
+
+        var legacyModels = new Dictionary<string, ModelConfigDto>(StringComparer.OrdinalIgnoreCase);
+        if (legacyModelIds.Count > 0)
+        {
+            var modelConfigs = await _context.ModelConfigs
+                .Where(m => legacyModelIds.Contains(m.Id) && m.IsActive && !m.IsDeleted)
+                .ToListAsync(cancellationToken);
+
+            legacyModels = modelConfigs
+                .Select(m => new ModelConfigDto
+                {
+                    Id = m.Id,
+                    Name = m.Name,
+                    Provider = m.Provider,
+                    ModelId = m.ModelId,
+                    Description = m.Description,
+                    IsDefault = string.Equals(m.Id, config.DefaultModelId, StringComparison.OrdinalIgnoreCase) || m.IsDefault,
+                    IsEnabled = true
+                })
+                .ToDictionary(m => m.Id, StringComparer.OrdinalIgnoreCase);
+        }
+
+        var directModels = await GetDirectModelDtosAsync(directSelections, config.DefaultModelId, cancellationToken);
+
+        return requestedModelIds
+            .Select(id =>
+                legacyModels.TryGetValue(id, out var legacyModel)
+                    ? legacyModel
+                    : directModels.GetValueOrDefault(id))
+            .Where(model => model != null)
+            .Select(model => model!)
+            .ToList();
+    }
+
+    private async Task<Dictionary<string, ModelConfigDto>> GetDirectModelDtosAsync(
+        List<(string SelectionId, string ProviderId, string ModelId)> selections,
+        string? defaultModelId,
+        CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<string, ModelConfigDto>(StringComparer.OrdinalIgnoreCase);
+        if (selections.Count == 0)
+        {
+            return result;
+        }
+
+        var providerIds = selections
+            .Select(selection => selection.ProviderId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var modelIds = selections
+            .Select(selection => selection.ModelId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var providers = (await _context.AiProviderConfigs
+                .Where(p => providerIds.Contains(p.Id) && p.IsActive && !p.IsDeleted)
+                .ToListAsync(cancellationToken))
+            .ToDictionary(p => p.Id, StringComparer.OrdinalIgnoreCase);
+
+        var aiModels = await _context.AiModelConfigs
+            .Where(m =>
+                providerIds.Contains(m.ProviderId) &&
+                modelIds.Contains(m.ModelId) &&
+                m.IsActive &&
+                !m.IsDeleted)
             .ToListAsync(cancellationToken);
 
-        return models;
+        var aiModelByBinding = aiModels
+            .GroupBy(m => CreateModelBindingKey(m.ProviderId, m.ModelId), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var selection in selections)
+        {
+            if (!providers.TryGetValue(selection.ProviderId, out var provider) ||
+                !aiModelByBinding.TryGetValue(CreateModelBindingKey(selection.ProviderId, selection.ModelId), out var aiModel))
+            {
+                continue;
+            }
+
+            result[selection.SelectionId] = new ModelConfigDto
+            {
+                Id = selection.SelectionId,
+                Name = $"{provider.DisplayName ?? provider.Name} / {aiModel.DisplayName ?? aiModel.Name}",
+                Provider = AiProviderResolver.ResolveEffectiveProviderType(
+                    provider.ProviderType,
+                    aiModel.ProviderType),
+                ModelId = aiModel.ModelId,
+                Description = aiModel.Description,
+                IsDefault = string.Equals(selection.SelectionId, defaultModelId, StringComparison.OrdinalIgnoreCase) || aiModel.IsDefault,
+                IsEnabled = true
+            };
+        }
+
+        return result;
+    }
+
+    private static string CreateModelBindingKey(string providerId, string modelId)
+    {
+        return $"{providerId}:{modelId}";
     }
 
     /// <inheritdoc />
@@ -427,15 +533,11 @@ public class ChatAssistantService : IChatAssistantService
             }
         };
 
-        var requestOptions = new AiRequestOptions
-        {
-            ApiKey = modelConfig.ApiKey,
-            Endpoint = modelConfig.Endpoint,
-            RequestType = ParseRequestType(modelConfig.Provider)
-        };
+        var resolvedModel = await _aiProviderResolver.ResolveModelConfigAsync(modelConfig, cancellationToken);
+        var requestOptions = resolvedModel.ToRequestOptions();
 
         var (agent, _) = _agentFactory.CreateChatClientWithTools(
-            modelConfig.ModelId,
+            resolvedModel.ModelId,
             tools.ToArray(),
             agentOptions,
             requestOptions);
@@ -446,8 +548,7 @@ public class ChatAssistantService : IChatAssistantService
         chatMessages.AddRange(BuildChatMessages(request.Messages));
 
         // Stream response
-        var inputTokens = 0;
-        var outputTokens = 0;
+        var usageAccumulator = new AiUsageAccumulator();
 
         // Track tool calls with a stack to handle nested calls
         var currentBlockIndex = -1;
@@ -463,6 +564,8 @@ public class ChatAssistantService : IChatAssistantService
         await foreach (var update in
                           agent.RunStreamingAsync(chatMessages, thread, cancellationToken: cancellationToken))
         {
+            usageAccumulator.Add(update);
+
             if (!string.IsNullOrEmpty(update.Text))
             {
                 yield return new SSEEvent
@@ -548,133 +651,53 @@ public class ChatAssistantService : IChatAssistantService
                 }
             }
 
-            if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
+            if (update.RawRepresentation is ChatResponseUpdate
+                {
+                    RawRepresentation: RawMessageStreamEvent rawMessageStreamEvent
+                })
             {
-                if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
-                    {
-                        Value: RawMessageDeltaEvent deltaEvent
-                    })
+                // handle custom streaming format with content block events for more granular tool call tracking
+                if (rawMessageStreamEvent.Json.TryGetProperty("type", out var typeElement))
                 {
-                    inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
-                        deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
-                    outputTokens = (int)(deltaEvent.Usage.OutputTokens);
-                }
-                else if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent rawMessageStreamEvent)
-                {
-                     // handle custom streaming format with content block events for more granular tool call tracking
-                    if (rawMessageStreamEvent.Json.TryGetProperty("type", out var typeElement))
-                    {
-                        var eventType = typeElement.GetString();
+                    var eventType = typeElement.GetString();
 
-                        // handle content block start event to track new tool calls 
-                        if (eventType == "content_block_start")
+                    // handle content block start event to track new tool calls
+                    if (eventType == "content_block_start")
+                    {
+                        // reset current block tracking
+                        if (rawMessageStreamEvent.Json.TryGetProperty("index", out var indexElement))
                         {
-                           // reset current block tracking
-                            if (rawMessageStreamEvent.Json.TryGetProperty("index", out var indexElement))
-                            {
-                                currentBlockIndex = indexElement.GetInt32();
-                            }
+                            currentBlockIndex = indexElement.GetInt32();
+                        }
 
-                            if (rawMessageStreamEvent.Json.TryGetProperty("content_block", out var contentBlock))
+                        if (rawMessageStreamEvent.Json.TryGetProperty("content_block", out var contentBlock))
+                        {
+                            var blockType = contentBlock.TryGetProperty("type", out var blockTypeElement)
+                                ? blockTypeElement.GetString() ?? ""
+                                : "";
+                            currentBlockType = blockType;
+
+                            // handle start of thinking block
+                            if (blockType == "thinking")
                             {
-                                var blockType = contentBlock.TryGetProperty("type", out var blockTypeElement)
-                                    ? blockTypeElement.GetString() ?? ""
+                                yield return new SSEEvent
+                                {
+                                    Type = SSEEventType.Thinking,
+                                    Data = new { type = "start", index = currentBlockIndex }
+                                };
+                            }
+                            // handle start of tool_use block
+                            else if (blockType == "tool_use")
+                            {
+                                currentToolId = contentBlock.TryGetProperty("id", out var idElement)
+                                    ? idElement.GetString() ?? ""
                                     : "";
-                                currentBlockType = blockType;
+                                currentToolName = contentBlock.TryGetProperty("name", out var nameElement)
+                                    ? nameElement.GetString() ?? ""
+                                    : "";
+                                toolInputJson.Clear();
 
-                               // handle start of thinking block
-                                if (blockType == "thinking")
-                                {
-                                    yield return new SSEEvent
-                                    {
-                                        Type = SSEEventType.Thinking,
-                                        Data = new { type = "start", index = currentBlockIndex }
-                                    };
-                                }
-                                // handle start of tool_use block
-                                else if (blockType == "tool_use")
-                                {
-                                    currentToolId = contentBlock.TryGetProperty("id", out var idElement)
-                                        ? idElement.GetString() ?? ""
-                                        : "";
-                                    currentToolName = contentBlock.TryGetProperty("name", out var nameElement)
-                                        ? nameElement.GetString() ?? ""
-                                        : "";
-                                    toolInputJson.Clear();
-
-                                    // send initial tool call event with empty arguments
-                                    yield return new SSEEvent
-                                    {
-                                        Type = SSEEventType.ToolCall,
-                                        Data = new ToolCallDto
-                                        {
-                                            Id = currentToolId,
-                                            Name = currentToolName,
-                                            Arguments = null
-                                        }
-                                    };
-                                }
-                            }
-                        }
-                        // handle content block delta events to capture thinking text and tool input updates
-                        else if (eventType == "content_block_delta")
-                        {
-                            if (rawMessageStreamEvent.Json.TryGetProperty("delta", out var delta))
-                            {
-                                var deltaType = delta.TryGetProperty("type", out var deltaTypeElement)
-                                    ? deltaTypeElement.GetString()
-                                    : null;
-
-                                 // handle thinking delta updates
-                                if (deltaType == "thinking_delta")
-                                {
-                                    var thinkingText = delta.TryGetProperty("thinking", out var thinkingElement)
-                                        ? thinkingElement.GetString() ?? ""
-                                        : "";
-
-                                    if (!string.IsNullOrEmpty(thinkingText))
-                                    {
-                                        yield return new SSEEvent
-                                        {
-                                            Type = SSEEventType.Thinking,
-                                            Data = new { type = "delta", content = thinkingText, index = currentBlockIndex }
-                                        };
-                                    }
-                                }
-                                // handle tool input delta updates
-                                else if (deltaType == "input_json_delta")
-                                {
-                                    var partialJson = delta.TryGetProperty("partial_json", out var jsonElement)
-                                        ? jsonElement.GetString() ?? ""
-                                        : "";
-
-                                    // append partial JSON updates for the current tool call
-                                    toolInputJson.Append(partialJson);
-                                }
-                            }
-                        }
-                        
-                       
-                        else if (eventType == "content_block_stop")
-                        {
-                            // handle end of thinking block
-                            if (currentBlockType == "tool_use" && !string.IsNullOrEmpty(currentToolId))
-                            {
-                                Dictionary<string, object>? arguments = null;
-                                var jsonStr = toolInputJson.ToString();
-                                if (!string.IsNullOrEmpty(jsonStr))
-                                {
-                                    try
-                                    {
-                                        arguments = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonStr);
-                                    }
-                                    catch
-                                    {
-                                        // failed to parse arguments, keep as null
-                                    }
-                                }
-
-                                // send final tool call event with complete arguments when tool_use block ends
+                                // send initial tool call event with empty arguments
                                 yield return new SSEEvent
                                 {
                                     Type = SSEEventType.ToolCall,
@@ -682,38 +705,103 @@ public class ChatAssistantService : IChatAssistantService
                                     {
                                         Id = currentToolId,
                                         Name = currentToolName,
-                                        Arguments = arguments
+                                        Arguments = null
                                     }
                                 };
+                            }
+                        }
+                    }
+                    // handle content block delta events to capture thinking text and tool input updates
+                    else if (eventType == "content_block_delta")
+                    {
+                        if (rawMessageStreamEvent.Json.TryGetProperty("delta", out var delta))
+                        {
+                            var deltaType = delta.TryGetProperty("type", out var deltaTypeElement)
+                                ? deltaTypeElement.GetString()
+                                : null;
 
-                                // reset tool call tracking
-                                currentToolId = "";
-                                currentToolName = "";
-                                toolInputJson.Clear();
+                            // handle thinking delta updates
+                            if (deltaType == "thinking_delta")
+                            {
+                                var thinkingText = delta.TryGetProperty("thinking", out var thinkingElement)
+                                    ? thinkingElement.GetString() ?? ""
+                                    : "";
+
+                                if (!string.IsNullOrEmpty(thinkingText))
+                                {
+                                    yield return new SSEEvent
+                                    {
+                                        Type = SSEEventType.Thinking,
+                                        Data = new { type = "delta", content = thinkingText, index = currentBlockIndex }
+                                    };
+                                }
+                            }
+                            // handle tool input delta updates
+                            else if (deltaType == "input_json_delta")
+                            {
+                                var partialJson = delta.TryGetProperty("partial_json", out var jsonElement)
+                                    ? jsonElement.GetString() ?? ""
+                                    : "";
+
+                                // append partial JSON updates for the current tool call
+                                toolInputJson.Append(partialJson);
+                            }
+                        }
+                    }
+                    else if (eventType == "content_block_stop")
+                    {
+                        // handle end of thinking block
+                        if (currentBlockType == "tool_use" && !string.IsNullOrEmpty(currentToolId))
+                        {
+                            Dictionary<string, object>? arguments = null;
+                            var jsonStr = toolInputJson.ToString();
+                            if (!string.IsNullOrEmpty(jsonStr))
+                            {
+                                try
+                                {
+                                    arguments = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonStr);
+                                }
+                                catch
+                                {
+                                    // failed to parse arguments, keep as null
+                                }
                             }
 
-                            currentBlockType = "";
+                            // send final tool call event with complete arguments when tool_use block ends
+                            yield return new SSEEvent
+                            {
+                                Type = SSEEventType.ToolCall,
+                                Data = new ToolCallDto
+                                {
+                                    Id = currentToolId,
+                                    Name = currentToolName,
+                                    Arguments = arguments
+                                }
+                            };
+
+                            // reset tool call tracking
+                            currentToolId = "";
+                            currentToolName = "";
+                            toolInputJson.Clear();
                         }
+
+                        currentBlockType = "";
                     }
                 }
             }
-            else
-            {
-                // try to extract token usage from other response formats
-                var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
-                if (usage != null)
-                {
-                    inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
-                    outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
-                }
-            }
         }
+
+        var usageSnapshot = usageAccumulator.Snapshot;
+        var inputTokens = usageSnapshot.InputTokens;
+        var outputTokens = usageSnapshot.OutputTokens;
+        var cachedInputTokens = usageSnapshot.CachedInputTokens;
 
         // send final done event with token usage
         await RecordTokenUsageAsync(
             inputTokens,
             outputTokens,
-            modelConfig.ModelId,
+            cachedInputTokens,
+            resolvedModel,
             request.Context,
             cancellationToken);
 
@@ -721,14 +809,15 @@ public class ChatAssistantService : IChatAssistantService
         yield return new SSEEvent
         {
             Type = SSEEventType.Done,
-            Data = new { inputTokens, outputTokens }
+            Data = new { inputTokens, outputTokens, cachedInputTokens }
         };
     }
 
     private async Task RecordTokenUsageAsync(
         int inputTokens,
         int outputTokens,
-        string modelName,
+        int cachedInputTokens,
+        ResolvedAiModel model,
         DocContextDto context,
         CancellationToken cancellationToken)
     {
@@ -747,10 +836,15 @@ public class ChatAssistantService : IChatAssistantService
                 RepositoryId = repositoryId,
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
-                ModelName = modelName,
+                CachedInputTokens = cachedInputTokens,
+                ModelId = model.ModelId,
+                ModelName = model.ModelName,
                 Operation = "ChatAssistant",
                 RecordedAt = DateTime.UtcNow
             };
+            AiUsageAccounting.ApplyModelAccounting(
+                usage,
+                AiUsageAccounting.FromResolvedModel(model));
 
             dbContext.TokenUsages.Add(usage);
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -794,9 +888,45 @@ public class ChatAssistantService : IChatAssistantService
             modelId = config.DefaultModelId ?? string.Empty;
         }
 
-        if (!config.EnabledModelIds.Contains(modelId))
+        if (!config.EnabledModelIds.Contains(modelId, StringComparer.OrdinalIgnoreCase))
         {
             return null;
+        }
+
+        if (AiModelSelectionIds.TryParse(modelId, out var providerId, out var directModelId))
+        {
+            var provider = await _context.AiProviderConfigs
+                .FirstOrDefaultAsync(p => p.Id == providerId && p.IsActive && !p.IsDeleted, cancellationToken);
+            if (provider == null)
+            {
+                return null;
+            }
+
+            var aiModel = await _context.AiModelConfigs
+                .FirstOrDefaultAsync(m =>
+                    m.ProviderId == providerId &&
+                    m.ModelId == directModelId &&
+                    m.IsActive &&
+                    !m.IsDeleted,
+                    cancellationToken);
+            if (aiModel == null)
+            {
+                return null;
+            }
+
+            return new ModelConfig
+            {
+                Id = modelId,
+                Name = aiModel.DisplayName ?? aiModel.Name,
+                Provider = AiProviderResolver.ResolveEffectiveProviderType(
+                    provider.ProviderType,
+                    aiModel.ProviderType),
+                AiProviderId = provider.Id,
+                ModelId = aiModel.ModelId,
+                IsDefault = string.Equals(modelId, config.DefaultModelId, StringComparison.OrdinalIgnoreCase) || aiModel.IsDefault,
+                IsActive = true,
+                Description = aiModel.Description
+            };
         }
 
         return await _context.ModelConfigs

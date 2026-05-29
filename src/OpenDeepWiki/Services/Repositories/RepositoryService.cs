@@ -76,6 +76,7 @@ public class RepositoryService(
             request.BranchName,
             request.LanguageCode,
             effectiveIsPublic,
+            request.GenerateSkill,
             request.AuthAccount,
             request.AuthPassword,
             starCount,
@@ -118,6 +119,7 @@ public class RepositoryService(
             branchName,
             request.LanguageCode,
             request.IsPublic,
+            request.GenerateSkill,
             null,
             null,
             0,
@@ -145,6 +147,7 @@ public class RepositoryService(
             NormalizeBranchName(request.BranchName),
             request.LanguageCode,
             request.IsPublic,
+            request.GenerateSkill,
             null,
             null,
             0,
@@ -264,6 +267,7 @@ public class RepositoryService(
                 SourceLocation = r.SourceLocation,
                 Status = r.Status,
                 IsPublic = r.IsPublic,
+                GenerateSkill = r.GenerateSkill,
                 HasPassword = !string.IsNullOrWhiteSpace(r.AuthPassword),
                 CreatedAt = r.CreatedAt,
                 UpdatedAt = r.UpdatedAt,
@@ -464,40 +468,39 @@ public class RepositoryService(
             };
         }
 
-        // 获取该仓库的所有分支语言ID
-        var branchLanguageIds = await context.RepositoryBranches
-            .Where(b => b.RepositoryId == repository.Id)
-            .Join(context.BranchLanguages, b => b.Id, l => l.RepositoryBranchId, (b, l) => l.Id)
-            .ToListAsync();
-
-        // 清空之前生成的文档目录
-        var oldCatalogs = await context.DocCatalogs
-            .Where(c => branchLanguageIds.Contains(c.BranchLanguageId))
-            .ToListAsync();
-
-        // 收集关联的文档文件ID
-        var docFileIds = oldCatalogs
-            .Where(c => c.DocFileId != null)
-            .Select(c => c.DocFileId!)
-            .Distinct()
-            .ToList();
-
-        // 清空文档目录
-        if (oldCatalogs.Count > 0)
+        if (repository.Status == RepositoryStatus.Completed)
         {
-            context.DocCatalogs.RemoveRange(oldCatalogs);
-        }
-
-        // 清空文档文件
-        if (docFileIds.Count > 0)
-        {
-            var oldDocFiles = await context.DocFiles
-                .Where(f => docFileIds.Contains(f.Id))
+            // Full regeneration for completed repositories starts from a clean document set.
+            var branchLanguageIds = await context.RepositoryBranches
+                .Where(b => b.RepositoryId == repository.Id)
+                .Join(context.BranchLanguages, b => b.Id, l => l.RepositoryBranchId, (b, l) => l.Id)
                 .ToListAsync();
-            
-            if (oldDocFiles.Count > 0)
+
+            var oldCatalogs = await context.DocCatalogs
+                .Where(c => branchLanguageIds.Contains(c.BranchLanguageId))
+                .ToListAsync();
+
+            var docFileIds = oldCatalogs
+                .Where(c => c.DocFileId != null)
+                .Select(c => c.DocFileId!)
+                .Distinct()
+                .ToList();
+
+            if (oldCatalogs.Count > 0)
             {
-                context.DocFiles.RemoveRange(oldDocFiles);
+                context.DocCatalogs.RemoveRange(oldCatalogs);
+            }
+
+            if (docFileIds.Count > 0)
+            {
+                var oldDocFiles = await context.DocFiles
+                    .Where(f => docFileIds.Contains(f.Id))
+                    .ToListAsync();
+
+                if (oldDocFiles.Count > 0)
+                {
+                    context.DocFiles.RemoveRange(oldDocFiles);
+                }
             }
         }
 
@@ -570,6 +573,7 @@ public class RepositoryService(
         string branchName,
         string languageCode,
         bool isPublic,
+        bool generateSkill,
         string? authAccount,
         string? authPassword,
         int starCount,
@@ -608,6 +612,7 @@ public class RepositoryService(
             AuthAccount = authAccount,
             AuthPassword = authPassword,
             IsPublic = isPublic,
+            GenerateSkill = generateSkill,
             Status = RepositoryStatus.Pending,
             StarCount = starCount,
             ForkCount = forkCount

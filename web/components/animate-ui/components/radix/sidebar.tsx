@@ -30,6 +30,7 @@ import {
   HighlightItem,
 } from '@/components/animate-ui/primitives/effects/highlight';
 import { getStrictContext } from '@/lib/get-strict-context';
+import { useTranslations } from '@/hooks/use-translations';
 
 const SIDEBAR_COOKIE_NAME = 'sidebar_state';
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
@@ -172,6 +173,7 @@ function Sidebar({
   ...props
 }: SidebarProps) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const t = useTranslations();
 
   if (collapsible === 'none') {
     return (
@@ -211,10 +213,10 @@ function Sidebar({
             } as React.CSSProperties
           }
           side={side}
-        >
+          >
           <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+            <SheetTitle>{t('common.sidebar.title')}</SheetTitle>
+            <SheetDescription>{t('common.sidebar.mobileDescription')}</SheetDescription>
           </SheetHeader>
           <Highlight
             enabled={animateOnHover}

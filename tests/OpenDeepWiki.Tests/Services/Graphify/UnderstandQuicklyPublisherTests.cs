@@ -120,12 +120,17 @@ public class UnderstandQuicklyPublisherTests
             await File.WriteAllTextAsync(graph, "{\"nodes\":[],\"links\":[]}");
 
             HttpRequestMessage? captured = null;
+            string? capturedBody = null;
             var handler = new Mock<HttpMessageHandler>();
             handler.Protected()
                 .Setup<Task<HttpResponseMessage>>("SendAsync",
                     ItExpr.IsAny<HttpRequestMessage>(), ItExpr.IsAny<CancellationToken>())
-                .Callback<HttpRequestMessage, CancellationToken>((req, _) => captured = req)
-                .ReturnsAsync(new HttpResponseMessage(HttpStatusCode.NoContent));
+                .Returns<HttpRequestMessage, CancellationToken>(async (req, ct) =>
+                {
+                    captured = req;
+                    capturedBody = await req.Content!.ReadAsStringAsync(ct);
+                    return new HttpResponseMessage(HttpStatusCode.NoContent);
+                });
 
             var options = Options.Create(new UnderstandQuicklyOptions
             {
@@ -144,8 +149,8 @@ public class UnderstandQuicklyPublisherTests
             Assert.Equal("https://api.github.com/repos/looptech-ai/understand-quickly/dispatches",
                 captured!.RequestUri!.ToString());
             Assert.Equal("Bearer", captured.Headers.Authorization!.Scheme);
-            var body = await captured.Content!.ReadAsStringAsync();
-            var payload = JsonDocument.Parse(body).RootElement;
+            Assert.NotNull(capturedBody);
+            var payload = JsonDocument.Parse(capturedBody!).RootElement;
             Assert.Equal("uq-publish", payload.GetProperty("event_type").GetString());
             var clientPayload = payload.GetProperty("client_payload");
             Assert.Equal("looptech-ai/demo", clientPayload.GetProperty("repo").GetString());

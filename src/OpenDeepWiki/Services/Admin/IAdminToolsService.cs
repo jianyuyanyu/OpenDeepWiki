@@ -23,6 +23,21 @@ public interface IAdminToolsService
     Task RefreshSkillsFromDiskAsync();
 
     // 模型配置
+    Task<List<AiProviderConfigDto>> GetAiProvidersAsync();
+    Task<AiProviderConfigDto> CreateAiProviderAsync(AiProviderConfigRequest request);
+    Task<bool> UpdateAiProviderAsync(string id, AiProviderConfigRequest request);
+    Task<bool> DeleteAiProviderAsync(string id);
+
+    Task<List<AiModelConfigDto>> GetAiModelsAsync(string? providerId = null);
+    Task<AiModelConfigDto> CreateAiModelAsync(AiModelConfigRequest request);
+    Task<bool> UpdateAiModelAsync(string id, AiModelConfigRequest request);
+    Task<bool> DeleteAiModelAsync(string id);
+    Task<List<AiModelConfigDto>> DiscoverAiModelsAsync(string providerId, CancellationToken cancellationToken = default);
+    Task<AiProviderConnectivityTestResult> TestAiProviderConnectivityAsync(
+        string providerId,
+        AiProviderConnectivityTestRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<List<ModelConfigDto>> GetModelConfigsAsync();
     Task<ModelConfigDto> CreateModelConfigAsync(ModelConfigRequest request);
     Task<bool> UpdateModelConfigAsync(string id, ModelConfigRequest request);

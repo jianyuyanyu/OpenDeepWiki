@@ -91,9 +91,9 @@ export default function SettingsPage() {
     setIsSaving(true);
     try {
       await updateUserSettings(settings);
-      toast.success(t("settings.saveSuccess") || "设置已保存");
+      toast.success(t("settings.saveSuccess"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("settings.saveFailed") || "保存失败");
+      toast.error(err instanceof Error ? err.message : t("settings.saveFailed"));
     } finally {
       setIsSaving(false);
     }
@@ -115,7 +115,7 @@ export default function SettingsPage() {
       const data = await getUserApiKeys();
       setApiKeys(data);
     } catch {
-      toast.error(t("settings.apiKeys.fetchFailed") || "Failed to load API keys");
+      toast.error(t("settings.apiKeys.fetchFailed"));
     } finally {
       setApiKeysLoading(false);
     }
@@ -123,7 +123,7 @@ export default function SettingsPage() {
 
   const handleCreateKey = async () => {
     if (!newKeyName.trim()) {
-      toast.error(t("settings.apiKeys.nameRequired") || "Please enter a name");
+      toast.error(t("settings.apiKeys.nameRequired"));
       return;
     }
     setIsCreatingKey(true);
@@ -141,7 +141,7 @@ export default function SettingsPage() {
       setNewKeyExpiry("");
       await loadApiKeys();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("settings.apiKeys.createFailed") || "Failed to create API key");
+      toast.error(err instanceof Error ? err.message : t("settings.apiKeys.createFailed"));
     } finally {
       setIsCreatingKey(false);
     }
@@ -152,11 +152,11 @@ export default function SettingsPage() {
     setIsRevoking(true);
     try {
       await revokeUserApiKey(revokeTarget.id);
-      toast.success(t("settings.apiKeys.revoked") || "API key revoked");
+      toast.success(t("settings.apiKeys.revoked"));
       setRevokeTarget(null);
       await loadApiKeys();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("settings.apiKeys.revokeFailed") || "Failed to revoke API key");
+      toast.error(err instanceof Error ? err.message : t("settings.apiKeys.revokeFailed"));
     } finally {
       setIsRevoking(false);
     }
@@ -165,12 +165,12 @@ export default function SettingsPage() {
   const handleCopyKey = async (key: string) => {
     await navigator.clipboard.writeText(key);
     setKeyCopied(true);
-    toast.success(t("settings.apiKeys.copied") || "Copied to clipboard");
+    toast.success(t("settings.apiKeys.copied"));
     setTimeout(() => setKeyCopied(false), 2000);
   };
 
   const formatDate = (dateStr?: string) => {
-    if (!dateStr) return t("settings.apiKeys.never") || "Never";
+    if (!dateStr) return t("settings.apiKeys.never");
     return new Date(dateStr).toLocaleDateString();
   };
 
@@ -195,7 +195,7 @@ export default function SettingsPage() {
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            {t("common.backToHome") || "返回首页"}
+            {t("common.backToHome")}
           </Link>
         </div>
 
@@ -205,18 +205,18 @@ export default function SettingsPage() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Palette className="h-5 w-5" />
-                <CardTitle>{t("settings.appearance") || "外观设置"}</CardTitle>
+                <CardTitle>{t("settings.appearance")}</CardTitle>
               </div>
               <CardDescription>
-                {t("settings.appearanceDescription") || "自定义应用的外观和显示"}
+                {t("settings.appearanceDescription")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>{t("settings.theme") || "主题"}</Label>
+                  <Label>{t("settings.theme")}</Label>
                   <p className="text-sm text-muted-foreground">
-                    {t("settings.themeDescription") || "选择应用的颜色主题"}
+                    {t("settings.themeDescription")}
                   </p>
                 </div>
                 <Select value={theme || settings.theme} onValueChange={handleThemeChange}>
@@ -224,18 +224,18 @@ export default function SettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="light">{t("settings.themeLight") || "浅色"}</SelectItem>
-                    <SelectItem value="dark">{t("settings.themeDark") || "深色"}</SelectItem>
-                    <SelectItem value="system">{t("settings.themeSystem") || "跟随系统"}</SelectItem>
+                    <SelectItem value="light">{t("settings.themeLight")}</SelectItem>
+                    <SelectItem value="dark">{t("settings.themeDark")}</SelectItem>
+                    <SelectItem value="system">{t("settings.themeSystem")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>{t("settings.language") || "语言"}</Label>
+                  <Label>{t("settings.language")}</Label>
                   <p className="text-sm text-muted-foreground">
-                    {t("settings.languageDescription") || "选择界面显示语言"}
+                    {t("settings.languageDescription")}
                   </p>
                 </div>
                 <Select value={settings.language} onValueChange={handleLanguageChange}>
@@ -243,10 +243,10 @@ export default function SettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="zh">中文</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="ja">日本語</SelectItem>
-                    <SelectItem value="ko">한국어</SelectItem>
+                    <SelectItem value="zh">{t("common.languageNames.zh")}</SelectItem>
+                    <SelectItem value="en">{t("common.languageNames.en")}</SelectItem>
+                    <SelectItem value="ja">{t("common.languageNames.ja")}</SelectItem>
+                    <SelectItem value="ko">{t("common.languageNames.ko")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -258,18 +258,18 @@ export default function SettingsPage() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Bell className="h-5 w-5" />
-                <CardTitle>{t("settings.notifications") || "通知设置"}</CardTitle>
+                <CardTitle>{t("settings.notifications")}</CardTitle>
               </div>
               <CardDescription>
-                {t("settings.notificationsDescription") || "管理你的通知偏好"}
+                {t("settings.notificationsDescription")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>{t("settings.emailNotifications") || "邮件通知"}</Label>
+                  <Label>{t("settings.emailNotifications")}</Label>
                   <p className="text-sm text-muted-foreground">
-                    {t("settings.emailNotificationsDescription") || "接收重要更新的邮件通知"}
+                    {t("settings.emailNotificationsDescription")}
                   </p>
                 </div>
                 <Switch
@@ -282,9 +282,9 @@ export default function SettingsPage() {
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>{t("settings.pushNotifications") || "推送通知"}</Label>
+                  <Label>{t("settings.pushNotifications")}</Label>
                   <p className="text-sm text-muted-foreground">
-                    {t("settings.pushNotificationsDescription") || "接收浏览器推送通知"}
+                    {t("settings.pushNotificationsDescription")}
                   </p>
                 </div>
                 <Switch
@@ -303,15 +303,15 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Key className="h-5 w-5" />
-                  <CardTitle>{t("settings.apiKeys.title") || "API Keys"}</CardTitle>
+                  <CardTitle>{t("settings.apiKeys.title")}</CardTitle>
                 </div>
                 <Button size="sm" onClick={() => setShowCreateDialog(true)}>
                   <Plus className="h-4 w-4 mr-1" />
-                  {t("settings.apiKeys.createKey") || "Create API Key"}
+                  {t("settings.apiKeys.createKey")}
                 </Button>
               </div>
               <CardDescription>
-                {t("settings.apiKeys.description") || "Create API keys for programmatic access to the MCP endpoint"}
+                {t("settings.apiKeys.description")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -322,7 +322,7 @@ export default function SettingsPage() {
               ) : apiKeys.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                   <Key className="h-10 w-10 mb-2 opacity-50" />
-                  <p className="text-sm">{t("settings.apiKeys.noKeys") || "No API keys yet"}</p>
+                  <p className="text-sm">{t("settings.apiKeys.noKeys")}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -341,13 +341,13 @@ export default function SettingsPage() {
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                           <span className="font-mono">{apiKey.keyPrefix}...</span>
                           <span>
-                            {t("settings.apiKeys.created") || "Created"}: {formatDate(apiKey.createdAt)}
+                            {t("settings.apiKeys.created")}: {formatDate(apiKey.createdAt)}
                           </span>
                           <span>
-                            {t("settings.apiKeys.expires") || "Expires"}: {apiKey.expiresAt ? formatDate(apiKey.expiresAt) : (t("settings.apiKeys.never") || "Never")}
+                            {t("settings.apiKeys.expires")}: {apiKey.expiresAt ? formatDate(apiKey.expiresAt) : (t("settings.apiKeys.never"))}
                           </span>
                           <span>
-                            {t("settings.apiKeys.lastUsed") || "Last Used"}: {apiKey.lastUsedAt ? formatDate(apiKey.lastUsedAt) : (t("settings.apiKeys.neverUsed") || "Never")}
+                            {t("settings.apiKeys.lastUsed")}: {apiKey.lastUsedAt ? formatDate(apiKey.lastUsedAt) : (t("settings.apiKeys.neverUsed"))}
                           </span>
                         </div>
                       </div>
@@ -370,41 +370,41 @@ export default function SettingsPage() {
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{t("settings.apiKeys.createKey") || "Create API Key"}</DialogTitle>
+                <DialogTitle>{t("settings.apiKeys.createKey")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="space-y-2">
-                  <Label>{t("settings.apiKeys.name") || "Name"}</Label>
+                  <Label>{t("settings.apiKeys.name")}</Label>
                   <Input
                     value={newKeyName}
                     onChange={(e) => setNewKeyName(e.target.value)}
-                    placeholder={t("settings.apiKeys.namePlaceholder") || "e.g., My CI/CD pipeline"}
+                    placeholder={t("settings.apiKeys.namePlaceholder")}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("settings.apiKeys.scope") || "Scope"}</Label>
+                  <Label>{t("settings.apiKeys.scope")}</Label>
                   <div>
                     <Badge variant="secondary">mcp:read</Badge>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("settings.apiKeys.expiresInDays") || "Expires in (days)"}</Label>
+                  <Label>{t("settings.apiKeys.expiresInDays")}</Label>
                   <Input
                     type="number"
                     min="1"
                     value={newKeyExpiry}
                     onChange={(e) => setNewKeyExpiry(e.target.value)}
-                    placeholder={t("settings.apiKeys.expiresPlaceholder") || "Leave empty for no expiry"}
+                    placeholder={t("settings.apiKeys.expiresPlaceholder")}
                   />
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                  {t("common.cancel") || "Cancel"}
+                  {t("common.cancel")}
                 </Button>
                 <Button onClick={handleCreateKey} disabled={isCreatingKey}>
                   {isCreatingKey && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {t("settings.apiKeys.createKey") || "Create API Key"}
+                  {t("settings.apiKeys.createKey")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -420,17 +420,17 @@ export default function SettingsPage() {
           }}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{t("settings.apiKeys.keyCreated") || "API Key Created"}</DialogTitle>
+                <DialogTitle>{t("settings.apiKeys.keyCreated")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-2">
                 <div className="flex items-start gap-2 rounded-md bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 p-3">
                   <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    {t("settings.apiKeys.keyWarning") || "Copy this key now. You will not be able to see it again."}
+                    {t("settings.apiKeys.keyWarning")}
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label>{t("settings.apiKeys.yourKey") || "Your API Key"}</Label>
+                  <Label>{t("settings.apiKeys.yourKey")}</Label>
                   <div className="flex gap-2">
                     <Input
                       readOnly
@@ -453,7 +453,7 @@ export default function SettingsPage() {
                   setCreatedKey(null);
                   setKeyCopied(false);
                 }}>
-                  {t("settings.apiKeys.done") || "Done"}
+                  {t("settings.apiKeys.done")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -463,20 +463,20 @@ export default function SettingsPage() {
           <AlertDialog open={!!revokeTarget} onOpenChange={(open) => !open && setRevokeTarget(null)}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>{t("settings.apiKeys.revokeTitle") || "Revoke API Key"}</AlertDialogTitle>
+                <AlertDialogTitle>{t("settings.apiKeys.revokeTitle")}</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {t("settings.apiKeys.revokeWarning") || "This will immediately revoke this API key. Any services using it will lose access."}
+                  {t("settings.apiKeys.revokeWarning")}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>{t("common.cancel") || "Cancel"}</AlertDialogCancel>
+                <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={handleRevokeKey}
                   disabled={isRevoking}
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 >
                   {isRevoking && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {t("settings.apiKeys.revoke") || "Revoke"}
+                  {t("settings.apiKeys.revoke")}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -487,13 +487,13 @@ export default function SettingsPage() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Globe className="h-5 w-5" />
-                <CardTitle>{t("settings.about") || "关于"}</CardTitle>
+                <CardTitle>{t("settings.about")}</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <p>{systemVersion?.productName || "OpenDeepWiki"} v{systemVersion?.version || "1.0.0"}</p>
-                <p>{t("settings.aboutDescription") || "AI 驱动的代码知识库平台"}</p>
+                <p>{t("settings.aboutDescription")}</p>
               </div>
             </CardContent>
           </Card>
@@ -504,10 +504,10 @@ export default function SettingsPage() {
               {isSaving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t("common.loading") || "保存中..."}
+                  {t("common.loading")}
                 </>
               ) : (
-                t("common.save") || "保存设置"
+                t("common.save")
               )}
             </Button>
           </div>

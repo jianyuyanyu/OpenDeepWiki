@@ -70,6 +70,7 @@ export interface RepositorySubmitRequest {
   branchName: string;
   languageCode: string;
   isPublic: boolean;
+  generateSkill: boolean;
 }
 
 export interface ArchiveRepositorySubmitRequest {
@@ -78,6 +79,7 @@ export interface ArchiveRepositorySubmitRequest {
   branchName: string;
   languageCode: string;
   isPublic: boolean;
+  generateSkill: boolean;
   archive: File;
 }
 
@@ -88,6 +90,7 @@ export interface LocalDirectoryRepositorySubmitRequest {
   branchName: string;
   languageCode: string;
   isPublic: boolean;
+  generateSkill: boolean;
 }
 
 export interface RepositoryItemResponse {
@@ -101,6 +104,7 @@ export interface RepositoryItemResponse {
   status: number;
   statusName: RepositoryStatus;
   isPublic: boolean;
+  generateSkill: boolean;
   hasPassword: boolean;  // 新增：是否设置了密码，用于判断是否可设为私有
   createdAt: string;
   updatedAt?: string;

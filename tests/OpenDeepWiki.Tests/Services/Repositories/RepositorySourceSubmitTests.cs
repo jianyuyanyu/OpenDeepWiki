@@ -82,6 +82,7 @@ public class RepositorySourceSubmitTests
         Assert.Equal("main", branch.BranchName);
         Assert.Equal("zh", language.LanguageCode);
         Assert.Equal(RepositoryStatus.Pending, repository.Status);
+        Assert.True(repository.GenerateSkill);
     }
 
     [Fact]
@@ -117,6 +118,7 @@ public class RepositorySourceSubmitTests
 
         var branch = await context.RepositoryBranches.SingleAsync(b => b.RepositoryId == repository.Id);
         Assert.Equal("main", branch.BranchName);
+        Assert.True(repository.GenerateSkill);
     }
 
     [Fact]
@@ -156,10 +158,104 @@ public class RepositorySourceSubmitTests
         Assert.Equal("https://github.com/AIDotNet/OpenDeepWiki.git", repository.GitUrl);
         Assert.Equal(10, repository.StarCount);
         Assert.Equal(2, repository.ForkCount);
+        Assert.True(repository.GenerateSkill);
     }
 
     [Fact]
-    public async Task DeleteRepositoryAsync_ShouldHardDeleteRepositoryAndClearOptionalReferences()
+    public async Task SubmitAsync_WhenGenerateSkillIsFalse_ShouldPersistFalse()
+    {
+        using var context = CreateContext();
+        var gitPlatformService = new Mock<IGitPlatformService>();
+        gitPlatformService
+            .Setup(s => s.GetRepoStatsAsync("https://github.com/AIDotNet/OpenDeepWiki.git"))
+            .ReturnsAsync(new GitRepoStats(10, 2));
+        gitPlatformService
+            .Setup(s => s.CheckRepoExistsAsync("AIDotNet", "OpenDeepWiki"))
+            .ReturnsAsync(new GitRepoInfo(true, "OpenDeepWiki", null, "main", 10, 2, "C#", null, false));
+
+        var service = CreateService(
+            context,
+            new RepositoryAnalyzerOptions
+            {
+                RepositoriesDirectory = CreateTempDirectory(),
+                AllowedLocalPathRoots = []
+            },
+            gitPlatformService: gitPlatformService.Object);
+
+        var repository = await service.SubmitAsync(new RepositorySubmitRequest
+        {
+            GitUrl = "https://github.com/AIDotNet/OpenDeepWiki.git",
+            OrgName = "AIDotNet",
+            RepoName = "OpenDeepWiki",
+            BranchName = "main",
+            LanguageCode = "zh",
+            IsPublic = true,
+            GenerateSkill = false
+        });
+
+        Assert.False(repository.GenerateSkill);
+    }
+
+    [Fact]
+    public async Task SubmitArchiveAsync_WhenGenerateSkillIsFalse_ShouldPersistFalse()
+    {
+        using var context = CreateContext();
+        var repositoriesRoot = CreateTempDirectory();
+        var service = CreateService(
+            context,
+            new RepositoryAnalyzerOptions
+            {
+                RepositoriesDirectory = repositoriesRoot,
+                AllowedLocalPathRoots = []
+            });
+
+        using var zipStream = CreateArchiveStream(("src/app.ts", "export const app = true;"));
+        IFormFile archive = new FormFile(zipStream, 0, zipStream.Length, "archive", "repo.zip");
+
+        var repository = await service.SubmitArchiveAsync(new ArchiveRepositorySubmitRequest
+        {
+            OrgName = "uploads",
+            RepoName = "repo-zip",
+            LanguageCode = "zh",
+            IsPublic = false,
+            GenerateSkill = false,
+            Archive = archive
+        });
+
+        Assert.False(repository.GenerateSkill);
+    }
+
+    [Fact]
+    public async Task SubmitLocalDirectoryAsync_WhenGenerateSkillIsFalse_ShouldPersistFalse()
+    {
+        using var context = CreateContext();
+        var allowedRoot = CreateTempDirectory();
+        var localRepositoryPath = Directory.CreateDirectory(Path.Combine(allowedRoot, "repo-local")).FullName;
+        File.WriteAllText(Path.Combine(localRepositoryPath, "README.md"), "# hello");
+
+        var service = CreateService(
+            context,
+            new RepositoryAnalyzerOptions
+            {
+                RepositoriesDirectory = CreateTempDirectory(),
+                AllowedLocalPathRoots = [allowedRoot]
+            });
+
+        var repository = await service.SubmitLocalDirectoryAsync(new LocalDirectoryRepositorySubmitRequest
+        {
+            OrgName = "local",
+            RepoName = "repo-local",
+            LocalPath = localRepositoryPath,
+            LanguageCode = "zh",
+            IsPublic = false,
+            GenerateSkill = false
+        });
+
+        Assert.False(repository.GenerateSkill);
+    }
+
+    [Fact]
+    public async Task DeleteRepositoryAsync_ShouldSoftDeleteRepositoryAndClearOptionalReferences()
     {
         using var context = CreateContext();
         var repository = new Repository
@@ -192,7 +288,9 @@ public class RepositorySourceSubmitTests
         var deleted = await adminService.DeleteRepositoryAsync(repository.Id);
 
         Assert.True(deleted);
-        Assert.False(await context.Repositories.AnyAsync(r => r.Id == repository.Id));
+        var deletedRepository = await context.Repositories.SingleAsync(r => r.Id == repository.Id);
+        Assert.True(deletedRepository.IsDeleted);
+        Assert.NotNull(deletedRepository.DeletedAt);
         Assert.Null((await context.TokenUsages.SingleAsync()).RepositoryId);
         Assert.Null((await context.UserActivities.SingleAsync()).RepositoryId);
     }
@@ -267,6 +365,46 @@ public class RepositorySourceSubmitTests
         Assert.Null((await context.TokenUsages.SingleAsync()).RepositoryId);
     }
 
+    [Fact]
+    public async Task RegenerateAsync_WhenRepositoryFailed_PreservesExistingDocumentsForResume()
+    {
+        using var context = CreateContext();
+        var (_, catalogId, docFileId) = await SeedRepositoryWithDocumentAsync(
+            context,
+            RepositoryStatus.Failed);
+        var service = CreateService(context, new RepositoryAnalyzerOptions());
+
+        var result = await service.RegenerateAsync(new RegenerateRequest
+        {
+            Owner = "AIDotNet",
+            Repo = "OpenCowork"
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal(RepositoryStatus.Pending, (await context.Repositories.SingleAsync()).Status);
+        Assert.True(await context.DocCatalogs.AnyAsync(c => c.Id == catalogId && c.DocFileId == docFileId));
+        Assert.True(await context.DocFiles.AnyAsync(f => f.Id == docFileId));
+    }
+
+    [Fact]
+    public async Task RegenerateAsync_WhenRepositoryCompleted_ClearsDocumentsForFreshRun()
+    {
+        using var context = CreateContext();
+        await SeedRepositoryWithDocumentAsync(context, RepositoryStatus.Completed);
+        var service = CreateService(context, new RepositoryAnalyzerOptions());
+
+        var result = await service.RegenerateAsync(new RegenerateRequest
+        {
+            Owner = "AIDotNet",
+            Repo = "OpenCowork"
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal(RepositoryStatus.Pending, (await context.Repositories.SingleAsync()).Status);
+        Assert.Empty(await context.DocCatalogs.ToListAsync());
+        Assert.Empty(await context.DocFiles.ToListAsync());
+    }
+
     private static RepositoryService CreateService(
         TestDbContext context,
         RepositoryAnalyzerOptions analyzerOptions,
@@ -280,6 +418,57 @@ public class RepositorySourceSubmitTests
             Mock.Of<IGitHubAppService>(),
             Mock.Of<IOrganizationService>(),
             Options.Create(analyzerOptions));
+    }
+
+    private static async Task<(string RepositoryId, string CatalogId, string DocFileId)> SeedRepositoryWithDocumentAsync(
+        TestDbContext context,
+        RepositoryStatus status)
+    {
+        var repositoryId = Guid.NewGuid().ToString();
+        var branchId = Guid.NewGuid().ToString();
+        var branchLanguageId = Guid.NewGuid().ToString();
+        var docFileId = Guid.NewGuid().ToString();
+        var catalogId = Guid.NewGuid().ToString();
+
+        context.Repositories.Add(new Repository
+        {
+            Id = repositoryId,
+            OwnerUserId = "user-1",
+            GitUrl = "https://github.com/AIDotNet/OpenCowork.git",
+            OrgName = "AIDotNet",
+            RepoName = "OpenCowork",
+            Status = status
+        });
+        context.RepositoryBranches.Add(new RepositoryBranch
+        {
+            Id = branchId,
+            RepositoryId = repositoryId,
+            BranchName = "main"
+        });
+        context.BranchLanguages.Add(new BranchLanguage
+        {
+            Id = branchLanguageId,
+            RepositoryBranchId = branchId,
+            LanguageCode = "zh",
+            IsDefault = true
+        });
+        context.DocFiles.Add(new DocFile
+        {
+            Id = docFileId,
+            BranchLanguageId = branchLanguageId,
+            Content = "# Existing"
+        });
+        context.DocCatalogs.Add(new DocCatalog
+        {
+            Id = catalogId,
+            BranchLanguageId = branchLanguageId,
+            Title = "Existing",
+            Path = "existing",
+            DocFileId = docFileId
+        });
+
+        await context.SaveChangesAsync();
+        return (repositoryId, catalogId, docFileId);
     }
 
     private static AdminRepositoryService CreateAdminService(TestDbContext context)

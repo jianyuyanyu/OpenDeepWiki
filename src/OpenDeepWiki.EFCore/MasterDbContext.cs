@@ -27,6 +27,8 @@ public interface IContext : IDisposable
     DbSet<SystemSetting> SystemSettings { get; set; }
     DbSet<McpConfig> McpConfigs { get; set; }
     DbSet<SkillConfig> SkillConfigs { get; set; }
+    DbSet<AiProviderConfig> AiProviderConfigs { get; set; }
+    DbSet<AiModelConfig> AiModelConfigs { get; set; }
     DbSet<ModelConfig> ModelConfigs { get; set; }
     DbSet<ChatSession> ChatSessions { get; set; }
     DbSet<ChatMessageHistory> ChatMessageHistories { get; set; }
@@ -80,6 +82,8 @@ public abstract class MasterDbContext : DbContext, IContext
     public DbSet<SystemSetting> SystemSettings { get; set; } = null!;
     public DbSet<McpConfig> McpConfigs { get; set; } = null!;
     public DbSet<SkillConfig> SkillConfigs { get; set; } = null!;
+    public DbSet<AiProviderConfig> AiProviderConfigs { get; set; } = null!;
+    public DbSet<AiModelConfig> AiModelConfigs { get; set; } = null!;
     public DbSet<ModelConfig> ModelConfigs { get; set; } = null!;
     public DbSet<ChatSession> ChatSessions { get; set; } = null!;
     public DbSet<ChatMessageHistory> ChatMessageHistories { get; set; } = null!;
@@ -114,6 +118,10 @@ public abstract class MasterDbContext : DbContext, IContext
         modelBuilder.Entity<Repository>()
             .HasIndex(repository => new { repository.OrgName, repository.RepoName })
             .IsUnique();
+
+        modelBuilder.Entity<Repository>()
+            .Property(repository => repository.GenerateSkill)
+            .HasAnnotation("Relational:DefaultValue", true);
 
         modelBuilder.Entity<RepositoryBranch>()
             .HasIndex(branch => new { branch.RepositoryId, branch.BranchName })
@@ -157,8 +165,15 @@ public abstract class MasterDbContext : DbContext, IContext
             .HasIndex(log => new { log.RepositoryId, log.CreatedAt });
 
         // TokenUsage 索引（按记录时间查询统计）
-        modelBuilder.Entity<TokenUsage>()
-            .HasIndex(t => t.RecordedAt);
+        modelBuilder.Entity<TokenUsage>(builder =>
+        {
+            builder.HasIndex(t => t.RecordedAt);
+            builder.Property(t => t.InputTokenPrice).HasPrecision(18, 8);
+            builder.Property(t => t.OutputTokenPrice).HasPrecision(18, 8);
+            builder.Property(t => t.InputCost).HasPrecision(18, 8);
+            builder.Property(t => t.OutputCost).HasPrecision(18, 8);
+            builder.Property(t => t.TotalCost).HasPrecision(18, 8);
+        });
 
         // SystemSetting 唯一键索引
         modelBuilder.Entity<SystemSetting>()
@@ -176,9 +191,27 @@ public abstract class MasterDbContext : DbContext, IContext
             .IsUnique();
 
         // ModelConfig 名称唯一索引
+        modelBuilder.Entity<AiProviderConfig>(builder =>
+        {
+            builder.HasIndex(p => p.Name).IsUnique();
+            builder.HasIndex(p => p.IsActive);
+        });
+
+        modelBuilder.Entity<AiModelConfig>(builder =>
+        {
+            builder.HasIndex(m => new { m.ProviderId, m.ModelId }).IsUnique();
+            builder.HasIndex(m => m.IsActive);
+            builder.Property(m => m.ProviderType).HasMaxLength(50);
+            builder.Property(m => m.InputTokenPrice).HasPrecision(18, 8);
+            builder.Property(m => m.OutputTokenPrice).HasPrecision(18, 8);
+        });
+
         modelBuilder.Entity<ModelConfig>()
             .HasIndex(m => m.Name)
             .IsUnique();
+
+        modelBuilder.Entity<ModelConfig>()
+            .HasIndex(m => new { m.AiProviderId, m.ModelId });
 
         // ChatSession 用户和平台组合唯一索引
         modelBuilder.Entity<ChatSession>()

@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Services.Auth;
 using OpenDeepWiki.Services.Chat;
 
@@ -30,6 +32,12 @@ public static class ChatAppEndpoints
             .WithSummary("创建新应用");
 
         // 获取应用详情
+        group.MapGet("/ai-providers", GetAiProvidersAsync)
+            .WithName("GetAppAiProviders");
+
+        group.MapGet("/ai-providers/{providerId}/models", GetAiModelsAsync)
+            .WithName("GetAppAiModels");
+
         group.MapGet("/{id:guid}", GetAppByIdAsync)
             .WithName("GetAppById")
             .WithSummary("获取应用详情");
@@ -106,6 +114,48 @@ public static class ChatAppEndpoints
     /// <summary>
     /// 获取应用详情
     /// </summary>
+    private static async Task<IResult> GetAiProvidersAsync(
+        [FromServices] IContext context,
+        CancellationToken cancellationToken)
+    {
+        var providers = await context.AiProviderConfigs
+            .Where(p => p.IsActive && !p.IsDeleted)
+            .OrderBy(p => p.SortOrder)
+            .ThenBy(p => p.Name)
+            .Select(p => new
+            {
+                p.Id,
+                Name = p.DisplayName ?? p.Name,
+                p.ProviderType,
+                p.DefaultModelId
+            })
+            .ToListAsync(cancellationToken);
+
+        return Results.Ok(providers);
+    }
+
+    private static async Task<IResult> GetAiModelsAsync(
+        string providerId,
+        [FromServices] IContext context,
+        CancellationToken cancellationToken)
+    {
+        var models = await context.AiModelConfigs
+            .Where(m => m.ProviderId == providerId && m.IsActive && !m.IsDeleted)
+            .OrderByDescending(m => m.IsDefault)
+            .ThenBy(m => m.SortOrder)
+            .ThenBy(m => m.Name)
+            .Select(m => new
+            {
+                m.Id,
+                m.ModelId,
+                Name = m.DisplayName ?? m.Name,
+                m.IsDefault
+            })
+            .ToListAsync(cancellationToken);
+
+        return Results.Ok(models);
+    }
+
     private static async Task<IResult> GetAppByIdAsync(
         Guid id,
         [FromServices] IChatAppService chatAppService,

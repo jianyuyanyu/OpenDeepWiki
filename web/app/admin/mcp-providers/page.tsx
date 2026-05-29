@@ -248,11 +248,17 @@ export default function AdminMcpProvidersPage() {
                       <span className="text-muted-foreground truncate">{provider.serverUrl}</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      <Badge variant="secondary">{provider.transportType}</Badge>
+                      <Badge variant="secondary">
+                        {provider.transportType === "streamable_http"
+                          ? t("admin.mcpProviders.transportStreamableHttp")
+                          : provider.transportType === "sse"
+                            ? t("admin.mcpProviders.transportSse")
+                            : provider.transportType}
+                      </Badge>
                       {provider.requiresApiKey && (
                         <Badge variant="outline" className="gap-1">
                           <Key className="h-3 w-3" />
-                          API Key
+                          {t("admin.mcpProviders.fieldRequiresApiKey")}
                         </Badge>
                       )}
                       {provider.modelConfigName && (
@@ -261,7 +267,7 @@ export default function AdminMcpProvidersPage() {
                           {provider.modelConfigName}
                         </Badge>
                       )}
-                      {!provider.isActive && <Badge variant="destructive">Disabled</Badge>}
+                      {!provider.isActive && <Badge variant="destructive">{t("admin.mcpProviders.disabled")}</Badge>}
                     </div>
                     {provider.apiKeyObtainUrl && (
                       <a
@@ -381,7 +387,7 @@ export default function AdminMcpProvidersPage() {
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder=" MCP"
+                  placeholder={t("admin.mcpProviders.fieldName")}
                 />
               </div>
               <div className="space-y-2">
@@ -391,7 +397,7 @@ export default function AdminMcpProvidersPage() {
                   readOnly
                 />
                 <p className="text-xs text-muted-foreground">
-                  固定路径模板，后端会按仓库解析 owner/repo。
+                  {t("admin.mcpProviders.serverUrlTemplateHint")}
                 </p>
               </div>
             </div>
@@ -416,8 +422,8 @@ export default function AdminMcpProvidersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="streamable_http">Streamable HTTP</SelectItem>
-                    <SelectItem value="sse">SSE</SelectItem>
+                    <SelectItem value="streamable_http">{t("admin.mcpProviders.transportStreamableHttp")}</SelectItem>
+                    <SelectItem value="sse">{t("admin.mcpProviders.transportSse")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

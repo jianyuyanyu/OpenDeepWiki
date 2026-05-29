@@ -57,6 +57,7 @@ public class RepositoryProcessingWorker(
         var repositoryAnalyzer = scope.ServiceProvider.GetService<IRepositoryAnalyzer>();
         var wikiGenerator = scope.ServiceProvider.GetService<IWikiGenerator>();
         var processingLogService = scope.ServiceProvider.GetService<IProcessingLogService>();
+        var skillMarkdownBuilder = scope.ServiceProvider.GetService<IRepositorySkillMarkdownBuilder>();
 
         if (context is null)
         {
@@ -126,6 +127,7 @@ public class RepositoryProcessingWorker(
                     context, 
                     repositoryAnalyzer, 
                     wikiGenerator,
+                    skillMarkdownBuilder,
                     processingLogService,
                     stoppingToken);
 
@@ -183,6 +185,7 @@ public class RepositoryProcessingWorker(
         IContext context,
         IRepositoryAnalyzer repositoryAnalyzer,
         IWikiGenerator wikiGenerator,
+        IRepositorySkillMarkdownBuilder? skillMarkdownBuilder,
         IProcessingLogService? processingLogService,
         CancellationToken stoppingToken)
     {
@@ -213,6 +216,7 @@ public class RepositoryProcessingWorker(
                 context,
                 repositoryAnalyzer,
                 wikiGenerator,
+                skillMarkdownBuilder,
                 processingLogService,
                 stoppingToken);
         }
@@ -227,6 +231,7 @@ public class RepositoryProcessingWorker(
         IContext context,
         IRepositoryAnalyzer repositoryAnalyzer,
         IWikiGenerator wikiGenerator,
+        IRepositorySkillMarkdownBuilder? skillMarkdownBuilder,
         IProcessingLogService? processingLogService,
         CancellationToken stoppingToken)
     {
@@ -331,9 +336,12 @@ public class RepositoryProcessingWorker(
                 stoppingToken.ThrowIfCancellationRequested();
 
                 await ProcessLanguageAsync(
+                    repository,
+                    branch,
                     workspace,
                     language,
                     wikiGenerator,
+                    skillMarkdownBuilder,
                     context,
                     isIncremental,
                     changedFiles,
@@ -363,9 +371,12 @@ public class RepositoryProcessingWorker(
     /// Processes a single language: generates or updates wiki content.
     /// </summary>
     private async Task ProcessLanguageAsync(
+        Repository repository,
+        RepositoryBranch branch,
         RepositoryWorkspace workspace,
         BranchLanguage language,
         IWikiGenerator wikiGenerator,
+        IRepositorySkillMarkdownBuilder? skillMarkdownBuilder,
         IContext context,
         bool isIncremental,
         string[]? changedFiles,
@@ -403,6 +414,16 @@ public class RepositoryProcessingWorker(
                 
                 logger.LogInformation("Generating documents for {LanguageCode}", language.LanguageCode);
                 await wikiGenerator.GenerateDocumentsAsync(workspace, language, stoppingToken);
+            }
+
+            if (repository.GenerateSkill && skillMarkdownBuilder is not null)
+            {
+                await skillMarkdownBuilder.RefreshSkillMarkdownAsync(
+                    context,
+                    repository,
+                    branch,
+                    language,
+                    stoppingToken);
             }
 
             languageStopwatch.Stop();

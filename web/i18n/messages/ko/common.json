@@ -11,12 +11,16 @@
   "delete": "삭제",
   "edit": "편집",
   "search": "검색",
+  "previous": "이전",
+  "next": "다음",
   "loading": "로딩 중...",
   "error": "오류",
   "success": "성공",
   "user": "사용자",
   "backToHome": "홈으로 돌아가기",
   "openMenu": "메뉴 열기",
+  "toggleSidebar": "사이드바 전환",
+  "close": "닫기",
   "submitting": "제출 중...",
   "submitFailed": "제출 실패",
   "pleaseLogin": "먼저 로그인해 주세요",
@@ -97,12 +101,37 @@
     "saturday": "토요일"
   },
   "repository": {
+    "wikiTitle": "저장소 Wiki",
+    "mindMap": "프로젝트 구조",
+    "graphify": "Graphify",
+    "exportDocs": "문서 내보내기",
+    "exportSkill": "SKILL 내보내기",
+    "exporting": "내보내는 중...",
+    "expandSection": "섹션 펼치기",
+    "collapseSection": "섹션 접기",
+    "tableOfContents": "목차",
+    "graphifyNotAvailable": "Graphify 보고서는 아직 사용할 수 없습니다.",
+    "graphifyGraph": "그래프",
+    "graphifyReport": "리포트",
     "notFound": {
       "title": "저장소를 찾을 수 없습니다",
       "description": "저장소 {owner}/{repo}를 찾을 수 없습니다",
       "privateOrNotExist": "이 저장소는 GitHub에 존재하지 않거나 비공개 저장소입니다.",
       "existsButNoDoc": "이 저장소는 GitHub에 존재하지만 아직 문서가 생성되지 않았습니다. 아래 버튼을 클릭하여 Wiki 문서를 생성하세요.",
       "generateWiki": "Wiki 생성"
+    },
+    "docNotFound": {
+      "title": "문서를 찾을 수 없습니다",
+      "description": "{slug}에 해당하는 문서를 찾을 수 없습니다.",
+      "hint": "왼쪽 사이드바에서 다른 문서를 선택하세요."
+    },
+    "globalError": {
+      "title": "페이지를 불러오지 못했습니다",
+      "description": "예기치 않은 오류가 발생했습니다. 잠시 후 다시 시도하세요."
+    },
+    "pageNotFound": {
+      "title": "페이지를 찾을 수 없습니다",
+      "description": "요청한 페이지가 없거나 이동되었습니다."
     }
   },
   "theme": {
@@ -114,8 +143,26 @@
   "branch": {
     "selectBranch": "브랜치 선택"
   },
+  "organization": {
+    "title": "내 조직",
+    "refresh": "새로고침",
+    "loginRequired": "조직을 보려면 로그인하세요",
+    "noDepartments": "아직 어떤 부서에도 속해 있지 않습니다",
+    "contactAdmin": "관리자에게 부서 추가를 요청하세요",
+    "myDepartments": "내 부서",
+    "departmentManager": "부서 관리자",
+    "departmentRepositories": "부서 저장소",
+    "noRepositories": "할당된 저장소가 없습니다",
+    "unknown": "알 수 없음",
+    "fetchFailed": "조직 데이터를 가져오지 못했습니다",
+    "viewDocs": "문서 보기"
+  },
   "language": {
     "selectLanguage": "언어 선택"
+  },
+  "sidebar": {
+    "title": "사이드바",
+    "mobileDescription": "모바일 사이드바를 표시합니다."
   },
   "mcp": {
     "title": "MCP 제공자",
@@ -149,6 +196,23 @@
     "zoomOut": "축소",
     "zoomIn": "확대",
     "resetView": "보기 재설정",
-    "close": "닫기 (ESC)"
+    "close": "닫기 (ESC)",
+    "hint": "스크롤로 확대 · 드래그로 이동 · ESC로 닫기",
+    "loading": "다이어그램을 불러오는 중...",
+    "enlarge": "클릭하여 확대",
+    "copyCode": "코드 복사"
+  },
+  "languageNames": {
+    "zh": "중국어(간체)",
+    "en": "영어",
+    "pl": "폴란드어",
+    "ko": "한국어",
+    "ja": "일본어",
+    "es": "스페인어",
+    "fr": "프랑스어",
+    "de": "독일어",
+    "pt": "포르투갈어",
+    "ru": "러시아어",
+    "ar": "아랍어"
   }
 }

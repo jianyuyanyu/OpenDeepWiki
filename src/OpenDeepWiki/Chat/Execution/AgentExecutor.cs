@@ -12,6 +12,7 @@ using OpenDeepWiki.Chat.Exceptions;
 using OpenDeepWiki.Chat.Sessions;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.AI;
 using ChatRole = Microsoft.Extensions.AI.ChatRole;
 using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
 
@@ -95,40 +96,22 @@ public class AgentExecutor : IAgentExecutor
             // Stream and collect response
             var thread = await agent.CreateSessionAsync(cts.Token);
             var contentBuilder = new StringBuilder();
-            var inputTokens = 0;
-            var outputTokens = 0;
+            var usageAccumulator = new AiUsageAccumulator();
 
             await foreach (var update in agent.RunStreamingAsync(chatMessages, thread, cancellationToken: cts.Token))
             {
+                usageAccumulator.Add(update);
+
                 if (!string.IsNullOrEmpty(update.Text))
                 {
                     contentBuilder.Append(update.Text);
                 }
-
-                // Track token usage if available
-                if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
-                {
-                    if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
-                        {
-                            Value: RawMessageDeltaEvent deltaEvent
-                        })
-                    {
-                        inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
-                            deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
-                        outputTokens = (int)(deltaEvent.Usage.OutputTokens);
-                    }
-                }
-                else
-                {
-                    var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
-                    if (usage != null)
-                    {
-                        inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
-                        outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
-                    }
-                }
             }
 
+            var usageSnapshot = usageAccumulator.Snapshot;
+            var inputTokens = usageSnapshot.InputTokens;
+            var outputTokens = usageSnapshot.OutputTokens;
+            var cachedInputTokens = usageSnapshot.CachedInputTokens;
             var responseContent = contentBuilder.ToString();
 
             var responseMessage = new Abstractions.ChatMessage
@@ -143,7 +126,13 @@ public class AgentExecutor : IAgentExecutor
             };
 
             var operationName = BuildOperationName(session);
-            await RecordTokenUsageAsync(inputTokens, outputTokens, _options.DefaultModel, operationName, cts.Token);
+            await RecordTokenUsageAsync(
+                inputTokens,
+                outputTokens,
+                cachedInputTokens,
+                _options.DefaultModel,
+                operationName,
+                cts.Token);
 
             if (inputTokens > 0 || outputTokens > 0)
             {
@@ -257,45 +246,33 @@ public class AgentExecutor : IAgentExecutor
 
         var chunks = new List<AgentResponseChunk>();
         string? streamError = null;
-        var inputTokens = 0;
-        var outputTokens = 0;
+        var usageAccumulator = new AiUsageAccumulator();
 
         try
         {
             await foreach (var update in agent.RunStreamingAsync(chatMessages, thread, cancellationToken: cts.Token))
             {
+                usageAccumulator.Add(update);
+
                 if (!string.IsNullOrEmpty(update.Text))
                 {
                     chunks.Add(AgentResponseChunk.CreateContent(update.Text));
                 }
-
-                // Track token usage if available
-                if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
-                {
-                    if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
-                        {
-                            Value: RawMessageDeltaEvent deltaEvent
-                        })
-                    {
-                        inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
-                            deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
-                        outputTokens = (int)(deltaEvent.Usage.OutputTokens);
-                    }
-                }
-                else
-                {
-                    var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
-                    if (usage != null)
-                    {
-                        inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
-                        outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
-                    }
-                }
             }
             chunks.Add(AgentResponseChunk.CreateComplete());
 
+            var usageSnapshot = usageAccumulator.Snapshot;
+            var inputTokens = usageSnapshot.InputTokens;
+            var outputTokens = usageSnapshot.OutputTokens;
+            var cachedInputTokens = usageSnapshot.CachedInputTokens;
             var operationName = BuildOperationName(session);
-            await RecordTokenUsageAsync(inputTokens, outputTokens, _options.DefaultModel, operationName, cts.Token);
+            await RecordTokenUsageAsync(
+                inputTokens,
+                outputTokens,
+                cachedInputTokens,
+                _options.DefaultModel,
+                operationName,
+                cts.Token);
 
             if (inputTokens > 0 || outputTokens > 0)
             {
@@ -432,6 +409,7 @@ public class AgentExecutor : IAgentExecutor
     private async Task RecordTokenUsageAsync(
         int inputTokens,
         int outputTokens,
+        int cachedInputTokens,
         string modelName,
         string operation,
         CancellationToken cancellationToken)
@@ -449,10 +427,17 @@ public class AgentExecutor : IAgentExecutor
                 Id = Guid.NewGuid().ToString(),
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
+                CachedInputTokens = cachedInputTokens,
+                ModelId = modelName,
                 ModelName = modelName,
                 Operation = operation,
                 RecordedAt = DateTime.UtcNow
             };
+            var modelAccounting = await AiUsageAccounting.TryResolveModelAccountingAsync(
+                context,
+                modelName,
+                cancellationToken);
+            AiUsageAccounting.ApplyModelAccounting(usage, modelAccounting);
 
             context.TokenUsages.Add(usage);
             await context.SaveChangesAsync(cancellationToken);

@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Configuration;
-using OpenDeepWiki.Agents;
 using OpenDeepWiki.Services.Wiki;
 using Xunit;
 
@@ -8,39 +7,38 @@ namespace OpenDeepWiki.Tests.Services.Wiki;
 public class WikiGeneratorOptionsConfiguratorTests
 {
     [Fact]
-    public void Apply_ShouldFallbackToGlobalAiSettings_WhenWikiSpecificSettingsAreMissing()
+    public void Apply_ShouldBindWikiTasks_FromProviderModelSettings()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
-            ["AI:Endpoint"] = "https://ark.example/v1",
-            ["AI:ApiKey"] = "global-key",
-            ["CHAT_REQUEST_TYPE"] = "OpenAI"
+            ["WikiGenerator:CatalogProviderId"] = "catalog-provider",
+            ["WikiGenerator:CatalogModel"] = "catalog-model",
+            ["WikiGenerator:ContentProviderId"] = "content-provider",
+            ["WikiGenerator:ContentModel"] = "content-model",
+            ["WikiGenerator:TranslationProviderId"] = "translation-provider",
+            ["WikiGenerator:TranslationModel"] = "translation-model"
         });
 
         var options = new WikiGeneratorOptions();
 
         WikiGeneratorOptionsConfigurator.Apply(options, configuration);
 
-        Assert.Equal("https://ark.example/v1", options.CatalogEndpoint);
-        Assert.Equal("https://ark.example/v1", options.ContentEndpoint);
-        Assert.Equal("https://ark.example/v1", options.TranslationEndpoint);
-        Assert.Equal("global-key", options.CatalogApiKey);
-        Assert.Equal("global-key", options.ContentApiKey);
-        Assert.Equal("global-key", options.TranslationApiKey);
-        Assert.Equal(AiRequestType.OpenAI, options.CatalogRequestType);
-        Assert.Equal(AiRequestType.OpenAI, options.ContentRequestType);
-        Assert.Equal(AiRequestType.OpenAI, options.TranslationRequestType);
+        Assert.Equal("catalog-provider", options.CatalogProviderId);
+        Assert.Equal("catalog-model", options.CatalogModel);
+        Assert.Equal("content-provider", options.ContentProviderId);
+        Assert.Equal("content-model", options.ContentModel);
+        Assert.Equal("translation-provider", options.TranslationProviderId);
+        Assert.Equal("translation-model", options.TranslationModel);
     }
 
     [Fact]
-    public void Apply_ShouldPreferWikiSpecificOverrides_OverGlobalAiFallbacks()
+    public void Apply_ShouldIgnoreLegacyAiEndpointAndKeyFallbacks()
     {
         var configuration = BuildConfiguration(new Dictionary<string, string?>
         {
             ["AI:Endpoint"] = "https://global.example/v1",
             ["AI:ApiKey"] = "global-key",
             ["CHAT_REQUEST_TYPE"] = "OpenAI",
-            ["WikiGenerator:CatalogEndpoint"] = "https://catalog.example/v1",
             ["WIKI_CONTENT_API_KEY"] = "content-key",
             ["WIKI_TRANSLATION_ENDPOINT"] = "https://translation.example/v1",
             ["WIKI_TRANSLATION_API_KEY"] = "translation-key",
@@ -51,13 +49,12 @@ public class WikiGeneratorOptionsConfiguratorTests
 
         WikiGeneratorOptionsConfigurator.Apply(options, configuration);
 
-        Assert.Equal("https://catalog.example/v1", options.CatalogEndpoint);
-        Assert.Equal("global-key", options.CatalogApiKey);
-        Assert.Equal("https://global.example/v1", options.ContentEndpoint);
-        Assert.Equal("content-key", options.ContentApiKey);
-        Assert.Equal("https://translation.example/v1", options.TranslationEndpoint);
-        Assert.Equal("translation-key", options.TranslationApiKey);
-        Assert.Equal(AiRequestType.Anthropic, options.TranslationRequestType);
+        Assert.Null(options.CatalogProviderId);
+        Assert.Equal("gpt-5-mini", options.CatalogModel);
+        Assert.Null(options.ContentProviderId);
+        Assert.Equal("gpt-5.2", options.ContentModel);
+        Assert.Null(options.TranslationProviderId);
+        Assert.Null(options.TranslationModel);
     }
 
     private static IConfiguration BuildConfiguration(IEnumerable<KeyValuePair<string, string?>> settings)

@@ -76,6 +76,7 @@
     "dialogDescription": "Configure how this MCP provider is accessed, throttled, and linked to models.",
     "fieldName": "Name",
     "fieldServerUrl": "Server URL Template",
+    "serverUrlTemplateHint": "Fixed path template; the backend resolves owner/repo from the repository.",
     "fieldDescription": "Description",
     "fieldTransportType": "Transport Type",
     "fieldModel": "Linked Model",
@@ -89,6 +90,9 @@
     "unlimited": "Unlimited",
     "fieldIconUrl": "Icon URL",
     "fieldIsActive": "Enable this provider",
+    "disabled": "Disabled",
+    "transportStreamableHttp": "Streamable HTTP",
+    "transportSse": "SSE",
     "deleteTitle": "Delete MCP Provider",
     "deleteDescription": "This provider will become unavailable after deletion. This action cannot be undone."
   },
@@ -161,6 +165,7 @@
       "branchLanguage": "Branch / Language",
       "docCatalog": "Doc / Catalog",
       "avgDocsPerLanguage": "Avg Docs Per Language",
+      "starFork": "Star / Fork",
       "generateGraphify": "Generate Graphify",
       "graphifyStatus": "Graphify Status",
       "notGenerated": "Not generated",
@@ -333,6 +338,31 @@
     "noSettings": "No settings available",
     "noChanges": "No changes to save",
     "selectRequestType": "Select request type",
+    "description": "Review runtime, security, and system behavior settings from one focused workspace.",
+    "loading": "Loading system settings...",
+    "savedState": "All saved",
+    "unsavedState": "{count} unsaved",
+    "saveHint": "Only changed fields will be saved.",
+    "resetChanges": "Discard changes",
+    "changesDiscarded": "Changes discarded",
+    "changedFields": "Changed Fields",
+    "searchLabel": "Find settings",
+    "searchPlaceholder": "Search key, description, or value",
+    "searchResults": "{count} shown",
+    "clearSearch": "Clear search",
+    "generalDescription": "Basic behavior used across the application.",
+    "aiDescription": "Generation strategy, runtime limits, and retry behavior.",
+    "securityDescription": "Sensitive credentials and access-related configuration.",
+    "categoryFallbackDescription": "Settings from this module.",
+    "sensitiveValue": "Sensitive",
+    "showSecret": "Show value",
+    "hideSecret": "Hide value",
+    "resetField": "Reset field",
+    "booleanOn": "Enabled",
+    "booleanOff": "Disabled",
+    "noSearchResults": "No matching settings",
+    "noSearchResultsDescription": "Try a different keyword or clear the search.",
+    "reviewChanges": "{count} changed fields need review",
     "activeCategory": "Active Category",
     "categorySummary": "{settings} settings · {pending} pending changes",
     "statCategories": "Categories",
@@ -360,6 +390,10 @@
       "aiRuntime": "Concurrency, timeout, retry count, and retry interval.",
       "aiOther": "AI settings that do not match a predefined group."
     },
+    "aiBindingsMigratedBadge": "AI Model Bindings Migrated",
+    "aiBindingsMigratedTitle": "Content, catalog, translation, and Graphify models are managed in Model Configuration",
+    "aiBindingsMigratedDescription": "System settings keep runtime parameters, directory strategy, and timeout retry rules. AI providers, models, context windows, and pricing are managed centrally in AI Provider Management / Model Management / Model Configuration.",
+    "goToModelConfigs": "Open Model Configuration",
     "requestTypeOptions": {
       "OpenAI": "OpenAI",
       "OpenAIResponses": "OpenAI Responses",
@@ -394,6 +428,10 @@
     "enableDesc": "When enabled, a chat assistant floating button will appear on document pages",
     "availableModels": "Available Models",
     "selectModelsDesc": "Select AI models that the chat assistant can use",
+    "selectedModelsCount": "Selected {count} models",
+    "selectProvidersAndModels": "Select AI providers and models",
+    "providersLabel": "AI Providers",
+    "selectProviderModels": "Select models from this provider",
     "noModels": "No models available. Please add models in Tools Configuration first",
     "defaultModel": "Default Model",
     "defaultModelDesc": "The model selected by default when users open the chat panel",
@@ -404,7 +442,25 @@
     "availableSkills": "Available Skills",
     "selectSkillsDesc": "Select skills that the chat assistant can use",
     "noSkills": "No Skills available. Please add Skills in Tools Configuration first",
-    "inactive": "Inactive"
+    "inactive": "Inactive",
+    "enabledModels": "Enabled Models",
+    "unboundProvider": "Unbound provider",
+    "contextNotSet": "Context not set",
+    "noProviders": "No AI providers available. Please add or enable providers in AI Providers first.",
+    "discoverModels": "Discover Models",
+    "noProviderModels": "This provider has no models yet. Click \"Discover Models\" to sync them, or add them manually in Model Management.",
+    "discoverModelsFailed": "Failed to discover models. Check the provider API key and models endpoint.",
+    "discoverModelsSuccess": "{discovered} models found, {created} added",
+    "removeModel": "Remove {model}",
+    "enabledModelCount": "{count} models",
+    "capabilities": {
+      "thinking": "Thinking",
+      "vision": "Vision",
+      "tools": "Tools",
+      "json": "JSON",
+      "chat": "Chat"
+    },
+    "contextUnit": "context"
   },
   "chatProviders": {
     "title": "Chat Platform Configuration",
@@ -494,8 +550,13 @@
     "enabled": "Enabled",
     "disabled": "Disabled"
   },
+  "toolPages": {
+    "aiProviders": "AI Providers",
+    "models": "Models",
+    "modelConfigs": "Model Configuration"
+  },
   "models": {
-    "title": "Model Configuration",
+    "title": "Model Management",
     "createModel": "Create Model",
     "noModels": "No model configurations",
     "addFirst": "Add your first model",
@@ -521,7 +582,116 @@
     "modelsLoaded": "Models loaded: {count}",
     "loadModelsFailed": "Failed to load models from provider",
     "selectModel": "Select a model",
-    "orTypeManually": "Or type model ID manually"
+    "orTypeManually": "Or type model ID manually",
+    "registryBadge": "Model Registry",
+    "subtitle": "Maintain model IDs, capabilities, context windows, and pricing here. Endpoints, API keys, and auth remain with the AI provider.",
+    "refresh": "Refresh",
+    "create": "Add Model",
+    "stats": {
+      "total": "Total Models",
+      "totalDetail": "{count} providers",
+      "active": "Enabled Models",
+      "activeDetail": "{count} disabled",
+      "thinking": "Thinking",
+      "thinkingDetail": "Supports reasoning control",
+      "vision": "Vision",
+      "visionDetail": "Supports image input",
+      "priced": "Priced Models",
+      "pricedDetail": "Input or output pricing"
+    },
+    "filters": {
+      "searchPlaceholder": "Search model ID, name, or provider",
+      "providerPlaceholder": "Filter providers",
+      "allProviders": "All Providers",
+      "typePlaceholder": "Model type",
+      "allTypes": "All Types"
+    },
+    "summary": {
+      "showing": "Showing {filtered} / {total} models",
+      "filteredHint": "Filters applied"
+    },
+    "empty": {
+      "title": "No matching models",
+      "description": "Adjust the filters, or discover models from the provider page and come back to set pricing."
+    },
+    "status": {
+      "default": "Default",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "defaultModel": "Default model",
+      "enabledModel": "Enabled model"
+    },
+    "actions": {
+      "edit": "Edit {name}",
+      "delete": "Delete {name}"
+    },
+    "metrics": {
+      "context": "Context",
+      "maxOutput": "Max output",
+      "inputPerM": "Input / 1M",
+      "outputPerM": "Output / 1M"
+    },
+    "descriptionFallback": "No description provided.",
+    "dialog": {
+      "newTitle": "Add Model",
+      "editTitle": "Edit Model",
+      "basicInfo": "Basic Info",
+      "providerLabel": "Provider",
+      "providerSelectPlaceholder": "Select provider",
+      "modelIdLabel": "Model ID",
+      "modelIdPlaceholder": "e.g. gpt-4.1",
+      "displayNameLabel": "Display name",
+      "displayNamePlaceholder": "e.g. GPT-4.1",
+      "modelTypeLabel": "Model type",
+      "providerTypeLabel": "Protocol type",
+      "sortOrderLabel": "Sort order",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Describe the model's purpose, pricing basis, or constraints",
+      "pricingTitle": "Pricing, context, and capabilities",
+      "contextWindowPlaceholder": "Context window",
+      "maxOutputTokensPlaceholder": "Max output tokens",
+      "inputPricePlaceholder": "Input price, USD / 1M tokens",
+      "outputPricePlaceholder": "Output price, USD / 1M tokens",
+      "advancedJson": "Advanced JSON Config",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "providerTypes": {
+      "inherit": "Inherit provider",
+      "inheritHint": "Use the provider's protocol type",
+      "openAI": "OpenAI Chat",
+      "openAIHint": "Compatible with /v1/chat/completions",
+      "deepSeek": "DeepSeek OpenAI",
+      "deepSeekHint": "DeepSeek / MiMo OpenAI-compatible chat completions",
+      "responses": "OpenAI Responses",
+      "responsesHint": "Responses API / reasoning models",
+      "anthropic": "Claude / Anthropic",
+      "anthropicHint": "Claude Messages API",
+      "azure": "Azure OpenAI",
+      "azureHint": "Azure deployment endpoint",
+      "inheritWithCurrent": "Inherit provider ({type})"
+    },
+    "modelTypes": {
+      "chat": "Chat",
+      "image": "Image",
+      "speech": "Speech",
+      "embedding": "Embedding"
+    },
+    "capabilities": {
+      "tools": "Tools",
+      "vision": "Vision",
+      "thinking": "Thinking",
+      "json": "JSON"
+    },
+    "toasts": {
+      "loadFailed": "Failed to load models",
+      "selectProviderAndModel": "Please select a provider and fill in the model ID",
+      "saveSuccess": "Model saved",
+      "saveFailed": "Failed to save model",
+      "deleteSuccess": "Model deleted",
+      "deleteFailed": "Failed to delete model"
+    },
+    "confirmDelete": "Delete \"{name}\"?"
   },
   "githubImport": {
     "title": "GitHub Import",
@@ -539,6 +709,7 @@
     "department": "Department",
     "selectDepartment": "Select department",
     "language": "Language",
+    "generateSkill": "Generate SKILL",
     "searchPlaceholder": "Search repositories by name or description...",
     "allLanguages": "All Languages",
     "matching": "matching",
@@ -707,5 +878,290 @@
     "passwordResetFailed": "Failed to reset password",
     "setDefaultSuccess": "Set as default model",
     "skillUploadSuccess": "Skill uploaded successfully"
+  },
+  "modelConfigs": {
+    "title": "Model Configuration",
+    "subtitle": "Manage runtime bindings for system tasks and reusable business model configurations in one place.",
+    "heroBadge": "Runtime Binding Center",
+    "heroStats": {
+      "systemTasks": "System tasks configured",
+      "availableProviders": "Active providers",
+      "modelMetadata": "Model entries"
+    },
+    "featureCards": {
+      "provider": {
+        "title": "Provider Separation",
+        "description": "Credentials and endpoints are managed in provider settings."
+      },
+      "models": {
+        "title": "Model Metadata",
+        "description": "Context window, pricing, and capabilities stay in model management."
+      },
+      "binding": {
+        "title": "Task Routing",
+        "description": "Bind each workflow to the best provider/model pair for stable runtime behavior."
+      }
+    },
+    "systemBindings": {
+      "title": "System Task Bindings",
+      "subtitle": "Bind core system workflows to concrete provider/model combinations."
+    },
+    "refresh": "Refresh",
+    "saveAll": "Save All ({count})",
+    "status": {
+      "pendingSave": "Pending Save",
+      "incomplete": "Incomplete",
+      "apiKeyConfigured": "API key configured",
+      "apiKeyMissing": "API key missing",
+      "waitingBinding": "Waiting for binding",
+      "runtimeResolve": "Runtime ready"
+    },
+    "fields": {
+      "provider": "Provider",
+      "model": "Model",
+      "selectProvider": "Select provider",
+      "selectModel": "Select model"
+    },
+    "metrics": {
+      "context": "Context",
+      "maxOutput": "Max output",
+      "price": "Price"
+    },
+    "capabilities": {
+      "chat": "Chat",
+      "thinking": "Thinking",
+      "vision": "Vision",
+      "tools": "Tools",
+      "json": "JSON"
+    },
+    "actions": {
+      "saveBinding": "Save Binding",
+      "edit": "Edit"
+    },
+    "generalBindings": {
+      "title": "Reusable Business Bindings",
+      "subtitle": "Reusable entries for Chat Assistant, MCP, and embedded app scenarios. Only provider/model binding is stored here.",
+      "create": "Add Configuration",
+      "emptyTitle": "No reusable model configuration",
+      "emptyDescription": "Add one when a feature requires its own model entry.",
+      "labels": {
+        "default": "Default",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      }
+    },
+    "dialog": {
+      "newGeneralTitle": "Add Reusable Model Configuration",
+      "editGeneralTitle": "Edit Reusable Model Configuration",
+      "generalDescription": "This section only stores business name, provider, and model. Maintain endpoint, API key, and pricing in provider/model management.",
+      "nameLabel": "Configuration Name",
+      "namePlaceholder": "e.g. Chat Assistant Default Model",
+      "statusLabel": "Status",
+      "defaultToggle": "Default",
+      "activeToggle": "Enabled",
+      "providerLabel": "AI Provider",
+      "providerPlaceholder": "Select provider",
+      "modelLabel": "Model",
+      "modelPlaceholder": "Select model",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Describe what features use this configuration",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "tasks": {
+      "content": {
+        "title": "Content Generation",
+        "group": "Core",
+        "description": "Generates main wiki content from source code and context.",
+        "recommendation": "Use strongest model"
+      },
+      "catalog": {
+        "title": "Catalog Generation",
+        "group": "Structure",
+        "description": "Builds navigation tree and document structure.",
+        "recommendation": "Prefer fast/low-cost model"
+      },
+      "translation": {
+        "title": "Translation",
+        "group": "Localization",
+        "description": "Translates generated content and metadata across locales.",
+        "recommendation": "Use balanced multilingual model"
+      },
+      "graphify": {
+        "title": "Graphify",
+        "group": "Visualization",
+        "description": "Builds graphify artifacts and relation mapping outputs.",
+        "recommendation": "Prefer stable long-context model"
+      }
+    },
+    "toasts": {
+      "loadFailed": "Failed to load model configurations",
+      "selectProviderAndModelForTask": "Please select provider and model for {task}",
+      "taskSaved": "{task} binding saved",
+      "taskSaveFailed": "Failed to save {task} binding",
+      "completeTask": "Complete provider and model selection for {task} before saving",
+      "systemBindingsSaved": "System task bindings saved",
+      "systemBindingsSaveFailed": "Failed to save system task bindings",
+      "selectProviderAndModel": "Please select provider and model",
+      "generalConfigSaved": "Reusable configuration saved",
+      "generalConfigSaveFailed": "Failed to save reusable configuration",
+      "deleteSuccess": "Configuration deleted",
+      "deleteFailed": "Failed to delete configuration"
+    },
+    "confirmDelete": "Delete \"{name}\"?"
+  },
+  "aiProviders": {
+    "title": "Providers",
+    "subtitle": "Configure API keys and models for each provider",
+    "searchProvidersPlaceholder": "Search providers...",
+    "searchModelsPlaceholder": "Search models...",
+    "confirmDeleteProvider": "Delete \"{name}\"?",
+    "providerGroups": {
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "providerList": {
+      "empty": "No matching providers"
+    },
+    "providerCard": {
+      "builtin": "Built-in",
+      "unselected": "Unselected provider"
+    },
+    "actions": {
+      "addProvider": "Add provider",
+      "deleteProvider": "Delete provider",
+      "refresh": "Refresh",
+      "saveProvider": "Save",
+      "addModel": "Add model",
+      "editModel": "Edit {name}"
+    },
+    "providerTypes": {
+      "inherit": "Inherit provider",
+      "inheritHint": "Use the provider protocol type",
+      "inheritWithCurrent": "Inherit provider ({type})",
+      "openAI": "OpenAI Chat",
+      "openAIHint": "Compatible with /v1/chat/completions",
+      "deepSeek": "DeepSeek OpenAI",
+      "deepSeekHint": "DeepSeek / MiMo OpenAI-compatible chat completions",
+      "responses": "OpenAI Responses",
+      "responsesHint": "Responses API / reasoning models",
+      "anthropic": "Anthropic Messages",
+      "anthropicHint": "Claude / Messages API",
+      "azure": "Azure OpenAI",
+      "azureHint": "Azure deployment endpoint"
+    },
+    "authTypes": {
+      "apiKey": "API Key",
+      "oauth": "OAuth",
+      "channel": "Channel",
+      "none": "No authentication"
+    },
+    "apiKey": {
+      "getKey": "Get API Key",
+      "keepExistingPlaceholder": "Leave blank to keep the existing key; input a new one to replace",
+      "placeholder": "Enter provider API key",
+      "noKeyRequiredHint": "This preset does not require an API key and can stay empty."
+    },
+    "baseUrl": {
+      "label": "API Proxy URL",
+      "hint": "Custom endpoint for proxy or third-party compatible services."
+    },
+    "connectivity": {
+      "label": "Connectivity Check",
+      "selectModelPlaceholder": "Select a model for connectivity check",
+      "check": "Check"
+    },
+    "models": {
+      "title": "Model List",
+      "summary": "Total {total} models, {active} enabled",
+      "enableAll": "Enable all",
+      "disableAll": "Disable all",
+      "discover": "Discover models",
+      "discoveryModeEnabled": "Discovery enabled",
+      "discoveryModeManual": "Manual maintenance",
+      "emptyTitle": "No matching models",
+      "emptyDescription": "Click \"Discover models\" to sync from provider."
+    },
+    "advanced": {
+      "title": "Provider Advanced Settings",
+      "uniqueName": "Unique name",
+      "displayName": "Display name",
+      "providerType": "Protocol type",
+      "authType": "Auth type",
+      "modelsEndpoint": "Models endpoint",
+      "modelsEndpointPlaceholder": "Leave empty to use Base URL /models",
+      "systemProxyUrl": "System proxy URL",
+      "optional": "Optional",
+      "iconUrl": "Icon URL",
+      "iconUrlPlaceholder": "Optional; leave empty to use default mapping",
+      "sortOrder": "Sort order",
+      "description": "Description",
+      "enableDiscovery": "Enable model discovery",
+      "enableDiscoveryHint": "Load provider model list and write into model management.",
+      "oauthChannelHint": "OAuth/Channel account tokens and channel parameters are kept in the JSON fields below. Runtime still binds only provider and model.",
+      "openHomepage": "Open provider homepage"
+    },
+    "empty": {
+      "title": "No providers",
+      "description": "Add a custom provider first, or wait for built-in presets to initialize.",
+      "create": "Add custom provider"
+    },
+    "modelDialog": {
+      "newTitle": "Add Model",
+      "editTitle": "Edit Model",
+      "description": "Model protocol type overrides provider protocol type, useful for mixed OpenAI/Responses/Claude-compatible models under one provider.",
+      "modelIdLabel": "Model ID",
+      "modelIdPlaceholder": "e.g. gpt-5.2 or claude-sonnet",
+      "displayNameLabel": "Display name",
+      "optionalPlaceholder": "Optional",
+      "modelTypeLabel": "Model type",
+      "providerTypeLabel": "Model protocol type",
+      "contextWindowLabel": "Context window",
+      "maxOutputLabel": "Max output",
+      "inputPriceLabel": "Input price / 1M",
+      "outputPriceLabel": "Output price / 1M",
+      "descriptionLabel": "Description",
+      "cancel": "Cancel",
+      "save": "Save model",
+      "flags": {
+        "defaultModel": "Default model",
+        "active": "Enabled"
+      }
+    },
+    "createProviderDialog": {
+      "title": "Add Custom Provider",
+      "description": "Create provider shell first, then configure authentication, model discovery, and advanced options in the right panel.",
+      "nameLabel": "Provider name",
+      "namePlaceholder": "e.g. My OpenAI Proxy",
+      "providerTypeLabel": "Protocol type",
+      "baseUrlHint": "Maintain API key and models in the right-side panel after creation.",
+      "cancel": "Cancel",
+      "create": "Create"
+    },
+    "toasts": {
+      "loadFailed": "Failed to load AI providers",
+      "providerNameRequired": "Please enter provider name",
+      "providerSaved": "Provider configuration saved",
+      "providerSaveFailed": "Failed to save provider",
+      "providerNameDuplicate": "Provider name already exists, please choose another",
+      "customProviderCreated": "Custom provider created, continue with authentication and model settings",
+      "createProviderFailed": "Failed to create provider",
+      "modelIdRequired": "Please enter model ID",
+      "modelSaved": "Model configuration saved",
+      "modelSaveFailed": "Failed to save model",
+      "builtinDeleteBlocked": "Built-in providers cannot be deleted; disable it if unused",
+      "providerDeleted": "Provider deleted",
+      "providerDeleteFailed": "Failed to delete provider",
+      "modelsDiscovered": "{discovered} models found, {created} added",
+      "discoverFailed": "Model discovery failed",
+      "selectModelForCheck": "Please select a model for connectivity check",
+      "connectivityFailed": "Connectivity check failed",
+      "modelEnabled": "Model enabled",
+      "modelDisabled": "Model disabled",
+      "modelStatusUpdateFailed": "Failed to update model status",
+      "allModelsEnabled": "All models enabled",
+      "allModelsDisabled": "All models disabled",
+      "bulkModelUpdateFailed": "Failed to batch update model status"
+    }
   }
 }

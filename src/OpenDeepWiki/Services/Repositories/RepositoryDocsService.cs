@@ -18,7 +18,8 @@ public class RepositoryDocsService(
     IContext context,
     IGitPlatformService gitPlatformService,
     ICache cache,
-    IGraphifyArtifactService graphifyArtifactService)
+    IGraphifyArtifactService graphifyArtifactService,
+    IRepositorySkillMarkdownBuilder skillMarkdownBuilder)
 {
     private const string FallbackLanguageCode = "zh"; // 当没有默认语言标记时的回退语言
     private const int ExportRateLimitMinutes = 5; // 导出限流：5分钟内只能导出一次
@@ -29,6 +30,7 @@ public class RepositoryDocsService(
     private static readonly TimeSpan ExportConcurrencyLockTimeout = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan ExportConcurrencyCountTtl = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan ExportRateLimitTtl = TimeSpan.FromMinutes(ExportRateLimitMinutes);
+    private static readonly Encoding Utf8NoBom = new UTF8Encoding(false);
 
     [HttpGet("/{owner}/{repo}/branches")]
     public async Task<RepositoryBranchesResponse> GetBranchesAsync(string owner, string repo)
@@ -409,9 +411,24 @@ public class RepositoryDocsService(
 
     private async Task<Repository?> GetRepositoryAsync(string owner, string repo)
     {
+        var repository = await context.Repositories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.OrgName == owner && item.RepoName == repo && !item.IsDeleted);
+
+        if (repository is not null)
+        {
+            return repository;
+        }
+
+        var normalizedOwner = owner.ToLower();
+        var normalizedRepo = repo.ToLower();
+
         return await context.Repositories
             .AsNoTracking()
-            .FirstOrDefaultAsync(item => item.OrgName == owner && item.RepoName == repo);
+            .FirstOrDefaultAsync(item =>
+                item.OrgName.ToLower() == normalizedOwner &&
+                item.RepoName.ToLower() == normalizedRepo &&
+                !item.IsDeleted);
     }
 
     private async Task<RepositoryBranch?> GetBranchAsync(string repositoryId, string? branchName)
@@ -569,6 +586,11 @@ public class RepositoryDocsService(
             return new NotFoundObjectResult("语言不存在");
         }
 
+        if (!repository.GenerateSkill)
+        {
+            return new BadRequestObjectResult("This repository does not have SKILL export enabled.");
+        }
+
         var now = DateTime.UtcNow;
         var rateLimitKey = BuildRateLimitKey(owner, repo, branchEntity.BranchName, language.LanguageCode);
 
@@ -612,12 +634,25 @@ public class RepositoryDocsService(
             using var memoryStream = new MemoryStream();
             using (var archive = new ZipArchive(memoryStream, ZipArchiveMode.Create, true))
             {
-                // 构建目录结构并添加文件
-                await AddFilesToArchive(archive, catalogs, null, null);
+                var skillMarkdown = string.IsNullOrWhiteSpace(language.SkillMarkdown)
+                    ? skillMarkdownBuilder.BuildSkillMarkdown(repository, branchEntity, language, catalogs, now)
+                    : language.SkillMarkdown;
+
+                var skillEntry = archive.CreateEntry("SKILL.md");
+                await using (var skillEntryStream = skillEntry.Open())
+                await using (var writer = new StreamWriter(skillEntryStream, Utf8NoBom))
+                {
+                    await writer.WriteAsync(skillMarkdown);
+                }
+
+                await skillMarkdownBuilder.AddDocumentsToArchiveAsync(
+                    archive,
+                    catalogs,
+                    "references/docs");
             }
 
             // 设置文件名
-            var fileName = $"{owner}-{repo}-{branchEntity.BranchName}-{language.LanguageCode}.zip";
+            var fileName = $"{SanitizeDownloadFileName(owner)}-{SanitizeDownloadFileName(repo)}-{SanitizeDownloadFileName(branchEntity.BranchName)}-{SanitizeDownloadFileName(language.LanguageCode)}-skill.zip";
 
             // 重置内存流并获取字节数组
             memoryStream.Seek(0, SeekOrigin.Begin);
@@ -635,6 +670,21 @@ public class RepositoryDocsService(
     private static string BuildRateLimitKey(string owner, string repo, string branch, string language)
     {
         return $"{ExportRateLimitKeyPrefix}:{owner}:{repo}:{branch}:{language}";
+    }
+
+    private static string SanitizeDownloadFileName(string value)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars()
+            .Concat(new[] { '/', '\\' })
+            .ToHashSet();
+        var sanitized = new string(value
+            .Select(ch => invalidChars.Contains(ch) ? '-' : ch)
+            .ToArray())
+            .Trim('-', '.', ' ');
+
+        return string.IsNullOrWhiteSpace(sanitized)
+            ? "repository"
+            : sanitized;
     }
 
     private async Task<bool> TryAcquireExportSlotAsync()

@@ -58,6 +58,7 @@
       </Content>
       <Content Include="skills\**\*" CopyToOutputDirectory="PreserveNewest" />
       <Content Include="prompts\**\*" CopyToOutputDirectory="PreserveNewest" />
+      <EmbeddedResource Include="Services\AI\BuiltinProviderPresets.json" />
     </ItemGroup>
 
 </Project>

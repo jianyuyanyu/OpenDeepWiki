@@ -12,6 +12,7 @@ using OpenDeepWiki.Agents.Tools;
 using OpenDeepWiki.Chat.Exceptions;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.AI;
 using OpenDeepWiki.Services.Repositories;
 using GitRepository = LibGit2Sharp.Repository;
 
@@ -107,6 +108,7 @@ public class EmbedService : IEmbedService
     private readonly IAppStatisticsService _statisticsService;
     private readonly IChatLogService _chatLogService;
     private readonly AgentFactory _agentFactory;
+    private readonly IAiProviderResolver _aiProviderResolver;
     private readonly RepositoryAnalyzerOptions _repoOptions;
     private readonly ILogger<EmbedService> _logger;
 
@@ -117,6 +119,7 @@ public class EmbedService : IEmbedService
         IAppStatisticsService statisticsService,
         IChatLogService chatLogService,
         AgentFactory agentFactory,
+        IAiProviderResolver aiProviderResolver,
         IOptions<RepositoryAnalyzerOptions> repoOptions,
         ILogger<EmbedService> logger)
     {
@@ -126,6 +129,7 @@ public class EmbedService : IEmbedService
         _statisticsService = statisticsService;
         _chatLogService = chatLogService;
         _agentFactory = agentFactory;
+        _aiProviderResolver = aiProviderResolver;
         _repoOptions = repoOptions.Value;
         _logger = logger;
     }
@@ -153,7 +157,7 @@ public class EmbedService : IEmbedService
         }
 
         // Check if AI configuration is complete
-        if (string.IsNullOrWhiteSpace(app.ApiKey))
+        if (string.IsNullOrWhiteSpace(app.AiProviderId))
         {
             return (false, "CONFIG_MISSING", "应用未配置API密钥");
         }
@@ -380,15 +384,11 @@ public class EmbedService : IEmbedService
             }
         };
 
-        var requestOptions = new AiRequestOptions
-        {
-            ApiKey = app.ApiKey,
-            Endpoint = app.BaseUrl,
-            RequestType = ParseRequestType(app.ProviderType)
-        };
+        var resolvedModel = await _aiProviderResolver.ResolveAsync(app.AiProviderId, modelId, cancellationToken);
+        var requestOptions = resolvedModel.ToRequestOptions();
 
         var (agent, _) = _agentFactory.CreateChatClientWithTools(
-            modelId,
+            resolvedModel.ModelId,
             tools.ToArray(),
             agentOptions,
             requestOptions);
@@ -405,14 +405,15 @@ public class EmbedService : IEmbedService
         var question = lastUserMessage?.Content ?? string.Empty;
 
         // Stream response
-        var inputTokens = 0;
-        var outputTokens = 0;
+        var usageAccumulator = new AiUsageAccumulator();
         var responseBuilder = new System.Text.StringBuilder();
 
         var thread = await agent.CreateSessionAsync(cancellationToken);
 
         await foreach (var update in agent.RunStreamingAsync(chatMessages, thread, cancellationToken: cancellationToken))
         {
+            usageAccumulator.Add(update);
+
             if (!string.IsNullOrEmpty(update.Text))
             {
                 responseBuilder.Append(update.Text);
@@ -423,29 +424,12 @@ public class EmbedService : IEmbedService
                 };
             }
 
-            // Track token usage if available
-            if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
-            {
-                if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
-                    {
-                        Value: RawMessageDeltaEvent deltaEvent
-                    })
-                {
-                    inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
-                        deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
-                    outputTokens = (int)(deltaEvent.Usage.OutputTokens);
-                }
-            }
-            else
-            {
-                var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
-                if (usage != null)
-                {
-                    inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
-                    outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
-                }
-            }
         }
+
+        var usageSnapshot = usageAccumulator.Snapshot;
+        var inputTokens = usageSnapshot.InputTokens;
+        var outputTokens = usageSnapshot.OutputTokens;
+        var cachedInputTokens = usageSnapshot.CachedInputTokens;
 
         // Record statistics
         await _statisticsService.RecordRequestAsync(new RecordRequestDto
@@ -458,7 +442,8 @@ public class EmbedService : IEmbedService
         await RecordTokenUsageAsync(
             inputTokens,
             outputTokens,
-            modelId,
+            cachedInputTokens,
+            resolvedModel,
             request.Owner,
             request.Repo,
             cancellationToken);
@@ -484,14 +469,15 @@ public class EmbedService : IEmbedService
         yield return new SSEEvent
         {
             Type = SSEEventType.Done,
-            Data = new { inputTokens, outputTokens }
+            Data = new { inputTokens, outputTokens, cachedInputTokens }
         };
     }
 
     private async Task RecordTokenUsageAsync(
         int inputTokens,
         int outputTokens,
-        string modelName,
+        int cachedInputTokens,
+        ResolvedAiModel model,
         string? owner,
         string? repo,
         CancellationToken cancellationToken)
@@ -522,10 +508,15 @@ public class EmbedService : IEmbedService
                 RepositoryId = repositoryId,
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
-                ModelName = modelName,
+                CachedInputTokens = cachedInputTokens,
+                ModelId = model.ModelId,
+                ModelName = model.ModelName,
                 Operation = "EmbedChat",
                 RecordedAt = DateTime.UtcNow
             };
+            AiUsageAccounting.ApplyModelAccounting(
+                usage,
+                AiUsageAccounting.FromResolvedModel(model));
 
             context.TokenUsages.Add(usage);
             await context.SaveChangesAsync(cancellationToken);

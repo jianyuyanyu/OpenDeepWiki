@@ -138,6 +138,7 @@ public class SkillUpdateRequest
 public class ModelConfigRequest
 {
     public string Name { get; set; } = string.Empty;
+    public string? AiProviderId { get; set; }
     public string Provider { get; set; } = string.Empty;
     public string ModelId { get; set; } = string.Empty;
     public string? Endpoint { get; set; }
@@ -154,6 +155,8 @@ public class ModelConfigDto
 {
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string? AiProviderId { get; set; }
+    public string? AiProviderName { get; set; }
     public string Provider { get; set; } = string.Empty;
     public string ModelId { get; set; } = string.Empty;
     public string? Endpoint { get; set; }
@@ -162,4 +165,103 @@ public class ModelConfigDto
     public bool IsActive { get; set; }
     public string? Description { get; set; }
     public DateTime CreatedAt { get; set; }
+}
+
+public class AiProviderConfigRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
+    public string ProviderType { get; set; } = "OpenAI";
+    public string BaseUrl { get; set; } = string.Empty;
+    public string? ApiKey { get; set; }
+    public string AuthType { get; set; } = "ApiKey";
+    public bool IsBuiltIn { get; set; }
+    public bool IsActive { get; set; } = true;
+    public bool SupportsModelDiscovery { get; set; } = true;
+    public string? ModelsEndpoint { get; set; }
+    public string? DefaultModelId { get; set; }
+    public string? SystemProxyUrl { get; set; }
+    public string? OAuthConfigJson { get; set; }
+    public string? ChannelConfigJson { get; set; }
+    public string? AccountsJson { get; set; }
+    public string? RequestOverridesJson { get; set; }
+    public string? IconUrl { get; set; }
+    public string? Description { get; set; }
+    public int SortOrder { get; set; }
+}
+
+public class AiProviderConfigDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
+    public string ProviderType { get; set; } = "OpenAI";
+    public string BaseUrl { get; set; } = string.Empty;
+    public bool HasApiKey { get; set; }
+    public string AuthType { get; set; } = "ApiKey";
+    public bool IsBuiltIn { get; set; }
+    public bool IsActive { get; set; }
+    public bool SupportsModelDiscovery { get; set; }
+    public string? ModelsEndpoint { get; set; }
+    public string? DefaultModelId { get; set; }
+    public string? SystemProxyUrl { get; set; }
+    public string? OAuthConfigJson { get; set; }
+    public string? ChannelConfigJson { get; set; }
+    public string? AccountsJson { get; set; }
+    public string? RequestOverridesJson { get; set; }
+    public string? IconUrl { get; set; }
+    public string? Description { get; set; }
+    public int SortOrder { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class AiModelConfigRequest
+{
+    public string ProviderId { get; set; } = string.Empty;
+    public string ModelId { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
+    public string ModelType { get; set; } = "chat";
+    public string? ProviderType { get; set; }
+    public int? ContextWindow { get; set; }
+    public int? MaxOutputTokens { get; set; }
+    public decimal? InputTokenPrice { get; set; }
+    public decimal? OutputTokenPrice { get; set; }
+    public bool SupportsThinking { get; set; }
+    public bool SupportsVision { get; set; }
+    public bool SupportsTools { get; set; } = true;
+    public bool SupportsJsonMode { get; set; }
+    public bool IsDefault { get; set; }
+    public bool IsActive { get; set; } = true;
+    public string? CapabilitiesJson { get; set; }
+    public string? ThinkingConfigJson { get; set; }
+    public string? RequestOverridesJson { get; set; }
+    public string? TagsJson { get; set; }
+    public string? Description { get; set; }
+    public int SortOrder { get; set; }
+}
+
+public class AiModelConfigDto : AiModelConfigRequest
+{
+    public string Id { get; set; } = string.Empty;
+    public string? ProviderName { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class AiProviderConnectivityTestRequest
+{
+    public string? ModelId { get; set; }
+    public string? ProviderType { get; set; }
+    public string? BaseUrl { get; set; }
+    public string? ApiKey { get; set; }
+}
+
+public class AiProviderConnectivityTestResult
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public string ProviderType { get; set; } = string.Empty;
+    public string ModelId { get; set; } = string.Empty;
+    public int? StatusCode { get; set; }
+    public long LatencyMs { get; set; }
 }

@@ -127,6 +127,8 @@
     "branchNotSupported": "此平台暂不支持自动获取分支，请手动输入",
     "language": "语言",
     "languageRequired": "请选择语言",
+    "generateSkill": "生成 SKILL",
+    "generateSkillDesc": "导出时将生成的文档打包为 SKILL ZIP",
     "isPublic": "公开仓库",
     "publicDesc": "任何人都可以查看此仓库",
     "privateDesc": "仅您可以访问此仓库",
@@ -170,6 +172,9 @@
         "workspace": "准备仓库",
         "catalog": "生成目录",
         "content": "生成文档",
+        "translation": "翻译",
+        "mindMap": "思维导图",
+        "graphify": "图谱",
         "complete": "完成"
       }
     },

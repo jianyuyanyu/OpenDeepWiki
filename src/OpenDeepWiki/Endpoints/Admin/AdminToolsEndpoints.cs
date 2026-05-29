@@ -16,6 +16,8 @@ public static class AdminToolsEndpoints
 
         MapMcpEndpoints(toolsGroup);
         MapSkillEndpoints(toolsGroup);
+        MapAiProviderEndpoints(toolsGroup);
+        MapAiModelEndpoints(toolsGroup);
         MapModelEndpoints(toolsGroup);
 
         return group;
@@ -201,5 +203,130 @@ public static class AdminToolsEndpoints
             return result ? Results.Ok(new { success = true })
                 : Results.NotFound(new { success = false });
         }).WithName("AdminDeleteModel");
+    }
+
+    private static void MapAiProviderEndpoints(RouteGroupBuilder group)
+    {
+        var providerGroup = group.MapGroup("/ai-providers");
+
+        providerGroup.MapGet("/", async ([FromServices] IAdminToolsService toolsService) =>
+        {
+            var result = await toolsService.GetAiProvidersAsync();
+            return Results.Ok(new { success = true, data = result });
+        }).WithName("AdminGetAiProviders");
+
+        providerGroup.MapPost("/", async (
+            [FromBody] AiProviderConfigRequest request,
+            [FromServices] IAdminToolsService toolsService) =>
+        {
+            var result = await toolsService.CreateAiProviderAsync(request);
+            return Results.Ok(new { success = true, data = result });
+        }).WithName("AdminCreateAiProvider");
+
+        providerGroup.MapPut("/{id}", async (
+            string id,
+            [FromBody] AiProviderConfigRequest request,
+            [FromServices] IAdminToolsService toolsService) =>
+        {
+            var result = await toolsService.UpdateAiProviderAsync(id, request);
+            return result ? Results.Ok(new { success = true })
+                : Results.NotFound(new { success = false });
+        }).WithName("AdminUpdateAiProvider");
+
+        providerGroup.MapDelete("/{id}", async (
+            string id,
+            [FromServices] IAdminToolsService toolsService) =>
+        {
+            var result = await toolsService.DeleteAiProviderAsync(id);
+            return result ? Results.Ok(new { success = true })
+                : Results.NotFound(new { success = false });
+        }).WithName("AdminDeleteAiProvider");
+
+        providerGroup.MapPost("/{id}/discover-models", async (
+            string id,
+            [FromServices] IAdminToolsService toolsService,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var result = await toolsService.DiscoverAiModelsAsync(id, cancellationToken);
+                return Results.Ok(new { success = true, data = result });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (HttpRequestException ex)
+            {
+                return Results.BadRequest(new { success = false, message = ex.Message });
+            }
+        }).WithName("AdminDiscoverAiModels");
+
+        providerGroup.MapPost("/{id}/test-connectivity", async (
+            string id,
+            [FromBody] AiProviderConnectivityTestRequest request,
+            [FromServices] IAdminToolsService toolsService,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                var result = await toolsService.TestAiProviderConnectivityAsync(id, request, cancellationToken);
+                return result.Success
+                    ? Results.Ok(new { success = true, data = result })
+                    : Results.BadRequest(new { success = false, message = result.Message, data = result });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (HttpRequestException ex)
+            {
+                return Results.BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                return Results.BadRequest(new { success = false, message = $"Connectivity check timed out: {ex.Message}" });
+            }
+        }).WithName("AdminTestAiProviderConnectivity");
+    }
+
+    private static void MapAiModelEndpoints(RouteGroupBuilder group)
+    {
+        var modelGroup = group.MapGroup("/ai-models");
+
+        modelGroup.MapGet("/", async (
+            [FromQuery] string? providerId,
+            [FromServices] IAdminToolsService toolsService) =>
+        {
+            var result = await toolsService.GetAiModelsAsync(providerId);
+            return Results.Ok(new { success = true, data = result });
+        }).WithName("AdminGetAiModels");
+
+        modelGroup.MapPost("/", async (
+            [FromBody] AiModelConfigRequest request,
+            [FromServices] IAdminToolsService toolsService) =>
+        {
+            var result = await toolsService.CreateAiModelAsync(request);
+            return Results.Ok(new { success = true, data = result });
+        }).WithName("AdminCreateAiModel");
+
+        modelGroup.MapPut("/{id}", async (
+            string id,
+            [FromBody] AiModelConfigRequest request,
+            [FromServices] IAdminToolsService toolsService) =>
+        {
+            var result = await toolsService.UpdateAiModelAsync(id, request);
+            return result ? Results.Ok(new { success = true })
+                : Results.NotFound(new { success = false });
+        }).WithName("AdminUpdateAiModel");
+
+        modelGroup.MapDelete("/{id}", async (
+            string id,
+            [FromServices] IAdminToolsService toolsService) =>
+        {
+            var result = await toolsService.DeleteAiModelAsync(id);
+            return result ? Results.Ok(new { success = true })
+                : Results.NotFound(new { success = false });
+        }).WithName("AdminDeleteAiModel");
     }
 }

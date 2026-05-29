@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.AI;
 using OpenDeepWiki.Services.Chat;
 using OpenDeepWiki.Services.Repositories;
 
@@ -55,7 +56,7 @@ public class EmbedServiceSecurityPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 var (isValid, errorCode, _) = embedService.ValidateAppAsync(invalidAppId)
                     .GetAwaiter().GetResult();
@@ -82,7 +83,7 @@ public class EmbedServiceSecurityPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 // Create a valid app
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -119,7 +120,7 @@ public class EmbedServiceSecurityPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 // Create and then deactivate the app
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -161,7 +162,7 @@ public class EmbedServiceSecurityPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 // Create app without API key
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -206,7 +207,7 @@ public class EmbedServiceSecurityPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 // Create app with domain validation enabled
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -245,7 +246,7 @@ public class EmbedServiceSecurityPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 // Create app with domain validation enabled
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -284,7 +285,7 @@ public class EmbedServiceSecurityPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 // Create app with domain validation disabled
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto

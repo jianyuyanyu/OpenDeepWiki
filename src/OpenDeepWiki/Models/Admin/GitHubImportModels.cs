@@ -55,6 +55,7 @@ public class BatchImportRequest
     public long InstallationId { get; set; }
     public string DepartmentId { get; set; } = string.Empty;
     public string LanguageCode { get; set; } = "en";
+    public bool GenerateSkill { get; set; } = true;
     public List<BatchImportRepo> Repos { get; set; } = new();
 }
 

@@ -66,6 +66,9 @@ public class ChatApp : AggregateRoot<Guid>
     [StringLength(50)]
     public string ProviderType { get; set; } = "OpenAI";
 
+    [StringLength(100)]
+    public string? AiProviderId { get; set; }
+
     /// <summary>
     /// API密钥
     /// </summary>

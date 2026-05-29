@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   GitBranch,
-  Settings,
   Shield,
   Users,
   Cog,
@@ -60,7 +59,9 @@ const getNavItems = (t: (key: string) => string): NavItem[] => [
     children: [
       { href: "/admin/tools/mcps", label: t("common.admin.mcps") },
       { href: "/admin/tools/skills", label: t("common.admin.skills") },
-      { href: "/admin/tools/models", label: t("common.admin.models") },
+      { href: "/admin/tools/ai-providers", label: t("admin.toolPages.aiProviders") },
+      { href: "/admin/tools/models", label: t("admin.toolPages.models") },
+      { href: "/admin/tools/model-configs", label: t("admin.toolPages.modelConfigs") },
       { href: "/admin/mcp-providers", label: t("admin.mcpProviders.title") },
     ],
   },

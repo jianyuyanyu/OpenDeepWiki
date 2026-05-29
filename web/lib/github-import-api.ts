@@ -81,6 +81,7 @@ export async function userImportRepos(request: {
   installationId: number;
   departmentId?: string;
   languageCode: string;
+  generateSkill: boolean;
   repos: {
     fullName: string;
     name: string;

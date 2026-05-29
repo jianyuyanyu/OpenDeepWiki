@@ -18,7 +18,7 @@ interface CodeBlockProps {
   code: string;
   language: string;
   isDark: boolean;
-  locale: "zh" | "en";
+  locale: keyof typeof repoMarkdownText;
 }
 
 const repoMarkdownText = {
@@ -41,6 +41,26 @@ const repoMarkdownText = {
     loading: "Loading diagram...",
     enlarge: "Click to enlarge",
     copyCode: "Copy code",
+  },
+  ja: {
+    zoomOut: "縮小",
+    zoomIn: "拡大",
+    resetView: "表示をリセット",
+    close: "閉じる (ESC)",
+    hint: "ホイールでズーム ・ ドラッグで移動 ・ ESCで閉じる",
+    loading: "図を読み込み中...",
+    enlarge: "クリックで拡大",
+    copyCode: "コードをコピー",
+  },
+  ko: {
+    zoomOut: "축소",
+    zoomIn: "확대",
+    resetView: "보기 초기화",
+    close: "닫기 (ESC)",
+    hint: "스크롤로 확대/축소 · 드래그로 이동 · ESC로 닫기",
+    loading: "다이어그램 불러오는 중...",
+    enlarge: "클릭하여 확대",
+    copyCode: "코드 복사",
   },
 } as const;
 
@@ -77,7 +97,7 @@ function MermaidFullscreenModal({
   svg: string; 
   isOpen: boolean; 
   onClose: () => void;
-  locale: "zh" | "en";
+  locale: keyof typeof repoMarkdownText;
 }) {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -234,7 +254,7 @@ function MermaidFullscreenModal({
 }
 
 // Mermaid 图表组件
-function MermaidDiagram({ code, isDark, locale }: { code: string; isDark: boolean; locale: "zh" | "en" }) {
+function MermaidDiagram({ code, isDark, locale }: { code: string; isDark: boolean; locale: keyof typeof repoMarkdownText }) {
   const id = useId().replace(/:/g, "");
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -428,7 +448,13 @@ function createHeadingIdMap(texts: string[]): Map<string, string[]> {
 }
 
 export function MarkdownRenderer({ content, language }: MarkdownRendererProps) {
-  const locale = language === "en" ? "en" : "zh";
+  const locale = language === "en"
+    ? "en"
+    : language === "ja"
+      ? "ja"
+      : language === "ko"
+        ? "ko"
+        : "zh";
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   

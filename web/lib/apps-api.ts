@@ -18,6 +18,7 @@ export interface CreateChatAppDto {
   iconUrl?: string
   enableDomainValidation: boolean
   allowedDomains?: string[]
+  aiProviderId?: string
   providerType: string
   apiKey?: string
   baseUrl?: string
@@ -35,6 +36,7 @@ export interface UpdateChatAppDto {
   iconUrl?: string
   enableDomainValidation?: boolean
   allowedDomains?: string[]
+  aiProviderId?: string
   providerType?: string
   apiKey?: string
   baseUrl?: string
@@ -57,6 +59,7 @@ export interface ChatAppDto {
   appSecret?: string
   enableDomainValidation: boolean
   allowedDomains: string[]
+  aiProviderId?: string
   providerType: string
   apiKey?: string
   baseUrl?: string
@@ -178,6 +181,28 @@ export async function regenerateAppSecret(id: string): Promise<{ appSecret: stri
   return api.post<{ appSecret: string }>(`/api/v1/apps/${id}/regenerate-secret`)
 }
 
+export interface AppAiProvider {
+  id: string
+  name: string
+  providerType: string
+  defaultModelId?: string
+}
+
+export interface AppAiModel {
+  id: string
+  modelId: string
+  name: string
+  isDefault: boolean
+}
+
+export async function getAppAiProviders(): Promise<AppAiProvider[]> {
+  return api.get<AppAiProvider[]>('/api/v1/apps/ai-providers')
+}
+
+export async function getAppAiModels(providerId: string): Promise<AppAiModel[]> {
+  return api.get<AppAiModel[]>(`/api/v1/apps/ai-providers/${providerId}/models`)
+}
+
 // ==================== 统计 API ====================
 
 /**
@@ -228,6 +253,7 @@ export async function getAppLogs(
  */
 export const PROVIDER_TYPES = [
   { value: 'OpenAI', label: 'OpenAI' },
+  { value: 'DeepSeekOpenAI', label: 'DeepSeek OpenAI' },
   { value: 'OpenAIResponses', label: 'OpenAI Responses' },
   { value: 'Anthropic', label: 'Anthropic' },
 ] as const

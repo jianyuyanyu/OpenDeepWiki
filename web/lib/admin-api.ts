@@ -53,14 +53,24 @@ export interface DailyTokenUsage {
   date: string;
   inputTokens: number;
   outputTokens: number;
+  cachedInputTokens: number;
   totalTokens: number;
+  inputCacheHitRate: number;
+  inputCost: number;
+  outputCost: number;
+  totalCost: number;
 }
 
 export interface TokenUsageStatistics {
   dailyUsages: DailyTokenUsage[];
   totalInputTokens: number;
   totalOutputTokens: number;
+  totalCachedInputTokens: number;
   totalTokens: number;
+  inputCacheHitRate: number;
+  totalInputCost: number;
+  totalOutputCost: number;
+  totalCost: number;
 }
 
 export interface McpDailyUsage {
@@ -218,6 +228,7 @@ export interface AdminRepository {
   repoName: string;
   orgName: string;
   isPublic: boolean;
+  generateSkill: boolean;
   status: number;
   statusText: string;
   starCount: number;
@@ -842,14 +853,106 @@ export async function refreshSkills(): Promise<void> {
 export interface ModelConfig {
   id: string;
   name: string;
+  aiProviderId?: string;
+  aiProviderName?: string;
   provider: string;
   modelId: string;
-  endpoint?: string;
-  apiKey?: string;
   isDefault: boolean;
   isActive: boolean;
   description?: string;
   createdAt: string;
+}
+
+export interface AiProviderConfig {
+  id: string;
+  name: string;
+  displayName?: string;
+  providerType: string;
+  baseUrl: string;
+  hasApiKey: boolean;
+  authType: string;
+  isBuiltIn: boolean;
+  isActive: boolean;
+  supportsModelDiscovery: boolean;
+  modelsEndpoint?: string;
+  defaultModelId?: string;
+  systemProxyUrl?: string;
+  oauthConfigJson?: string;
+  channelConfigJson?: string;
+  accountsJson?: string;
+  requestOverridesJson?: string;
+  iconUrl?: string;
+  description?: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface AiProviderConfigRequest {
+  name: string;
+  displayName?: string;
+  providerType: string;
+  baseUrl: string;
+  apiKey?: string;
+  authType: string;
+  isBuiltIn?: boolean;
+  isActive?: boolean;
+  supportsModelDiscovery?: boolean;
+  modelsEndpoint?: string;
+  defaultModelId?: string;
+  systemProxyUrl?: string;
+  oauthConfigJson?: string;
+  channelConfigJson?: string;
+  accountsJson?: string;
+  requestOverridesJson?: string;
+  iconUrl?: string;
+  description?: string;
+  sortOrder?: number;
+}
+
+export interface AiModelConfig {
+  id: string;
+  providerId: string;
+  providerName?: string;
+  modelId: string;
+  name: string;
+  displayName?: string;
+  modelType: string;
+  providerType?: string;
+  contextWindow?: number;
+  maxOutputTokens?: number;
+  inputTokenPrice?: number;
+  outputTokenPrice?: number;
+  supportsThinking: boolean;
+  supportsVision: boolean;
+  supportsTools: boolean;
+  supportsJsonMode: boolean;
+  isDefault: boolean;
+  isActive: boolean;
+  capabilitiesJson?: string;
+  thinkingConfigJson?: string;
+  requestOverridesJson?: string;
+  tagsJson?: string;
+  description?: string;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export type AiModelConfigRequest = Omit<AiModelConfig, "id" | "providerName" | "createdAt">;
+
+export interface AiProviderConnectivityTestRequest {
+  modelId?: string;
+  providerType?: string;
+  baseUrl?: string;
+  apiKey?: string;
+}
+
+export interface AiProviderConnectivityTestResult {
+  success: boolean;
+  message: string;
+  providerType: string;
+  modelId: string;
+  statusCode?: number;
+  latencyMs: number;
 }
 
 export async function getModelConfigs(): Promise<ModelConfig[]> {
@@ -858,12 +961,86 @@ export async function getModelConfigs(): Promise<ModelConfig[]> {
   return result.data;
 }
 
+export async function getAiProviders(): Promise<AiProviderConfig[]> {
+  const url = buildApiUrl("/api/admin/tools/ai-providers");
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function createAiProvider(data: AiProviderConfigRequest): Promise<AiProviderConfig> {
+  const url = buildApiUrl("/api/admin/tools/ai-providers");
+  const result = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return result.data;
+}
+
+export async function updateAiProvider(id: string, data: AiProviderConfigRequest): Promise<void> {
+  const url = buildApiUrl(`/api/admin/tools/ai-providers/${id}`);
+  await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteAiProvider(id: string): Promise<void> {
+  const url = buildApiUrl(`/api/admin/tools/ai-providers/${id}`);
+  await fetchWithAuth(url, { method: "DELETE" });
+}
+
+export async function getAiModels(providerId?: string): Promise<AiModelConfig[]> {
+  const params = providerId ? `?providerId=${encodeURIComponent(providerId)}` : "";
+  const url = buildApiUrl(`/api/admin/tools/ai-models${params}`);
+  const result = await fetchWithAuth(url);
+  return result.data;
+}
+
+export async function createAiModel(data: AiModelConfigRequest): Promise<AiModelConfig> {
+  const url = buildApiUrl("/api/admin/tools/ai-models");
+  const result = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return result.data;
+}
+
+export async function updateAiModel(id: string, data: AiModelConfigRequest): Promise<void> {
+  const url = buildApiUrl(`/api/admin/tools/ai-models/${id}`);
+  await fetchWithAuth(url, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteAiModel(id: string): Promise<void> {
+  const url = buildApiUrl(`/api/admin/tools/ai-models/${id}`);
+  await fetchWithAuth(url, { method: "DELETE" });
+}
+
+export async function discoverAiModels(providerId: string): Promise<AiModelConfig[]> {
+  const url = buildApiUrl(`/api/admin/tools/ai-providers/${providerId}/discover-models`);
+  const result = await fetchWithAuth(url, { method: "POST" });
+  return result.data;
+}
+
+export async function testAiProviderConnectivity(
+  providerId: string,
+  request: AiProviderConnectivityTestRequest
+): Promise<AiProviderConnectivityTestResult> {
+  const url = buildApiUrl(`/api/admin/tools/ai-providers/${providerId}/test-connectivity`);
+  const result = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
+  return result.data;
+}
+
 export async function createModelConfig(data: {
   name: string;
-  provider: string;
+  aiProviderId?: string;
+  provider?: string;
   modelId: string;
-  endpoint?: string;
-  apiKey?: string;
   isDefault?: boolean;
   isActive?: boolean;
   description?: string;
@@ -878,10 +1055,9 @@ export async function createModelConfig(data: {
 
 export async function updateModelConfig(id: string, data: {
   name?: string;
+  aiProviderId?: string;
   provider?: string;
   modelId?: string;
-  endpoint?: string;
-  apiKey?: string;
   isDefault?: boolean;
   isActive?: boolean;
   description?: string;
@@ -997,14 +1173,12 @@ export interface ProviderModel {
 }
 
 export async function listProviderModels(
-  endpoint: string,
-  apiKey: string,
-  requestType: string
+  providerId: string
 ): Promise<ProviderModel[]> {
   const url = buildApiUrl("/api/admin/settings/list-provider-models");
   const result = await fetchWithAuth(url, {
     method: "POST",
-    body: JSON.stringify({ endpoint, apiKey, requestType }),
+    body: JSON.stringify({ providerId }),
   });
   return result.data?.models || [];
 }
@@ -1153,6 +1327,21 @@ export interface SelectableItem {
   isSelected: boolean;
 }
 
+export interface SelectableModelItem extends SelectableItem {
+  aiProviderId?: string;
+  aiProviderName?: string;
+  aiProviderType?: string;
+  aiProviderIsActive: boolean;
+  modelId: string;
+  modelName?: string;
+  modelDisplayName?: string;
+  contextWindow?: number;
+  supportsThinking: boolean;
+  supportsVision: boolean;
+  supportsTools: boolean;
+  supportsJsonMode: boolean;
+}
+
 export interface ChatAssistantConfig {
   id: string;
   isEnabled: boolean;
@@ -1160,13 +1349,14 @@ export interface ChatAssistantConfig {
   enabledMcpIds: string[];
   enabledSkillIds: string[];
   defaultModelId?: string;
+  enableImageUpload: boolean;
   createdAt: string;
   updatedAt?: string;
 }
 
 export interface ChatAssistantConfigOptions {
   config: ChatAssistantConfig;
-  availableModels: SelectableItem[];
+  availableModels: SelectableModelItem[];
   availableMcps: SelectableItem[];
   availableSkills: SelectableItem[];
 }
@@ -1177,6 +1367,7 @@ export interface UpdateChatAssistantConfigRequest {
   enabledMcpIds: string[];
   enabledSkillIds: string[];
   defaultModelId?: string;
+  enableImageUpload?: boolean;
 }
 
 export async function getChatAssistantConfig(): Promise<ChatAssistantConfigOptions> {
@@ -1299,6 +1490,7 @@ export async function batchImportRepos(request: {
   installationId: number;
   departmentId: string;
   languageCode: string;
+  generateSkill: boolean;
   repos: {
     fullName: string;
     name: string;

@@ -1,31 +1,16 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useSearchParams, usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import type { RepoTreeNode, RepoBranchesResponse } from "@/types/repository";
+import { useTranslations } from "next-intl";
+import { ChevronRight, Download, Home, Network, Sparkles } from "lucide-react";
+import type { RepoBranchesResponse, RepoTreeNode } from "@/types/repository";
 import { BranchLanguageSelector } from "./branch-language-selector";
-import { fetchRepoTree, fetchRepoBranches } from "@/lib/repository-api";
-import { ChevronDown, ChevronRight, Network, Download, Sparkles } from "lucide-react";
+import { fetchRepoBranches, fetchRepoTree } from "@/lib/repository-api";
 import { ChatAssistant, buildCatalogMenu } from "@/components/chat";
 import { buildRepoBasePath, buildRepoDocPath, buildRepoGraphifyPath, buildRepoMindMapPath } from "@/lib/repo-route";
-
-const repoUiText = {
-  zh: {
-    wikiTitle: "仓库 Wiki",
-    mindMap: "项目架构",
-    exportDocs: "导出文档",
-    graphify: "Graphify",
-    exporting: "导出中...",
-  },
-  en: {
-    wikiTitle: "Repository Wiki",
-    mindMap: "Project Architecture",
-    exportDocs: "Export Docs",
-    graphify: "Graphify",
-    exporting: "Exporting...",
-  },
-} as const;
+import { cn } from "@/lib/utils";
 
 interface RepoShellProps {
   owner: string;
@@ -36,7 +21,56 @@ interface RepoShellProps {
   initialBranch?: string;
   initialLanguage?: string;
   initialHasGraphifyArtifact?: boolean;
-  uiLocale?: "zh" | "en";
+}
+
+interface SidebarTreeLabels {
+  expandSection: string;
+  collapseSection: string;
+}
+
+function collectExpandableSlugs(items: RepoTreeNode[]) {
+  const expanded = new Set<string>();
+
+  const walk = (tree: RepoTreeNode[]) => {
+    for (const item of tree) {
+      const children = item.children ?? [];
+      if (children.length === 0) {
+        continue;
+      }
+
+      expanded.add(item.slug);
+      walk(children);
+    }
+  };
+
+  walk(items);
+  return expanded;
+}
+
+function collectParentSlugs(items: RepoTreeNode[], targetPath: string) {
+  const parents = new Set<string>();
+
+  const walk = (tree: RepoTreeNode[]): boolean => {
+    for (const item of tree) {
+      if (item.slug === targetPath) {
+        return true;
+      }
+
+      const children = item.children ?? [];
+      if (children.length > 0 && walk(children)) {
+        parents.add(item.slug);
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  if (targetPath) {
+    walk(items);
+  }
+
+  return parents;
 }
 
 function SidebarTree({
@@ -45,6 +79,7 @@ function SidebarTree({
   repo,
   queryString,
   currentPath,
+  labels,
   depth = 0,
 }: {
   nodes: RepoTreeNode[];
@@ -52,24 +87,35 @@ function SidebarTree({
   repo: string;
   queryString: string;
   currentPath: string;
+  labels: SidebarTreeLabels;
   depth?: number;
 }) {
-  // 追踪每个目录节点的展开/折叠状态
-  const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(() => {
-    const expanded = new Set<string>();
-    const expandParents = (items: RepoTreeNode[], targetPath: string): boolean => {
-      for (const item of items) {
-        if (item.slug === targetPath) return true;
-        if (item.children && item.children.length > 0 && expandParents(item.children, targetPath)) {
-          expanded.add(item.slug);
-          return true;
+  const [expandedSlugs, setExpandedSlugs] = useState<Set<string>>(() => collectExpandableSlugs(nodes));
+
+  useEffect(() => {
+    setExpandedSlugs(collectExpandableSlugs(nodes));
+  }, [nodes]);
+
+  useEffect(() => {
+    const parentSlugs = collectParentSlugs(nodes, currentPath);
+    if (parentSlugs.size === 0) {
+      return;
+    }
+
+    setExpandedSlugs((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+
+      parentSlugs.forEach((slug) => {
+        if (!next.has(slug)) {
+          next.add(slug);
+          changed = true;
         }
-      }
-      return false;
-    };
-    if (currentPath) expandParents(nodes, currentPath);
-    return expanded;
-  });
+      });
+
+      return changed ? next : prev;
+    });
+  }, [currentPath, nodes]);
 
   const toggleExpand = (slug: string) => {
     setExpandedSlugs((prev) => {
@@ -84,10 +130,10 @@ function SidebarTree({
   };
 
   return (
-    <ul className={depth === 0 ? "space-y-1" : "mt-1 space-y-1 border-l border-border/60 pl-3"}>
+    <ul className={cn(depth === 0 ? "space-y-0.5" : "ml-2 mt-0.5 space-y-0.5 border-l border-border/50 pl-2")}>
       {nodes.map((node) => {
-        const hasChildren = node.children && node.children.length > 0;
-        const isDirectory = hasChildren;
+        const children = node.children ?? [];
+        const isDirectory = children.length > 0;
         const isExpanded = expandedSlugs.has(node.slug);
         const isActive = currentPath === node.slug;
         const href = queryString
@@ -95,59 +141,78 @@ function SidebarTree({
           : buildRepoDocPath(owner, repo, node.slug);
 
         return (
-          <li key={node.slug}>
-            <div className="flex items-center">
-              {/* 目录节点显示展开/折叠箭头 */}
-              {isDirectory && (
-                <button
-                  type="button"
-                  onClick={() => toggleExpand(node.slug)}
-                  className="flex h-6 w-4 shrink-0 items-center justify-center hover:text-foreground"
-                >
-                  {isExpanded ? (
-                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                  )}
-                </button>
-              )}
-              {/* 节点标题 */}
+          <li key={node.slug} className="min-w-0">
+            <div className="flex min-w-0 items-center gap-1">
               {isDirectory ? (
                 <button
                   type="button"
+                  aria-expanded={isExpanded}
+                  aria-label={isExpanded ? labels.collapseSection : labels.expandSection}
                   onClick={() => toggleExpand(node.slug)}
-                  className={[
-                    "flex-1 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                  className="flex size-5 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <ChevronRight
+                    className={cn(
+                      "size-3.5 transition-transform duration-200 ease-out motion-reduce:transition-none",
+                      isExpanded && "rotate-90"
+                    )}
+                  />
+                </button>
+              ) : (
+                <span className="size-5 shrink-0" aria-hidden="true" />
+              )}
+
+              {isDirectory ? (
+                <button
+                  type="button"
+                  title={node.title}
+                  onClick={() => toggleExpand(node.slug)}
+                  className={cn(
+                    "min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-[13px] leading-5 transition-colors",
                     isActive
-                      ? "bg-primary text-primary-foreground font-medium"
-                      : "text-foreground/80 hover:bg-muted hover:text-foreground",
-                  ].join(" ")}
+                      ? "bg-primary/10 font-medium text-primary ring-1 ring-primary/15"
+                      : "text-foreground/80 hover:bg-muted hover:text-foreground"
+                  )}
                 >
                   {node.title}
                 </button>
               ) : (
                 <Link
                   href={href}
-                  className={[
-                    "block flex-1 rounded-md px-3 py-2 text-sm transition-colors",
+                  title={node.title}
+                  className={cn(
+                    "block min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-[13px] leading-5 transition-colors",
                     isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-foreground/80 hover:bg-muted hover:text-foreground",
-                  ].join(" ")}
+                      ? "bg-primary font-medium text-primary-foreground shadow-sm"
+                      : "text-foreground/80 hover:bg-muted hover:text-foreground"
+                  )}
                 >
                   {node.title}
                 </Link>
               )}
             </div>
-            {isDirectory && isExpanded && (
-              <SidebarTree
-                nodes={node.children}
-                owner={owner}
-                repo={repo}
-                queryString={queryString}
-                currentPath={currentPath}
-                depth={depth + 1}
-              />
+
+            {isDirectory && (
+              <div
+                aria-hidden={!isExpanded}
+                inert={isExpanded ? undefined : true}
+                className={cn(
+                  "grid transition-[grid-template-rows,opacity,transform] duration-200 ease-out motion-reduce:transition-none",
+                  isExpanded ? "grid-rows-[1fr] translate-y-0 opacity-100" : "grid-rows-[0fr] -translate-y-1 opacity-0"
+                )}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <SidebarTree
+                    nodes={children}
+                    owner={owner}
+                    repo={repo}
+                    queryString={queryString}
+                    currentPath={currentPath}
+                    labels={labels}
+                    depth={depth + 1}
+                  />
+                </div>
+              </div>
             )}
           </li>
         );
@@ -156,23 +221,23 @@ function SidebarTree({
   );
 }
 
-export function RepoShell({ 
-  owner, 
-  repo, 
-  initialNodes, 
+export function RepoShell({
+  owner,
+  repo,
+  initialNodes,
   children,
   initialBranches,
   initialBranch,
   initialLanguage,
   initialHasGraphifyArtifact = false,
-  uiLocale = "zh",
 }: RepoShellProps) {
+  const t = useTranslations("common");
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const urlBranch = searchParams.get("branch");
   const urlLang = searchParams.get("lang");
   const repoBasePath = buildRepoBasePath(owner, repo);
-  
+
   const [nodes, setNodes] = useState<RepoTreeNode[]>(initialNodes);
   const [branches, setBranches] = useState<RepoBranchesResponse | undefined>(initialBranches);
   const [currentBranch, setCurrentBranch] = useState(initialBranch || "");
@@ -180,11 +245,8 @@ export function RepoShell({
   const [hasGraphifyArtifact, setHasGraphifyArtifact] = useState(initialHasGraphifyArtifact);
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const copy = repoUiText[uiLocale];
 
-  // 从pathname提取当前文档路径
   const currentDocPath = React.useMemo(() => {
-    // pathname格式: /owner/repo/slug 或 /owner/repo/path/to/doc
     const encodedPrefix = `${repoBasePath}/`;
     if (pathname.startsWith(encodedPrefix)) {
       return pathname.slice(encodedPrefix.length);
@@ -197,17 +259,14 @@ export function RepoShell({
     return "";
   }, [pathname, owner, repo, repoBasePath]);
 
-  // 当 URL 参数变化时，重新获取数据
   useEffect(() => {
     const branch = urlBranch || undefined;
     const lang = urlLang || undefined;
-    
-    // 如果没有指定参数，使用初始值
+
     if (!branch && !lang) {
       return;
     }
 
-    // 如果参数和当前状态相同，不需要重新获取
     if (branch === currentBranch && lang === currentLanguage) {
       return;
     }
@@ -219,7 +278,7 @@ export function RepoShell({
           fetchRepoTree(owner, repo, branch, lang),
           fetchRepoBranches(owner, repo),
         ]);
-        
+
         if (treeData.nodes.length > 0) {
           setNodes(treeData.nodes);
           setCurrentBranch(treeData.currentBranch || "");
@@ -239,11 +298,9 @@ export function RepoShell({
     fetchData();
   }, [urlBranch, urlLang, owner, repo, currentBranch, currentLanguage]);
 
-  // 构建查询字符串 - 优先使用 URL 参数，确保链接始终保持当前 URL 的参数
   const queryString = searchParams.toString();
 
-  // 构建思维导图链接
-  const mindMapUrl = queryString 
+  const mindMapUrl = queryString
     ? `${buildRepoMindMapPath(owner, repo)}?${queryString}`
     : buildRepoMindMapPath(owner, repo);
 
@@ -251,43 +308,39 @@ export function RepoShell({
     ? `${buildRepoGraphifyPath(owner, repo)}?${queryString}`
     : buildRepoGraphifyPath(owner, repo);
 
-  // 导出功能处理
   const handleExport = async () => {
     if (isExporting) return;
-    
+
     setIsExporting(true);
     try {
       const params = new URLSearchParams();
       if (currentBranch) params.set("branch", currentBranch);
       if (currentLanguage) params.set("lang", currentLanguage);
-      
-      const exportUrl = `/api/v1/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/export${params.toString() ? `?${params.toString()}` : ""}`;
-      
+
+      const exportUrl = `/api/v1/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/export${
+        params.toString() ? `?${params.toString()}` : ""
+      }`;
+
       const response = await fetch(exportUrl);
       if (!response.ok) {
-        throw new Error(copy.exportDocs);
+        throw new Error(t("repository.exportSkill"));
       }
-      
-      // 获取文件名
+
       const contentDisposition = response.headers.get("content-disposition");
-      let fileName = `${owner}-${repo}-${currentBranch || "main"}-${currentLanguage || "zh"}.zip`;
+      let fileName = `${owner}-${repo}-${currentBranch || "main"}-${currentLanguage || "zh"}-skill.zip`;
       if (contentDisposition) {
         const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
         if (fileNameMatch?.[1]) {
           fileName = fileNameMatch[1].replace(/['"]/g, "");
         }
       }
-      
-      // 获取原始字节数据
-      const rawBytes = await response.arrayBuffer();
 
-      // MiniApi 框架会将 FileContentResult 序列化为 JSON（包含 base64 编码的 fileContents 字段）
-      // 需要检测并解码，否则直接使用原始数据
-      let blob: Blob;
+      const rawBytes = await response.arrayBuffer();
       const textDecoder = new TextDecoder();
       const textPreview = textDecoder.decode(rawBytes.slice(0, 50));
 
-      if (textPreview.startsWith('{"') && textPreview.includes('fileContents')) {
+      let blob: Blob;
+      if (textPreview.startsWith('{"') && textPreview.includes("fileContents")) {
         const jsonString = textDecoder.decode(rawBytes);
         const json = JSON.parse(jsonString);
         const base64Content = json.fileContents as string;
@@ -301,7 +354,6 @@ export function RepoShell({
         blob = new Blob([rawBytes], { type: "application/zip" });
       }
 
-      // 下载文件
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -312,51 +364,54 @@ export function RepoShell({
       document.body.removeChild(a);
     } catch (error) {
       console.error("Export failed:", error);
-      // 可以在这里添加错误提示
     } finally {
       setIsExporting(false);
     }
   };
 
   const title = `${owner}/${repo}`;
+  const sidebarLabels = {
+    expandSection: t("repository.expandSection"),
+    collapseSection: t("repository.collapseSection"),
+  };
 
-  // 构建侧边栏顶部的选择器和操作按钮
   const sidebarBanner = (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {branches && (
-        <BranchLanguageSelector
-          owner={owner}
-          repo={repo}
-          branches={branches}
-          currentBranch={currentBranch}
-          currentLanguage={currentLanguage}
-        />
+        <div className="-mx-3 -mt-3">
+          <BranchLanguageSelector
+            owner={owner}
+            repo={repo}
+            branches={branches}
+            currentBranch={currentBranch}
+            currentLanguage={currentLanguage}
+          />
+        </div>
       )}
-      <div className="space-y-2">
+      <div className="grid gap-1.5">
         <Link
           href={mindMapUrl}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20 transition-colors"
+          className="flex items-center gap-2 rounded-lg border border-blue-500/25 bg-blue-500/10 px-2.5 py-1.5 text-[13px] font-medium leading-5 text-blue-700 transition-colors hover:bg-blue-500/15 dark:text-blue-300"
         >
-          <Network className="h-4 w-4" />
-          <span className="font-medium text-sm">{copy.mindMap}</span>
+          <Network className="size-3.5" />
+          <span>{t("repository.mindMap")}</span>
         </Link>
         <button
+          type="button"
           onClick={handleExport}
           disabled={isExporting}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-300 hover:bg-green-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full"
+          className="flex w-full items-center gap-2 rounded-lg border border-green-500/25 bg-green-500/10 px-2.5 py-1.5 text-[13px] font-medium leading-5 text-green-700 transition-colors hover:bg-green-500/15 disabled:cursor-not-allowed disabled:opacity-50 dark:text-green-300"
         >
-          <Download className="h-4 w-4" />
-            <span className="font-medium text-sm">
-              {isExporting ? copy.exporting : copy.exportDocs}
-            </span>
+          <Download className="size-3.5" />
+          <span>{isExporting ? t("repository.exporting") : t("repository.exportSkill")}</span>
         </button>
         {hasGraphifyArtifact && (
           <Link
             href={graphifyUrl}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/30 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 transition-colors"
+            className="flex items-center gap-2 rounded-lg border border-purple-500/25 bg-purple-500/10 px-2.5 py-1.5 text-[13px] font-medium leading-5 text-purple-700 transition-colors hover:bg-purple-500/15 dark:text-purple-300"
           >
-            <Sparkles className="h-4 w-4" />
-            <span className="font-medium text-sm">{copy.graphify}</span>
+            <Sparkles className="size-3.5" />
+            <span>{t("repository.graphify")}</span>
           </Link>
         )}
       </div>
@@ -364,37 +419,48 @@ export function RepoShell({
   );
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="border-b border-border/70 bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-6 py-4">
-          <div>
-            <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{copy.wikiTitle}</div>
-            <div className="text-lg font-semibold">{title}</div>
+    <div className="flex h-svh flex-col overflow-hidden bg-background">
+      <div className="shrink-0 border-b border-border/70 bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3 lg:px-6">
+          <div className="min-w-0">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              {t("repository.wikiTitle")}
+            </div>
+            <div className="truncate text-base font-semibold sm:text-lg">{title}</div>
           </div>
+          <Link
+            href="/"
+            aria-label={t("backToHome")}
+            className="inline-flex h-9 shrink-0 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+          >
+            <Home className="h-4 w-4" />
+            <span className="hidden sm:inline">{t("backToHome")}</span>
+          </Link>
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 lg:flex-row lg:px-6">
-        <aside className="w-full shrink-0 lg:sticky lg:top-6 lg:w-80 lg:self-start">
-          <div className="rounded-xl border border-border/70 bg-card p-4 shadow-sm">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-5 overflow-hidden px-4 py-5 lg:flex-row lg:px-5">
+        <aside className="min-h-0 w-full shrink-0 lg:w-72">
+          <div className="flex max-h-[38svh] min-h-0 flex-col overflow-hidden rounded-xl border border-border/70 bg-card p-3 shadow-sm lg:h-full lg:max-h-none">
             {sidebarBanner}
-            <div className="mt-4 border-t border-border/70 pt-4">
+            <div className="wiki-scrollbar mt-3 min-h-0 overflow-y-auto border-t border-border/70 pt-3 pr-1">
               <SidebarTree
                 nodes={nodes}
                 owner={owner}
                 repo={repo}
                 queryString={queryString}
                 currentPath={currentDocPath}
+                labels={sidebarLabels}
               />
             </div>
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1">
-          <div className="rounded-xl border border-border/70 bg-card p-4 shadow-sm sm:p-6">
+        <main className="min-h-0 min-w-0 flex-1">
+          <div className="wiki-scrollbar h-full min-h-0 overflow-y-auto rounded-xl border border-border/70 bg-card p-4 shadow-sm sm:p-5">
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                <div className="size-7 animate-spin rounded-full border-b-2 border-primary" />
               </div>
             ) : (
               children
@@ -403,7 +469,6 @@ export function RepoShell({
         </main>
       </div>
 
-      {/* 文档对话助手悬浮球 */}
       <ChatAssistant
         context={{
           owner,

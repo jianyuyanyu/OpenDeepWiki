@@ -17,6 +17,8 @@
   "user": "用户",
   "backToHome": "返回首页",
   "openMenu": "打开菜单",
+  "toggleSidebar": "切换侧边栏",
+  "close": "关闭",
   "submitting": "提交中...",
   "submitFailed": "提交失败",
   "pleaseLogin": "请先登录",
@@ -98,9 +100,17 @@
   },
   "repository": {
     "wikiTitle": "仓库 Wiki",
+    "mindMap": "项目架构",
+    "graphify": "Graphify",
     "exportDocs": "导出文档",
+    "exportSkill": "导出 SKILL",
     "exporting": "导出中...",
+    "expandSection": "展开章节",
+    "collapseSection": "收起章节",
     "tableOfContents": "目录",
+    "graphifyNotAvailable": "Graphify 报告暂不可用。",
+    "graphifyGraph": "图谱",
+    "graphifyReport": "报告",
     "notFound": {
       "title": "仓库不存在",
       "description": "未找到 {owner}/{repo} 仓库",
@@ -131,8 +141,26 @@
   "branch": {
     "selectBranch": "选择分支"
   },
+  "organization": {
+    "title": "我的组织",
+    "refresh": "刷新",
+    "loginRequired": "请先登录查看您的组织",
+    "noDepartments": "您还没有加入任何部门",
+    "contactAdmin": "请联系管理员将您添加到部门中",
+    "myDepartments": "我的部门",
+    "departmentManager": "部门主管",
+    "departmentRepositories": "部门仓库",
+    "noRepositories": "暂无分配的仓库",
+    "unknown": "未知",
+    "fetchFailed": "获取组织数据失败",
+    "viewDocs": "查看文档"
+  },
   "language": {
     "selectLanguage": "选择语言"
+  },
+  "sidebar": {
+    "title": "侧边栏",
+    "mobileDescription": "显示移动端侧边栏。"
   },
   "mcp": {
     "title": "MCP 提供商",

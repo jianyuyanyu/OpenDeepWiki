@@ -1,10 +1,17 @@
 using System.IO.Compression;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Entities.Tools;
 using OpenDeepWiki.Models.Admin;
+using OpenDeepWiki.Services.AI;
+using OpenDeepWiki.Agents;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -14,12 +21,18 @@ public class AdminToolsService : IAdminToolsService
 {
     private readonly IContext _context;
     private readonly ILogger<AdminToolsService> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly string _skillsBasePath;
 
-    public AdminToolsService(IContext context, ILogger<AdminToolsService> logger, IConfiguration configuration)
+    public AdminToolsService(
+        IContext context,
+        ILogger<AdminToolsService> logger,
+        IConfiguration configuration,
+        IHttpClientFactory httpClientFactory)
     {
         _context = context;
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
         _skillsBasePath = configuration["Skills:BasePath"] ?? Path.Combine(AppContext.BaseDirectory, "skills");
         if (!Directory.Exists(_skillsBasePath)) Directory.CreateDirectory(_skillsBasePath);
     }
@@ -287,23 +300,429 @@ public class AdminToolsService : IAdminToolsService
         await _context.SaveChangesAsync();
     }
 
+    public async Task<List<AiProviderConfigDto>> GetAiProvidersAsync()
+    {
+        return await _context.AiProviderConfigs
+            .Where(p => !p.IsDeleted)
+            .OrderBy(p => p.SortOrder)
+            .ThenBy(p => p.Name)
+            .Select(p => new AiProviderConfigDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                DisplayName = p.DisplayName,
+                ProviderType = p.ProviderType,
+                BaseUrl = p.BaseUrl,
+                HasApiKey = !string.IsNullOrEmpty(p.ApiKey),
+                AuthType = p.AuthType,
+                IsBuiltIn = p.IsBuiltIn,
+                IsActive = p.IsActive,
+                SupportsModelDiscovery = p.SupportsModelDiscovery,
+                ModelsEndpoint = p.ModelsEndpoint,
+                DefaultModelId = p.DefaultModelId,
+                SystemProxyUrl = p.SystemProxyUrl,
+                OAuthConfigJson = p.OAuthConfigJson,
+                ChannelConfigJson = p.ChannelConfigJson,
+                AccountsJson = p.AccountsJson,
+                RequestOverridesJson = p.RequestOverridesJson,
+                IconUrl = p.IconUrl,
+                Description = p.Description,
+                SortOrder = p.SortOrder,
+                CreatedAt = p.CreatedAt
+            })
+            .ToListAsync();
+    }
+
+    public async Task<AiProviderConfigDto> CreateAiProviderAsync(AiProviderConfigRequest request)
+    {
+        var provider = new AiProviderConfig
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = request.Name,
+            DisplayName = request.DisplayName,
+            ProviderType = request.ProviderType,
+            BaseUrl = request.BaseUrl.TrimEnd('/'),
+            ApiKey = request.ApiKey,
+            AuthType = request.AuthType,
+            IsBuiltIn = request.IsBuiltIn,
+            IsActive = request.IsActive,
+            SupportsModelDiscovery = request.SupportsModelDiscovery,
+            ModelsEndpoint = request.ModelsEndpoint,
+            DefaultModelId = request.DefaultModelId,
+            SystemProxyUrl = request.SystemProxyUrl,
+            OAuthConfigJson = request.OAuthConfigJson,
+            ChannelConfigJson = request.ChannelConfigJson,
+            AccountsJson = request.AccountsJson,
+            RequestOverridesJson = request.RequestOverridesJson,
+            IconUrl = request.IconUrl,
+            Description = request.Description,
+            SortOrder = request.SortOrder,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.AiProviderConfigs.Add(provider);
+        await _context.SaveChangesAsync();
+        return MapAiProvider(provider);
+    }
+
+    public async Task<bool> UpdateAiProviderAsync(string id, AiProviderConfigRequest request)
+    {
+        var provider = await _context.AiProviderConfigs.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+        if (provider == null) return false;
+
+        provider.Name = request.Name;
+        provider.DisplayName = request.DisplayName;
+        provider.ProviderType = request.ProviderType;
+        provider.BaseUrl = request.BaseUrl.TrimEnd('/');
+        if (request.ApiKey != null) provider.ApiKey = request.ApiKey;
+        provider.AuthType = request.AuthType;
+        provider.IsBuiltIn = request.IsBuiltIn;
+        provider.IsActive = request.IsActive;
+        provider.SupportsModelDiscovery = request.SupportsModelDiscovery;
+        provider.ModelsEndpoint = request.ModelsEndpoint;
+        provider.DefaultModelId = request.DefaultModelId;
+        provider.SystemProxyUrl = request.SystemProxyUrl;
+        provider.OAuthConfigJson = request.OAuthConfigJson;
+        provider.ChannelConfigJson = request.ChannelConfigJson;
+        provider.AccountsJson = request.AccountsJson;
+        provider.RequestOverridesJson = request.RequestOverridesJson;
+        provider.IconUrl = request.IconUrl;
+        provider.Description = request.Description;
+        provider.SortOrder = request.SortOrder;
+        provider.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeleteAiProviderAsync(string id)
+    {
+        var provider = await _context.AiProviderConfigs.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted);
+        if (provider == null) return false;
+        provider.IsDeleted = true;
+        provider.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<List<AiModelConfigDto>> GetAiModelsAsync(string? providerId = null)
+    {
+        var query = _context.AiModelConfigs.Where(m => !m.IsDeleted);
+        if (!string.IsNullOrWhiteSpace(providerId))
+        {
+            query = query.Where(m => m.ProviderId == providerId);
+        }
+
+        var models = await query
+            .OrderByDescending(m => m.IsDefault)
+            .ThenBy(m => m.SortOrder)
+            .ThenBy(m => m.Name)
+            .ToListAsync();
+
+        var providerIds = models.Select(m => m.ProviderId).Distinct().ToList();
+        var providers = providerIds.Count == 0
+            ? new Dictionary<string, string>()
+            : await _context.AiProviderConfigs
+                .Where(p => providerIds.Contains(p.Id) && !p.IsDeleted)
+                .ToDictionaryAsync(p => p.Id, p => p.DisplayName ?? p.Name);
+
+        return models.Select(m => MapAiModel(m, providers.GetValueOrDefault(m.ProviderId))).ToList();
+    }
+
+    public async Task<AiModelConfigDto> CreateAiModelAsync(AiModelConfigRequest request)
+    {
+        var model = new AiModelConfig
+        {
+            Id = Guid.NewGuid().ToString(),
+            ProviderId = request.ProviderId,
+            ModelId = request.ModelId,
+            Name = string.IsNullOrWhiteSpace(request.Name) ? request.ModelId : request.Name,
+            DisplayName = request.DisplayName,
+            ModelType = request.ModelType,
+            ProviderType = AiProviderResolver.NormalizeModelProviderType(request.ProviderType, request.ModelId),
+            ContextWindow = request.ContextWindow,
+            MaxOutputTokens = request.MaxOutputTokens,
+            InputTokenPrice = request.InputTokenPrice,
+            OutputTokenPrice = request.OutputTokenPrice,
+            SupportsThinking = request.SupportsThinking,
+            SupportsVision = request.SupportsVision,
+            SupportsTools = request.SupportsTools,
+            SupportsJsonMode = request.SupportsJsonMode,
+            IsDefault = request.IsDefault,
+            IsActive = request.IsActive,
+            CapabilitiesJson = request.CapabilitiesJson,
+            ThinkingConfigJson = request.ThinkingConfigJson,
+            RequestOverridesJson = request.RequestOverridesJson,
+            TagsJson = request.TagsJson,
+            Description = request.Description,
+            SortOrder = request.SortOrder,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.AiModelConfigs.Add(model);
+        await _context.SaveChangesAsync();
+        return MapAiModel(model, null);
+    }
+
+    public async Task<bool> UpdateAiModelAsync(string id, AiModelConfigRequest request)
+    {
+        var model = await _context.AiModelConfigs.FirstOrDefaultAsync(m => m.Id == id && !m.IsDeleted);
+        if (model == null) return false;
+
+        model.ProviderId = request.ProviderId;
+        model.ModelId = request.ModelId;
+        model.Name = string.IsNullOrWhiteSpace(request.Name) ? request.ModelId : request.Name;
+        model.DisplayName = request.DisplayName;
+        model.ModelType = request.ModelType;
+        model.ProviderType = AiProviderResolver.NormalizeModelProviderType(request.ProviderType, request.ModelId);
+        model.ContextWindow = request.ContextWindow;
+        model.MaxOutputTokens = request.MaxOutputTokens;
+        model.InputTokenPrice = request.InputTokenPrice;
+        model.OutputTokenPrice = request.OutputTokenPrice;
+        model.SupportsThinking = request.SupportsThinking;
+        model.SupportsVision = request.SupportsVision;
+        model.SupportsTools = request.SupportsTools;
+        model.SupportsJsonMode = request.SupportsJsonMode;
+        model.IsDefault = request.IsDefault;
+        model.IsActive = request.IsActive;
+        model.CapabilitiesJson = request.CapabilitiesJson;
+        model.ThinkingConfigJson = request.ThinkingConfigJson;
+        model.RequestOverridesJson = request.RequestOverridesJson;
+        model.TagsJson = request.TagsJson;
+        model.Description = request.Description;
+        model.SortOrder = request.SortOrder;
+        model.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeleteAiModelAsync(string id)
+    {
+        var model = await _context.AiModelConfigs.FirstOrDefaultAsync(m => m.Id == id && !m.IsDeleted);
+        if (model == null) return false;
+        model.IsDeleted = true;
+        model.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<List<AiModelConfigDto>> DiscoverAiModelsAsync(
+        string providerId,
+        CancellationToken cancellationToken = default)
+    {
+        var provider = await _context.AiProviderConfigs
+            .FirstOrDefaultAsync(p => p.Id == providerId && !p.IsDeleted, cancellationToken);
+        if (provider == null)
+        {
+            throw new InvalidOperationException("AI provider does not exist.");
+        }
+
+        var endpoint = string.IsNullOrWhiteSpace(provider.ModelsEndpoint)
+            ? $"{provider.BaseUrl.TrimEnd('/')}/models"
+            : provider.ModelsEndpoint;
+
+        var client = _httpClientFactory.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+        if (!string.IsNullOrWhiteSpace(provider.ApiKey))
+        {
+            if (provider.ProviderType.Equals("Anthropic", StringComparison.OrdinalIgnoreCase))
+            {
+                request.Headers.Add("x-api-key", provider.ApiKey);
+                request.Headers.Add("anthropic-version", "2023-06-01");
+            }
+            else
+            {
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", provider.ApiKey);
+            }
+        }
+
+        using var response = await client.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        using var document = JsonDocument.Parse(json);
+        var modelElements = EnumerateModelElements(document.RootElement);
+        return modelElements
+            .Select(id => new AiModelConfigDto
+            {
+                ProviderId = provider.Id,
+                ProviderName = provider.DisplayName ?? provider.Name,
+                ModelId = id,
+                Name = id,
+                DisplayName = id,
+                ModelType = "chat",
+                ProviderType = AiProviderResolver.NormalizeModelProviderType(null, id) ?? provider.ProviderType,
+                SupportsTools = true,
+                IsActive = true
+            })
+            .ToList();
+    }
+
+    public async Task<AiProviderConnectivityTestResult> TestAiProviderConnectivityAsync(
+        string providerId,
+        AiProviderConnectivityTestRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var provider = await _context.AiProviderConfigs
+            .FirstOrDefaultAsync(p => p.Id == providerId && !p.IsDeleted, cancellationToken);
+        if (provider == null)
+        {
+            throw new InvalidOperationException("AI provider does not exist.");
+        }
+
+        request ??= new AiProviderConnectivityTestRequest();
+        var modelId = request.ModelId?.Trim();
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            modelId = provider.DefaultModelId;
+        }
+
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            modelId = await _context.AiModelConfigs
+                .Where(m => m.ProviderId == provider.Id && m.IsActive && !m.IsDeleted)
+                .OrderByDescending(m => m.IsDefault)
+                .ThenBy(m => m.SortOrder)
+                .ThenBy(m => m.Name)
+                .Select(m => m.ModelId)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            throw new InvalidOperationException("Please select a model before checking connectivity.");
+        }
+
+        var model = await _context.AiModelConfigs.FirstOrDefaultAsync(m =>
+                m.ProviderId == provider.Id &&
+                m.ModelId == modelId &&
+                !m.IsDeleted,
+            cancellationToken);
+
+        var providerType = AiProviderResolver.ResolveEffectiveProviderType(
+            string.IsNullOrWhiteSpace(request.ProviderType) ? provider.ProviderType : request.ProviderType,
+            model?.ProviderType);
+        var baseUrl = NormalizeConnectivityBaseUrl(
+            string.IsNullOrWhiteSpace(request.BaseUrl) ? provider.BaseUrl : request.BaseUrl,
+            providerType);
+        var apiKey = request.ApiKey ?? provider.ApiKey;
+
+        using var message = CreateConnectivityRequest(
+            providerType,
+            baseUrl,
+            apiKey,
+            modelId,
+            model);
+        var client = _httpClientFactory.CreateClient();
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        var stopwatch = Stopwatch.StartNew();
+
+        using var response = await client.SendAsync(message, timeout.Token);
+        stopwatch.Stop();
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (response.IsSuccessStatusCode)
+        {
+            return new AiProviderConnectivityTestResult
+            {
+                Success = true,
+                Message = $"Connectivity check succeeded for model '{modelId}'.",
+                ProviderType = providerType,
+                ModelId = modelId,
+                StatusCode = (int)response.StatusCode,
+                LatencyMs = stopwatch.ElapsedMilliseconds
+            };
+        }
+
+        var error = string.IsNullOrWhiteSpace(content)
+            ? response.ReasonPhrase
+            : content.Trim();
+        if (error is { Length: > 600 })
+        {
+            error = error[..600];
+        }
+
+        return new AiProviderConnectivityTestResult
+        {
+            Success = false,
+            Message = $"Connectivity check failed with HTTP {(int)response.StatusCode}: {error}",
+            ProviderType = providerType,
+            ModelId = modelId,
+            StatusCode = (int)response.StatusCode,
+            LatencyMs = stopwatch.ElapsedMilliseconds
+        };
+    }
+
     public async Task<List<ModelConfigDto>> GetModelConfigsAsync()
     {
-        return await _context.ModelConfigs.Where(m => !m.IsDeleted).OrderByDescending(m => m.IsDefault).ThenBy(m => m.Name)
-            .Select(m => new ModelConfigDto
+        var configs = await _context.ModelConfigs
+            .Where(m => !m.IsDeleted)
+            .OrderByDescending(m => m.IsDefault)
+            .ThenBy(m => m.Name)
+            .ToListAsync();
+
+        var providerIds = configs
+            .Where(m => !string.IsNullOrEmpty(m.AiProviderId))
+            .Select(m => m.AiProviderId!)
+            .Distinct()
+            .ToList();
+
+        var providers = providerIds.Count == 0
+            ? new Dictionary<string, AiProviderConfig>()
+            : await _context.AiProviderConfigs
+                .Where(p => providerIds.Contains(p.Id) && !p.IsDeleted)
+                .ToDictionaryAsync(p => p.Id);
+
+        var aiModels = providerIds.Count == 0
+            ? new Dictionary<string, AiModelConfig>(StringComparer.OrdinalIgnoreCase)
+            : await _context.AiModelConfigs
+                .Where(m => !m.IsDeleted && providerIds.Contains(m.ProviderId))
+                .ToDictionaryAsync(
+                    m => CreateModelBindingKey(m.ProviderId, m.ModelId),
+                    StringComparer.OrdinalIgnoreCase);
+
+        return configs.Select(m =>
+        {
+            providers.TryGetValue(m.AiProviderId ?? string.Empty, out var provider);
+            aiModels.TryGetValue(
+                CreateModelBindingKey(m.AiProviderId ?? string.Empty, m.ModelId),
+                out var aiModel);
+            var providerType = AiProviderResolver.ResolveEffectiveProviderType(
+                provider?.ProviderType ?? m.Provider,
+                aiModel?.ProviderType);
+            return new ModelConfigDto
             {
-                Id = m.Id, Name = m.Name, Provider = m.Provider, ModelId = m.ModelId, Endpoint = m.Endpoint,
-                HasApiKey = !string.IsNullOrEmpty(m.ApiKey), IsDefault = m.IsDefault, IsActive = m.IsActive,
-                Description = m.Description, CreatedAt = m.CreatedAt
-            }).ToListAsync();
+                Id = m.Id,
+                Name = m.Name,
+                AiProviderId = m.AiProviderId,
+                AiProviderName = provider?.DisplayName ?? provider?.Name,
+                Provider = providerType,
+                ModelId = m.ModelId,
+                Endpoint = null,
+                HasApiKey = provider != null && !string.IsNullOrEmpty(provider.ApiKey),
+                IsDefault = m.IsDefault,
+                IsActive = m.IsActive,
+                Description = m.Description,
+                CreatedAt = m.CreatedAt
+            };
+        }).ToList();
     }
 
     public async Task<ModelConfigDto> CreateModelConfigAsync(ModelConfigRequest request)
     {
+        var provider = !string.IsNullOrWhiteSpace(request.AiProviderId)
+            ? await _context.AiProviderConfigs.FirstOrDefaultAsync(p => p.Id == request.AiProviderId && !p.IsDeleted)
+            : null;
+        var providerType = provider == null
+            ? AiProviderResolver.ResolveEffectiveProviderType(request.Provider, null)
+            : await ResolveModelProviderTypeAsync(provider, request.ModelId);
+
         var config = new ModelConfig
         {
-            Id = Guid.NewGuid().ToString(), Name = request.Name, Provider = request.Provider,
-            ModelId = request.ModelId, Endpoint = request.Endpoint, ApiKey = request.ApiKey,
+            Id = Guid.NewGuid().ToString(), Name = request.Name, Provider = providerType,
+            AiProviderId = request.AiProviderId, ModelId = request.ModelId, Endpoint = null, ApiKey = null,
             IsDefault = request.IsDefault, IsActive = request.IsActive, Description = request.Description,
             CreatedAt = DateTime.UtcNow
         };
@@ -311,8 +730,9 @@ public class AdminToolsService : IAdminToolsService
         await _context.SaveChangesAsync();
         return new ModelConfigDto
         {
-            Id = config.Id, Name = config.Name, Provider = config.Provider, ModelId = config.ModelId,
-            Endpoint = config.Endpoint, HasApiKey = !string.IsNullOrEmpty(config.ApiKey),
+            Id = config.Id, Name = config.Name, AiProviderId = config.AiProviderId,
+            AiProviderName = provider?.DisplayName ?? provider?.Name, Provider = providerType,
+            ModelId = config.ModelId, Endpoint = null, HasApiKey = provider != null && !string.IsNullOrEmpty(provider.ApiKey),
             IsDefault = config.IsDefault, IsActive = config.IsActive, Description = config.Description,
             CreatedAt = config.CreatedAt
         };
@@ -322,9 +742,16 @@ public class AdminToolsService : IAdminToolsService
     {
         var config = await _context.ModelConfigs.FirstOrDefaultAsync(m => m.Id == id && !m.IsDeleted);
         if (config == null) return false;
-        config.Name = request.Name; config.Provider = request.Provider; config.ModelId = request.ModelId;
-        config.Endpoint = request.Endpoint;
-        if (request.ApiKey != null) config.ApiKey = request.ApiKey;
+        var provider = !string.IsNullOrWhiteSpace(request.AiProviderId)
+            ? await _context.AiProviderConfigs.FirstOrDefaultAsync(p => p.Id == request.AiProviderId && !p.IsDeleted)
+            : null;
+        var providerType = provider == null
+            ? AiProviderResolver.ResolveEffectiveProviderType(request.Provider, null)
+            : await ResolveModelProviderTypeAsync(provider, request.ModelId);
+        config.Name = request.Name; config.Provider = providerType; config.ModelId = request.ModelId;
+        config.AiProviderId = request.AiProviderId;
+        config.Endpoint = null;
+        config.ApiKey = null;
         config.IsDefault = request.IsDefault; config.IsActive = request.IsActive;
         config.Description = request.Description; config.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
@@ -338,6 +765,312 @@ public class AdminToolsService : IAdminToolsService
         config.IsDeleted = true; config.UpdatedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    private async Task<string> ResolveModelProviderTypeAsync(AiProviderConfig provider, string modelId)
+    {
+        var model = await _context.AiModelConfigs.FirstOrDefaultAsync(m =>
+            m.ProviderId == provider.Id &&
+            m.ModelId == modelId &&
+            !m.IsDeleted);
+
+        return AiProviderResolver.ResolveEffectiveProviderType(
+            provider.ProviderType,
+            model?.ProviderType);
+    }
+
+    private static HttpRequestMessage CreateConnectivityRequest(
+        string providerType,
+        string baseUrl,
+        string? apiKey,
+        string modelId,
+        AiModelConfig? model)
+    {
+        var requestType = AiProviderResolver.ParseRequestType(providerType);
+        return requestType switch
+        {
+            AiRequestType.OpenAIResponses => CreateJsonRequest(
+                HttpMethod.Post,
+                AppendEndpointPath(baseUrl, "responses", "responses"),
+                apiKey,
+                new
+                {
+                    model = modelId,
+                    input = "ping",
+                    max_output_tokens = 1,
+                    stream = false
+                }),
+            AiRequestType.Anthropic => CreateJsonRequest(
+                HttpMethod.Post,
+                AppendEndpointPath(baseUrl, "v1/messages", "messages"),
+                apiKey,
+                new
+                {
+                    model = modelId,
+                    max_tokens = 1,
+                    messages = new[]
+                    {
+                        new { role = "user", content = "ping" }
+                    }
+                },
+                configure: message =>
+                {
+                    if (!string.IsNullOrWhiteSpace(apiKey))
+                    {
+                        message.Headers.Remove("Authorization");
+                        message.Headers.Add("x-api-key", apiKey);
+                    }
+
+                    message.Headers.Add("anthropic-version", "2023-06-01");
+                }),
+            AiRequestType.DeepSeekOpenAI => CreateJsonRequest(
+                HttpMethod.Post,
+                AppendEndpointPath(baseUrl, "chat/completions", "chat/completions"),
+                apiKey,
+                CreateDeepSeekConnectivityBody(modelId, model)),
+            AiRequestType.AzureOpenAI => CreateAzureOpenAIConnectivityRequest(baseUrl, apiKey, modelId),
+            _ => CreateJsonRequest(
+                HttpMethod.Post,
+                AppendEndpointPath(baseUrl, "chat/completions", "chat/completions"),
+                apiKey,
+                new
+                {
+                    model = modelId,
+                    max_tokens = 1,
+                    stream = false,
+                    messages = new[]
+                    {
+                        new { role = "user", content = "ping" }
+                    }
+                })
+        };
+    }
+
+    private static JsonObject CreateDeepSeekConnectivityBody(string modelId, AiModelConfig? model)
+    {
+        var body = new JsonObject
+        {
+            ["model"] = modelId,
+            ["max_tokens"] = 1,
+            ["stream"] = false,
+            ["messages"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["role"] = "user",
+                    ["content"] = "ping"
+                }
+            }
+        };
+
+        if (model?.SupportsThinking == true &&
+            !string.IsNullOrWhiteSpace(model.ThinkingConfigJson))
+        {
+            try
+            {
+                if (JsonNode.Parse(model.ThinkingConfigJson) is JsonObject config &&
+                    config["bodyParams"] is JsonObject bodyParams)
+                {
+                    foreach (var pair in bodyParams)
+                    {
+                        body[pair.Key] = pair.Value?.DeepClone();
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+                // Connectivity checks should still verify the base protocol if model metadata is malformed.
+            }
+        }
+
+        return body;
+    }
+
+    private static HttpRequestMessage CreateAzureOpenAIConnectivityRequest(
+        string baseUrl,
+        string? apiKey,
+        string modelId)
+    {
+        var endpoint = baseUrl.Contains("/chat/completions", StringComparison.OrdinalIgnoreCase)
+            ? baseUrl
+            : $"{baseUrl.TrimEnd('/')}/openai/deployments/{Uri.EscapeDataString(modelId)}/chat/completions?api-version=2024-10-21";
+        return CreateJsonRequest(
+            HttpMethod.Post,
+            endpoint,
+            apiKey,
+            new
+            {
+                max_tokens = 1,
+                stream = false,
+                messages = new[]
+                {
+                    new { role = "user", content = "ping" }
+                }
+            },
+            message =>
+            {
+                message.Headers.Remove("Authorization");
+                if (!string.IsNullOrWhiteSpace(apiKey))
+                {
+                    message.Headers.Add("api-key", apiKey);
+                }
+            });
+    }
+
+    private static HttpRequestMessage CreateJsonRequest(
+        HttpMethod method,
+        string endpoint,
+        string? apiKey,
+        object body,
+        Action<HttpRequestMessage>? configure = null)
+    {
+        var message = new HttpRequestMessage(method, endpoint)
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(body),
+                Encoding.UTF8,
+                "application/json")
+        };
+
+        if (!string.IsNullOrWhiteSpace(apiKey))
+        {
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        }
+
+        configure?.Invoke(message);
+        return message;
+    }
+
+    private static string NormalizeConnectivityBaseUrl(string? baseUrl, string providerType)
+    {
+        if (!string.IsNullOrWhiteSpace(baseUrl))
+        {
+            var normalized = baseUrl.Trim().TrimEnd('/');
+            return AiProviderResolver.NormalizeProviderType(providerType).Equals("Anthropic", StringComparison.OrdinalIgnoreCase) &&
+                   normalized.EndsWith("/v1", StringComparison.OrdinalIgnoreCase)
+                ? normalized[..^3]
+                : normalized;
+        }
+
+        return AiProviderResolver.NormalizeProviderType(providerType) switch
+        {
+            "Anthropic" => "https://api.anthropic.com",
+            "DeepSeekOpenAI" => "https://api.deepseek.com/v1",
+            _ => "https://api.openai.com/v1"
+        };
+    }
+
+    private static string AppendEndpointPath(string baseUrl, string path, string terminalPath)
+    {
+        var trimmed = baseUrl.TrimEnd('/');
+        if (trimmed.EndsWith($"/{terminalPath}", StringComparison.OrdinalIgnoreCase))
+        {
+            return trimmed;
+        }
+
+        return $"{trimmed}/{path.TrimStart('/')}";
+    }
+
+    private static string CreateModelBindingKey(string providerId, string modelId)
+    {
+        return $"{providerId}:{modelId}";
+    }
+
+    private static AiProviderConfigDto MapAiProvider(AiProviderConfig provider)
+    {
+        return new AiProviderConfigDto
+        {
+            Id = provider.Id,
+            Name = provider.Name,
+            DisplayName = provider.DisplayName,
+            ProviderType = provider.ProviderType,
+            BaseUrl = provider.BaseUrl,
+            HasApiKey = !string.IsNullOrEmpty(provider.ApiKey),
+            AuthType = provider.AuthType,
+            IsBuiltIn = provider.IsBuiltIn,
+            IsActive = provider.IsActive,
+            SupportsModelDiscovery = provider.SupportsModelDiscovery,
+            ModelsEndpoint = provider.ModelsEndpoint,
+            DefaultModelId = provider.DefaultModelId,
+            SystemProxyUrl = provider.SystemProxyUrl,
+            OAuthConfigJson = provider.OAuthConfigJson,
+            ChannelConfigJson = provider.ChannelConfigJson,
+            AccountsJson = provider.AccountsJson,
+            RequestOverridesJson = provider.RequestOverridesJson,
+            IconUrl = provider.IconUrl,
+            Description = provider.Description,
+            SortOrder = provider.SortOrder,
+            CreatedAt = provider.CreatedAt
+        };
+    }
+
+    private static AiModelConfigDto MapAiModel(AiModelConfig model, string? providerName)
+    {
+        return new AiModelConfigDto
+        {
+            Id = model.Id,
+            ProviderId = model.ProviderId,
+            ProviderName = providerName,
+            ModelId = model.ModelId,
+            Name = model.Name,
+            DisplayName = model.DisplayName,
+            ModelType = model.ModelType,
+            ProviderType = model.ProviderType,
+            ContextWindow = model.ContextWindow,
+            MaxOutputTokens = model.MaxOutputTokens,
+            InputTokenPrice = model.InputTokenPrice,
+            OutputTokenPrice = model.OutputTokenPrice,
+            SupportsThinking = model.SupportsThinking,
+            SupportsVision = model.SupportsVision,
+            SupportsTools = model.SupportsTools,
+            SupportsJsonMode = model.SupportsJsonMode,
+            IsDefault = model.IsDefault,
+            IsActive = model.IsActive,
+            CapabilitiesJson = model.CapabilitiesJson,
+            ThinkingConfigJson = model.ThinkingConfigJson,
+            RequestOverridesJson = model.RequestOverridesJson,
+            TagsJson = model.TagsJson,
+            Description = model.Description,
+            SortOrder = model.SortOrder,
+            CreatedAt = model.CreatedAt
+        };
+    }
+
+    private static IEnumerable<string> EnumerateModelElements(JsonElement root)
+    {
+        var source = root;
+        if (root.ValueKind == JsonValueKind.Object &&
+            root.TryGetProperty("data", out var data) &&
+            data.ValueKind == JsonValueKind.Array)
+        {
+            source = data;
+        }
+
+        if (source.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        return source.EnumerateArray()
+            .Select(item =>
+            {
+                if (item.ValueKind == JsonValueKind.String)
+                {
+                    return item.GetString();
+                }
+
+                if (item.ValueKind == JsonValueKind.Object &&
+                    item.TryGetProperty("id", out var id) &&
+                    id.ValueKind == JsonValueKind.String)
+                {
+                    return id.GetString();
+                }
+
+                return null;
+            })
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
     private static string? FindSkillMd(string directory)

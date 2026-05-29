@@ -20,34 +20,20 @@ public class WikiGeneratorOptions
     public string CatalogModel { get; set; } = "gpt-5-mini";
 
     /// <summary>
+    /// The AI provider bound to catalog and mind map generation.
+    /// </summary>
+    public string? CatalogProviderId { get; set; }
+
+    /// <summary>
     /// The AI model to use for document content generation.
     /// Default: gpt-4o (better quality for content generation).
     /// </summary>
     public string ContentModel { get; set; } = "gpt-5.2";
 
     /// <summary>
-    /// Optional custom endpoint for catalog generation.
-    /// If not set, falls back to the default AI endpoint.
+    /// The AI provider bound to content generation.
     /// </summary>
-    public string? CatalogEndpoint { get; set; } = "https://api.routin.ai/";
-
-    /// <summary>
-    /// Optional custom endpoint for content generation.
-    /// If not set, falls back to the default AI endpoint.
-    /// </summary>
-    public string? ContentEndpoint { get; set; } = "https://api.routin.ai/";
-
-    /// <summary>
-    /// Optional API key for catalog generation.
-    /// If not set, falls back to the default AI API key.
-    /// </summary>
-    public string? CatalogApiKey { get; set; }
-
-    /// <summary>
-    /// Optional API key for content generation.
-    /// If not set, falls back to the default AI API key.
-    /// </summary>
-    public string? ContentApiKey { get; set; }
+    public string? ContentProviderId { get; set; }
 
     /// <summary>
     /// The directory containing prompt template files.
@@ -69,9 +55,9 @@ public class WikiGeneratorOptions
 
     /// <summary>
     /// Maximum number of parallel document generation tasks.
-    /// Default: 3. Can be configured via WIKI_PARALLEL_COUNT environment variable.
+    /// Default: 5. Configure through system settings.
     /// </summary>
-    public int ParallelCount { get; set; } = GetParallelCountFromEnv();
+    public int ParallelCount { get; set; } = 5;
 
     /// <summary>
     /// Maximum output tokens for AI generation.
@@ -117,40 +103,15 @@ public class WikiGeneratorOptions
     public string? Languages { get; set; } = "en,zh,ja,ko";
 
     /// <summary>
-    /// The request type for catalog generation (e.g., OpenAI, Azure, Claude).
-    /// If not set, uses the default request type.
-    /// </summary>
-    public AiRequestType? CatalogRequestType { get; set; } = AiRequestType.Anthropic;
-
-    /// <summary>
-    /// The request type for content generation (e.g., OpenAI, Azure, Claude).
-    /// If not set, uses the default request type.
-    /// </summary>
-    public AiRequestType? ContentRequestType { get; set; } = AiRequestType.Anthropic;
-
-    /// <summary>
     /// The AI model to use for translation.
     /// Default: uses ContentModel if not specified.
     /// </summary>
     public string? TranslationModel { get; set; }
 
     /// <summary>
-    /// Optional custom endpoint for translation.
-    /// If not set, falls back to ContentEndpoint.
+    /// The AI provider bound to translation.
     /// </summary>
-    public string? TranslationEndpoint { get; set; } = "https://api.routin.ai/";
-
-    /// <summary>
-    /// Optional API key for translation.
-    /// If not set, falls back to ContentApiKey.
-    /// </summary>
-    public string? TranslationApiKey { get; set; }
-
-    /// <summary>
-    /// The request type for translation (e.g., OpenAI, Azure, Claude).
-    /// If not set, falls back to ContentRequestType.
-    /// </summary>
-    public AiRequestType? TranslationRequestType { get; set; } = AiRequestType.Anthropic;
+    public string? TranslationProviderId { get; set; }
 
     /// <summary>
     /// Gets the list of target languages for translation (excluding the primary language).
@@ -170,63 +131,6 @@ public class WikiGeneratorOptions
             .Where(l => !string.Equals(l, primaryLanguage, StringComparison.OrdinalIgnoreCase))
             .Distinct()
             .ToList();
-    }
-
-    /// <summary>
-    /// Gets the parallel count from environment variable or returns default value.
-    /// </summary>
-    private static int GetParallelCountFromEnv()
-    {
-        var envValue = Environment.GetEnvironmentVariable("WIKI_PARALLEL_COUNT");
-        if (!string.IsNullOrEmpty(envValue) && int.TryParse(envValue, out var count) && count > 0)
-        {
-            return count;
-        }
-
-        return 5; // Default value
-    }
-
-    /// <summary>
-    /// Gets the AiRequestOptions for catalog generation.
-    /// </summary>
-    /// <returns>AiRequestOptions configured for catalog generation.</returns>
-    public Agents.AiRequestOptions GetCatalogRequestOptions()
-    {
-        return new Agents.AiRequestOptions
-        {
-            Endpoint = CatalogEndpoint,
-            ApiKey = CatalogApiKey,
-            RequestType = CatalogRequestType
-        };
-    }
-
-    /// <summary>
-    /// Gets the AiRequestOptions for content generation.
-    /// </summary>
-    /// <returns>AiRequestOptions configured for content generation.</returns>
-    public Agents.AiRequestOptions GetContentRequestOptions()
-    {
-        return new Agents.AiRequestOptions
-        {
-            Endpoint = ContentEndpoint,
-            ApiKey = ContentApiKey,
-            RequestType = ContentRequestType
-        };
-    }
-
-    /// <summary>
-    /// Gets the AiRequestOptions for translation.
-    /// Falls back to content options if translation-specific options are not set.
-    /// </summary>
-    /// <returns>AiRequestOptions configured for translation.</returns>
-    public Agents.AiRequestOptions GetTranslationRequestOptions()
-    {
-        return new Agents.AiRequestOptions
-        {
-            Endpoint = TranslationEndpoint ?? ContentEndpoint,
-            ApiKey = TranslationApiKey ?? ContentApiKey,
-            RequestType = TranslationRequestType ?? ContentRequestType
-        };
     }
 
     /// <summary>

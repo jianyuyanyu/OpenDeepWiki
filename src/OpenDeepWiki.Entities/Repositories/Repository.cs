@@ -77,6 +77,12 @@ public class Repository : AggregateRoot<string>
     public bool IsPublic { get; set; } = true;
 
     /// <summary>
+    /// Whether generated repository docs should be packaged as a SKILL export.
+    /// This is unrelated to the system managed agent skills registry.
+    /// </summary>
+    public bool GenerateSkill { get; set; } = true;
+
+    /// <summary>
     /// 仓库处理状态
     /// </summary>
     public RepositoryStatus Status { get; set; } = RepositoryStatus.Pending;

@@ -103,6 +103,12 @@ namespace OpenDeepWiki.Postgresql.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("character varying(36)");
 
+                    b.Property<DateTime?>("SkillGeneratedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SkillMarkdown")
+                        .HasColumnType("text");
+
                     b.Property<string>("UpdateSummary")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
@@ -1408,6 +1414,11 @@ namespace OpenDeepWiki.Postgresql.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("GenerateSkill")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");

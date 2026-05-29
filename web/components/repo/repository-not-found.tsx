@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useLocale } from "next-intl";
 import { GitBranch, Star, GitFork, Code, Plus, Loader2, ExternalLink, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { submitRepository } from "@/lib/repository-api";
@@ -18,6 +19,7 @@ interface RepositoryNotFoundProps {
 export function RepositoryNotFound({ owner, repo, gitHubInfo }: RepositoryNotFoundProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const locale = useLocale();
   const t = useTranslations();
   const { isAuthenticated } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,8 +45,9 @@ export function RepositoryNotFound({ owner, repo, gitHubInfo }: RepositoryNotFou
         repoName: repo,
         orgName: owner,
         branchName: gitHubInfo.defaultBranch,
-        languageCode: "zh",
+        languageCode: locale,
         isPublic: true,
+        generateSkill: true,
       });
       
       // 刷新页面以显示处理状态
@@ -66,7 +69,7 @@ export function RepositoryNotFound({ owner, repo, gitHubInfo }: RepositoryNotFou
           </div>
           <h1 className="text-2xl font-bold mb-2">{t("common.repository.notFound.title")}</h1>
           <p className="text-muted-foreground mb-6">
-            {t("common.repository.notFound.description").replace("{owner}", owner).replace("{repo}", repo)}
+            {t("common.repository.notFound.description", { owner, repo })}
           </p>
           <p className="text-sm text-muted-foreground mb-6">
             {t("common.repository.notFound.privateOrNotExist")}

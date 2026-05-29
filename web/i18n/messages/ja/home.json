@@ -1,4 +1,15 @@
 {
+  "actions": {
+    "bookmark": "ブックマークする",
+    "bookmarked": "ブックマーク済み",
+    "subscribe": "購読する",
+    "subscribed": "購読済み",
+    "bookmarkSuccess": "ブックマークしました",
+    "bookmarkRemoved": "ブックマークを削除しました",
+    "subscribeSuccess": "購読しました",
+    "subscribeRemoved": "購読を解除しました",
+    "actionError": "操作に失敗しました。もう一度お試しください"
+  },
   "title": "何を知りたいですか？",
   "bookmarks": {
     "pageTitle": "ブックマーク",
@@ -116,6 +127,8 @@
     "branchNotSupported": "このプラットフォームでは自動取得がサポートされていません。手動で入力してください",
     "language": "言語",
     "languageRequired": "言語を選択してください",
+    "generateSkill": "SKILL を生成",
+    "generateSkillDesc": "エクスポート時に生成済みドキュメントを SKILL ZIP としてパッケージします",
     "isPublic": "公開リポジトリ",
     "publicDesc": "誰でもこのリポジトリを閲覧できます",
     "privateDesc": "あなただけがこのリポジトリにアクセスできます",
@@ -141,6 +154,7 @@
       "failedDescription": "Wiki生成中にエラーが発生しました。再試行してください",
       "autoRefreshHint": "自動更新中",
       "retry": "再生成",
+      "regenerating": "再生成中...",
       "notFound": "リポジトリが見つかりません",
       "notFoundDescription": "リポジトリが見つかりませんでした。URLを確認してください",
       "elapsed": "経過時間",
@@ -158,6 +172,9 @@
         "workspace": "準備",
         "catalog": "目録",
         "content": "内容",
+        "translation": "翻訳",
+        "mindMap": "マインドマップ",
+        "graphify": "グラフ",
         "complete": "完了"
       }
     },
@@ -168,7 +185,8 @@
       "en": "英語",
       "zh": "中国語",
       "ja": "日本語",
-      "ko": "韓国語"
+      "ko": "韓国語",
+      "pl": "ポーランド語"
     }
   }
 }

@@ -21,6 +21,9 @@ public class ModelConfig : AggregateRoot<string>
     [StringLength(50)]
     public string Provider { get; set; } = string.Empty;
 
+    [StringLength(100)]
+    public string? AiProviderId { get; set; }
+
     /// <summary>
     /// 模型ID
     /// </summary>

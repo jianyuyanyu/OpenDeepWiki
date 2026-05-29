@@ -61,78 +61,32 @@ public static class AdminSettingsEndpoints
         .WithName("AdminUpdateSettings")
         .WithSummary("更新设置");
 
-        // List available models from a provider endpoint
+        // List available models from a configured provider
         settingsGroup.MapPost("/list-provider-models", async (
             [FromBody] ListProviderModelsRequest request,
-            [FromServices] IHttpClientFactory httpClientFactory) =>
+            [FromServices] IAdminToolsService toolsService,
+            CancellationToken cancellationToken) =>
         {
-            if (string.IsNullOrWhiteSpace(request.Endpoint) || string.IsNullOrWhiteSpace(request.ApiKey))
+            if (string.IsNullOrWhiteSpace(request.ProviderId))
             {
-                return Results.BadRequest(new { success = false, message = "Endpoint and apiKey are required." });
+                return Results.BadRequest(new { success = false, message = "providerId is required." });
             }
 
             try
             {
-                using var client = httpClientFactory.CreateClient();
-                client.Timeout = TimeSpan.FromSeconds(15);
+                var configured = await toolsService.GetAiModelsAsync(request.ProviderId);
+                var models = configured
+                    .Where(m => m.IsActive)
+                    .Select(m => new ProviderModelInfo(m.ModelId, m.DisplayName ?? m.Name))
+                    .ToList();
 
-                var baseUrl = request.Endpoint.TrimEnd('/');
-                string requestUrl;
-
-                if (string.Equals(request.RequestType, "Anthropic", StringComparison.OrdinalIgnoreCase))
+                if (models.Count == 0)
                 {
-                    requestUrl = $"{baseUrl}/v1/models";
-                    client.DefaultRequestHeaders.Add("x-api-key", request.ApiKey);
-                    client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
-                }
-                else
-                {
-                    // OpenAI and OpenAI-compatible providers (OpenAIResponses, etc.)
-                    requestUrl = $"{baseUrl}/models";
-                    client.DefaultRequestHeaders.Authorization =
-                        new AuthenticationHeaderValue("Bearer", request.ApiKey);
-                }
-
-                var response = await client.GetAsync(requestUrl);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    var errorBody = await response.Content.ReadAsStringAsync();
-                    return Results.BadRequest(new
-                    {
-                        success = false,
-                        message = $"Provider returned HTTP {(int)response.StatusCode}: {errorBody}"
-                    });
-                }
-
-                var json = await response.Content.ReadAsStringAsync();
-                var doc = JsonDocument.Parse(json);
-
-                var models = new List<ProviderModelInfo>();
-
-                if (doc.RootElement.TryGetProperty("data", out var dataArray) &&
-                    dataArray.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var item in dataArray.EnumerateArray())
-                    {
-                        var id = item.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
-                        if (string.IsNullOrEmpty(id))
-                            continue;
-
-                        // Strip "models/" prefix (Gemini returns IDs like "models/gemini-2.5-flash")
-                        if (id.StartsWith("models/", StringComparison.OrdinalIgnoreCase))
-                            id = id["models/".Length..];
-
-                        // Anthropic provides display_name; OpenAI-compatible typically does not
-                        string? displayName = null;
-                        if (item.TryGetProperty("display_name", out var displayNameProp) &&
-                            displayNameProp.ValueKind == JsonValueKind.String)
-                        {
-                            displayName = displayNameProp.GetString();
-                        }
-
-                        models.Add(new ProviderModelInfo(id, displayName ?? id));
-                    }
+                    var discovered = await toolsService.DiscoverAiModelsAsync(request.ProviderId, cancellationToken);
+                    models = discovered
+                        .Where(m => m.IsActive)
+                        .Select(m => new ProviderModelInfo(m.ModelId, m.DisplayName ?? m.Name))
+                        .ToList();
                 }
 
                 return Results.Ok(new { success = true, data = new { models } });
@@ -171,11 +125,7 @@ public static class AdminSettingsEndpoints
     /// <summary>
     /// Request body for listing provider models.
     /// </summary>
-    internal record ListProviderModelsRequest(
-        string Endpoint,
-        string ApiKey,
-        string RequestType
-    );
+    internal record ListProviderModelsRequest(string ProviderId);
 
     /// <summary>
     /// Model info returned from a provider.

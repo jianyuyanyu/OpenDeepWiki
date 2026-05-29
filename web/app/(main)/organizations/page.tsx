@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,25 +25,29 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { buildRepoBasePath } from "@/lib/repo-route";
-
-const statusConfig: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-  Pending: { icon: Clock, color: "text-yellow-500", label: "等待处理" },
-  Processing: { icon: Loader2, color: "text-blue-500", label: "处理中" },
-  Completed: { icon: CheckCircle, color: "text-green-500", label: "已完成" },
-  Failed: { icon: XCircle, color: "text-red-500", label: "失败" },
-  Unknown: { icon: AlertCircle, color: "text-gray-500", label: "未知" },
-};
-
+import { useTranslations } from "@/hooks/use-translations";
 
 export default function OrganizationsPage() {
   const { user, isLoading: authLoading } = useAuth();
+  const t = useTranslations();
   const [departments, setDepartments] = useState<UserDepartment[]>([]);
   const [repositories, setRepositories] = useState<DepartmentRepository[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const statusConfig = useMemo(
+    () => ({
+      Pending: { icon: Clock, color: "text-yellow-500", label: t("admin.pending") },
+      Processing: { icon: Loader2, color: "text-blue-500", label: t("admin.processing") },
+      Completed: { icon: CheckCircle, color: "text-green-500", label: t("admin.completed") },
+      Failed: { icon: XCircle, color: "text-red-500", label: t("admin.failed") },
+      Unknown: { icon: AlertCircle, color: "text-gray-500", label: t("common.organization.unknown") },
+    }),
+    [t]
+  );
+
   const fetchData = useCallback(async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
       const [depts, repos] = await Promise.all([
@@ -54,11 +58,11 @@ export default function OrganizationsPage() {
       setRepositories(repos);
     } catch (error) {
       console.error("Failed to fetch organization data:", error);
-      toast.error("获取组织数据失败");
+      toast.error(t("common.organization.fetchFailed"));
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [t, user]);
 
   useEffect(() => {
     if (user) {
@@ -81,7 +85,7 @@ export default function OrganizationsPage() {
       return (
         <Card className="flex h-64 flex-col items-center justify-center">
           <Building2 className="h-12 w-12 text-muted-foreground/50" />
-          <p className="mt-4 text-muted-foreground">请先登录查看您的组织</p>
+          <p className="mt-4 text-muted-foreground">{t("common.organization.loginRequired")}</p>
         </Card>
       );
     }
@@ -90,17 +94,16 @@ export default function OrganizationsPage() {
       return (
         <Card className="flex h-64 flex-col items-center justify-center">
           <Building2 className="h-12 w-12 text-muted-foreground/50" />
-          <p className="mt-4 text-muted-foreground">您还没有加入任何部门</p>
-          <p className="mt-2 text-sm text-muted-foreground">请联系管理员将您添加到部门中</p>
+          <p className="mt-4 text-muted-foreground">{t("common.organization.noDepartments")}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t("common.organization.contactAdmin")}</p>
         </Card>
       );
     }
 
     return (
       <div className="space-y-6">
-        {/* 部门列表 */}
         <div>
-          <h2 className="text-lg font-semibold mb-4">我的部门</h2>
+          <h2 className="mb-4 text-lg font-semibold">{t("common.organization.myDepartments")}</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {departments.map((dept) => (
               <Card key={dept.id} className="p-4">
@@ -111,12 +114,12 @@ export default function OrganizationsPage() {
                   <div>
                     <h3 className="font-medium">{dept.name}</h3>
                     {dept.isManager && (
-                      <span className="text-xs text-primary">部门主管</span>
+                      <span className="text-xs text-primary">{t("common.organization.departmentManager")}</span>
                     )}
                   </div>
                 </div>
                 {dept.description && (
-                  <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
                     {dept.description}
                   </p>
                 )}
@@ -125,21 +128,19 @@ export default function OrganizationsPage() {
           </div>
         </div>
 
-
-        {/* 仓库列表 */}
         <div>
-          <h2 className="text-lg font-semibold mb-4">部门仓库</h2>
+          <h2 className="mb-4 text-lg font-semibold">{t("common.organization.departmentRepositories")}</h2>
           {repositories.length === 0 ? (
             <Card className="flex h-32 flex-col items-center justify-center">
               <GitBranch className="h-8 w-8 text-muted-foreground/50" />
-              <p className="mt-2 text-sm text-muted-foreground">暂无分配的仓库</p>
+              <p className="mt-2 text-sm text-muted-foreground">{t("common.organization.noRepositories")}</p>
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {repositories.map((repo) => {
-                const status = statusConfig[repo.statusName] || statusConfig.Unknown;
+                const status = statusConfig[repo.statusName as keyof typeof statusConfig] || statusConfig.Unknown;
                 const StatusIcon = status.icon;
-                
+
                 return (
                   <Card key={repo.repositoryId} className="p-4">
                     <div className="flex items-start justify-between">
@@ -148,10 +149,10 @@ export default function OrganizationsPage() {
                           <GitBranch className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <h3 className="font-medium">{repo.orgName}/{repo.repoName}</h3>
-                          <span className="text-xs text-muted-foreground">
-                            {repo.departmentName}
-                          </span>
+                          <h3 className="font-medium">
+                            {repo.orgName}/{repo.repoName}
+                          </h3>
+                          <span className="text-xs text-muted-foreground">{repo.departmentName}</span>
                         </div>
                       </div>
                       <div className={`flex items-center gap-1 ${status.color}`}>
@@ -164,7 +165,7 @@ export default function OrganizationsPage() {
                         <Link href={buildRepoBasePath(repo.orgName, repo.repoName)}>
                           <Button size="sm" variant="outline">
                             <ExternalLink className="mr-1 h-3 w-3" />
-                            查看文档
+                            {t("common.organization.viewDocs")}
                           </Button>
                         </Link>
                       )}
@@ -180,14 +181,14 @@ export default function OrganizationsPage() {
   };
 
   return (
-    <AppLayout activeItem="我的组织">
+    <AppLayout activeItem={t("sidebar.organizations")}>
       <div className="container mx-auto p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">我的组织</h1>
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold">{t("common.organization.title")}</h1>
           {user && (
             <Button variant="outline" onClick={fetchData}>
               <RefreshCw className="mr-2 h-4 w-4" />
-              刷新
+              {t("common.organization.refresh")}
             </Button>
           )}
         </div>

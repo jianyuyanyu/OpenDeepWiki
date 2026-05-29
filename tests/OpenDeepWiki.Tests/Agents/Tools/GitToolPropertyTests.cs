@@ -1,7 +1,10 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using FsCheck;
 using FsCheck.Fluent;
 using FsCheck.Xunit;
+using Microsoft.Extensions.AI;
+using OpenDeepWiki.Agents.Tools;
 using Xunit;
 
 namespace OpenDeepWiki.Tests.Agents.Tools;
@@ -219,6 +222,21 @@ public class GitToolPropertyTests : IDisposable
     }
 
     /// <summary>
+    /// Claude's tool input_schema rejects nullable JSON Schema type arrays like ["string", "null"].
+    /// Optional string filters should use an empty-string default instead of a nullable schema.
+    /// </summary>
+    [Fact]
+    public void GitTool_ToolSchemas_ShouldNotAllowNullForOptionalStringFilters()
+    {
+        var functions = new GitTool(_testDirectory).GetTools()
+            .OfType<AIFunctionDeclaration>()
+            .ToDictionary(tool => tool.Name, StringComparer.Ordinal);
+
+        AssertParameterTypeDoesNotContainNull(functions["ListFiles"], "glob");
+        AssertParameterTypeDoesNotContainNull(functions["Grep"], "glob");
+    }
+
+    /// <summary>
     /// Property 8: Git Tool Path Abstraction
     /// GitTool Grep results SHALL contain matching file paths and line content.
     /// Validates: Requirements 13.2, 13.4
@@ -235,6 +253,26 @@ public class GitToolPropertyTests : IDisposable
             Assert.True(r.LineNumber > 0);
             Assert.Contains("class", r.LineContent, StringComparison.OrdinalIgnoreCase);
         });
+    }
+
+    private static void AssertParameterTypeDoesNotContainNull(AIFunctionDeclaration function, string parameterName)
+    {
+        var parameterType = function.JsonSchema
+            .GetProperty("properties")
+            .GetProperty(parameterName)
+            .GetProperty("type");
+
+        if (parameterType.ValueKind == JsonValueKind.Array)
+        {
+            Assert.False(
+                parameterType.EnumerateArray().Any(value =>
+                    value.ValueKind == JsonValueKind.String &&
+                    value.GetString() == "null"),
+                $"{function.Name}.{parameterName} schema must not include null.");
+            return;
+        }
+
+        Assert.NotEqual("null", parameterType.GetString());
     }
 }
 

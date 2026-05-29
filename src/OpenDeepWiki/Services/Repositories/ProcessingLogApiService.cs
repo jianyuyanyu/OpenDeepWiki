@@ -28,9 +28,7 @@ public class ProcessingLogApiService(IContext context, IProcessingLogService pro
         if (limit <= 0) limit = 100;
         if (limit > 500) limit = 500;
 
-        var repository = await context.Repositories
-            .AsNoTracking()
-            .FirstOrDefaultAsync(r => r.OrgName == owner && r.RepoName == repo);
+        var repository = await GetRepositoryAsync(owner, repo);
 
         if (repository is null)
         {
@@ -48,19 +46,31 @@ public class ProcessingLogApiService(IContext context, IProcessingLogService pro
             TotalDocuments = response.TotalDocuments,
             CompletedDocuments = response.CompletedDocuments,
             StartedAt = response.StartedAt,
-            Logs = response.Logs.Select(log => new ProcessingLogApiItem
-            {
-                Id = log.Id,
-                Step = log.Step,
-                StepName = log.Step.ToString(),
-                Message = log.Message,
-                IsAiOutput = log.IsAiOutput,
-                ToolName = log.ToolName,
-                CreatedAt = log.CreatedAt
-            }).ToList()
+            Logs = []
         });
     }
 
+    private async Task<Repository?> GetRepositoryAsync(string owner, string repo)
+    {
+        var repository = await context.Repositories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.OrgName == owner && r.RepoName == repo && !r.IsDeleted);
+
+        if (repository is not null)
+        {
+            return repository;
+        }
+
+        var normalizedOwner = owner.ToLower();
+        var normalizedRepo = repo.ToLower();
+
+        return await context.Repositories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r =>
+                r.OrgName.ToLower() == normalizedOwner &&
+                r.RepoName.ToLower() == normalizedRepo &&
+                !r.IsDeleted);
+    }
 }
 
 /// <summary>

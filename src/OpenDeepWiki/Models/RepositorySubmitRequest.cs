@@ -60,6 +60,11 @@ public class RepositorySubmitRequest
     /// 是否公开
     /// </summary>
     public bool IsPublic { get; set; } = true;
+
+    /// <summary>
+    /// Whether to generate a SKILL.md package descriptor for exported docs.
+    /// </summary>
+    public bool GenerateSkill { get; set; } = true;
 }
 
 /// <summary>
@@ -98,6 +103,11 @@ public class ArchiveRepositorySubmitRequest
     /// 是否公开
     /// </summary>
     public bool IsPublic { get; set; } = false;
+
+    /// <summary>
+    /// Whether to generate a SKILL.md package descriptor for exported docs.
+    /// </summary>
+    public bool GenerateSkill { get; set; } = true;
 
     /// <summary>
     /// 上传的 ZIP 压缩包
@@ -149,4 +159,9 @@ public class LocalDirectoryRepositorySubmitRequest
     /// 是否公开
     /// </summary>
     public bool IsPublic { get; set; } = false;
+
+    /// <summary>
+    /// Whether to generate a SKILL.md package descriptor for exported docs.
+    /// </summary>
+    public bool GenerateSkill { get; set; } = true;
 }

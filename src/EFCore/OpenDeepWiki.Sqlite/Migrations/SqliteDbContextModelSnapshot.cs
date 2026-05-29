@@ -98,6 +98,12 @@ namespace OpenDeepWiki.Sqlite.Migrations
                         .HasMaxLength(36)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("SkillGeneratedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SkillMarkdown")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("UpdateSummary")
                         .HasMaxLength(2000)
                         .HasColumnType("TEXT");
@@ -1403,6 +1409,11 @@ namespace OpenDeepWiki.Sqlite.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("GenerateSkill")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");

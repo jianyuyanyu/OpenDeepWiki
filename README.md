@@ -178,7 +178,7 @@ make up      # Start all services (detached)
 | Frontend | http://localhost:3000   |
 | Backend API | http://localhost:8080 |
 
-Default admin credentials: `admin@routin.ai` / `Admin@123`
+A default seed admin user is created on first startup: `admin@routin.ai` / `Admin@123`
 
 ## Database Configuration
 

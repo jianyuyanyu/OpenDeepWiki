@@ -202,6 +202,7 @@ export default function GitHubImportPage() {
     installationId: number;
     departmentId: string;
     languageCode: string;
+    generateSkill: boolean;
     repos: {
       fullName: string;
       name: string;

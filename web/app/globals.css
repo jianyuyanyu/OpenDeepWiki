@@ -125,3 +125,65 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .admin-menu-scrollbar {
+    overflow-y: scroll;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 55%, transparent) transparent;
+  }
+
+  .admin-menu-scrollbar::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .admin-menu-scrollbar::-webkit-scrollbar-track {
+    background: color-mix(in oklab, var(--muted) 80%, transparent);
+    border-radius: 999px;
+  }
+
+  .admin-menu-scrollbar::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--muted-foreground) 45%, transparent);
+    border: 2px solid var(--popover);
+    border-radius: 999px;
+  }
+
+  .admin-menu-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--muted-foreground) 65%, transparent);
+  }
+
+  .wiki-scrollbar {
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 38%, transparent) transparent;
+  }
+
+  .wiki-scrollbar::-webkit-scrollbar {
+    background: transparent;
+    height: 6px;
+    width: 6px;
+  }
+
+  .wiki-scrollbar::-webkit-scrollbar-track,
+  .wiki-scrollbar::-webkit-scrollbar-track-piece,
+  .wiki-scrollbar::-webkit-scrollbar-corner,
+  .wiki-scrollbar::-webkit-scrollbar-button,
+  .wiki-scrollbar::-webkit-resizer {
+    background: transparent !important;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .wiki-scrollbar::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--muted-foreground) 34%, transparent);
+    border: 0;
+    border-radius: 999px;
+    box-shadow: none;
+  }
+
+  .wiki-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--muted-foreground) 54%, transparent);
+  }
+}

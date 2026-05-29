@@ -11,12 +11,16 @@
   "delete": "削除",
   "edit": "編集",
   "search": "検索",
+  "previous": "前へ",
+  "next": "次へ",
   "loading": "読み込み中...",
   "error": "エラー",
   "success": "成功",
   "user": "ユーザー",
   "backToHome": "ホームに戻る",
   "openMenu": "メニューを開く",
+  "toggleSidebar": "サイドバーを切り替え",
+  "close": "閉じる",
   "submitting": "送信中...",
   "submitFailed": "送信に失敗しました",
   "pleaseLogin": "ログインしてください",
@@ -97,12 +101,37 @@
     "saturday": "土曜日"
   },
   "repository": {
+    "wikiTitle": "リポジトリ Wiki",
+    "mindMap": "プロジェクト構成",
+    "graphify": "Graphify",
+    "exportDocs": "ドキュメントをエクスポート",
+    "exportSkill": "SKILL をエクスポート",
+    "exporting": "エクスポート中...",
+    "expandSection": "セクションを展開",
+    "collapseSection": "セクションを折りたたむ",
+    "tableOfContents": "目次",
+    "graphifyNotAvailable": "Graphify レポートはまだ利用できません。",
+    "graphifyGraph": "グラフ",
+    "graphifyReport": "レポート",
     "notFound": {
       "title": "リポジトリが見つかりません",
       "description": "リポジトリ {owner}/{repo} が見つかりません",
       "privateOrNotExist": "このリポジトリはGitHubに存在しないか、プライベートリポジトリです。",
       "existsButNoDoc": "このリポジトリはGitHubに存在しますが、まだドキュメントが生成されていません。下のボタンをクリックしてWikiドキュメントを生成してください。",
       "generateWiki": "Wiki を生成"
+    },
+    "docNotFound": {
+      "title": "ドキュメントが見つかりません",
+      "description": "{slug} に対応するドキュメントが見つかりませんでした。",
+      "hint": "左のサイドバーから別のドキュメントを選択してください。"
+    },
+    "globalError": {
+      "title": "ページの読み込みに失敗しました",
+      "description": "予期しないエラーが発生しました。しばらくしてからもう一度お試しください。"
+    },
+    "pageNotFound": {
+      "title": "ページが見つかりません",
+      "description": "要求されたページは存在しないか、移動されています。"
     }
   },
   "theme": {
@@ -114,8 +143,26 @@
   "branch": {
     "selectBranch": "ブランチを選択"
   },
+  "organization": {
+    "title": "マイ組織",
+    "refresh": "更新",
+    "loginRequired": "組織を表示するにはログインしてください",
+    "noDepartments": "まだどの部門にも所属していません",
+    "contactAdmin": "管理者に部門へ追加してもらってください",
+    "myDepartments": "所属部門",
+    "departmentManager": "部門マネージャー",
+    "departmentRepositories": "部門リポジトリ",
+    "noRepositories": "割り当てられたリポジトリはありません",
+    "unknown": "不明",
+    "fetchFailed": "組織データの取得に失敗しました",
+    "viewDocs": "ドキュメントを見る"
+  },
   "language": {
     "selectLanguage": "言語を選択"
+  },
+  "sidebar": {
+    "title": "サイドバー",
+    "mobileDescription": "モバイル用サイドバーを表示します。"
   },
   "mcp": {
     "title": "MCP プロバイダー",
@@ -149,6 +196,23 @@
     "zoomOut": "縮小",
     "zoomIn": "拡大",
     "resetView": "ビューをリセット",
-    "close": "閉じる (ESC)"
+    "close": "閉じる (ESC)",
+    "hint": "スクロールでズーム・ドラッグで移動・ESCで閉じる",
+    "loading": "図を読み込み中...",
+    "enlarge": "クリックして拡大",
+    "copyCode": "コードをコピー"
+  },
+  "languageNames": {
+    "zh": "中国語（簡体字）",
+    "en": "英語",
+    "pl": "ポーランド語",
+    "ko": "韓国語",
+    "ja": "日本語",
+    "es": "スペイン語",
+    "fr": "フランス語",
+    "de": "ドイツ語",
+    "pt": "ポルトガル語",
+    "ru": "ロシア語",
+    "ar": "アラビア語"
   }
 }

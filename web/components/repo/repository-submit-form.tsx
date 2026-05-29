@@ -108,6 +108,7 @@ export function RepositorySubmitForm({ onSuccess }: RepositorySubmitFormProps) {
   const [branchName, setBranchName] = useState("main");
   const [languageCode, setLanguageCode] = useState("en");
   const [isPublic, setIsPublic] = useState(true);
+  const [generateSkill, setGenerateSkill] = useState(true);
   const [authAccount, setAuthAccount] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -139,6 +140,7 @@ export function RepositorySubmitForm({ onSuccess }: RepositorySubmitFormProps) {
     setBranchName("main");
     setLanguageCode("en");
     setIsPublic(true);
+    setGenerateSkill(true);
     setAuthAccount("");
     setAuthPassword("");
     setErrors({});
@@ -300,6 +302,7 @@ export function RepositorySubmitForm({ onSuccess }: RepositorySubmitFormProps) {
           branchName: branchName.trim(),
           languageCode,
           isPublic,
+          generateSkill,
           authAccount: authAccount.trim() || undefined,
           authPassword: authPassword || undefined,
         };
@@ -312,6 +315,7 @@ export function RepositorySubmitForm({ onSuccess }: RepositorySubmitFormProps) {
           branchName: branchName.trim(),
           languageCode,
           isPublic,
+          generateSkill,
           archive: archiveFile,
         };
 
@@ -324,6 +328,7 @@ export function RepositorySubmitForm({ onSuccess }: RepositorySubmitFormProps) {
           branchName: branchName.trim(),
           languageCode,
           isPublic,
+          generateSkill,
         };
 
         await submitLocalDirectoryRepository(request);
@@ -584,6 +589,21 @@ export function RepositorySubmitForm({ onSuccess }: RepositorySubmitFormProps) {
           </SelectContent>
         </Select>
         {errors.languageCode && <p className="text-sm text-destructive">{errors.languageCode}</p>}
+      </div>
+
+      <div className="flex items-center justify-between rounded-xl bg-secondary/50 p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+            <Archive className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-sm font-medium">{t("home.repository.generateSkill")}</p>
+            <p className="text-xs text-muted-foreground">
+              {t("home.repository.generateSkillDesc")}
+            </p>
+          </div>
+        </div>
+        <Switch checked={generateSkill} onCheckedChange={setGenerateSkill} />
       </div>
 
       <div className="flex items-center justify-between rounded-xl bg-secondary/50 p-4">

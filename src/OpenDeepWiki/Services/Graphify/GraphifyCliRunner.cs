@@ -4,6 +4,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
+using OpenDeepWiki.Services.AI;
+using OpenDeepWiki.Services.Admin;
 using OpenDeepWiki.Services.Repositories;
 
 namespace OpenDeepWiki.Services.Graphify;
@@ -53,6 +55,8 @@ public class GraphifyCliRunner : IGraphifyCliRunner
     private readonly GraphifyOptions _options;
     private readonly ILogger<GraphifyCliRunner> _logger;
     private readonly HttpClient _httpClient;
+    private readonly IAiProviderResolver? _aiProviderResolver;
+    private readonly IAdminSettingsService? _settingsService;
 
     public GraphifyCliRunner(
         IOptions<GraphifyOptions> options,
@@ -62,6 +66,18 @@ public class GraphifyCliRunner : IGraphifyCliRunner
         _options = options.Value;
         _logger = logger;
         _httpClient = httpClient ?? new HttpClient();
+    }
+
+    public GraphifyCliRunner(
+        IOptions<GraphifyOptions> options,
+        ILogger<GraphifyCliRunner> logger,
+        IAiProviderResolver aiProviderResolver,
+        IAdminSettingsService settingsService,
+        HttpClient? httpClient = null)
+        : this(options, logger, httpClient)
+    {
+        _aiProviderResolver = aiProviderResolver;
+        _settingsService = settingsService;
     }
 
     public async Task<GraphifyRunResult> GenerateAsync(
@@ -85,27 +101,30 @@ public class GraphifyCliRunner : IGraphifyCliRunner
 
         using var timeoutCts = CreateTimeoutTokenSource(cancellationToken);
         var token = timeoutCts.Token;
+        var graphifyAi = await ResolveGraphifyAiAsync(token);
 
         var logBuilder = new StringBuilder();
 
         await RunGraphifyCommandAsync(
             workspace.WorkingDirectory,
-            BuildExtractArguments(workspace.WorkingDirectory, artifactRoot),
+            BuildExtractArguments(workspace.WorkingDirectory, artifactRoot, graphifyAi),
             logBuilder,
-            token);
+            token,
+            ai: graphifyAi);
 
         if (!File.Exists(graphJsonPath))
         {
             throw new FileNotFoundException("Graphify did not produce graph.json", graphJsonPath);
         }
 
-        await EnsureCommunityLabelsAsync(graphifyOut, graphJsonPath, token);
+        await EnsureCommunityLabelsAsync(graphifyOut, graphJsonPath, graphifyAi, token);
 
         await RunGraphifyCommandAsync(
             workspace.WorkingDirectory,
             ["cluster-only", artifactRoot, "--graph", graphJsonPath],
             logBuilder,
             token,
+            graphifyAi,
             new Dictionary<string, string>
             {
                 ["GRAPHIFY_OUT"] = graphifyOut
@@ -130,21 +149,25 @@ public class GraphifyCliRunner : IGraphifyCliRunner
             TrimLog(logBuilder.ToString()));
     }
 
-    private string[] BuildExtractArguments(string workspacePath, string artifactRoot)
+    private string[] BuildExtractArguments(
+        string workspacePath,
+        string artifactRoot,
+        ResolvedAiModel? ai)
     {
         var args = new List<string> { "extract", workspacePath, "--out", artifactRoot };
 
-        var backend = ResolveBackend();
+        var backend = ResolveBackend(ai);
         if (!string.IsNullOrWhiteSpace(backend))
         {
             args.Add("--backend");
             args.Add(backend);
         }
 
-        if (!string.IsNullOrWhiteSpace(_options.Model))
+        var model = ai?.ModelId ?? _options.Model;
+        if (!string.IsNullOrWhiteSpace(model))
         {
             args.Add("--model");
-            args.Add(_options.Model);
+            args.Add(model);
         }
 
         return args.ToArray();
@@ -153,6 +176,7 @@ public class GraphifyCliRunner : IGraphifyCliRunner
     private async Task EnsureCommunityLabelsAsync(
         string graphifyOut,
         string graphJsonPath,
+        ResolvedAiModel? ai,
         CancellationToken cancellationToken)
     {
         var labelsPath = Path.Combine(graphifyOut, ".graphify_labels.json");
@@ -174,7 +198,7 @@ public class GraphifyCliRunner : IGraphifyCliRunner
             return;
         }
 
-        var labels = await TryGenerateLlmCommunityLabelsAsync(summaries, cancellationToken);
+        var labels = await TryGenerateLlmCommunityLabelsAsync(summaries, ai, cancellationToken);
         if (labels == null)
         {
             labels = BuildFallbackCommunityLabels(summaries);
@@ -339,16 +363,18 @@ public class GraphifyCliRunner : IGraphifyCliRunner
 
     private async Task<Dictionary<string, string>?> TryGenerateLlmCommunityLabelsAsync(
         IReadOnlyCollection<CommunitySummary> summaries,
+        ResolvedAiModel? ai,
         CancellationToken cancellationToken)
     {
+        var apiKey = ai?.ApiKey;
         if (!_options.EnableLlmCommunityLabels ||
-            string.IsNullOrWhiteSpace(_options.OpenAiApiKey))
+            string.IsNullOrWhiteSpace(apiKey))
         {
             return null;
         }
 
-        var endpoint = (_options.OpenAiBaseUrl ?? "https://api.openai.com/v1").TrimEnd('/');
-        var model = string.IsNullOrWhiteSpace(_options.Model) ? "gpt-4.1-mini" : _options.Model;
+        var endpoint = (ai?.BaseUrl ?? "https://api.openai.com/v1").TrimEnd('/');
+        var model = ai!.ModelId;
         var requestPayload = new
         {
             model,
@@ -371,7 +397,7 @@ public class GraphifyCliRunner : IGraphifyCliRunner
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Post, $"{endpoint}/chat/completions");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.OpenAiApiKey);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             request.Content = new StringContent(
                 JsonSerializer.Serialize(requestPayload),
                 Encoding.UTF8,
@@ -737,14 +763,37 @@ Communities:
         return value.Length <= maxLength ? value : value[..maxLength];
     }
 
-    private string? ResolveBackend()
+    private string? ResolveBackend(ResolvedAiModel? ai)
     {
+        if (ai != null)
+        {
+            return "openai";
+        }
+
         if (!string.IsNullOrWhiteSpace(_options.Backend))
         {
             return _options.Backend;
         }
 
-        return HasOpenAiOverrides() ? "openai" : null;
+        return null;
+    }
+
+    private async Task<ResolvedAiModel?> ResolveGraphifyAiAsync(CancellationToken cancellationToken)
+    {
+        if (_aiProviderResolver == null || _settingsService == null)
+        {
+            return null;
+        }
+
+        var providerId = (await _settingsService.GetSettingByKeyAsync(SystemSettingDefaults.GraphifyProviderId))?.Value;
+        var modelId = (await _settingsService.GetSettingByKeyAsync(SystemSettingDefaults.GraphifyModelId))?.Value;
+
+        if (string.IsNullOrWhiteSpace(providerId) || string.IsNullOrWhiteSpace(modelId))
+        {
+            return null;
+        }
+
+        return await _aiProviderResolver.ResolveAsync(providerId, modelId, cancellationToken);
     }
 
     private async Task RunGraphifyCommandAsync(
@@ -752,9 +801,10 @@ Communities:
         IReadOnlyList<string> arguments,
         StringBuilder logBuilder,
         CancellationToken cancellationToken,
+        ResolvedAiModel? ai = null,
         IReadOnlyDictionary<string, string>? environment = null)
     {
-        var startInfo = CreateGraphifyStartInfo(workingDirectory, arguments, environment);
+        var startInfo = CreateGraphifyStartInfo(workingDirectory, arguments, ai, environment);
 
         _logger.LogInformation(
             "Running Graphify command. Command: {Command}, Arguments: {Arguments}, WorkingDirectory: {WorkingDirectory}",
@@ -793,9 +843,12 @@ Communities:
     private ProcessStartInfo CreateGraphifyStartInfo(
         string workingDirectory,
         IReadOnlyList<string> arguments,
+        ResolvedAiModel? ai,
         IReadOnlyDictionary<string, string>? environment)
     {
-        var usePythonLauncher = !string.IsNullOrWhiteSpace(_options.OpenAiBaseUrl);
+        var openAiBaseUrl = ai?.BaseUrl;
+        var openAiApiKey = ai?.ApiKey;
+        var usePythonLauncher = !string.IsNullOrWhiteSpace(openAiBaseUrl);
         var startInfo = new ProcessStartInfo
         {
             FileName = usePythonLauncher ? _options.PythonCommand : _options.Command,
@@ -809,7 +862,7 @@ Communities:
         {
             startInfo.ArgumentList.Add("-c");
             startInfo.ArgumentList.Add(BuildOpenAiBaseUrlLauncher());
-            startInfo.ArgumentList.Add(_options.OpenAiBaseUrl!);
+            startInfo.ArgumentList.Add(openAiBaseUrl!);
         }
 
         foreach (var argument in arguments)
@@ -817,9 +870,9 @@ Communities:
             startInfo.ArgumentList.Add(argument);
         }
 
-        if (!string.IsNullOrWhiteSpace(_options.OpenAiApiKey))
+        if (!string.IsNullOrWhiteSpace(openAiApiKey))
         {
-            startInfo.Environment["OPENAI_API_KEY"] = _options.OpenAiApiKey;
+            startInfo.Environment["OPENAI_API_KEY"] = openAiApiKey;
         }
 
         if (environment != null)
@@ -831,12 +884,6 @@ Communities:
         }
 
         return startInfo;
-    }
-
-    private bool HasOpenAiOverrides()
-    {
-        return !string.IsNullOrWhiteSpace(_options.OpenAiBaseUrl) ||
-               !string.IsNullOrWhiteSpace(_options.OpenAiApiKey);
     }
 
     private static string BuildOpenAiBaseUrlLauncher()

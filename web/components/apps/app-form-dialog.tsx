@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "@/hooks/use-translations";
 import {
   Dialog,
@@ -27,7 +27,10 @@ import {
   ChatAppDto,
   CreateChatAppDto,
   UpdateChatAppDto,
-  PROVIDER_TYPES,
+  AppAiModel,
+  AppAiProvider,
+  getAppAiModels,
+  getAppAiProviders,
 } from "@/lib/apps-api";
 
 interface AppFormDialogProps {
@@ -49,54 +52,88 @@ export function AppFormDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [iconUrl, setIconUrl] = useState("");
   const [enableDomainValidation, setEnableDomainValidation] = useState(false);
   const [allowedDomains, setAllowedDomains] = useState("");
-  const [providerType, setProviderType] = useState("OpenAI");
-  const [apiKey, setApiKey] = useState("");
-  const [baseUrl, setBaseUrl] = useState("");
-  const [availableModels, setAvailableModels] = useState("");
+  const [aiProviders, setAiProviders] = useState<AppAiProvider[]>([]);
+  const [aiModels, setAiModels] = useState<AppAiModel[]>([]);
+  const [aiProviderId, setAiProviderId] = useState("");
   const [defaultModel, setDefaultModel] = useState("");
   const [rateLimitPerMinute, setRateLimitPerMinute] = useState("");
   const [isActive, setIsActive] = useState(true);
 
-  // Reset form when dialog opens/closes or app changes
   useEffect(() => {
-    if (open) {
-      if (app) {
-        setName(app.name);
-        setDescription(app.description || "");
-        setIconUrl(app.iconUrl || "");
-        setEnableDomainValidation(app.enableDomainValidation);
-        setAllowedDomains(app.allowedDomains.join("\n"));
-        setProviderType(app.providerType);
-        setApiKey(""); // Don't show existing API key
-        setBaseUrl(app.baseUrl || "");
-        setAvailableModels(app.availableModels.join("\n"));
-        setDefaultModel(app.defaultModel || "");
-        setRateLimitPerMinute(app.rateLimitPerMinute?.toString() || "");
-        setIsActive(app.isActive);
-      } else {
-        // Reset to defaults for new app
-        setName("");
-        setDescription("");
-        setIconUrl("");
-        setEnableDomainValidation(false);
-        setAllowedDomains("");
-        setProviderType("OpenAI");
-        setApiKey("");
-        setBaseUrl("");
-        setAvailableModels("");
-        setDefaultModel("");
-        setRateLimitPerMinute("");
-        setIsActive(true);
-      }
-      setError(null);
+    if (!open) return;
+
+    if (app) {
+      setName(app.name);
+      setDescription(app.description || "");
+      setIconUrl(app.iconUrl || "");
+      setEnableDomainValidation(app.enableDomainValidation);
+      setAllowedDomains(app.allowedDomains.join("\n"));
+      setAiProviderId(app.aiProviderId || "");
+      setDefaultModel(app.defaultModel || "");
+      setRateLimitPerMinute(app.rateLimitPerMinute?.toString() || "");
+      setIsActive(app.isActive);
+    } else {
+      setName("");
+      setDescription("");
+      setIconUrl("");
+      setEnableDomainValidation(false);
+      setAllowedDomains("");
+      setAiProviderId("");
+      setDefaultModel("");
+      setRateLimitPerMinute("");
+      setIsActive(true);
     }
+
+    setError(null);
   }, [open, app]);
+
+  useEffect(() => {
+    if (!open) return;
+    let isMounted = true;
+
+    getAppAiProviders()
+      .then((providers) => {
+        if (!isMounted) return;
+        setAiProviders(providers);
+        setAiProviderId((current) => current || app?.aiProviderId || providers[0]?.id || "");
+      })
+      .catch(() => setError("Failed to load AI providers"));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open, app?.aiProviderId]);
+
+  useEffect(() => {
+    if (!aiProviderId) {
+      setAiModels([]);
+      setDefaultModel("");
+      return;
+    }
+
+    let isMounted = true;
+
+    getAppAiModels(aiProviderId)
+      .then((models) => {
+        if (!isMounted) return;
+        setAiModels(models);
+        setDefaultModel((current) =>
+          current && models.some((model) => model.modelId === current)
+            ? current
+            : models.find((model) => model.isDefault)?.modelId || models[0]?.modelId || ""
+        );
+      })
+      .catch(() => setError("Failed to load AI models"));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [aiProviderId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,18 +143,26 @@ export function AppFormDialog({
       return;
     }
 
+    if (!aiProviderId) {
+      setError("Please select an AI provider");
+      return;
+    }
+
+    if (!defaultModel.trim()) {
+      setError("Please select a default model");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
       const domainsArray = allowedDomains
         .split("\n")
-        .map((d) => d.trim())
-        .filter((d) => d);
-      const modelsArray = availableModels
-        .split("\n")
-        .map((m) => m.trim())
-        .filter((m) => m);
+        .map((domain) => domain.trim())
+        .filter(Boolean);
+      const modelsArray = aiModels.map((model) => model.modelId);
+      const selectedProvider = aiProviders.find((provider) => provider.id === aiProviderId);
 
       if (isEditing && app) {
         const updateDto: UpdateChatAppDto = {
@@ -126,19 +171,15 @@ export function AppFormDialog({
           iconUrl: iconUrl.trim() || undefined,
           enableDomainValidation,
           allowedDomains: domainsArray,
-          providerType,
-          baseUrl: baseUrl.trim() || undefined,
+          aiProviderId,
+          providerType: selectedProvider?.providerType,
           availableModels: modelsArray,
-          defaultModel: defaultModel.trim() || undefined,
+          defaultModel: defaultModel.trim(),
           rateLimitPerMinute: rateLimitPerMinute
-            ? parseInt(rateLimitPerMinute)
+            ? parseInt(rateLimitPerMinute, 10)
             : undefined,
           isActive,
         };
-        // Only include apiKey if it was changed
-        if (apiKey.trim()) {
-          updateDto.apiKey = apiKey.trim();
-        }
         await updateApp(app.id, updateDto);
       } else {
         const createDto: CreateChatAppDto = {
@@ -147,13 +188,12 @@ export function AppFormDialog({
           iconUrl: iconUrl.trim() || undefined,
           enableDomainValidation,
           allowedDomains: domainsArray,
-          providerType,
-          apiKey: apiKey.trim() || undefined,
-          baseUrl: baseUrl.trim() || undefined,
+          aiProviderId,
+          providerType: selectedProvider?.providerType || "OpenAI",
           availableModels: modelsArray,
-          defaultModel: defaultModel.trim() || undefined,
+          defaultModel: defaultModel.trim(),
           rateLimitPerMinute: rateLimitPerMinute
-            ? parseInt(rateLimitPerMinute)
+            ? parseInt(rateLimitPerMinute, 10)
             : undefined,
         };
         await createApp(createDto);
@@ -165,18 +205,15 @@ export function AppFormDialog({
         err instanceof Error
           ? err.message
           : isEditing
-          ? t("apps.form.updateFailed")
-          : t("apps.form.createFailed")
+            ? t("apps.form.updateFailed")
+            : t("apps.form.createFailed")
       );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const modelOptions = availableModels
-    .split("\n")
-    .map((m) => m.trim())
-    .filter((m) => m);
+  const modelOptions = aiModels.map((model) => model.modelId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -194,7 +231,6 @@ export function AppFormDialog({
             </div>
           )}
 
-          {/* Basic Info */}
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">{t("apps.form.name")} *</Label>
@@ -228,7 +264,6 @@ export function AppFormDialog({
             </div>
           </div>
 
-          {/* Domain Validation */}
           <div className="space-y-4 border-t pt-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -259,21 +294,20 @@ export function AppFormDialog({
             )}
           </div>
 
-          {/* AI Configuration */}
           <div className="space-y-4 border-t pt-4">
             <h3 className="font-medium">{t("apps.form.aiConfig")}</h3>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t("apps.form.providerType")}</Label>
-                <Select value={providerType} onValueChange={setProviderType}>
+                <Label>AI Provider *</Label>
+                <Select value={aiProviderId} onValueChange={setAiProviderId}>
                   <SelectTrigger className="w-full">
-                    <SelectValue />
+                    <SelectValue placeholder="Select AI provider" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROVIDER_TYPES.map((provider) => (
-                      <SelectItem key={provider.value} value={provider.value}>
-                        {provider.label}
+                    {aiProviders.map((provider) => (
+                      <SelectItem key={provider.id} value={provider.id}>
+                        {provider.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -281,44 +315,12 @@ export function AppFormDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="apiKey">{t("apps.form.apiKey")}</Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  placeholder={t("apps.form.apiKeyPlaceholder")}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="baseUrl">{t("apps.form.baseUrl")}</Label>
-              <Input
-                id="baseUrl"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder={t("apps.form.baseUrlPlaceholder")}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="availableModels">
-                {t("apps.form.availableModels")}
-              </Label>
-              <Textarea
-                id="availableModels"
-                value={availableModels}
-                onChange={(e) => setAvailableModels(e.target.value)}
-                placeholder={t("apps.form.availableModelsPlaceholder")}
-                rows={3}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>{t("apps.form.defaultModel")}</Label>
-                <Select value={defaultModel} onValueChange={setDefaultModel}>
+                <Label>{t("apps.form.defaultModel")} *</Label>
+                <Select
+                  value={defaultModel}
+                  onValueChange={setDefaultModel}
+                  disabled={!aiProviderId || aiModels.length === 0}
+                >
                   <SelectTrigger className="w-full">
                     <SelectValue
                       placeholder={t("apps.form.defaultModelPlaceholder")}
@@ -333,7 +335,13 @@ export function AppFormDialog({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
 
+            <p className="text-sm text-muted-foreground">
+              Endpoint and API key are read from the selected provider.
+            </p>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="rateLimit">
                   {t("apps.form.rateLimitPerMinute")}
@@ -350,7 +358,6 @@ export function AppFormDialog({
             </div>
           </div>
 
-          {/* Active Status (only for editing) */}
           {isEditing && (
             <div className="flex items-center justify-between border-t pt-4">
               <Label>{t("apps.form.isActive")}</Label>
@@ -358,7 +365,6 @@ export function AppFormDialog({
             </div>
           )}
 
-          {/* Actions */}
           <div className="flex justify-end gap-2 border-t pt-4">
             <Button
               type="button"

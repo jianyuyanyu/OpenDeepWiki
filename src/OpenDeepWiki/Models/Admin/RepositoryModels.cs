@@ -26,6 +26,7 @@ public class AdminRepositoryDto
     public string RepoName { get; set; } = string.Empty;
     public string OrgName { get; set; } = string.Empty;
     public bool IsPublic { get; set; }
+    public bool GenerateSkill { get; set; }
     public int Status { get; set; }
     public string StatusText { get; set; } = string.Empty;
     public int StarCount { get; set; }

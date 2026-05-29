@@ -29,6 +29,16 @@ public class BranchLanguage : AggregateRoot<string>
     public string? UpdateSummary { get; set; }
 
     /// <summary>
+    /// Generated English SKILL.md content for exporting this branch language as a skill package.
+    /// </summary>
+    public string? SkillMarkdown { get; set; }
+
+    /// <summary>
+    /// UTC time when SkillMarkdown was generated.
+    /// </summary>
+    public DateTime? SkillGeneratedAt { get; set; }
+
+    /// <summary>
     /// 是否为默认语言
     /// </summary>
     public bool IsDefault { get; set; }

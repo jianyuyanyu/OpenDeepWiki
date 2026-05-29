@@ -16,7 +16,26 @@
     "uploadImage": "画像をアップロード",
     "send": "送信",
     "retry": "再試行",
-    "closeError": "閉じる"
+    "closeError": "閉じる",
+    "shareConversation": "現在の会話を共有",
+    "shareNoMessages": "共有できる会話がありません",
+    "shareSelectModel": "先にモデルを選択してください",
+    "shareFailed": "会話の共有に失敗しました。もう一度お試しください。",
+    "shareDialogTitle": "現在の会話を共有",
+    "shareDialogDescription": "この会話のスナップショットを共有するための読み取り専用リンクを生成します。",
+    "shareLink": "共有リンク",
+    "shareId": "共有ID",
+    "copied": "コピーしました",
+    "copyLink": "リンクをコピー",
+    "openSharePage": "共有ページを開く",
+    "shareTitle": "共有タイトル",
+    "shareTitlePlaceholder": "共有にタイトルを付けてください",
+    "shareDescription": "説明（任意）",
+    "shareDescriptionPlaceholder": "閲覧者向けの文脈を追加",
+    "shareExpiration": "有効期限（分）",
+    "shareExpirationHint": "既定は7日、最大30日です。",
+    "generateShareLink": "共有リンクを生成",
+    "generating": "生成中..."
   },
   "message": {
     "thinking": "思考プロセス",
@@ -67,5 +86,10 @@
     "icon": "📎",
     "label": "引用元：",
     "remove": "引用を削除"
+  },
+  "share": {
+    "title": "チャット共有",
+    "messageCount": "{count} 件のチャットメッセージ",
+    "empty": "この共有会話にはまだメッセージがありません。"
   }
 }

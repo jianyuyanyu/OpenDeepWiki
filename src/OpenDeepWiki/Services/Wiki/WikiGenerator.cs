@@ -15,6 +15,7 @@ using OpenDeepWiki.Agents;
 using OpenDeepWiki.Agents.Tools;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.AI;
 using OpenDeepWiki.Services.Chat;
 using OpenDeepWiki.Services.Prompts;
 using OpenDeepWiki.Services.Repositories;
@@ -73,6 +74,7 @@ public class WikiGenerator : IWikiGenerator
     private readonly ILogger<WikiGenerator> _logger;
     private readonly IProcessingLogService _processingLogService;
     private readonly ISkillToolConverter _skillToolConverter;
+    private readonly IAiProviderResolver _aiProviderResolver;
 
     // Use AsyncLocal for thread-safe repository ID tracking in concurrent scenarios
     private static readonly AsyncLocal<string?> _currentRepositoryId = new();
@@ -88,7 +90,8 @@ public class WikiGenerator : IWikiGenerator
         IContextFactory contextFactory,
         ILogger<WikiGenerator> logger,
         IProcessingLogService processingLogService,
-        ISkillToolConverter skillToolConverter)
+        ISkillToolConverter skillToolConverter,
+        IAiProviderResolver aiProviderResolver)
     {
         _agentFactory = agentFactory ?? throw new ArgumentNullException(nameof(agentFactory));
         _promptPlugin = promptPlugin ?? throw new ArgumentNullException(nameof(promptPlugin));
@@ -98,6 +101,7 @@ public class WikiGenerator : IWikiGenerator
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _processingLogService = processingLogService ?? throw new ArgumentNullException(nameof(processingLogService));
         _skillToolConverter = skillToolConverter ?? throw new ArgumentNullException(nameof(skillToolConverter));
+        _aiProviderResolver = aiProviderResolver ?? throw new ArgumentNullException(nameof(aiProviderResolver));
 
         _logger.LogDebug(
             "WikiGenerator initialized. CatalogModel: {CatalogModel}, ContentModel: {ContentModel}, MaxRetryAttempts: {MaxRetry}",
@@ -171,9 +175,9 @@ Entry Points: {string.Join(", ", repoContext.EntryPoints.Take(5))}
 Execute the workflow now. Read entry point files to understand the architecture, then generate a comprehensive mind map in {branchLanguage.LanguageCode}.
 Remember to call WriteMindMapAsync with the complete mind map content.";
 
+            var catalogAi = await ResolveCatalogModelAsync(cancellationToken);
             await ExecuteAgentWithRetryAsync(
-                _options.CatalogModel,
-                _options.GetCatalogRequestOptions(),
+                catalogAi,
                 prompt,
                 userMessage,
                 tools,
@@ -261,9 +265,9 @@ Entry Points: {string.Join(", ", repoContext.EntryPoints.Take(5))}
 
 Execute the workflow now. Read entry point files to understand the architecture, then generate a comprehensive catalog in {branchLanguage.LanguageCode}.";
 
+            var catalogAi = await ResolveCatalogModelAsync(cancellationToken);
             await ExecuteAgentWithRetryAsync(
-                _options.CatalogModel,
-                _options.GetCatalogRequestOptions(),
+                catalogAi,
                 prompt,
                 userMessage,
                 tools,
@@ -310,13 +314,58 @@ Execute the workflow now. Read entry point files to understand the architecture,
         var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
         var catalogJson = await catalogStorage.GetCatalogJsonAsync(cancellationToken);
         var catalogItems = GetAllCatalogPaths(catalogJson);
+        var duplicatePathCount = catalogItems
+            .GroupBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Sum(group => group.Count() - 1);
 
-        var parallelCount = _options.ParallelCount;
+        if (duplicatePathCount > 0)
+        {
+            _logger.LogWarning(
+                "Catalog contains {DuplicatePathCount} duplicate document paths. Repository: {Org}/{Repo}, Language: {Language}",
+                duplicatePathCount, workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode);
+
+            catalogItems = catalogItems
+                .GroupBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+        }
+
+        var parallelCount = Math.Max(1, _options.ParallelCount);
+        if (_options.ParallelCount < 1)
+        {
+            _logger.LogWarning(
+                "Invalid WikiGenerator ParallelCount configured: {ConfiguredParallelCount}. Falling back to 1.",
+                _options.ParallelCount);
+        }
+        var persistedDocumentPaths = await GetPersistedDocumentPathsAsync(branchLanguage.Id, cancellationToken);
+        var skippedCount = catalogItems.Count(item => persistedDocumentPaths.Contains(item.Path));
+        var itemsToGenerate = skippedCount == 0
+            ? catalogItems
+            : catalogItems
+                .Where(item => !persistedDocumentPaths.Contains(item.Path))
+                .ToList();
+
         _logger.LogInformation(
-            "Found {Count} catalog items to generate content for. Repository: {Org}/{Repo}, ParallelCount: {ParallelCount}",
-            catalogItems.Count, workspace.Organization, workspace.RepositoryName, parallelCount);
+            "Found {Count} catalog items to generate content for. Repository: {Org}/{Repo}, Pending: {PendingCount}, Skipped: {SkippedCount}, ParallelCount: {ParallelCount}",
+            catalogItems.Count, workspace.Organization, workspace.RepositoryName, itemsToGenerate.Count, skippedCount, parallelCount);
 
-        await LogProcessingAsync(ProcessingStep.Content, $"发现 {catalogItems.Count} documents to generate, parallelism: {parallelCount}", cancellationToken);
+        await LogProcessingAsync(
+            ProcessingStep.Content,
+            $"Found {catalogItems.Count} documents to generate, pending: {itemsToGenerate.Count}, skipped: {skippedCount}, parallelism: {parallelCount}",
+            cancellationToken);
+
+        if (skippedCount > 0)
+        {
+            _logger.LogInformation(
+                "Skipping {SkippedCount} already persisted documents. Repository: {Org}/{Repo}, Language: {Language}",
+                skippedCount, workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode);
+
+            await LogProcessingAsync(
+                ProcessingStep.Content,
+                $"Document progress ({skippedCount}/{catalogItems.Count})",
+                cancellationToken);
+        }
 
         if (catalogItems.Count > 0)
         {
@@ -324,10 +373,10 @@ Execute the workflow now. Read entry point files to understand the architecture,
                 string.Join(", ", catalogItems.Select(i => $"{i.Path}:{i.Title}")));
         }
 
-        var successCount = 0;
+        var generatedCount = 0;
         var failCount = 0;
-        var startedCount = 0;
-        var completedCount = 0;
+        var startedCount = skippedCount;
+        var completedCount = skippedCount;
 
         // Use Parallel.ForEachAsync for better parallel control with timeout protection
         var parallelOptions = new ParallelOptions
@@ -336,7 +385,7 @@ Execute the workflow now. Read entry point files to understand the architecture,
             CancellationToken = cancellationToken
         };
 
-        await Parallel.ForEachAsync(catalogItems, parallelOptions, async (item, ct) =>
+        await Parallel.ForEachAsync(itemsToGenerate, parallelOptions, async (item, ct) =>
         {
             var startedIndex = Interlocked.Increment(ref startedCount);
             var completionStatus = "success";
@@ -363,7 +412,7 @@ Execute the workflow now. Read entry point files to understand the architecture,
                     throw;
                 }
 
-                Interlocked.Increment(ref successCount);
+                Interlocked.Increment(ref generatedCount);
                 shouldLogCompletion = true;
 
                 _logger.LogDebug(
@@ -426,12 +475,22 @@ Execute the workflow now. Read entry point files to understand the architecture,
         });
 
         stopwatch.Stop();
+        var successCount = skippedCount + generatedCount;
         _logger.LogInformation(
-            "Document generation completed. Repository: {Org}/{Repo}, Language: {Language}, Success: {SuccessCount}, Failed: {FailCount}, Duration: {Duration}ms",
+            "Document generation completed. Repository: {Org}/{Repo}, Language: {Language}, Success: {SuccessCount}, Generated: {GeneratedCount}, Skipped: {SkippedCount}, Failed: {FailCount}, Duration: {Duration}ms",
             workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode,
-            successCount, failCount, stopwatch.ElapsedMilliseconds);
+            successCount, generatedCount, skippedCount, failCount, stopwatch.ElapsedMilliseconds);
 
-        await LogProcessingAsync(ProcessingStep.Content, $"Document generation complete, success: {successCount}, failures: {failCount}, time: {stopwatch.ElapsedMilliseconds}ms", cancellationToken);
+        await LogProcessingAsync(
+            ProcessingStep.Content,
+            $"Document generation complete, success: {successCount}, generated: {generatedCount}, skipped: {skippedCount}, failures: {failCount}, time: {stopwatch.ElapsedMilliseconds}ms",
+            cancellationToken);
+
+        if (failCount > 0)
+        {
+            throw new InvalidOperationException(
+                $"Document generation completed with {failCount} failures out of {catalogItems.Count} documents.");
+        }
     }
 
     /// <inheritdoc />
@@ -575,9 +634,9 @@ Execute the workflow now. Read entry point files to understand the architecture,
 
 Please start executing the task.";
 
+            var contentAi = await ResolveContentModelAsync(cancellationToken);
             await ExecuteAgentWithRetryAsync(
-                _options.ContentModel,
-                _options.GetContentRequestOptions(),
+                contentAi,
                 prompt,
                 userMessage,
                 tools,
@@ -615,9 +674,6 @@ Please start executing the task.";
             "Starting document content generation. Path: {Path}, Title: {Title}, Language: {Language}",
             catalogPath, catalogTitle, branchLanguage.LanguageCode);
 
-        // Create a new DbContext instance for this parallel task to ensure thread safety
-        using var context = _contextFactory.CreateContext();
-
         try
         {
             // 构建文件引用的基础URL
@@ -632,12 +688,6 @@ Please start executing the task.";
                     ["catalog_path"] = catalogPath,
                     ["catalog_title"] = catalogTitle
                 },
-                cancellationToken);
-
-            var gitTool = new GitTool(workspace.WorkingDirectory);
-            var docTool = new DocTool(context, branchLanguage.Id, catalogPath, gitTool);
-            var tools = await BuildToolsAsync(
-                gitTool.GetTools().Concat(docTool.GetTools()),
                 cancellationToken);
 
             var userMessage = $@"Please generate Wiki document content for catalog item ""{catalogTitle}"" (path: {catalogPath}).
@@ -721,20 +771,70 @@ Please start executing the task.";
 
 Please start executing the task.";
 
-            await ExecuteAgentWithRetryAsync(
-                _options.ContentModel,
-                _options.GetContentRequestOptions(),
-                prompt,
-                userMessage,
-                tools,
-                $"DocumentContent:{catalogPath}",
-                ProcessingStep.Content,
-                cancellationToken);
+            var contentAi = await ResolveContentModelAsync(cancellationToken);
+            var persistenceAttempts = Math.Max(1, _options.MaxRetryAttempts);
+            Exception? lastPersistenceFailure = null;
 
-            stopwatch.Stop();
-            _logger.LogInformation(
-                "Document content generation completed. Path: {Path}, Title: {Title}, Duration: {Duration}ms",
-                catalogPath, catalogTitle, stopwatch.ElapsedMilliseconds);
+            for (var attempt = 1; attempt <= persistenceAttempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Use a fresh context per retry; failed tool writes can leave tracked
+                // entities in a stale state even when SaveChanges did not persist.
+                using var context = _contextFactory.CreateContext();
+                var gitTool = new GitTool(workspace.WorkingDirectory);
+                var docTool = new DocTool(context, branchLanguage.Id, catalogPath, gitTool);
+                var tools = await BuildToolsAsync(
+                    gitTool.GetTools().Concat(docTool.GetTools()),
+                    cancellationToken);
+
+                _logger.LogDebug(
+                    "Starting document persistence attempt {Attempt}/{MaxAttempts}. Path: {Path}, Title: {Title}",
+                    attempt, persistenceAttempts, catalogPath, catalogTitle);
+
+                var attemptStartedAt = DateTime.UtcNow.AddSeconds(-1);
+                await ExecuteAgentWithRetryAsync(
+                    contentAi,
+                    prompt,
+                    userMessage,
+                    tools,
+                    $"DocumentContent:{catalogPath}",
+                    ProcessingStep.Content,
+                    cancellationToken);
+
+                if (await HasPersistedDocumentContentAsync(branchLanguage.Id, catalogPath, attemptStartedAt, cancellationToken))
+                {
+                    if (attempt > 1)
+                    {
+                        _logger.LogInformation(
+                            "Document persisted after retry. Path: {Path}, Title: {Title}, Attempt: {Attempt}/{MaxAttempts}",
+                            catalogPath, catalogTitle, attempt, persistenceAttempts);
+                    }
+
+                    stopwatch.Stop();
+                    _logger.LogInformation(
+                        "Document content generation completed. Path: {Path}, Title: {Title}, Duration: {Duration}ms",
+                        catalogPath, catalogTitle, stopwatch.ElapsedMilliseconds);
+                    return;
+                }
+
+                lastPersistenceFailure = new InvalidOperationException(
+                    $"AI agent completed but WriteDoc did not persist content for catalog path '{catalogPath}'.");
+
+                _logger.LogWarning(
+                    lastPersistenceFailure,
+                    "Document generation completed without persisted content. Path: {Path}, Title: {Title}, Attempt: {Attempt}/{MaxAttempts}",
+                    catalogPath, catalogTitle, attempt, persistenceAttempts);
+
+                if (attempt < persistenceAttempts)
+                {
+                    await Task.Delay(CalculateRetryDelayMs(attempt), cancellationToken);
+                }
+            }
+
+            throw new InvalidOperationException(
+                $"Document content generation failed to persist content for path '{catalogPath}' after {persistenceAttempts} attempts.",
+                lastPersistenceFailure);
         }
         catch (Exception ex)
         {
@@ -744,6 +844,69 @@ Please start executing the task.";
                 catalogPath, catalogTitle, stopwatch.ElapsedMilliseconds);
             throw;
         }
+    }
+
+    private async Task<bool> HasPersistedDocumentContentAsync(
+        string branchLanguageId,
+        string catalogPath,
+        DateTime updatedAfter,
+        CancellationToken cancellationToken)
+    {
+        using var context = _contextFactory.CreateContext();
+
+        var docFileId = await context.DocCatalogs
+            .AsNoTracking()
+            .Where(c => c.BranchLanguageId == branchLanguageId &&
+                        c.Path == catalogPath &&
+                        !c.IsDeleted)
+            .Select(c => c.DocFileId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (string.IsNullOrEmpty(docFileId))
+        {
+            return false;
+        }
+
+        var doc = await context.DocFiles
+            .AsNoTracking()
+            .Where(d => d.Id == docFileId && !d.IsDeleted)
+            .Select(d => new { d.Content, d.CreatedAt, d.UpdatedAt })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return doc != null &&
+               !string.IsNullOrWhiteSpace(doc.Content) &&
+               (doc.CreatedAt >= updatedAfter || (doc.UpdatedAt.HasValue && doc.UpdatedAt.Value >= updatedAfter));
+    }
+
+    private async Task<HashSet<string>> GetPersistedDocumentPathsAsync(
+        string branchLanguageId,
+        CancellationToken cancellationToken)
+    {
+        using var context = _contextFactory.CreateContext();
+
+        var paths = await context.DocCatalogs
+            .AsNoTracking()
+            .Where(c => c.BranchLanguageId == branchLanguageId &&
+                        !c.IsDeleted &&
+                        c.DocFileId != null &&
+                        c.DocFileId != string.Empty)
+            .Join(
+                context.DocFiles
+                    .AsNoTracking()
+                    .Where(d => !d.IsDeleted && !string.IsNullOrEmpty(d.Content)),
+                c => c.DocFileId!,
+                d => d.Id,
+                (c, _) => c.Path)
+            .ToListAsync(cancellationToken);
+
+        return paths.ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private int CalculateRetryDelayMs(int retryCount)
+    {
+        var exponentialDelay = _options.RetryDelayMs * Math.Pow(2, retryCount - 1);
+        var jitter = Random.Shared.Next(0, 1000);
+        return (int)Math.Min(exponentialDelay + jitter, 60000);
     }
 
 
@@ -794,12 +957,37 @@ Please start executing the task.";
             .ToListAsync(cancellationToken);
     }
 
+    private Task<ResolvedAiModel> ResolveCatalogModelAsync(CancellationToken cancellationToken)
+    {
+        return _aiProviderResolver.ResolveAsync(
+            _options.CatalogProviderId,
+            _options.CatalogModel,
+            cancellationToken);
+    }
+
+    private Task<ResolvedAiModel> ResolveContentModelAsync(CancellationToken cancellationToken)
+    {
+        return _aiProviderResolver.ResolveAsync(
+            _options.ContentProviderId,
+            _options.ContentModel,
+            cancellationToken);
+    }
+
+    private Task<ResolvedAiModel> ResolveTranslationModelAsync(CancellationToken cancellationToken)
+    {
+        return _aiProviderResolver.ResolveAsync(
+            string.IsNullOrWhiteSpace(_options.TranslationProviderId)
+                ? _options.ContentProviderId
+                : _options.TranslationProviderId,
+            _options.GetTranslationModel(),
+            cancellationToken);
+    }
+
     /// <summary>
     /// Executes an AI agent with retry logic using exponential backoff.
     /// </summary>
     private async Task ExecuteAgentWithRetryAsync(
-        string model,
-        AiRequestOptions requestOptions,
+        ResolvedAiModel ai,
         string systemPrompt,
         string userMessage,
         AITool[] tools,
@@ -807,6 +995,8 @@ Please start executing the task.";
         ProcessingStep step,
         CancellationToken cancellationToken)
     {
+        var model = ai.ModelId;
+        var requestOptions = ai.ToRequestOptions();
         var retryCount = 0;
         Exception? lastException = null;
 
@@ -865,9 +1055,7 @@ Please start executing the task.";
 
                 // Use streaming response for real-time output
                 var contentBuilder = new StringBuilder();
-                UsageDetails? usageDetails = null;
-                var inputTokens = 0;
-                var outputTokens = 0;
+                var usageAccumulator = new AiUsageAccumulator();
                 var toolCallCount = 0;
 
                 _logger.LogDebug("Starting streaming response. Operation: {Operation}", operationName);
@@ -876,18 +1064,25 @@ Please start executing the task.";
                 
                 await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
                 {
-                    // Print streaming content
+                    // Accumulate streamed content without writing it to processing logs.
                     if (!string.IsNullOrEmpty(update.Text))
                     {
-                        Console.Write(update.Text);
                         contentBuilder.Append(update.Text);
+                    }
 
-                        // 记录AI输出（每100个字符记录一次，避免过于频繁）
-                        if (contentBuilder.Length % 200 < update.Text.Length)
+                    var functionCallContents = update.Contents.OfType<FunctionCallContent>().ToList();
+                    if (functionCallContents.Count > 0)
+                    {
+                        foreach (var functionCall in functionCallContents)
                         {
-                            await LogProcessingAsync(step, update.Text, true, null, cancellationToken);
+                            toolCallCount++;
+                            _logger.LogDebug(
+                                "Tool call #{CallNumber}: {FunctionName}. Operation: {Operation}",
+                                toolCallCount, functionCall.Name, operationName);
                         }
                     }
+
+                    usageAccumulator.Add(update);
 
                     if (update.RawRepresentation is StreamingChatCompletionUpdate chatCompletionUpdate &&
                         chatCompletionUpdate.ToolCallUpdates.Count > 0)
@@ -897,71 +1092,28 @@ Please start executing the task.";
                             if (!string.IsNullOrEmpty(tool.FunctionName))
                             {
                                 toolCallCount++;
-                                Console.WriteLine();
-                                Console.Write("Call Function:" + tool.FunctionName);
                                 _logger.LogDebug(
                                     "Tool call #{CallNumber}: {FunctionName}. Operation: {Operation}",
                                     toolCallCount, tool.FunctionName, operationName);
-
-                                // 记录工具调用
-                                await LogProcessingAsync(step, $"Tool call: {tool.FunctionName}", false, tool.FunctionName, cancellationToken);
-                            }
-                            else
-                            {
-                                Console.Write(" " +
-                                              Encoding.UTF8.GetString(tool.FunctionArgumentsUpdate.ToArray()));
                             }
                         }
                     }
 
-                    // Track token usage if available
-                    if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
-                    {
-                        if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
-                            {
-                                Value: RawMessageDeltaEvent deltaEvent
-                            })
-                        {
-                            inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
-                                deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
-                            outputTokens = (int)(deltaEvent.Usage.OutputTokens);
-                        }
-                    }
-                    else
-                    {
-                        var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
-                        if (usage != null)
-                        {
-                            usageDetails = usage;
-                        }
-                    }
                 }
 
-                // Print newline after streaming completes
-                Console.WriteLine();
 
                 attemptStopwatch.Stop();
 
                 // Log usage statistics
-                if (usageDetails != null)
+                var usageSnapshot = usageAccumulator.Snapshot;
+                if (usageSnapshot.HasUsage)
                 {
                     _logger.LogInformation(
                         "AI agent completed. Operation: {Operation}, Model: {Model}, InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}, ToolCalls: {ToolCalls}, Duration: {Duration}ms",
                         operationName, model,
-                        usageDetails.InputTokenCount,
-                        usageDetails.OutputTokenCount,
-                        usageDetails.TotalTokenCount,
-                        toolCallCount,
-                        attemptStopwatch.ElapsedMilliseconds);
-                }
-                else if (inputTokens > 0 || outputTokens > 0)
-                {
-                    _logger.LogInformation(
-                        "AI agent completed. Operation: {Operation}, Model: {Model}, InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}, ToolCalls: {ToolCalls}, Duration: {Duration}ms",
-                        operationName, model,
-                        inputTokens,
-                        outputTokens,
-                        inputTokens + outputTokens,
+                        usageSnapshot.InputTokens,
+                        usageSnapshot.OutputTokens,
+                        usageSnapshot.TotalTokens,
                         toolCallCount,
                         attemptStopwatch.ElapsedMilliseconds);
                 }
@@ -972,12 +1124,11 @@ Please start executing the task.";
                         operationName, model, toolCallCount, attemptStopwatch.ElapsedMilliseconds);
                 }
 
-                var recordedInputTokens = (int)(usageDetails?.InputTokenCount ?? inputTokens);
-                var recordedOutputTokens = (int)(usageDetails?.OutputTokenCount ?? outputTokens);
                 await RecordTokenUsageAsync(
-                    recordedInputTokens,
-                    recordedOutputTokens,
-                    model,
+                    usageSnapshot.InputTokens,
+                    usageSnapshot.OutputTokens,
+                    usageSnapshot.CachedInputTokens,
+                    ai,
                     operationName,
                     cancellationToken);
 
@@ -1166,7 +1317,8 @@ Please start executing the task.";
     private async Task RecordTokenUsageAsync(
         int inputTokens,
         int outputTokens,
-        string modelName,
+        int cachedInputTokens,
+        ResolvedAiModel ai,
         string operation,
         CancellationToken cancellationToken)
     {
@@ -1184,10 +1336,15 @@ Please start executing the task.";
                 RepositoryId = _currentRepositoryId.Value,
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
-                ModelName = modelName,
+                CachedInputTokens = cachedInputTokens,
+                ModelId = ai.ModelId,
+                ModelName = ai.ModelName,
                 Operation = operation,
                 RecordedAt = DateTime.UtcNow
             };
+            AiUsageAccounting.ApplyModelAccounting(
+                usage,
+                AiUsageAccounting.FromResolvedModel(ai));
 
             context.TokenUsages.Add(usage);
             await context.SaveChangesAsync(cancellationToken);
@@ -1568,15 +1725,15 @@ Translation:";
             new(ChatRole.User, prompt)
         };
 
+        var translationAi = await ResolveTranslationModelAsync(cancellationToken);
         var chatClient = _agentFactory.CreateSimpleChatClient(
-            _options.GetTranslationModel(),
+            translationAi.ModelId,
             _options.MaxOutputTokens,
-            _options.GetTranslationRequestOptions());
+            translationAi.ToRequestOptions());
         var thread = await chatClient.CreateSessionAsync(cancellationToken);
 
         var contentBuilder = new StringBuilder();
-        var inputTokens = 0;
-        var outputTokens = 0;
+        var usageAccumulator = new AiUsageAccumulator();
 
         await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
         {
@@ -1585,44 +1742,26 @@ Translation:";
                 contentBuilder.Append(update.Text);
             }
 
-            if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
-            {
-                if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
-                    {
-                        Value: RawMessageDeltaEvent deltaEvent
-                    })
-                {
-                    inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
-                        deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
-                    outputTokens = (int)(deltaEvent.Usage.OutputTokens);
-                }
-            }
-            else
-            {
-                var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
-                if (usage != null)
-                {
-                    inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
-                    outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
-                }
-            }
+            usageAccumulator.Add(update);
         }
 
         var translatedTitle = contentBuilder.ToString().Trim();
+        var usageSnapshot = usageAccumulator.Snapshot;
 
-        if (inputTokens > 0 || outputTokens > 0)
+        if (usageSnapshot.HasUsage)
         {
             _logger.LogDebug(
                 "TranslateSingleTitleAsync token usage. InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}",
-                inputTokens,
-                outputTokens,
-                inputTokens + outputTokens);
+                usageSnapshot.InputTokens,
+                usageSnapshot.OutputTokens,
+                usageSnapshot.TotalTokens);
         }
 
         await RecordTokenUsageAsync(
-            inputTokens,
-            outputTokens,
-            _options.GetTranslationModel(),
+            usageSnapshot.InputTokens,
+            usageSnapshot.OutputTokens,
+            usageSnapshot.CachedInputTokens,
+            translationAi,
             "Translation:CatalogTitle",
             cancellationToken);
 
@@ -1665,20 +1804,20 @@ Translated document:";
 
         var retryCount = 0;
         Exception? lastException = null;
+        var translationAi = await ResolveTranslationModelAsync(cancellationToken);
 
         while (retryCount < _options.MaxRetryAttempts)
         {
             try
             {
                 var chatClient = _agentFactory.CreateSimpleChatClient(
-                    _options.GetTranslationModel(), 
+                    translationAi.ModelId,
                     _options.MaxOutputTokens, 
-                    _options.GetTranslationRequestOptions());
+                    translationAi.ToRequestOptions());
                 var thread = await chatClient.CreateSessionAsync(cancellationToken);
                 
                 var contentBuilder = new StringBuilder();
-                var inputTokens = 0;
-                var outputTokens = 0;
+                var usageAccumulator = new AiUsageAccumulator();
                 await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
                 {
                     if (!string.IsNullOrEmpty(update.Text))
@@ -1686,44 +1825,25 @@ Translated document:";
                         contentBuilder.Append(update.Text);
                     }
 
-                    // Track token usage if available
-                    if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
-                    {
-                        if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
-                            {
-                                Value: RawMessageDeltaEvent deltaEvent
-                            })
-                        {
-                            inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
-                                deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
-                            outputTokens = (int)(deltaEvent.Usage.OutputTokens);
-                        }
-                    }
-                    else
-                    {
-                        var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
-                        if (usage != null)
-                        {
-                            inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
-                            outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
-                        }
-                    }
+                    usageAccumulator.Add(update);
                 }
 
                 var result = contentBuilder.ToString().Trim();
-                if (inputTokens > 0 || outputTokens > 0)
+                var usageSnapshot = usageAccumulator.Snapshot;
+                if (usageSnapshot.HasUsage)
                 {
                     _logger.LogDebug(
                         "TranslateContentAsync token usage. InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}",
-                        inputTokens,
-                        outputTokens,
-                        inputTokens + outputTokens);
+                        usageSnapshot.InputTokens,
+                        usageSnapshot.OutputTokens,
+                        usageSnapshot.TotalTokens);
                 }
 
                 await RecordTokenUsageAsync(
-                    inputTokens,
-                    outputTokens,
-                    _options.GetTranslationModel(),
+                    usageSnapshot.InputTokens,
+                    usageSnapshot.OutputTokens,
+                    usageSnapshot.CachedInputTokens,
+                    translationAi,
                     "Translation:Content",
                     cancellationToken);
 
@@ -1793,20 +1913,20 @@ Translated mind map:";
 
         var retryCount = 0;
         Exception? lastException = null;
+        var translationAi = await ResolveTranslationModelAsync(cancellationToken);
 
         while (retryCount < _options.MaxRetryAttempts)
         {
             try
             {
                 var chatClient = _agentFactory.CreateSimpleChatClient(
-                    _options.GetTranslationModel(),
+                    translationAi.ModelId,
                     _options.MaxOutputTokens,
-                    _options.GetTranslationRequestOptions());
+                    translationAi.ToRequestOptions());
                 var thread = await chatClient.CreateSessionAsync(cancellationToken);
 
                 var contentBuilder = new StringBuilder();
-                var inputTokens = 0;
-                var outputTokens = 0;
+                var usageAccumulator = new AiUsageAccumulator();
                 await foreach (var update in chatClient.RunStreamingAsync(messages, thread, cancellationToken: cancellationToken))
                 {
                     if (!string.IsNullOrEmpty(update.Text))
@@ -1814,28 +1934,7 @@ Translated mind map:";
                         contentBuilder.Append(update.Text);
                     }
 
-                    // Track token usage if available
-                    if (update.RawRepresentation is ChatResponseUpdate chatResponseUpdate)
-                    {
-                        if (chatResponseUpdate.RawRepresentation is RawMessageStreamEvent
-                            {
-                                Value: RawMessageDeltaEvent deltaEvent
-                            })
-                        {
-                            inputTokens = (int)((int)(deltaEvent.Usage.InputTokens ?? inputTokens) +
-                                deltaEvent.Usage.CacheCreationInputTokens + deltaEvent.Usage.CacheReadInputTokens ?? 0);
-                            outputTokens = (int)(deltaEvent.Usage.OutputTokens);
-                        }
-                    }
-                    else
-                    {
-                        var usage = update.Contents.OfType<UsageContent>().FirstOrDefault()?.Details;
-                        if (usage != null)
-                        {
-                            inputTokens = (int)(usage.InputTokenCount ?? inputTokens);
-                            outputTokens = (int)(usage.OutputTokenCount ?? outputTokens);
-                        }
-                    }
+                    usageAccumulator.Add(update);
                 }
 
                 var result = contentBuilder.ToString().Trim();
@@ -1843,19 +1942,21 @@ Translated mind map:";
                 // 清理可能的 <think> 标签
                 result = RemoveThinkTags(result);
 
-                if (inputTokens > 0 || outputTokens > 0)
+                var usageSnapshot = usageAccumulator.Snapshot;
+                if (usageSnapshot.HasUsage)
                 {
                     _logger.LogDebug(
                         "TranslateMindMapAsync token usage. InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}",
-                        inputTokens,
-                        outputTokens,
-                        inputTokens + outputTokens);
+                        usageSnapshot.InputTokens,
+                        usageSnapshot.OutputTokens,
+                        usageSnapshot.TotalTokens);
                 }
 
                 await RecordTokenUsageAsync(
-                    inputTokens,
-                    outputTokens,
-                    _options.GetTranslationModel(),
+                    usageSnapshot.InputTokens,
+                    usageSnapshot.OutputTokens,
+                    usageSnapshot.CachedInputTokens,
+                    translationAi,
                     "Translation:MindMap",
                     cancellationToken);
 

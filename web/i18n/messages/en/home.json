@@ -127,6 +127,8 @@
     "branchNotSupported": "Auto-fetch not supported for this platform, please enter manually",
     "language": "Language",
     "languageRequired": "Language is required",
+    "generateSkill": "Generate SKILL",
+    "generateSkillDesc": "Package generated documentation as a SKILL ZIP for export",
     "isPublic": "Public Repository",
     "publicDesc": "Anyone can view this repository",
     "privateDesc": "Only you can access this repository",
@@ -170,6 +172,9 @@
         "workspace": "Prepare",
         "catalog": "Catalog",
         "content": "Content",
+        "translation": "Translate",
+        "mindMap": "Mind map",
+        "graphify": "Graphify",
         "complete": "Complete"
       }
     },

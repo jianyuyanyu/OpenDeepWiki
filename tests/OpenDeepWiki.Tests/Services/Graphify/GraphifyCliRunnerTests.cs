@@ -2,6 +2,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using System.Net;
 using System.Text;
+using OpenDeepWiki.Agents;
+using OpenDeepWiki.Entities;
+using OpenDeepWiki.Models.Admin;
+using OpenDeepWiki.Services.AI;
+using OpenDeepWiki.Services.Admin;
 using OpenDeepWiki.Services.Graphify;
 using OpenDeepWiki.Services.Repositories;
 using Xunit;
@@ -82,12 +87,12 @@ fi
                 {
                     PythonCommand = fakePython,
                     OutputRoot = outputRoot,
-                    OpenAiBaseUrl = "https://openai-compatible.example/v1",
-                    OpenAiApiKey = "test-openai-key",
                     EnableLlmCommunityLabels = false,
                     TimeoutMinutes = 1
                 }),
-                NullLogger<GraphifyCliRunner>.Instance);
+                NullLogger<GraphifyCliRunner>.Instance,
+                new StubAiProviderResolver(),
+                new StubAdminSettingsService());
 
             var result = await runner.GenerateAsync(new RepositoryWorkspace
             {
@@ -222,12 +227,11 @@ fi
                 {
                     PythonCommand = fakePython,
                     OutputRoot = outputRoot,
-                    OpenAiBaseUrl = "https://openai-compatible.example/v1",
-                    OpenAiApiKey = "test-openai-key",
-                    Model = "test-model",
                     TimeoutMinutes = 1
                 }),
                 NullLogger<GraphifyCliRunner>.Instance,
+                new StubAiProviderResolver(),
+                new StubAdminSettingsService(),
                 httpClient);
 
             var result = await runner.GenerateAsync(new RepositoryWorkspace
@@ -317,12 +321,11 @@ fi
                 {
                     PythonCommand = fakePython,
                     OutputRoot = outputRoot,
-                    OpenAiBaseUrl = "https://openai-compatible.example/v1",
-                    OpenAiApiKey = "test-openai-key",
-                    Model = "test-model",
                     TimeoutMinutes = 1
                 }),
                 NullLogger<GraphifyCliRunner>.Instance,
+                new StubAiProviderResolver(),
+                new StubAdminSettingsService(),
                 httpClient);
 
             var result = await runner.GenerateAsync(new RepositoryWorkspace
@@ -369,6 +372,73 @@ fi
             {
                 Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
             };
+        }
+    }
+
+    private sealed class StubAiProviderResolver : IAiProviderResolver
+    {
+        public Task<ResolvedAiModel> ResolveAsync(
+            string? providerId,
+            string? modelId,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new ResolvedAiModel(
+                providerId ?? "graphify-provider",
+                "Graphify Provider",
+                "OpenAI",
+                modelId ?? "test-model",
+                modelId ?? "test-model",
+                "https://openai-compatible.example/v1",
+                "test-openai-key",
+                AiRequestType.OpenAI,
+                null,
+                null,
+                null,
+                null,
+                false,
+                null,
+                null,
+                null));
+        }
+
+        public Task<ResolvedAiModel> ResolveModelConfigAsync(
+            ModelConfig modelConfig,
+            CancellationToken cancellationToken = default)
+        {
+            return ResolveAsync(modelConfig.AiProviderId, modelConfig.ModelId, cancellationToken);
+        }
+    }
+
+    private sealed class StubAdminSettingsService : IAdminSettingsService
+    {
+        public Task<List<SystemSettingDto>> GetSettingsAsync(string? category)
+        {
+            return Task.FromResult(new List<SystemSettingDto>());
+        }
+
+        public Task<SystemSettingDto?> GetSettingByKeyAsync(string key)
+        {
+            var value = key switch
+            {
+                SystemSettingDefaults.GraphifyProviderId => "graphify-provider",
+                SystemSettingDefaults.GraphifyModelId => "test-model",
+                _ => null
+            };
+
+            return Task.FromResult(value == null
+                ? null
+                : new SystemSettingDto
+                {
+                    Id = key,
+                    Key = key,
+                    Value = value,
+                    Category = "ai"
+                });
+        }
+
+        public Task UpdateSettingsAsync(List<UpdateSettingRequest> requests)
+        {
+            return Task.CompletedTask;
         }
     }
 }

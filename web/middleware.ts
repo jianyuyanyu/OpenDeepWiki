@@ -10,7 +10,7 @@ export function middleware(request: NextRequest) {
   // 从 cookie 中获取语言设置
   const cookieLocale = request.cookies.get('NEXT_LOCALE')?.value;
   
-  // Priority: URL `lang` > cookie > default `zh`
+  // Priority: URL `lang` > cookie > default `en`
   let locale = defaultLocale;
   if (urlLang && supportedLocales.includes(urlLang)) {
     locale = urlLang;

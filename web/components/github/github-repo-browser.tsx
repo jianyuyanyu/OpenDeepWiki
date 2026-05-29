@@ -62,6 +62,7 @@ interface GitHubRepoBrowserProps {
     installationId: number;
     departmentId: string;
     languageCode: string;
+    generateSkill: boolean;
     repos: ImportRepoData[];
   }) => Promise<BatchImportResult>;
   /** Whether to show a "Personal only" option in the department selector */
@@ -104,6 +105,7 @@ export function GitHubRepoBrowser({
   // Import
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>(PERSONAL_ONLY_VALUE);
   const [languageCode, setLanguageCode] = useState("en");
+  const [generateSkill, setGenerateSkill] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<BatchImportResult | null>(null);
 
@@ -294,6 +296,7 @@ export function GitHubRepoBrowser({
         installationId: installation.installationId,
         departmentId: selectedDepartmentId === PERSONAL_ONLY_VALUE ? "" : selectedDepartmentId,
         languageCode,
+        generateSkill,
         repos: selectedRepoData,
       });
 
@@ -368,18 +371,26 @@ export function GitHubRepoBrowser({
           <label className="text-sm font-medium">
             {t("admin.githubImport.language")}:
           </label>
-          <Select value={languageCode} onValueChange={setLanguageCode}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
+            <Select value={languageCode} onValueChange={setLanguageCode}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue />
+              </SelectTrigger>
             <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="zh">Chinese</SelectItem>
-              <SelectItem value="ko">Korean</SelectItem>
-              <SelectItem value="ja">Japanese</SelectItem>
+              <SelectItem value="en">{t("common.languageNames.en")}</SelectItem>
+              <SelectItem value="zh">{t("common.languageNames.zh")}</SelectItem>
+              <SelectItem value="ko">{t("common.languageNames.ko")}</SelectItem>
+              <SelectItem value="ja">{t("common.languageNames.ja")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
+
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <Checkbox
+            checked={generateSkill}
+            onCheckedChange={(checked) => setGenerateSkill(checked === true)}
+          />
+          {t("admin.githubImport.generateSkill")}
+        </label>
       </div>
 
       {/* Search and Filter */}

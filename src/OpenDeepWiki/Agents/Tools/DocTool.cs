@@ -17,6 +17,8 @@ public class DocTool
     private readonly string _branchLanguageId;
     private readonly string _catalogPath;
     private readonly GitTool? _gitTool;
+    private const int MaxDatabaseWriteAttempts = 3;
+    private const int DatabaseWriteRetryBaseDelayMs = 250;
 
     /// <summary>
     /// Initializes a new instance of DocTool with the specified context, branch language, and catalog path.
@@ -96,7 +98,7 @@ content: '# Overview\n\nThis is the overview section...'")]
                     existingDoc.Content = content;
                     existingDoc.SourceFiles = sourceFilesJson;
                     existingDoc.UpdateTimestamp();
-                    await _context.SaveChangesAsync(cancellationToken);
+                    await SaveChangesWithRetryAsync(cancellationToken);
                     return $"SUCCESS: Document '{_catalogPath}' has been updated successfully.";
                 }
             }
@@ -116,7 +118,7 @@ content: '# Overview\n\nThis is the overview section...'")]
             catalog.DocFileId = docFile.Id;
             catalog.UpdateTimestamp();
 
-            await _context.SaveChangesAsync(cancellationToken);
+            await SaveChangesWithRetryAsync(cancellationToken);
             return $"SUCCESS: Document '{_catalogPath}' has been created successfully.";
         }
         catch (Exception ex)
@@ -191,7 +193,7 @@ newContent: '## New Section\n\nUpdated content here'")]
             docFile.Content = docFile.Content.Replace(oldContent, newContent);
             docFile.UpdateTimestamp();
 
-            await _context.SaveChangesAsync(cancellationToken);
+            await SaveChangesWithRetryAsync(cancellationToken);
             return $"SUCCESS: Document '{_catalogPath}' has been edited successfully.";
         }
         catch (Exception ex)
@@ -291,5 +293,31 @@ Usage:
                 Name = "DocExists"
             })
         };
+    }
+
+    private async Task SaveChangesWithRetryAsync(CancellationToken cancellationToken)
+    {
+        for (var attempt = 1;; attempt++)
+        {
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+                return;
+            }
+            catch (Exception ex) when (attempt < MaxDatabaseWriteAttempts && IsRetryableDatabaseWriteException(ex))
+            {
+                var delay = DatabaseWriteRetryBaseDelayMs * attempt + Random.Shared.Next(0, 150);
+                await Task.Delay(delay, cancellationToken);
+            }
+        }
+    }
+
+    private static bool IsRetryableDatabaseWriteException(Exception ex)
+    {
+        var message = ex.ToString().ToLowerInvariant();
+        return message.Contains("database is locked") ||
+               message.Contains("database table is locked") ||
+               message.Contains("sqlite_busy") ||
+               message.Contains("database is busy");
     }
 }

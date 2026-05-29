@@ -74,6 +74,11 @@ public class RepositoryItemResponse
     public bool IsPublic { get; set; }
 
     /// <summary>
+    /// 鏄惁鐢熸垚 SKILL 瀵煎嚭鍖?
+    /// </summary>
+    public bool GenerateSkill { get; set; }
+
+    /// <summary>
     /// 是否设置了密码
     /// </summary>
     public bool HasPassword { get; set; }

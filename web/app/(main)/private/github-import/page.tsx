@@ -17,7 +17,7 @@ import {
 } from "@/lib/github-import-api";
 import { getMyDepartments, type UserDepartment } from "@/lib/organization-api";
 import { GitHubInstallationList } from "@/components/github/github-installation-list";
-import { GitHubRepoBrowser } from "@/components/github/github-repo-browser";
+import { GitHubRepoBrowser, type ImportRepoData } from "@/components/github/github-repo-browser";
 
 export default function UserGitHubImportPage() {
   const t = useTranslations();
@@ -59,12 +59,14 @@ export default function UserGitHubImportPage() {
     installationId: number;
     departmentId: string;
     languageCode: string;
-    repos: any[];
+    generateSkill: boolean;
+    repos: ImportRepoData[];
   }) => {
     return userImportRepos({
       installationId: params.installationId,
       departmentId: params.departmentId || undefined,
       languageCode: params.languageCode,
+      generateSkill: params.generateSkill,
       repos: params.repos,
     });
   }, []);

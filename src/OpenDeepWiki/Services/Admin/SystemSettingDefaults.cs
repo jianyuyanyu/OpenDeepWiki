@@ -1,35 +1,32 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
-using OpenDeepWiki.Agents;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Services.Wiki;
 
 namespace OpenDeepWiki.Services.Admin;
 
-/// <summary>
-/// Helper class for initializing default system settings from environment variables.
-/// </summary>
 public static class SystemSettingDefaults
 {
-    /// <summary>
-    /// Default settings for the wiki generator.
-    /// </summary>
+    public const string WikiCatalogProviderId = "WIKI_CATALOG_PROVIDER_ID";
+    public const string WikiCatalogModelId = "WIKI_CATALOG_MODEL_ID";
+    public const string WikiContentProviderId = "WIKI_CONTENT_PROVIDER_ID";
+    public const string WikiContentModelId = "WIKI_CONTENT_MODEL_ID";
+    public const string WikiTranslationProviderId = "WIKI_TRANSLATION_PROVIDER_ID";
+    public const string WikiTranslationModelId = "WIKI_TRANSLATION_MODEL_ID";
+    public const string GraphifyProviderId = "GRAPHIFY_PROVIDER_ID";
+    public const string GraphifyModelId = "GRAPHIFY_MODEL_ID";
+
     public static readonly (string Key, string Category, string Description)[] WikiGeneratorDefaults =
     [
-        ("WIKI_CATALOG_MODEL", "ai", "AI model used for catalog generation"),
-        ("WIKI_CATALOG_ENDPOINT", "ai", "API endpoint for catalog generation"),
-        ("WIKI_CATALOG_API_KEY", "ai", "API key for catalog generation"),
-        ("WIKI_CATALOG_REQUEST_TYPE", "ai", "Request type for catalog generation"),
-        ("WIKI_CONTENT_MODEL", "ai", "AI model used for content generation"),
-        ("WIKI_CONTENT_ENDPOINT", "ai", "API endpoint for content generation"),
-        ("WIKI_CONTENT_API_KEY", "ai", "API key for content generation"),
-        ("WIKI_CONTENT_REQUEST_TYPE", "ai", "Request type for content generation"),
-        ("WIKI_TRANSLATION_MODEL", "ai", "AI model used for translation"),
-        ("WIKI_TRANSLATION_ENDPOINT", "ai", "API endpoint for translation"),
-        ("WIKI_TRANSLATION_API_KEY", "ai", "API key for translation"),
-        ("WIKI_TRANSLATION_REQUEST_TYPE", "ai", "Request type for translation"),
+        (WikiCatalogProviderId, "ai", "AI provider used for catalog and mind map generation"),
+        (WikiCatalogModelId, "ai", "AI model used for catalog and mind map generation"),
+        (WikiContentProviderId, "ai", "AI provider used for content generation"),
+        (WikiContentModelId, "ai", "AI model used for content generation"),
+        (WikiTranslationProviderId, "ai", "AI provider used for translation"),
+        (WikiTranslationModelId, "ai", "AI model used for translation"),
+        (GraphifyProviderId, "ai", "AI provider used for Graphify community labels"),
+        (GraphifyModelId, "ai", "AI model used for Graphify community labels"),
         ("WIKI_LANGUAGES", "ai", "Supported languages (comma-separated)"),
         ("WIKI_PARALLEL_COUNT", "ai", "Number of parallel document generation tasks"),
         ("WIKI_MAX_OUTPUT_TOKENS", "ai", "Maximum output token count"),
@@ -43,9 +40,6 @@ public static class SystemSettingDefaults
         ("WIKI_PROMPTS_DIRECTORY", "ai", "Prompt templates directory")
     ];
 
-    /// <summary>
-    /// Initialize default system settings (only for keys not already in the database).
-    /// </summary>
     public static async Task InitializeDefaultsAsync(IConfiguration configuration, IContext context)
     {
         var existingSettings = await context.SystemSettings
@@ -53,54 +47,35 @@ public static class SystemSettingDefaults
             .ToListAsync();
 
         var existingByKey = existingSettings.ToDictionary(s => s.Key);
+        var wikiOptionDefaults = new WikiGeneratorOptions();
+        configuration.GetSection(WikiGeneratorOptions.SectionName).Bind(wikiOptionDefaults);
 
         var settingsToAdd = new List<SystemSetting>();
         var hasChanges = false;
 
-        // Prepare WikiGeneratorOptions defaults so values can be written even without env vars
-        var wikiOptionDefaults = new WikiGeneratorOptions();
-        var wikiSection = configuration.GetSection(WikiGeneratorOptions.SectionName);
-        wikiSection.Bind(wikiOptionDefaults);
-
-        // Apply environment variable overrides to match runtime behavior
-        ApplyEnvironmentOverrides(wikiOptionDefaults, configuration);
-
-        // Process wiki generator settings
         foreach (var (key, category, description) in WikiGeneratorDefaults)
         {
             if (existingByKey.TryGetValue(key, out var existing))
             {
-                // Update description if it changed (e.g. translated from Chinese to English)
-                if (existing.Description != description)
+                if (existing.Description != description || existing.Category != category)
                 {
                     existing.Description = description;
+                    existing.Category = category;
                     hasChanges = true;
                 }
 
-                // Sync existing setting value with current environment variable
-                var envValue = GetEnvironmentOrConfigurationValue(configuration, key);
-                if (!string.IsNullOrWhiteSpace(envValue) && existing.Value != envValue)
-                {
-                    existing.Value = envValue;
-                    hasChanges = true;
-                }
+                continue;
             }
-            else
+
+            settingsToAdd.Add(new SystemSetting
             {
-                var envValue = GetEnvironmentOrConfigurationValue(configuration, key);
-                var fallbackValue = GetOptionDefaultValue(wikiOptionDefaults, key);
-                var valueToUse = envValue ?? fallbackValue ?? string.Empty;
-
-                settingsToAdd.Add(new SystemSetting
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    Key = key,
-                    Value = valueToUse,
-                    Description = description,
-                    Category = category,
-                    CreatedAt = DateTime.UtcNow
-                });
-            }
+                Id = Guid.NewGuid().ToString(),
+                Key = key,
+                Value = GetOptionDefaultValue(wikiOptionDefaults, key) ?? string.Empty,
+                Description = description,
+                Category = category,
+                CreatedAt = DateTime.UtcNow
+            });
         }
 
         if (settingsToAdd.Count > 0)
@@ -115,41 +90,9 @@ public static class SystemSettingDefaults
         }
     }
 
-    /// <summary>
-    /// Get value from environment variable or configuration.
-    /// </summary>
-    private static string? GetEnvironmentOrConfigurationValue(IConfiguration configuration, string key)
-    {
-        // Prefer environment variable
-        var envValue = Environment.GetEnvironmentVariable(key);
-        if (!string.IsNullOrWhiteSpace(envValue))
-        {
-            return envValue;
-        }
-
-        // Fall back to configuration (appsettings.json etc.)
-        return configuration[key];
-    }
-
-    /// <summary>
-    /// Apply environment variable values to WikiGeneratorOptions for runtime consistency.
-    /// </summary>
-    private static void ApplyEnvironmentOverrides(WikiGeneratorOptions options, IConfiguration configuration)
-    {
-        foreach (var (key, _, _) in WikiGeneratorDefaults)
-        {
-            var envValue = GetEnvironmentOrConfigurationValue(configuration, key);
-            if (!string.IsNullOrWhiteSpace(envValue))
-            {
-                ApplySettingToOption(options, key, envValue);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Apply system settings to WikiGeneratorOptions.
-    /// </summary>
-    public static async Task ApplyToWikiGeneratorOptions(WikiGeneratorOptions options, IAdminSettingsService settingsService)
+    public static async Task ApplyToWikiGeneratorOptions(
+        WikiGeneratorOptions options,
+        IAdminSettingsService settingsService)
     {
         foreach (var def in WikiGeneratorDefaults)
         {
@@ -161,25 +104,16 @@ public static class SystemSettingDefaults
         }
     }
 
-    /// <summary>
-    /// Get the default value from WikiGeneratorOptions as a string.
-    /// </summary>
     private static string? GetOptionDefaultValue(WikiGeneratorOptions options, string key)
     {
         return key switch
         {
-            "WIKI_CATALOG_MODEL" => options.CatalogModel,
-            "WIKI_CATALOG_ENDPOINT" => options.CatalogEndpoint,
-            "WIKI_CATALOG_API_KEY" => options.CatalogApiKey,
-            "WIKI_CATALOG_REQUEST_TYPE" => options.CatalogRequestType?.ToString(),
-            "WIKI_CONTENT_MODEL" => options.ContentModel,
-            "WIKI_CONTENT_ENDPOINT" => options.ContentEndpoint,
-            "WIKI_CONTENT_API_KEY" => options.ContentApiKey,
-            "WIKI_CONTENT_REQUEST_TYPE" => options.ContentRequestType?.ToString(),
-            "WIKI_TRANSLATION_MODEL" => options.TranslationModel,
-            "WIKI_TRANSLATION_ENDPOINT" => options.TranslationEndpoint,
-            "WIKI_TRANSLATION_API_KEY" => options.TranslationApiKey,
-            "WIKI_TRANSLATION_REQUEST_TYPE" => options.TranslationRequestType?.ToString(),
+            WikiCatalogProviderId => options.CatalogProviderId,
+            WikiCatalogModelId => options.CatalogModel,
+            WikiContentProviderId => options.ContentProviderId,
+            WikiContentModelId => options.ContentModel,
+            WikiTranslationProviderId => options.TranslationProviderId,
+            WikiTranslationModelId => options.TranslationModel,
             "WIKI_LANGUAGES" => options.Languages,
             "WIKI_PARALLEL_COUNT" => options.ParallelCount.ToString(),
             "WIKI_MAX_OUTPUT_TOKENS" => options.MaxOutputTokens.ToString(),
@@ -195,48 +129,27 @@ public static class SystemSettingDefaults
         };
     }
 
-    /// <summary>
-    /// Apply a single setting to WikiGeneratorOptions.
-    /// </summary>
     public static void ApplySettingToOption(WikiGeneratorOptions options, string key, string value)
     {
         switch (key)
         {
-            case "WIKI_CATALOG_MODEL":
+            case WikiCatalogProviderId:
+                options.CatalogProviderId = value;
+                break;
+            case WikiCatalogModelId:
                 options.CatalogModel = value;
                 break;
-            case "WIKI_CATALOG_ENDPOINT":
-                options.CatalogEndpoint = value;
+            case WikiContentProviderId:
+                options.ContentProviderId = value;
                 break;
-            case "WIKI_CATALOG_API_KEY":
-                options.CatalogApiKey = value;
-                break;
-            case "WIKI_CATALOG_REQUEST_TYPE" when Enum.TryParse<AiRequestType>(value, true, out var catalogType):
-                options.CatalogRequestType = catalogType;
-                break;
-            case "WIKI_CONTENT_MODEL":
+            case WikiContentModelId:
                 options.ContentModel = value;
                 break;
-            case "WIKI_CONTENT_ENDPOINT":
-                options.ContentEndpoint = value;
+            case WikiTranslationProviderId:
+                options.TranslationProviderId = value;
                 break;
-            case "WIKI_CONTENT_API_KEY":
-                options.ContentApiKey = value;
-                break;
-            case "WIKI_CONTENT_REQUEST_TYPE" when Enum.TryParse<AiRequestType>(value, true, out var contentType):
-                options.ContentRequestType = contentType;
-                break;
-            case "WIKI_TRANSLATION_MODEL":
+            case WikiTranslationModelId:
                 options.TranslationModel = value;
-                break;
-            case "WIKI_TRANSLATION_ENDPOINT":
-                options.TranslationEndpoint = value;
-                break;
-            case "WIKI_TRANSLATION_API_KEY":
-                options.TranslationApiKey = value;
-                break;
-            case "WIKI_TRANSLATION_REQUEST_TYPE" when Enum.TryParse<AiRequestType>(value, true, out var translationType):
-                options.TranslationRequestType = translationType;
                 break;
             case "WIKI_LANGUAGES":
                 options.Languages = value;

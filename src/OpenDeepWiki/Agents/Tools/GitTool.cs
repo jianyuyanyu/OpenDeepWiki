@@ -284,7 +284,7 @@ Pattern Examples:
         [Description("The regex pattern to search for in file contents. Supports full regex syntax.")]
         string pattern,
         [Description("Glob pattern to filter files (e.g., '*.cs', '*.ts', '**/*.json'). Default: all files")]
-        string? glob = null,
+        string glob = "",
         [Description("Whether the search is case sensitive. Default: false")]
         bool caseSensitive = false,
         [Description("Number of context lines to show before and after each match. Default: 2")]
@@ -492,7 +492,7 @@ Glob Examples:
 - Single char wildcard: glob='file?.txt'")]
     public async Task<string[]> ListFilesAsync(
         [Description("Glob pattern (e.g., '*.cs', 'src/**/*.ts', '**/*.json'). Default: all files")]
-        string? glob = null,
+        string glob = "",
         [Description("Maximum number of files to return. Default: 50. Use higher values (100-200) for comprehensive discovery.")]
         int maxResults = 50,
         CancellationToken cancellationToken = default)

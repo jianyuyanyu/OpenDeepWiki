@@ -16,7 +16,26 @@
     "uploadImage": "이미지 업로드",
     "send": "전송",
     "retry": "재시도",
-    "closeError": "닫기"
+    "closeError": "닫기",
+    "shareConversation": "현재 대화 공유",
+    "shareNoMessages": "공유할 대화가 없습니다",
+    "shareSelectModel": "먼저 모델을 선택하세요",
+    "shareFailed": "대화 공유에 실패했습니다. 다시 시도해주세요.",
+    "shareDialogTitle": "현재 대화 공유",
+    "shareDialogDescription": "이 대화의 스냅샷을 공유할 읽기 전용 링크를 생성합니다.",
+    "shareLink": "공유 링크",
+    "shareId": "공유 ID",
+    "copied": "복사됨",
+    "copyLink": "링크 복사",
+    "openSharePage": "공유 페이지 열기",
+    "shareTitle": "공유 제목",
+    "shareTitlePlaceholder": "공유 제목을 입력하세요",
+    "shareDescription": "설명(선택사항)",
+    "shareDescriptionPlaceholder": "보는 사람에게 참고될 설명을 추가하세요",
+    "shareExpiration": "만료(분)",
+    "shareExpirationHint": "기본값은 7일이며 최대 30일입니다.",
+    "generateShareLink": "공유 링크 생성",
+    "generating": "생성 중..."
   },
   "message": {
     "thinking": "사고 과정",
@@ -67,5 +86,10 @@
     "icon": "📎",
     "label": "인용 출처:",
     "remove": "인용 제거"
+  },
+  "share": {
+    "title": "채팅 공유",
+    "messageCount": "{count}개의 채팅 메시지",
+    "empty": "이 공유 대화에는 아직 메시지가 없습니다."
   }
 }

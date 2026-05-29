@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using System.Text.RegularExpressions;
 
 namespace OpenDeepWiki.Services.Repositories;
 
@@ -10,6 +11,14 @@ namespace OpenDeepWiki.Services.Repositories;
 /// </summary>
 public class ProcessingLogService : IProcessingLogService
 {
+    private static readonly Regex DocumentsToGenerateRegex = new(
+        @"\b(\d+)\s+documents?\s+to\s+generate\b",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static readonly Regex DocumentProgressRegex = new(
+        @"\bDocument\s+(?:complete|progress)\s*\(\s*(\d+)\s*/\s*(\d+)\s*\)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private readonly IServiceScopeFactory _scopeFactory;
 
     public ProcessingLogService(IServiceScopeFactory scopeFactory)
@@ -27,6 +36,17 @@ public class ProcessingLogService : IProcessingLogService
         CancellationToken cancellationToken = default)
     {
         // 使用独立的 scope 来保存日志，避免影响其他操作
+        if (isAiOutput || !string.IsNullOrWhiteSpace(toolName))
+        {
+            return;
+        }
+
+        var normalizedMessage = NormalizeProgressMessage(step, message);
+        if (normalizedMessage is null)
+        {
+            return;
+        }
+
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<IContext>();
 
@@ -35,7 +55,7 @@ public class ProcessingLogService : IProcessingLogService
             Id = Guid.NewGuid().ToString(),
             RepositoryId = repositoryId,
             Step = step,
-            Message = message,
+            Message = normalizedMessage,
             IsAiOutput = isAiOutput,
             ToolName = toolName,
             CreatedAt = DateTime.UtcNow
@@ -112,6 +132,24 @@ public class ProcessingLogService : IProcessingLogService
             if (log.Step != ProcessingStep.Content || log.IsAiOutput || !string.IsNullOrEmpty(log.ToolName))
                 continue;
 
+            var documentProgressMatch = DocumentProgressRegex.Match(log.Message);
+            if (documentProgressMatch.Success)
+            {
+                completed = Math.Max(completed, int.Parse(documentProgressMatch.Groups[1].Value));
+                if (total == 0)
+                {
+                    total = int.Parse(documentProgressMatch.Groups[2].Value);
+                }
+                continue;
+            }
+
+            var documentsToGenerateMatch = DocumentsToGenerateRegex.Match(log.Message);
+            if (documentsToGenerateMatch.Success)
+            {
+                total = int.Parse(documentsToGenerateMatch.Groups[1].Value);
+                continue;
+            }
+
             // 匹配 "发现 X 个文档需要生成" 格式
             var totalMatch = System.Text.RegularExpressions.Regex.Match(
                 log.Message, @"发现\s*(\d+)\s*个文档");
@@ -154,6 +192,28 @@ public class ProcessingLogService : IProcessingLogService
         }
 
         return (total, completed);
+    }
+
+    private static string? NormalizeProgressMessage(ProcessingStep step, string message)
+    {
+        if (step != ProcessingStep.Content)
+        {
+            return $"Step progress ({step})";
+        }
+
+        var progressMatch = DocumentProgressRegex.Match(message);
+        if (progressMatch.Success)
+        {
+            return $"Document progress ({progressMatch.Groups[1].Value}/{progressMatch.Groups[2].Value})";
+        }
+
+        var totalMatch = DocumentsToGenerateRegex.Match(message);
+        if (totalMatch.Success)
+        {
+            return $"Document progress (0/{totalMatch.Groups[1].Value})";
+        }
+
+        return null;
     }
 
     /// <inheritdoc />

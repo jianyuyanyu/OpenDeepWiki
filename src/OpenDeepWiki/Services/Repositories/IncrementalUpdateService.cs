@@ -17,6 +17,7 @@ public class IncrementalUpdateService : IIncrementalUpdateService
 {
     private readonly IRepositoryAnalyzer _repositoryAnalyzer;
     private readonly IWikiGenerator _wikiGenerator;
+    private readonly IRepositorySkillMarkdownBuilder _skillMarkdownBuilder;
     private readonly ISubscriberNotificationService _notificationService;
     private readonly IContext _context;
     private readonly IncrementalUpdateOptions _options;
@@ -25,6 +26,7 @@ public class IncrementalUpdateService : IIncrementalUpdateService
     public IncrementalUpdateService(
         IRepositoryAnalyzer repositoryAnalyzer,
         IWikiGenerator wikiGenerator,
+        IRepositorySkillMarkdownBuilder skillMarkdownBuilder,
         ISubscriberNotificationService notificationService,
         IContext context,
         IOptions<IncrementalUpdateOptions> options,
@@ -32,6 +34,7 @@ public class IncrementalUpdateService : IIncrementalUpdateService
     {
         _repositoryAnalyzer = repositoryAnalyzer;
         _wikiGenerator = wikiGenerator;
+        _skillMarkdownBuilder = skillMarkdownBuilder;
         _notificationService = notificationService;
         _context = context;
         _options = options.Value;
@@ -198,6 +201,16 @@ public class IncrementalUpdateService : IIncrementalUpdateService
                     branchLanguage,
                     checkResult.ChangedFiles ?? Array.Empty<string>(),
                     cancellationToken);
+
+                if (repository.GenerateSkill)
+                {
+                    await _skillMarkdownBuilder.RefreshSkillMarkdownAsync(
+                        _context,
+                        repository,
+                        branch,
+                        branchLanguage,
+                        cancellationToken);
+                }
 
                 updatedDocumentsCount++;
             }

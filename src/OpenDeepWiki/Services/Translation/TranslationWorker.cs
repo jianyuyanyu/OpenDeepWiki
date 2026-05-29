@@ -64,6 +64,7 @@ public class TranslationWorker : BackgroundService
         var repositoryAnalyzer = scope.ServiceProvider.GetService<IRepositoryAnalyzer>();
         var wikiGenerator = scope.ServiceProvider.GetService<IWikiGenerator>();
         var processingLogService = scope.ServiceProvider.GetService<IProcessingLogService>();
+        var skillMarkdownBuilder = scope.ServiceProvider.GetService<IRepositorySkillMarkdownBuilder>();
         var wikiOptions = scope.ServiceProvider.GetService<IOptions<WikiGeneratorOptions>>()?.Value;
 
         if (translationService == null || context == null || repositoryAnalyzer == null || 
@@ -92,6 +93,7 @@ public class TranslationWorker : BackgroundService
                 context,
                 repositoryAnalyzer,
                 wikiGenerator,
+                skillMarkdownBuilder,
                 processingLogService,
                 stoppingToken);
         }
@@ -212,6 +214,7 @@ public class TranslationWorker : BackgroundService
         IContext context,
         IRepositoryAnalyzer repositoryAnalyzer,
         IWikiGenerator wikiGenerator,
+        IRepositorySkillMarkdownBuilder? skillMarkdownBuilder,
         IProcessingLogService? processingLogService,
         CancellationToken stoppingToken)
     {
@@ -279,11 +282,21 @@ public class TranslationWorker : BackgroundService
             try
             {
                 // 执行翻译
-                await wikiGenerator.TranslateWikiAsync(
+                var targetBranchLanguage = await wikiGenerator.TranslateWikiAsync(
                     workspace,
                     sourceBranchLanguage,
                     task.TargetLanguageCode,
                     stoppingToken);
+
+                if (repository.GenerateSkill && skillMarkdownBuilder is not null)
+                {
+                    await skillMarkdownBuilder.RefreshSkillMarkdownAsync(
+                        context,
+                        repository,
+                        branch,
+                        targetBranchLanguage,
+                        stoppingToken);
+                }
 
                 // 标记为完成
                 await translationService.MarkAsCompletedAsync(task.Id, stoppingToken);

@@ -57,6 +57,7 @@ public class AdminRepositoryService : IAdminRepositoryService
                 RepoName = r.RepoName,
                 OrgName = r.OrgName,
                 IsPublic = r.IsPublic,
+                GenerateSkill = r.GenerateSkill,
                 Status = (int)r.Status,
                 StatusText = GetStatusText(r.Status),
                 StarCount = r.StarCount,
@@ -95,6 +96,7 @@ public class AdminRepositoryService : IAdminRepositoryService
             RepoName = repo.RepoName,
             OrgName = repo.OrgName,
             IsPublic = repo.IsPublic,
+            GenerateSkill = repo.GenerateSkill,
             Status = (int)repo.Status,
             StatusText = GetStatusText(repo.Status),
             StarCount = repo.StarCount,
@@ -589,38 +591,42 @@ public class AdminRepositoryService : IAdminRepositoryService
             };
         }
 
-        var branchLanguageIds = await _context.RepositoryBranches
-            .Where(b => b.RepositoryId == repository.Id && !b.IsDeleted)
-            .Join(
-                _context.BranchLanguages.Where(l => !l.IsDeleted),
-                b => b.Id,
-                l => l.RepositoryBranchId,
-                (b, l) => l.Id)
-            .ToListAsync();
-
-        var oldCatalogs = await _context.DocCatalogs
-            .Where(c => branchLanguageIds.Contains(c.BranchLanguageId) && !c.IsDeleted)
-            .ToListAsync();
-
-        var docFileIds = oldCatalogs
-            .Where(c => c.DocFileId != null)
-            .Select(c => c.DocFileId!)
-            .Distinct()
-            .ToList();
-
-        if (oldCatalogs.Count > 0)
+        if (repository.Status == RepositoryStatus.Completed)
         {
-            _context.DocCatalogs.RemoveRange(oldCatalogs);
-        }
-
-        if (docFileIds.Count > 0)
-        {
-            var oldDocFiles = await _context.DocFiles
-                .Where(file => docFileIds.Contains(file.Id))
+            // Full regeneration for completed repositories starts from a clean document set.
+            var branchLanguageIds = await _context.RepositoryBranches
+                .Where(b => b.RepositoryId == repository.Id && !b.IsDeleted)
+                .Join(
+                    _context.BranchLanguages.Where(l => !l.IsDeleted),
+                    b => b.Id,
+                    l => l.RepositoryBranchId,
+                    (b, l) => l.Id)
                 .ToListAsync();
-            if (oldDocFiles.Count > 0)
+
+            var oldCatalogs = await _context.DocCatalogs
+                .Where(c => branchLanguageIds.Contains(c.BranchLanguageId) && !c.IsDeleted)
+                .ToListAsync();
+
+            var docFileIds = oldCatalogs
+                .Where(c => c.DocFileId != null)
+                .Select(c => c.DocFileId!)
+                .Distinct()
+                .ToList();
+
+            if (oldCatalogs.Count > 0)
             {
-                _context.DocFiles.RemoveRange(oldDocFiles);
+                _context.DocCatalogs.RemoveRange(oldCatalogs);
+            }
+
+            if (docFileIds.Count > 0)
+            {
+                var oldDocFiles = await _context.DocFiles
+                    .Where(file => docFileIds.Contains(file.Id))
+                    .ToListAsync();
+                if (oldDocFiles.Count > 0)
+                {
+                    _context.DocFiles.RemoveRange(oldDocFiles);
+                }
             }
         }
 

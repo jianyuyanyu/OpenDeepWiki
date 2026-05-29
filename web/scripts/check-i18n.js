@@ -1,58 +1,100 @@
-// 检查i18n翻译文件的完整性
 const fs = require('fs');
 const path = require('path');
 
-const locales = ['zh', 'en', 'ja', 'ko'];
 const messagesDir = path.join(__dirname, '../i18n/messages');
+const baseLocale = 'en';
 
-console.log('🔍 检查i18n翻译文件...\n');
+function flatten(value, prefix = '', out = {}) {
+  if (value === null || value === undefined) return out;
 
-// 检查每个语言的翻译文件
-locales.forEach(locale => {
-  const localeDir = path.join(messagesDir, locale);
-  console.log(`📁 ${locale}:`);
-  
-  if (!fs.existsSync(localeDir)) {
-    console.log(`  ❌ 目录不存在: ${localeDir}`);
-    return;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    if (prefix) out[prefix] = value;
+    return out;
   }
-  
-  const files = fs.readdirSync(localeDir).filter(f => f.endsWith('.json'));
-  files.forEach(file => {
-    const filePath = path.join(localeDir, file);
-    try {
-      const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-      const keys = Object.keys(content);
-      console.log(`  ✅ ${file} (${keys.length} keys)`);
-    } catch (err) {
-      console.log(`  ❌ ${file} - 解析错误: ${err.message}`);
-    }
-  });
-  console.log('');
-});
 
-// 检查request.ts
-const requestPath = path.join(__dirname, '../i18n/request.ts');
-console.log('📄 检查 request.ts...');
-if (fs.existsSync(requestPath)) {
-  const content = fs.readFileSync(requestPath, 'utf8');
-  const imports = content.match(/await import\(`\.\/messages\/\$\{locale\}\/(.+?)\.json`\)/g);
-  if (imports) {
-    console.log('  加载的翻译文件:');
-    imports.forEach(imp => {
-      const match = imp.match(/\/([^/]+)\.json/);
-      if (match) {
-        console.log(`    - ${match[1]}.json`);
-      }
-    });
+  for (const [key, child] of Object.entries(value)) {
+    const nextPrefix = prefix ? `${prefix}.${key}` : key;
+    flatten(child, nextPrefix, out);
   }
-  console.log('  ✅ request.ts 存在');
-} else {
-  console.log('  ❌ request.ts 不存在');
+
+  return out;
 }
 
-console.log('\n✨ 检查完成！');
-console.log('\n💡 如果翻译没有生效，请尝试：');
-console.log('   1. 重启开发服务器: npm run dev');
-console.log('   2. 清除浏览器缓存并硬刷新 (Ctrl+Shift+R)');
-console.log('   3. 删除 .next 目录: rm -rf .next');
+function readJson(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+const locales = fs
+  .readdirSync(messagesDir)
+  .filter((entry) => fs.statSync(path.join(messagesDir, entry)).isDirectory())
+  .sort();
+
+const baseLocaleDir = path.join(messagesDir, baseLocale);
+const baseFiles = fs
+  .readdirSync(baseLocaleDir)
+  .filter((file) => file.endsWith('.json'))
+  .sort();
+
+const baseline = new Map();
+for (const file of baseFiles) {
+  baseline.set(file, flatten(readJson(path.join(baseLocaleDir, file))));
+}
+
+console.log(`i18n check against ${baseLocale}`);
+console.log(`locales: ${locales.join(', ')}`);
+console.log('');
+
+let hasIssues = false;
+
+for (const locale of locales) {
+  const localeDir = path.join(messagesDir, locale);
+  const localeFiles = new Set(
+    fs.readdirSync(localeDir).filter((file) => file.endsWith('.json'))
+  );
+
+  const missingFiles = baseFiles.filter((file) => !localeFiles.has(file));
+  const extraFiles = [...localeFiles].filter((file) => !baseline.has(file));
+
+  console.log(`== ${locale} ==`);
+  if (missingFiles.length === 0 && extraFiles.length === 0) {
+    console.log('files: ok');
+  } else {
+    if (missingFiles.length) {
+      hasIssues = true;
+      console.log(`missing files: ${missingFiles.join(', ')}`);
+    }
+    if (extraFiles.length) {
+      console.log(`extra files: ${extraFiles.join(', ')}`);
+    }
+  }
+
+  for (const file of baseFiles) {
+    if (!localeFiles.has(file)) continue;
+
+    const baseEntries = baseline.get(file);
+    const localeEntries = flatten(readJson(path.join(localeDir, file)));
+
+    const missingKeys = Object.keys(baseEntries).filter((key) => !(key in localeEntries));
+    const extraKeys = Object.keys(localeEntries).filter((key) => !(key in baseEntries));
+
+    if (missingKeys.length || extraKeys.length) {
+      hasIssues = true;
+      if (missingKeys.length) {
+        console.log(`  ${file} missing ${missingKeys.length} key(s)`);
+        console.log(`    ${missingKeys.join(', ')}`);
+      }
+      if (extraKeys.length) {
+        console.log(`  ${file} extra ${extraKeys.length} key(s)`);
+        console.log(`    ${extraKeys.join(', ')}`);
+      }
+    }
+  }
+
+  console.log('');
+}
+
+if (hasIssues) {
+  process.exitCode = 1;
+} else {
+  console.log('All locale files match the English baseline.');
+}

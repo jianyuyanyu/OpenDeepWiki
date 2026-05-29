@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Models.Admin;
+using OpenDeepWiki.Services.AI;
 
 namespace OpenDeepWiki.Services.Admin;
 
@@ -28,19 +29,123 @@ public class AdminChatAssistantService : IAdminChatAssistantService
         var enabledSkillIds = ParseJsonArray(config.EnabledSkillIds);
 
         // 获取所有可用的模型
-        var models = await _context.ModelConfigs
+        var providers = await _context.AiProviderConfigs
+            .Where(p => !p.IsDeleted)
+            .OrderBy(p => p.SortOrder)
+            .ThenBy(p => p.DisplayName ?? p.Name)
+            .ToListAsync();
+
+        var providerById = providers.ToDictionary(p => p.Id, StringComparer.OrdinalIgnoreCase);
+
+        var aiModels = await _context.AiModelConfigs
+            .Where(m => !m.IsDeleted)
+            .OrderByDescending(m => m.IsDefault)
+            .ThenBy(m => m.SortOrder)
+            .ThenBy(m => m.DisplayName ?? m.Name)
+            .ToListAsync();
+
+        var aiModelBindingKeys = aiModels
+            .Select(m => CreateModelBindingKey(m.ProviderId, m.ModelId))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var modelConfigs = await _context.ModelConfigs
             .Where(m => !m.IsDeleted)
             .OrderByDescending(m => m.IsDefault)
             .ThenBy(m => m.Name)
-            .Select(m => new SelectableItemDto
-            {
-                Id = m.Id,
-                Name = m.Name,
-                Description = m.Description,
-                IsActive = m.IsActive,
-                IsSelected = enabledModelIds.Contains(m.Id)
-            })
             .ToListAsync();
+
+        var modelConfigById = modelConfigs.ToDictionary(m => m.Id, StringComparer.OrdinalIgnoreCase);
+        var modelConfigByBinding = modelConfigs
+            .Where(m => !string.IsNullOrWhiteSpace(m.AiProviderId))
+            .GroupBy(m => CreateModelBindingKey(m.AiProviderId!, m.ModelId), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        var models = new List<SelectableModelItemDto>();
+
+        foreach (var aiModel in aiModels)
+        {
+            if (!providerById.TryGetValue(aiModel.ProviderId, out var provider))
+            {
+                continue;
+            }
+
+            var directId = AiModelSelectionIds.Create(aiModel.ProviderId, aiModel.ModelId);
+            modelConfigByBinding.TryGetValue(
+                CreateModelBindingKey(aiModel.ProviderId, aiModel.ModelId),
+                out var modelConfig);
+
+            var providerName = provider.DisplayName ?? provider.Name;
+            var modelName = aiModel.DisplayName ?? aiModel.Name ?? aiModel.ModelId;
+
+            models.Add(new SelectableModelItemDto
+            {
+                Id = directId,
+                Name = $"{providerName} / {modelName}",
+                Description = modelConfig?.Description ?? aiModel.Description,
+                IsActive = provider.IsActive && aiModel.IsActive && (modelConfig?.IsActive ?? true),
+                IsSelected = enabledModelIds.Contains(directId, StringComparer.OrdinalIgnoreCase) ||
+                             (modelConfig != null && enabledModelIds.Contains(modelConfig.Id, StringComparer.OrdinalIgnoreCase)),
+                AiProviderId = provider.Id,
+                AiProviderName = providerName,
+                AiProviderType = AiProviderResolver.ResolveEffectiveProviderType(
+                    provider.ProviderType,
+                    aiModel.ProviderType),
+                AiProviderIsActive = provider.IsActive,
+                ModelId = aiModel.ModelId,
+                ModelName = aiModel.Name,
+                ModelDisplayName = aiModel.DisplayName,
+                ContextWindow = aiModel.ContextWindow,
+                SupportsThinking = aiModel.SupportsThinking,
+                SupportsVision = aiModel.SupportsVision,
+                SupportsTools = aiModel.SupportsTools,
+                SupportsJsonMode = aiModel.SupportsJsonMode
+            });
+        }
+
+        foreach (var modelConfig in modelConfigs.Where(m =>
+                     string.IsNullOrWhiteSpace(m.AiProviderId) ||
+                     !aiModelBindingKeys.Contains(CreateModelBindingKey(m.AiProviderId!, m.ModelId))))
+        {
+            providerById.TryGetValue(modelConfig.AiProviderId ?? string.Empty, out var provider);
+            var providerName = provider?.DisplayName ?? provider?.Name ?? modelConfig.Provider;
+
+            models.Add(new SelectableModelItemDto
+            {
+                Id = modelConfig.Id,
+                Name = $"{providerName} / {modelConfig.Name}",
+                Description = modelConfig.Description,
+                IsActive = modelConfig.IsActive && (provider?.IsActive ?? true),
+                IsSelected = enabledModelIds.Contains(modelConfig.Id, StringComparer.OrdinalIgnoreCase),
+                AiProviderId = modelConfig.AiProviderId,
+                AiProviderName = providerName,
+                AiProviderType = provider?.ProviderType ?? modelConfig.Provider,
+                AiProviderIsActive = provider?.IsActive ?? true,
+                ModelId = modelConfig.ModelId,
+                ModelName = modelConfig.Name,
+                ModelDisplayName = modelConfig.Name,
+                SupportsTools = true
+            });
+        }
+
+        models = models
+            .OrderByDescending(m => m.IsSelected)
+            .ThenBy(m => m.AiProviderName)
+            .ThenBy(m => m.ModelDisplayName ?? m.ModelName ?? m.ModelId)
+            .ToList();
+
+        var configDto = MapToDto(config);
+        configDto.EnabledModelIds = configDto.EnabledModelIds
+            .Select(id => NormalizeModelSelectionId(id, modelConfigById, aiModelBindingKeys))
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        configDto.DefaultModelId = NormalizeModelSelectionId(configDto.DefaultModelId, modelConfigById, aiModelBindingKeys);
+        if (!string.IsNullOrWhiteSpace(configDto.DefaultModelId) &&
+            !configDto.EnabledModelIds.Contains(configDto.DefaultModelId, StringComparer.OrdinalIgnoreCase))
+        {
+            configDto.DefaultModelId = null;
+        }
 
         // 获取所有可用的MCP
         var mcps = await _context.McpConfigs
@@ -74,7 +179,7 @@ public class AdminChatAssistantService : IAdminChatAssistantService
 
         return new ChatAssistantConfigOptionsDto
         {
-            Config = MapToDto(config),
+            Config = configDto,
             AvailableModels = models,
             AvailableMcps = mcps,
             AvailableSkills = skills
@@ -90,19 +195,35 @@ public class AdminChatAssistantService : IAdminChatAssistantService
     public async Task<ChatAssistantConfigDto> UpdateConfigAsync(UpdateChatAssistantConfigRequest request)
     {
         var config = await GetOrCreateConfigAsync();
+        var enabledModelIds = request.EnabledModelIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var enabledMcpIds = request.EnabledMcpIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var enabledSkillIds = request.EnabledSkillIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var defaultModelId = !string.IsNullOrWhiteSpace(request.DefaultModelId) &&
+                             enabledModelIds.Contains(request.DefaultModelId, StringComparer.OrdinalIgnoreCase)
+            ? request.DefaultModelId
+            : null;
 
         config.IsEnabled = request.IsEnabled;
-        config.EnabledModelIds = SerializeJsonArray(request.EnabledModelIds);
-        config.EnabledMcpIds = SerializeJsonArray(request.EnabledMcpIds);
-        config.EnabledSkillIds = SerializeJsonArray(request.EnabledSkillIds);
-        config.DefaultModelId = request.DefaultModelId;
+        config.EnabledModelIds = SerializeJsonArray(enabledModelIds);
+        config.EnabledMcpIds = SerializeJsonArray(enabledMcpIds);
+        config.EnabledSkillIds = SerializeJsonArray(enabledSkillIds);
+        config.DefaultModelId = defaultModelId;
         config.EnableImageUpload = request.EnableImageUpload;
         config.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("对话助手配置已更新: IsEnabled={IsEnabled}, Models={ModelCount}, MCPs={McpCount}, Skills={SkillCount}, EnableImageUpload={EnableImageUpload}",
-            config.IsEnabled, request.EnabledModelIds.Count, request.EnabledMcpIds.Count, request.EnabledSkillIds.Count, config.EnableImageUpload);
+            config.IsEnabled, enabledModelIds.Count, enabledMcpIds.Count, enabledSkillIds.Count, config.EnableImageUpload);
 
         return MapToDto(config);
     }
@@ -165,5 +286,31 @@ public class AdminChatAssistantService : IAdminChatAssistantService
             return null;
 
         return JsonSerializer.Serialize(items);
+    }
+
+    private static string CreateModelBindingKey(string providerId, string modelId)
+    {
+        return $"{providerId}:{modelId}";
+    }
+
+    private static string? NormalizeModelSelectionId(
+        string? id,
+        Dictionary<string, ModelConfig> modelConfigById,
+        HashSet<string> aiModelBindingKeys)
+    {
+        if (string.IsNullOrWhiteSpace(id) || AiModelSelectionIds.TryParse(id, out _, out _))
+        {
+            return id;
+        }
+
+        if (!modelConfigById.TryGetValue(id, out var modelConfig) ||
+            string.IsNullOrWhiteSpace(modelConfig.AiProviderId))
+        {
+            return id;
+        }
+
+        return aiModelBindingKeys.Contains(CreateModelBindingKey(modelConfig.AiProviderId!, modelConfig.ModelId))
+            ? AiModelSelectionIds.Create(modelConfig.AiProviderId!, modelConfig.ModelId)
+            : id;
     }
 }

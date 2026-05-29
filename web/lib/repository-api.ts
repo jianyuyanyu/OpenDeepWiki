@@ -144,6 +144,7 @@ export async function submitArchiveRepository(
   formData.append("branchName", request.branchName);
   formData.append("languageCode", request.languageCode);
   formData.append("isPublic", String(request.isPublic));
+  formData.append("generateSkill", String(request.generateSkill));
   formData.append("archive", request.archive);
 
   return api.post<RepositoryItemResponse>("/api/v1/repositories/submit-archive", formData);

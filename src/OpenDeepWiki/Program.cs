@@ -10,6 +10,7 @@ using OpenDeepWiki.Endpoints;
 using OpenDeepWiki.Endpoints.Admin;
 using OpenDeepWiki.Infrastructure;
 using OpenDeepWiki.Services.Admin;
+using OpenDeepWiki.Services.AI;
 using OpenDeepWiki.Services.Auth;
 using OpenDeepWiki.Services.GitHub;
 using OpenDeepWiki.Services.Graphify;
@@ -138,28 +139,7 @@ try
     builder.Services.AddScoped<IGitPlatformService, GitPlatformService>();
 
     builder.Services.AddOptions<AiRequestOptions>()
-        .Bind(builder.Configuration.GetSection("AI"))
-        .PostConfigure(options =>
-        {
-            if (string.IsNullOrWhiteSpace(options.ApiKey))
-            {
-                options.ApiKey = builder.Configuration["CHAT_API_KEY"];
-            }
-
-            if (string.IsNullOrWhiteSpace(options.Endpoint))
-            {
-                options.Endpoint = builder.Configuration["ENDPOINT"];
-            }
-
-            if (!options.RequestType.HasValue)
-            {
-                var requestType = builder.Configuration["CHAT_REQUEST_TYPE"];
-                if (Enum.TryParse<AiRequestType>(requestType, true, out var parsed))
-                {
-                    options.RequestType = parsed;
-                }
-            }
-        });
+        .Bind(builder.Configuration.GetSection("AI"));
 
     builder.Services
         .AddCors(options =>
@@ -172,6 +152,10 @@ try
                     .AllowCredentials());
         });
     builder.Services.AddSingleton<AgentFactory>();
+    builder.Services.AddSingleton<IAiProviderPresetCatalog, AiProviderPresetCatalog>();
+    builder.Services.AddScoped<IAiProviderResolver, AiProviderResolver>();
+    builder.Services.AddScoped<IAiProviderPresetSeeder, AiProviderPresetSeeder>();
+    builder.Services.AddScoped<IAiConfigurationMigrationService, AiConfigurationMigrationService>();
 
     // 配置 Repository Analyzer
     builder.Services.AddOptions<RepositoryAnalyzerOptions>()
@@ -188,62 +172,13 @@ try
 
     // Configure Graphify artifact generation
     builder.Services.AddOptions<GraphifyOptions>()
-        .Bind(builder.Configuration.GetSection("Graphify"))
-        .PostConfigure(options =>
-        {
-            var command = Environment.GetEnvironmentVariable("GRAPHIFY_COMMAND");
-            if (!string.IsNullOrWhiteSpace(command))
-            {
-                options.Command = command;
-            }
-
-            var backend = Environment.GetEnvironmentVariable("GRAPHIFY_BACKEND");
-            if (!string.IsNullOrWhiteSpace(backend))
-            {
-                options.Backend = backend;
-            }
-
-            var model = Environment.GetEnvironmentVariable("GRAPHIFY_MODEL");
-            if (!string.IsNullOrWhiteSpace(model))
-            {
-                options.Model = model;
-            }
-
-            var openAiBaseUrl = Environment.GetEnvironmentVariable("GRAPHIFY_OPENAI_BASE_URL")
-                ?? Environment.GetEnvironmentVariable("OPENAI_BASE_URL");
-            if (!string.IsNullOrWhiteSpace(openAiBaseUrl))
-            {
-                options.OpenAiBaseUrl = openAiBaseUrl;
-            }
-
-            var openAiApiKey = Environment.GetEnvironmentVariable("GRAPHIFY_OPENAI_API_KEY")
-                ?? Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-            if (!string.IsNullOrWhiteSpace(openAiApiKey))
-            {
-                options.OpenAiApiKey = openAiApiKey;
-            }
-
-            var outputRoot = Environment.GetEnvironmentVariable("GRAPHIFY_OUTPUT_ROOT");
-            if (!string.IsNullOrWhiteSpace(outputRoot))
-            {
-                options.OutputRoot = outputRoot;
-            }
-        });
+        .Bind(builder.Configuration.GetSection("Graphify"));
     builder.Services.AddScoped<IGraphifyCliRunner, GraphifyCliRunner>();
 
     // Opt-in publish to the understand-quickly registry of code-knowledge graphs.
     // https://github.com/looptech-ai/understand-quickly
     builder.Services.AddOptions<UnderstandQuicklyOptions>()
-        .Bind(builder.Configuration.GetSection(UnderstandQuicklyOptions.SectionName))
-        .PostConfigure(options =>
-        {
-            var token = Environment.GetEnvironmentVariable("UNDERSTAND_QUICKLY_TOKEN");
-            if (!string.IsNullOrWhiteSpace(token))
-            {
-                options.Token = token;
-                options.Enabled = true;
-            }
-        });
+        .Bind(builder.Configuration.GetSection(UnderstandQuicklyOptions.SectionName));
     builder.Services
         .AddHttpClient<IUnderstandQuicklyPublisher, UnderstandQuicklyPublisher>();
 
@@ -269,6 +204,7 @@ try
 
     // 注册 Wiki Generator
     builder.Services.AddScoped<IWikiGenerator, WikiGenerator>();
+    builder.Services.AddScoped<IRepositorySkillMarkdownBuilder, RepositorySkillMarkdownBuilder>();
 
     // 注册缓存框架（默认内存实现）
     builder.Services.AddOpenDeepWikiCache();

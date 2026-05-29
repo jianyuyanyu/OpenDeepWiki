@@ -1,10 +1,9 @@
 import React from "react";
-import { fetchRepoTree, fetchRepoBranches, checkGitHubRepo } from "@/lib/repository-api";
+import { fetchRepoTree, fetchRepoBranches, checkGitHubRepo, fetchProcessingLogs } from "@/lib/repository-api";
 import { RepoShell } from "@/components/repo/repo-shell";
 import { RepositoryProcessingStatus } from "@/components/repo/repository-processing-status";
 import { RepositoryNotFound } from "@/components/repo/repository-not-found";
 import { decodeRouteSegment } from "@/lib/repo-route";
-import { cookies } from "next/headers";
 import RouteProviders from "@/app/route-providers";
 
 // 禁用缓存
@@ -44,6 +43,19 @@ async function getGitHubInfo(owner: string, repo: string) {
   }
 }
 
+async function getProcessingStatus(owner: string, repo: string) {
+  try {
+    const logs = await fetchProcessingLogs(owner, repo, undefined, 1);
+    if (logs.statusName === "Pending" || logs.statusName === "Processing" || logs.statusName === "Failed") {
+      return logs.statusName;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 export default async function RepoLayout({ children, params }: RepoLayoutProps) {
   const { owner, repo } = await params;
   const decodedOwner = decodeRouteSegment(owner);
@@ -53,10 +65,21 @@ export default async function RepoLayout({ children, params }: RepoLayoutProps) 
 
   let content: React.ReactNode;
 
-  // API请求失败或仓库不存在，检查GitHub
+  // API请求失败或仓库不存在时，先查本地处理状态，再检查GitHub
   if (!tree || !tree.exists) {
-    const gitHubInfo = await getGitHubInfo(decodedOwner, decodedRepo);
-    content = <RepositoryNotFound owner={decodedOwner} repo={decodedRepo} gitHubInfo={gitHubInfo} />;
+    const processingStatus = await getProcessingStatus(decodedOwner, decodedRepo);
+    if (processingStatus) {
+      content = (
+        <RepositoryProcessingStatus
+          owner={decodedOwner}
+          repo={decodedRepo}
+          status={processingStatus}
+        />
+      );
+    } else {
+      const gitHubInfo = await getGitHubInfo(decodedOwner, decodedRepo);
+      content = <RepositoryNotFound owner={decodedOwner} repo={decodedRepo} gitHubInfo={gitHubInfo} />;
+    }
   }
   // 仓库正在处理中或等待处理
   else if (tree.statusName === "Pending" || tree.statusName === "Processing" || tree.statusName === "Failed") {
@@ -81,8 +104,6 @@ export default async function RepoLayout({ children, params }: RepoLayoutProps) 
   else {
     // 获取分支和语言数据
     const branches = await getBranchesData(decodedOwner, decodedRepo);
-    const cookieStore = await cookies();
-    const uiLocale = cookieStore.get("NEXT_LOCALE")?.value === "en" ? "en" : "zh";
 
     return (
       <RepoShell
@@ -93,7 +114,6 @@ export default async function RepoLayout({ children, params }: RepoLayoutProps) 
         initialBranch={tree.currentBranch}
         initialLanguage={tree.currentLanguage}
         initialHasGraphifyArtifact={tree.hasGraphifyArtifact}
-        uiLocale={uiLocale}
       >
         {children}
       </RepoShell>

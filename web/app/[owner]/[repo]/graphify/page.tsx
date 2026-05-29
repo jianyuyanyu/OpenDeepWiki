@@ -2,6 +2,7 @@ import { decodeRouteSegment } from "@/lib/repo-route";
 import { fetchGraphifyReport } from "@/lib/repository-api";
 import { MarkdownRenderer } from "@/components/repo/markdown-renderer";
 import Link from "next/link";
+import { getLocale, getTranslations } from "next-intl/server";
 
 interface GraphifyPageProps {
   params: Promise<{
@@ -19,6 +20,8 @@ export default async function GraphifyPage({ params, searchParams }: GraphifyPag
   const { owner, repo } = await params;
   const decodedOwner = decodeRouteSegment(owner);
   const decodedRepo = decodeRouteSegment(repo);
+  const locale = await getLocale();
+  const t = await getTranslations("common");
   const resolvedSearchParams = await searchParams;
   const currentView = resolvedSearchParams?.view === "report" ? "report" : "graph";
 
@@ -66,7 +69,7 @@ export default async function GraphifyPage({ params, searchParams }: GraphifyPag
               : "border-border bg-background hover:bg-muted"
           }`}
         >
-          Graph
+          {t("repository.graphifyGraph")}
         </Link>
         <Link
           href={reportHref}
@@ -76,16 +79,16 @@ export default async function GraphifyPage({ params, searchParams }: GraphifyPag
               : "border-border bg-background hover:bg-muted"
           }`}
         >
-          Report
+          {t("repository.graphifyReport")}
         </Link>
       </div>
 
       {currentView === "report" ? (
         <article className="rounded-xl border border-border/70 bg-card p-6 shadow-sm">
           {reportContent ? (
-            <MarkdownRenderer content={reportContent} />
+            <MarkdownRenderer content={reportContent} language={locale} />
           ) : (
-            <p className="text-sm text-muted-foreground">Graphify report is not available yet.</p>
+            <p className="text-sm text-muted-foreground">{t("repository.graphifyNotAvailable")}</p>
           )}
         </article>
       ) : (

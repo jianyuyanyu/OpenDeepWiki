@@ -10,6 +10,7 @@ using OpenDeepWiki.Agents;
 using OpenDeepWiki.Agents.Tools;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.AI;
 using OpenDeepWiki.Services.Repositories;
 
 namespace OpenDeepWiki.MCP;
@@ -25,6 +26,7 @@ public class McpRepositoryTools
     public static async Task<string> SearchDoc(
         IContext context,
         AgentFactory agentFactory,
+        IAiProviderResolver aiProviderResolver,
         McpServer mcpServer,
         IOptions<RepositoryAnalyzerOptions> repoOptions,
         [Description("Search query or question to answer.")] string query,
@@ -131,6 +133,7 @@ public class McpRepositoryTools
         var summary = await BuildSearchSummaryAsync(
             context,
             agentFactory,
+            aiProviderResolver,
             resolvedOwner!,
             resolvedName!,
             query,
@@ -268,6 +271,7 @@ public class McpRepositoryTools
     private static async Task<string?> BuildSearchSummaryAsync(
         IContext context,
         AgentFactory agentFactory,
+        IAiProviderResolver aiProviderResolver,
         string owner,
         string repo,
         string query,
@@ -282,12 +286,8 @@ public class McpRepositoryTools
         if (modelConfig == null)
             return null;
 
-        var requestOptions = new AiRequestOptions
-        {
-            ApiKey = modelConfig.ApiKey,
-            Endpoint = modelConfig.Endpoint,
-            RequestType = ParseRequestType(modelConfig.Provider)
-        };
+        var resolvedModel = await aiProviderResolver.ResolveModelConfigAsync(modelConfig, cancellationToken);
+        var requestOptions = resolvedModel.ToRequestOptions();
 
         var agentOptions = new ChatClientAgentOptions
         {
@@ -299,7 +299,7 @@ public class McpRepositoryTools
         };
 
         var (agent, _) = agentFactory.CreateChatClientWithTools(
-            modelConfig.ModelId,
+            resolvedModel.ModelId,
             tools.Count == 0 ? Array.Empty<AITool>() : tools.ToArray(),
             agentOptions,
             requestOptions);

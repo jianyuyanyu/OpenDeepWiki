@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using OpenDeepWiki.Agents;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.AI;
 using OpenDeepWiki.Services.Chat;
 using OpenDeepWiki.Services.Repositories;
 
@@ -56,7 +57,7 @@ public class EmbedServiceAppConfigPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 // Create app
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -95,7 +96,7 @@ public class EmbedServiceAppConfigPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 // Create app with specific models
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -138,7 +139,7 @@ public class EmbedServiceAppConfigPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 // Create app with specific default model
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -178,7 +179,7 @@ public class EmbedServiceAppConfigPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 // Create app with icon
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -256,7 +257,7 @@ public class EmbedServiceAppConfigPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 // Create app
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto
@@ -302,7 +303,7 @@ public class EmbedServiceAppConfigPropertyTests
                 var statsService = new AppStatisticsService(context, StatsLogger);
                 var logService = new ChatLogService(context, LogLogger);
                 var embedService = new EmbedService(
-                    context, null!, chatAppService, statsService, logService, null!, RepoOptions, EmbedLogger);
+                    context, null!, chatAppService, statsService, logService, null!, TestAiProviderResolver.Instance, RepoOptions, EmbedLogger);
 
                 // Create app with domain validation
                 var app = chatAppService.CreateAppAsync("user1", new CreateChatAppDto

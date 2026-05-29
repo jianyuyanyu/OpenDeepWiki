@@ -33,16 +33,16 @@ public interface ISkillToolConverter
 /// </summary>
 public class SkillToolConverter : ISkillToolConverter
 {
-    private readonly IContext _context;
+    private readonly IContextFactory _contextFactory;
     private readonly ILogger<SkillToolConverter> _logger;
     private readonly string _skillsBasePath;
 
     public SkillToolConverter(
-        IContext context,
+        IContextFactory contextFactory,
         ILogger<SkillToolConverter> logger,
         IConfiguration configuration)
     {
-        _context = context;
+        _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
         _logger = logger;
         _skillsBasePath = configuration["Skills:BasePath"] ?? Path.Combine(AppContext.BaseDirectory, "skills");
     }
@@ -59,8 +59,11 @@ public class SkillToolConverter : ISkillToolConverter
             return tools;
         }
 
-        // Load active Skill configurations from database
-        var skillConfigs = await _context.SkillConfigs
+        // Use a fresh context because wiki generation builds tools from parallel document tasks.
+        using var context = _contextFactory.CreateContext();
+
+        var skillConfigs = await context.SkillConfigs
+            .AsNoTracking()
             .Where(s => skillIds.Contains(s.Id) && s.IsActive && !s.IsDeleted)
             .OrderBy(s => s.SortOrder)
             .ThenBy(s => s.Name)
