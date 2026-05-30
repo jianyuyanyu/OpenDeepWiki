@@ -1,6 +1,18 @@
 # Changelog
 
-## v2.0.2 - 2026-05-29
+## v2.0.3 - 2026-05-30
+
+### Added
+- Added AI billing and token usage accounting across chat, document tools, and admin statistics.
+- Added AI provider preset loading and expanded admin controls for AI providers and model configs.
+
+### Changed
+- Reworked repository processing, incremental updates, wiki generation, and prompt cache handling.
+- Updated admin pages, repository UI, SEO metadata, sitemap, and i18n content.
+
+### Fixed
+- Fixed Graphify build tooling support.
+- Fixed several backend and frontend regressions surfaced by the new AI and admin flows.
 
 ### Added
 - Added AI provider and model config management with built-in preset loading.
