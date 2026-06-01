@@ -4,443 +4,278 @@
 
 <div align="center">
   <img src="/img/favicon.png" alt="OpenDeepWiki Logo" width="220" />
-  <h3>AI-Driven Code Knowledge Base</h3>
+  <h3>AI-driven repository knowledge base with docs, chat, and MCP</h3>
 </div>
 
----
+OpenDeepWiki turns Git repositories, ZIP archives, and local directories into searchable knowledge bases. It generates structured repository docs, serves them through a public Next.js site, and reuses the same indexed content for chat, embed, and MCP workflows.
 
-# enterprise service
+Enterprise support and pricing: [docs.opendeep.wiki/pricing](https://docs.opendeep.wiki/pricing)
 
-[Pricing of enterprise services](https://docs.opendeep.wiki/pricing)
+## What OpenDeepWiki Ships Today
 
-Our enterprise service offers comprehensive support and flexibility for businesses seeking professional AI solutions.
+- Import repository sources from Git URLs, uploaded ZIP archives, or approved local directories.
+- Generate README summaries, project overviews, wiki catalogs, document content, multi-language translations, mind maps, and optional Graphify artifacts.
+- Publish public repository docs on SEO-friendly routes such as `/{owner}/{repo}`, `/{owner}/{repo}/mindmap`, and `/{owner}/{repo}/graphify`.
+- Expose repository knowledge through repository-scoped MCP endpoints, the built-in chat assistant, embedded chat APIs, and share links.
+- Manage repositories, users, roles, departments, API keys, AI providers/models, skills, MCP providers, and GitHub App imports from the admin console.
+- Run background workers for repository processing, translation, mind map generation, Graphify artifacts, and scheduled incremental updates.
+- Support incoming chat/webhook channels for Feishu, QQ, WeChat, and Slack.
 
----
+## Architecture At A Glance
 
-# Features
+| Layer | Current implementation |
+| --- | --- |
+| Backend | ASP.NET Core on .NET 10, MiniApis, background workers |
+| AI orchestration | `Microsoft.Agents.AI`, prompt assets under `src/OpenDeepWiki/prompts`, provider/model binding from settings |
+| Frontend | Next.js 16, React 19, App Router |
+| Database | SQLite or PostgreSQL |
+| Repo processing | `LibGit2Sharp`, ZIP/local-directory ingestion, incremental update pipeline |
+| Visualization | Mermaid mind maps plus optional `graphifyy` artifacts |
+| Deployment | Docker Compose, Makefile, optional Sealos deployment |
 
-- **Quick Conversion**: Supports converting all GitHub, GitLab, AtomGit, Gitee, Gitea and other code repositories into knowledge bases within minutes.
-- **Multi-language Support**: Supports code analysis and documentation generation for all programming languages.
-- **Code Structure Diagrams**: Automatically generates Mermaid diagrams to help understand code structure.
-- **Custom Model Support**: Supports custom models and custom APIs for flexible extension.
-- **AI Intelligent Analysis**: AI-based code analysis and code relationship understanding.
-- **SEO Friendly**: Generates SEO-friendly documentation and knowledge bases based on Next.js for easy search engine crawling.
-- **Conversational Interaction**: Supports conversations with AI to obtain detailed code information and usage methods for deep code understanding.
+## Quick Start With Docker
 
----
+### Prerequisites
 
-# Feature List
+- Docker with Compose support
+- At least one LLM API key compatible with your chosen provider
 
-- [x] Support multiple code repositories (GitHub, GitLab, AtomGit, Gitee, Gitea, etc.)
-- [x] Support multiple programming languages (Python, Java, C#, JavaScript, etc.)
-- [x] Support repository management (CRUD operations on repositories)
-- [x] Support multiple AI providers (OpenAI, AzureOpenAI, Anthropic, etc.)
-- [x] Support multiple databases (SQLite, PostgreSQL, SqlServer, MySQL, etc.)
-- [x] Support multiple languages (Chinese, English, French, etc.)
-- [x] Support uploading ZIP files and local files
-- [x] Provide data fine-tuning platform to generate fine-tuning datasets
-- [x] Support directory-level repository management with dynamic directory and document generation
-- [x] Support repository directory modification management
-- [x] Support user management (CRUD operations on users)
-- [x] Support user permission management
-- [x] Support repository-level generation of different fine-tuning framework datasets
-
----
-
-# Project Introduction
-
-OpenDeepWiki is an open-source project inspired by [DeepWiki](https://deepwiki.com/), developed based on .NET 9 and Semantic Kernel. It aims to help developers better understand and utilize code repositories, providing features such as code analysis, documentation generation, and knowledge graph construction.
-
-Main Features:
-
-- Analyze code structure
-- Understand repository core concepts
-- Generate code documentation
-- Automatically generate README.md for code
-- Support MCP (Model Context Protocol)
-
----
-
-# MCP Support
-
-OpenDeepWiki supports the MCP protocol:
-
-- Can serve as a single repository MCPServer for repository analysis.
-
-Example configuration:
-
-```json
-{
-  "mcpServers": {
-    "OpenDeepWiki":{
-      "url": "http://Your OpenDeepWiki service IP:port/api/mcp?owner=AIDotNet&name=OpenDeepWiki"
-    }
-  }
-}
-```
-
-If mcp streamable http is not supported, use the following format: 
-```json
-
-{
-  "mcpServers": {
-    "OpenDeepWiki":{
-      "url": "http://Your OpenDeepWiki service IP:port/api/mcp/sse?owner=AIDotNet&name=OpenDeepWiki"
-    }
-  }
-}
-```
-
-**MCP Streamable Configuration**
-
-You can configure MCP streamable support for specific services using the `MCP_STREAMABLE` environment variable:
-
-```yaml
-environment:
-  # Format: serviceName1=streamableUrl1,serviceName2=streamableUrl2
-  - MCP_STREAMABLE=claude=http://localhost:8080/api/mcp,windsurf=http://localhost:8080/api/mcp
-```
-
-This allows you to specify which services should use streamable HTTP endpoints and their corresponding URLs.
-
-- owner: Repository organization or owner name
-- name: Repository name
-
-After adding the repository, you can test by asking questions like "What is OpenDeepWiki?", with effects as shown below:
-
-![](img/mcp.png)
-
-This way, OpenDeepWiki can serve as an MCPServer for other AI models to call, facilitating analysis and understanding of open-source projects.
-
----
-
-# 🚀 Quick Start
-
-## Prerequisites
-
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose installed
-- An API key from an OpenAI-compatible LLM provider
-
-## 1. Clone the repository
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/AIDotNet/OpenDeepWiki.git
 cd OpenDeepWiki
 ```
 
-## 2. Configure environment variables
+### 2. Edit `compose.yaml`
 
-Edit `compose.yaml` and fill in your AI provider settings. At minimum, set these variables:
+At minimum, set a real JWT secret and your AI credentials:
 
 ```yaml
 services:
   opendeepwiki:
     environment:
-      # AI Chat (used for conversational features)
-      - CHAT_API_KEY=sk-xxx              # Your API key
-      - ENDPOINT=https://api.openai.com/v1
-      - CHAT_REQUEST_TYPE=OpenAI         # OpenAI | AzureOpenAI | Anthropic
+      - JWT_SECRET_KEY=replace-this-in-production
 
-      # Wiki generator - catalog generation
+      - CHAT_API_KEY=your-chat-api-key
+      - ENDPOINT=https://api.openai.com/v1
+      - CHAT_REQUEST_TYPE=OpenAI
+
       - WIKI_CATALOG_MODEL=gpt-4o
-      - WIKI_CATALOG_API_KEY=sk-xxx
       - WIKI_CATALOG_ENDPOINT=https://api.openai.com/v1
+      - WIKI_CATALOG_API_KEY=your-catalog-api-key
       - WIKI_CATALOG_REQUEST_TYPE=OpenAI
 
-      # Wiki generator - content generation
       - WIKI_CONTENT_MODEL=gpt-4o
-      - WIKI_CONTENT_API_KEY=sk-xxx
       - WIKI_CONTENT_ENDPOINT=https://api.openai.com/v1
+      - WIKI_CONTENT_API_KEY=your-content-api-key
       - WIKI_CONTENT_REQUEST_TYPE=OpenAI
+
+      - WIKI_LANGUAGES=en,zh
+      - WIKI_PARALLEL_COUNT=5
 ```
 
-> All three key groups (CHAT, WIKI_CATALOG, WIKI_CONTENT) can share the same API key and endpoint.
+Notes:
 
-## 3. Build and start
+- `CHAT_*`, `WIKI_CATALOG_*`, and `WIKI_CONTENT_*` can point to the same provider.
+- Translation is optional. If `WIKI_TRANSLATION_*` is not set, translation falls back to the content-generation provider/model.
+- `compose.yaml` uses `Database__Type=sqlite` and `ConnectionStrings__Default=Data Source=/data/opendeepwiki.db` by default.
+
+### 3. Start the stack
 
 ```bash
-# Build all images and start in background
-docker compose build
-docker compose up -d
+docker compose up -d --build
 ```
 
-Or use the Makefile shortcut:
+Or use the Makefile shortcuts:
 
 ```bash
-make build   # Build all Docker images
-make up      # Start all services (detached)
+make build
+make up
 ```
 
-## 4. Access the application
+### 4. Open the app
 
-| Service  | URL                    |
-|----------|------------------------|
-| Frontend | http://localhost:3000   |
-| Backend API | http://localhost:8080 |
+- Web UI: [http://localhost:3000](http://localhost:3000)
+- Backend health: [http://localhost:8080/health](http://localhost:8080/health)
 
-A default seed admin user is created on first startup: `admin@routin.ai` / `Admin@123`
+On a fresh database, the seeded admin account is:
 
-## Database Configuration
+- Email: `admin@routin.ai`
+- Password: `Admin@123`
 
-SQLite is used by default with no extra setup. To use PostgreSQL, update `compose.yaml`:
+Change the default JWT secret and admin password before any real deployment.
+
+## PostgreSQL Instead Of SQLite
+
+The current runtime code supports `sqlite` and `postgresql`.
+
+To boot the bundled PostgreSQL stack:
+
+```bash
+docker compose -f compose.pgsql.yaml up -d --build
+```
+
+If you prefer your own database, configure either of these equivalent pairs:
+
+```yaml
+- Database__Type=postgresql
+- ConnectionStrings__Default=Host=your-host;Port=5432;Database=opendeepwiki;Username=postgres;Password=secret
+```
+
+or
 
 ```yaml
 - DB_TYPE=postgresql
-- CONNECTION_STRING=Host=your-host;Database=opendeepwiki;Username=postgres;Password=password
+- CONNECTION_STRING=Host=your-host;Port=5432;Database=opendeepwiki;Username=postgres;Password=secret
 ```
 
----
+## Local Development
 
-# Deployment Recommendations
-
-Build for a specific architecture:
+### Backend
 
 ```bash
-docker compose build --build-arg ARCH=arm64
-docker compose build --build-arg ARCH=amd64
+dotnet restore OpenDeepWiki.sln
+dotnet build OpenDeepWiki.sln
+dotnet run --project src/OpenDeepWiki/OpenDeepWiki.csproj
 ```
 
-Build only backend or frontend:
+Useful local endpoints:
+
+- Backend API: [http://localhost:5265](http://localhost:5265) with the default `http` launch profile, or the URL printed by ASP.NET Core
+- Health: [http://localhost:5265/health](http://localhost:5265/health)
+- OpenAPI/Scalar: [http://localhost:5265/v1/scalar](http://localhost:5265/v1/scalar) when running in `Development`
+
+### Web app
+
+Set the backend proxy first. The web app reads `API_PROXY_URL` from the environment, `web/.env.local`, or `web/.env`.
 
 ```bash
-docker compose build opendeepwiki
-docker compose build web
+cd web
+npm install
+echo API_PROXY_URL=http://localhost:5265 > .env.local
+npm run dev
 ```
 
-One-click deployment to Sealos (supports public network access):
+### Docs app (optional)
 
-[![Deploy on Sealos](https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg)](https://bja.sealos.run/?openapp=system-template%3FtemplateName%3DOpenDeepWiki)
+```bash
+cd docs
+npm install
+npm run dev
+```
 
-For detailed steps, please refer to: [One-click Sealos Deployment of OpenDeepWiki](scripts/sealos/README.zh-CN.md)
+### Tests and lint
 
----
+```bash
+dotnet test tests/OpenDeepWiki.Tests/OpenDeepWiki.Tests.csproj
+cd web && npm test
+cd web && npm run lint
+```
 
-# 🔍 How It Works
+Common Makefile shortcuts:
 
-OpenDeepWiki leverages AI to achieve:
+```bash
+make dev
+make down
+make logs
+make test
+make build-arm
+make build-amd
+```
 
-- Clone code repository locally
-- Read .gitignore configuration to ignore irrelevant files
-- Recursively scan directories to get all files and directories
-- Determine if file count exceeds threshold; if so, call AI model for intelligent directory filtering
-- Parse AI-returned directory JSON data
-- Generate or update README.md
-- Call AI model to generate repository classification information and project overview
-- Clean project analysis tag content and save project overview to database
-- Call AI to generate thinking directory (task list)
-- Recursively process directory tasks to generate document directory structure
-- Save directory structure to database
-- Process incomplete document tasks
-- If Git repository, clean old commit records, call AI to generate update log and save
-
----
-
-# OpenDeepWiki Repository Parsing to Documentation Detailed Flow Chart
+## Repository Processing Flow
 
 ```mermaid
-graph TD
-    A[Clone code repository] --> B[Read .gitignore configuration to ignore files]
-    B --> C[Recursively scan directories to get all files and directories]
-    C --> D{Does file count exceed threshold?}
-    D -- No --> E[Directly return directory structure]
-    D -- Yes --> F[Call AI model for intelligent directory structure filtering]
-    F --> G[Parse AI-returned directory JSON data]
-    E --> G
-    G --> H[Generate or update README.md]
-    H --> I[Call AI model to generate repository classification information]
-    I --> J[Call AI model to generate project overview information]
-    J --> K[Clean project analysis tag content]
-    K --> L[Save project overview to database]
-    L --> M[Call AI to generate thinking directory task list]
-    M --> N[Recursively process directory tasks to generate DocumentCatalog]
-    N --> O[Save directory structure to database]
-    O --> P[Process incomplete document tasks]
-    P --> Q{Is repository type Git?}
-    Q -- Yes --> R[Clean old commit records]
-    R --> S[Call AI to generate update log]
-    S --> T[Save update log to database]
-    Q -- No --> T
+graph LR
+    A["Git / ZIP / Local directory"] --> B["Prepare workspace"]
+    B --> C["Analyze tree and existing repo context"]
+    C --> D["Generate README, overview, and wiki catalog"]
+    D --> E["Generate document content"]
+    E --> F["Translation / mind map / Graphify / incremental workers"]
+    F --> G["Public docs, chat, embed, and MCP"]
 ```
 
----
+In practice, the main runtime path looks like this:
 
-# Advanced Configuration
+1. Normalize the repository source and prepare a workspace under `REPOSITORIES_DIRECTORY`.
+2. Build or refresh repository metadata, branch/language state, and processing logs.
+3. Generate documentation catalogs and document content with the configured AI provider/model bindings.
+4. Queue follow-up work such as translation, mind map generation, Graphify artifacts, and incremental updates.
+5. Serve the final repository knowledge through the public web app, admin tooling, chat APIs, and MCP endpoints.
 
-## Environment Variables
+## MCP Usage
 
-- `KOALAWIKI_REPOSITORIES`: Repository storage path
-- `TASK_MAX_SIZE_PER_USER`: Maximum parallel document generation tasks per user for AI
-- `CHAT_MODEL`: Chat model (must support function calling)
-- `ENDPOINT`: API endpoint
-- `ANALYSIS_MODEL`: Analysis model for generating repository directory structure
-- `CHAT_API_KEY`: API key
-- `LANGUAGE`: Document generation language
-- `DB_TYPE`: Database type, supports sqlite, postgres, sqlserver, mysql (default: sqlite)
-- `MODEL_PROVIDER`: Model provider, default OpenAI, supports AzureOpenAI, Anthropic
-- `DB_CONNECTION_STRING`: Database connection string
-- `EnableSmartFilter`: Whether to enable smart filtering, affects AI's ability to get repository directories
-- `UPDATE_INTERVAL`: Repository incremental update interval (days)
-- `MAX_FILE_LIMIT`: Maximum upload file limit (MB)
-- `DEEP_RESEARCH_MODEL`: Deep research model, if empty uses CHAT_MODEL
-- `ENABLE_INCREMENTAL_UPDATE`: Whether to enable incremental updates
-- `ENABLE_CODED_DEPENDENCY_ANALYSIS`: Whether to enable code dependency analysis, may affect code quality
-- `ENABLE_WAREHOUSE_COMMIT`: Whether to enable warehouse commit
-- `ENABLE_FILE_COMMIT`: Whether to enable file commit
-- `REFINE_AND_ENHANCE_QUALITY`: Whether to refine and enhance quality
-- `ENABLE_WAREHOUSE_FUNCTION_PROMPT_TASK`: Whether to enable warehouse function prompt task
-- `ENABLE_WAREHOUSE_DESCRIPTION_TASK`: Whether to enable warehouse description task
-- `CATALOGUE_FORMAT`: Directory structure format (compact, json, pathlist, unix)
-- `ENABLE_CODE_COMPRESSION`: Whether to enable code compression
-- `CUSTOM_BODY_PARAMS`: Custom request body parameters, format: `key1=value1,key2=value2` (e.g., `stop=<|im_end|>,max_tokens=4096`). These parameters will be added to all AI model API requests
-- `READ_MAX_TOKENS`: Maximum token limit for reading files in AI, prevents unlimited file reading. It is recommended to fill in 70% of the model's maximum token (default: 100000)
-- `MAX_FILE_READ_COUNT`: Maximum file read count limit for AI, prevents unlimited file reading and improves processing efficiency (default: 10, 0 = no limit)
-- `AUTO_CONTEXT_COMPRESS_ENABLED`: Whether to enable AI-powered intelligent context compression for long conversations (default: false)
-- `AUTO_CONTEXT_COMPRESS_TOKEN_LIMIT`: Token threshold to trigger context compression. Required when compression is enabled (default: 100000)
-- `AUTO_CONTEXT_COMPRESS_MAX_TOKEN_LIMIT`: Maximum allowed token limit, ensures the token limit doesn't exceed model capabilities (default: 200000)
-- `UNDERSTAND_QUICKLY_TOKEN`: Optional GitHub PAT (`Repository dispatches: write` on `looptech-ai/understand-quickly` only). When set, OpenDeepWiki stamps `metadata.{tool, tool_version, generated_at, commit}` into the generated `graphify-out/graph.json` and fires a `repository_dispatch` so the [understand-quickly](https://github.com/looptech-ai/understand-quickly) registry resyncs the entry. Opt-in; default behavior is unchanged. See [`looptech-ai/uq-publish-action@v0.1.0`](https://github.com/looptech-ai/uq-publish-action) for the recommended CI step.
+OpenDeepWiki registers official MCP endpoints at:
 
-**Intelligent Context Compression Features:**
-Uses **Prompt Encoding Compression** - an ultra-dense, structured format that achieves 90%+ compression while preserving ALL critical information.
+- `/api/mcp`
+- `/api/mcp/{owner}/{repo}`
 
-**Compression Strategy:**
-```
-100 messages (50k tokens) → 1 encoded snapshot (3k tokens)
-Compression ratio: 94% ✨
+You can scope the repository either by path or query string. Example:
+
+```json
+{
+  "mcpServers": {
+    "OpenDeepWiki": {
+      "url": "http://localhost:8080/api/mcp/AIDotNet/OpenDeepWiki"
+    }
+  }
+}
 ```
 
-**What Gets Preserved (100%):**
-- **System Messages**: All system-level instructions
-- **Function Calls & Results**: Complete tool invocation history (preserves core behavior)
-- **Recent Conversation**: Most recent 30% of messages in original form
+Query-based alternative:
 
-**What Gets Encoded (Older Messages):**
-Instead of selecting/deleting messages, older messages are compressed into an ultra-dense structured snapshot:
-
-```markdown
-## CONTEXT_SNAPSHOT
-### FILES
-✓ src/File.cs:modified(L:25-48) → README.md:pending
-
-### TASKS
-✓ Implement feature X ✓ Fix bug Y → Add tests (pending)
-
-### TECH_STACK
-IChatClient, Semantic Kernel, AutoContextCompress, TokenHelper
-
-### DECISIONS
-[D1] Use message filtering: preserve structure
-[D2] Keep 30% recent: based on Google Gemini best practice
-
-### CODE_PATTERNS
-```cs
-if (message.Contents.Any(c => c is FunctionCallContent)) { ... }
+```text
+http://localhost:8080/api/mcp?owner=AIDotNet&name=OpenDeepWiki
 ```
 
-### USER_INTENT
-Enable configurable compression via env vars. Must preserve core behavior.
+Optional:
 
-### NEXT_ACTIONS
-1. Update documentation 2. Add unit tests
-```
+- Set `MCP_ENABLED=false` to disable MCP endpoints.
+- Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` if you want protected-resource MCP OAuth support.
 
-**Encoding Format Features:**
-- ✓ Ultra-dense: Uses symbols (✓=done, →=pending, ✗=blocked)
-- ✓ Structured: 8 semantic sections (FILES, TASKS, TECH_STACK, etc.)
-- ✓ Precise: Preserves file paths, line numbers, function names, decisions
-- ✓ Actionable: Clear next steps for AI to continue work
-- ✓ Lossless: All critical information encoded, zero loss
+## Optional Graphify Configuration
 
-**Key Benefits:**
-- ✅ 90-95% compression ratio (vs 30-40% with message filtering)
-- ✅ Zero loss of function calls and results
-- ✅ Maintains temporal context (recent messages untouched)
-- ✅ AI can reconstruct full understanding from snapshot
-- ✅ One snapshot replaces hundreds of messages
-- `FeishuAppId`: Feishu App ID (required if enabling Feishu Bot)
-- `FeishuAppSecret`: Feishu App Secret (required if enabling Feishu Bot)
-- `FeishuBotName`: Feishu bot display name (optional)
+The backend Docker image already installs `graphifyy`. To enable Graphify artifact generation, configure one of the optional provider groups already present in `compose.yaml`, such as:
 
----
+- `GRAPHIFY_BACKEND`
+- `GRAPHIFY_MODEL`
+- `GRAPHIFY_OPENAI_BASE_URL`
+- `GRAPHIFY_OPENAI_API_KEY`
+- `OPENAI_BASE_URL` / `OPENAI_API_KEY`
+- `OLLAMA_BASE_URL` / `OLLAMA_MODEL`
 
-# Feishu Bot Integration
+## Repository Layout
 
-- Purpose: Connect the current repository to Feishu group/DM as a knowledge bot for Q&A and content delivery.
-- Callback route: `/api/feishu-bot/{owner}/{name}` (copy the full URL from the "Feishu Bot" button on the repository page).
-- Requirement: Service must be publicly accessible; message encryption (Encrypt Key) is not supported yet.
+- `src/OpenDeepWiki/`: ASP.NET Core entry point, endpoints, workers, AI/repository/chat/MCP services
+- `src/OpenDeepWiki.Entities/`: domain entities
+- `src/OpenDeepWiki.EFCore/`: shared EF Core model and context contract
+- `src/EFCore/OpenDeepWiki.Sqlite/`: SQLite provider
+- `src/EFCore/OpenDeepWiki.Postgresql/`: PostgreSQL provider
+- `web/`: public docs site and admin UI built with Next.js
+- `docs/`: separate documentation app
+- `tests/OpenDeepWiki.Tests/`: xUnit and FsCheck tests
+- `scripts/`: deployment and helper scripts
 
-## 1) Create an App in Feishu Open Platform
+## Deployment Notes
 
-- Type: Internal App (for your organization).
-- Capability: Enable "Bot". Publish to the organization and install it.
-- Permissions (at minimum, per platform guidance):
-  - Message send/read related scopes (e.g., `im:message`, `im:message:send_as_bot`).
-  - Event subscription related scopes (for receiving message events).
+- Sealos: [One-click deployment guide](scripts/sealos/README.zh-CN.md)
+- Backend container definition: `src/OpenDeepWiki/Dockerfile`
+- Frontend container definition: `web/Dockerfile`
 
-## 2) Configure Event Subscriptions (Important)
-
-- Open "Event Subscriptions" and disable "Encrypt Key".
-- Subscribe to event: `im.message.receive_v1`.
-- Request URL: `https://your-domain/api/feishu-bot/{owner}/{name}`.
-  - `{owner}` is the repository organization or owner, e.g., `AIDotNet`.
-  - `{name}` is the repository name, e.g., `OpenDeepWiki`.
-- Save to complete the URL verification (backend already handles the challenge response).
-
-Tip: You can also click the "Feishu Bot" button on the repository page to copy the dedicated callback URL.
-
-## 3) Configure Server Environment Variables
-
-Set the following in your backend service (see docker-compose example below):
-
-- `FeishuAppId`: Feishu App ID
-- `FeishuAppSecret`: Feishu App Secret
-- `FeishuBotName`: Bot display name (optional)
-
-## 4) Add the Bot to a Group and Use It
-
-- After installing the app, add the bot to the target group.
-- Group: @bot + your question (answers using the current repository's knowledge).
-- Direct Message: send your question directly.
-- Supports text and image replies (e.g., mind map images).
-
-## Feishu FAQ
-
-- No response/callback failed: ensure the Request URL is publicly reachable and that Nginx proxies `/api/` to the backend.
-- "Encryption enabled" message: disable Encrypt Key (current version doesn't support encrypted messages).
-- 403/insufficient permissions: make sure the app is installed in the org and required scopes/events are granted.
-
-## Build for Different Architectures
-
-Makefile commands:
-
-```bash
-make build-arm    # ARM architecture
-make build-amd    # AMD architecture
-make build-backend-arm   # Backend only ARM
-make build-frontend-amd  # Frontend only AMD
-```
-
----
-
-# Community
+## Community
 
 - Discord: [join us](https://discord.gg/Y3fvpnGVwt)
-- Feishu QR Code:
+- Feishu QR code:
 
 ![Feishu](/img/feishu.png)
 
 ![WeChat](https://github.com/user-attachments/assets/cb346569-2635-4038-a5cd-1c14485da7b2)
 
----
-
-# 📄 License
+## License
 
 This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
 
----
-
-# ⭐ Star History
+## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=AIDotNet/OpenDeepWiki&type=Date)](https://www.star-history.com/#AIDotNet/OpenDeepWiki&Date)
-
-
-

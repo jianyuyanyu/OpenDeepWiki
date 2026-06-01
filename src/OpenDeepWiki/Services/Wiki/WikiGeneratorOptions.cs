@@ -60,7 +60,10 @@ public class WikiGeneratorOptions
     public int ParallelCount { get; set; } = 5;
 
     /// <summary>
-    /// Maximum output tokens for AI generation.
+    /// Maximum output tokens per AI response.
+    /// This bounds a SINGLE model response, not the whole document. The content
+    /// generator builds long documents incrementally across multiple tool calls
+    /// (WriteDoc + AppendDoc), so the final page can far exceed this limit.
     /// Default: 32000
     /// </summary>
     public int MaxOutputTokens { get; set; } = 32000;

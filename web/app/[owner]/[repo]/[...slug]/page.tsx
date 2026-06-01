@@ -109,8 +109,8 @@ export default async function RepoDocPage({ params, searchParams }: RepoDocPageP
   });
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 xl:flex-row">
-      <article className="min-w-0 flex-1">
+    <div className="mx-auto flex max-w-6xl flex-col gap-6 xl:h-full xl:min-h-0 xl:flex-row">
+      <article className="min-w-0 flex-1 xl:wiki-scrollbar xl:min-h-0 xl:overflow-y-auto xl:pr-2">
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
@@ -122,8 +122,8 @@ export default async function RepoDocPage({ params, searchParams }: RepoDocPageP
         />
       </article>
       {headings.length > 0 && (
-        <aside className="xl:w-64 xl:shrink-0">
-          <div className="wiki-scrollbar rounded-xl border border-border/70 bg-muted/20 p-3 xl:sticky xl:top-0 xl:max-h-full xl:overflow-y-auto">
+        <aside className="xl:flex xl:min-h-0 xl:w-64 xl:shrink-0">
+          <div className="wiki-scrollbar rounded-xl border border-border/70 bg-muted/20 p-3 xl:h-full xl:min-h-0 xl:overflow-y-auto">
             <div className="mb-2 text-sm font-semibold">{t("repository.tableOfContents")}</div>
             <nav className="space-y-1.5">
               {headings.map((heading) => (

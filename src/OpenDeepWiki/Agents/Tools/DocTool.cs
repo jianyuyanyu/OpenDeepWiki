@@ -136,6 +136,108 @@ content: '# Overview\n\nThis is the overview section...'")]
     }
 
     /// <summary>
+    /// Appends content to the end of an existing document, creating it if it does not exist.
+    /// Enables building long documents incrementally across multiple tool calls,
+    /// so the final document can far exceed a single response's token limit.
+    /// </summary>
+    /// <param name="content">The Markdown content to append.</param>
+    /// <param name="path">Optional catalog path. Omit for the current catalog item.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    [Description(@"Appends Markdown content to the END of the current catalog item's document.
+
+Usage:
+- Use this to build a long, comprehensive document in multiple steps without hitting a single-response size limit
+- First call WriteDoc with the title + opening sections, then call AppendDoc repeatedly to add more sections
+- If no document exists yet, AppendDoc creates one with the given content
+- Content is appended exactly as provided; include a leading blank line / heading so sections stay separated
+- Source files are automatically tracked from files you read
+
+Example:
+content: '\n## Failure Modes\n\nThe service handles ... '")]
+    public async Task<string> AppendAsync(
+        [Description("Markdown content to append to the end of the document")]
+        string content,
+        [Description("Optional catalog path. Omit this when appending to the current catalog item; provide it for incremental updates.")]
+        string path = "",
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return "ERROR: Content cannot be empty. Please provide valid Markdown content to append.";
+        }
+
+        var catalogPath = ResolveCatalogPath(path);
+        if (catalogPath == null)
+        {
+            return "ERROR: Catalog path is required. Provide the path parameter for incremental updates.";
+        }
+
+        try
+        {
+            // Find the catalog item
+            var catalog = await _context.DocCatalogs
+                .FirstOrDefaultAsync(c => c.BranchLanguageId == _branchLanguageId &&
+                                          c.Path == catalogPath &&
+                                          !c.IsDeleted, cancellationToken);
+
+            if (catalog == null)
+            {
+                return $"ERROR: Catalog item with path '{catalogPath}' not found. Please ensure the catalog item exists before writing content.";
+            }
+
+            // 从 GitTool 获取读取的文件列表
+            string? sourceFilesJson = null;
+            if (_gitTool != null)
+            {
+                var readFiles = _gitTool.GetReadFiles();
+                if (readFiles.Count > 0)
+                {
+                    sourceFilesJson = JsonSerializer.Serialize(readFiles);
+                }
+            }
+
+            // Append to existing document if present
+            if (!string.IsNullOrEmpty(catalog.DocFileId))
+            {
+                var existingDoc = await _context.DocFiles
+                    .FirstOrDefaultAsync(d => d.Id == catalog.DocFileId && !d.IsDeleted, cancellationToken);
+
+                if (existingDoc != null)
+                {
+                    existingDoc.Content = string.Concat(existingDoc.Content, content);
+                    if (sourceFilesJson != null)
+                    {
+                        existingDoc.SourceFiles = sourceFilesJson;
+                    }
+                    existingDoc.UpdateTimestamp();
+                    await SaveChangesWithRetryAsync(cancellationToken);
+                    return $"SUCCESS: Appended content to document '{catalogPath}'. Current length: {existingDoc.Content.Length} characters.";
+                }
+            }
+
+            // No document yet — create one with the provided content
+            var docFile = new DocFile
+            {
+                Id = Guid.NewGuid().ToString(),
+                BranchLanguageId = _branchLanguageId,
+                Content = content,
+                SourceFiles = sourceFilesJson
+            };
+
+            _context.DocFiles.Add(docFile);
+            catalog.DocFileId = docFile.Id;
+            catalog.UpdateTimestamp();
+
+            await SaveChangesWithRetryAsync(cancellationToken);
+            return $"SUCCESS: Created document '{catalogPath}' and wrote initial content. Current length: {content.Length} characters.";
+        }
+        catch (Exception ex)
+        {
+            return $"ERROR: Failed to append to document '{catalogPath}': {ex.Message}";
+        }
+    }
+
+    /// <summary>
     /// Edits existing document content by replacing specified text.
     /// </summary>
     /// <param name="oldContent">The content to be replaced.</param>
@@ -311,6 +413,10 @@ Usage:
             AIFunctionFactory.Create(WriteAsync, new AIFunctionFactoryOptions
             {
                 Name = "WriteDoc"
+            }),
+            AIFunctionFactory.Create(AppendAsync, new AIFunctionFactoryOptions
+            {
+                Name = "AppendDoc"
             }),
             AIFunctionFactory.Create(EditAsync, new AIFunctionFactoryOptions
             {

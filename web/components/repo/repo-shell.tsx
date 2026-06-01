@@ -457,9 +457,9 @@ export function RepoShell({
         </aside>
 
         <main className="min-h-0 min-w-0 flex-1">
-          <div className="wiki-scrollbar h-full min-h-0 overflow-y-auto rounded-xl border border-border/70 bg-card p-4 shadow-sm sm:p-5">
+          <div className="wiki-scrollbar h-full min-h-0 overflow-y-auto rounded-xl border border-border/70 bg-card p-4 shadow-sm xl:overflow-hidden sm:p-5">
             {isLoading ? (
-              <div className="flex items-center justify-center py-20">
+              <div className="flex h-full items-center justify-center py-20">
                 <div className="size-7 animate-spin rounded-full border-b-2 border-primary" />
               </div>
             ) : (

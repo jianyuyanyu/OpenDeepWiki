@@ -769,13 +769,18 @@ Please start executing the task.";
 
 2. **Document Structure** (Must Include)
    - Title (H1): Must match catalog title
+   - Relevant source files: List the real files that define this page's implementation boundary
+   - Purpose and Scope: Explain what this page covers and what related catalog topics are intentionally left to sibling pages
    - Overview: Explain purpose and use cases
    - Architecture Diagram: Use Mermaid to illustrate component relationships, data flow, or system architecture
-   - Main Content: Detailed explanation of implementation, architecture, or usage
-   - Usage Examples: Code examples extracted from actual source code
+   - Main Content: Deep, detailed explanation of implementation, architecture, and real control flow (use multiple subsections)
+   - Usage Examples: Multiple code examples extracted from actual source code
    - Configuration Options (if applicable): List options in table format
    - API Reference (if applicable): Method signatures, parameters, return values
+   - Failure Modes, Edge Cases & Concurrency (when source evidence exists)
+   - Performance / Operational notes and Extension Points (when applicable)
    - Related Links: Links to related documentation and source files
+   - This is a right-sized DeepWiki-style catalog, so each leaf page must be a LONG, comprehensive, source-backed reference for its specific topic — not a thin summary or a catch-all replacement for sibling pages
 
 3. **File Reference Links** (IMPORTANT)
    - When referencing source files, use the runtime File Reference Base URL
@@ -815,18 +820,21 @@ Please start executing the task.";
    - Keep code identifiers in original form, do not translate
 
 6. **Output Requirements**
-   - Use WriteDoc tool to write the document
+   - Write the document INCREMENTALLY so its length is not capped by a single response:
+     * Call WriteDoc(content) first with the title, relevant source files, purpose and scope, overview, and architecture section
+     * Then call AppendDoc(content) repeatedly to add each remaining major section
+   - Keep appending until the entire capability is fully documented — aim for a long, thorough page
    - Source files are automatically tracked from files you read
 
 ## Execution Steps
 
-1. Analyze catalog title to determine document scope
-2. Use ListFiles and Grep to find related source files
+1. Analyze catalog title to determine document scope (treat it as a broad subsystem)
+2. Use ListFiles and Grep to find related source files; read widely, not just one or two files
 3. Read key files, extract information and code examples
 4. Design appropriate Mermaid diagrams to illustrate architecture/flow
 5. Organize content following document structure template
 6. Ensure all file references use the correct URL format with branch
-7. Call WriteDoc(content) to write document
+7. Call WriteDoc(content) for the opening sections, then AppendDoc(content) for each remaining section until complete
 
 ## Runtime Context
 
@@ -1139,6 +1147,7 @@ Please start executing the task.";
                                         3. After completing all tool calls, provide a brief summary of what was accomplished.
                                         4. If you encounter errors, retry with adjusted parameters or report the issue.
                                         5. Do NOT output the full document content in your response - write it using the tools instead.
+                                        6. When generating document content, build LONG, comprehensive pages: start with WriteDoc for the opening sections, then call AppendDoc repeatedly to add each remaining section. Keep going until the whole topic is fully covered; do not stop early.
                                         </system-remind>
                                         """),
                         new TextContent(userMessage)
