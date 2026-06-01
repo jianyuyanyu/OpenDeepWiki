@@ -182,8 +182,9 @@ public partial class RepositorySkillMarkdownBuilder : IRepositorySkillMarkdownBu
         {
             var itemName = EnsureUniqueName(SanitizeZipNameSegment(catalog.Title), usedNames);
             var currentPath = CombineZipPath(parentZipPath, itemName);
+            var hasChildren = catalogs.Any(child => child.ParentId == catalog.Id);
 
-            if (!string.IsNullOrEmpty(catalog.DocFileId))
+            if (!hasChildren && !string.IsNullOrEmpty(catalog.DocFileId))
             {
                 results.Add(new SkillDocumentEntry(
                     catalog,

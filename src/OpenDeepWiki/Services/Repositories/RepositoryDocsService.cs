@@ -60,7 +60,14 @@ public class RepositoryDocsService(
             var languagesWithContent = await context.BranchLanguages
                 .AsNoTracking()
                 .Where(item => item.RepositoryBranchId == branch.Id)
-                .Where(item => context.DocCatalogs.Any(c => c.BranchLanguageId == item.Id && !c.IsDeleted))
+                .Where(item => context.DocCatalogs.Any(c =>
+                    c.BranchLanguageId == item.Id &&
+                    !c.IsDeleted &&
+                    !string.IsNullOrEmpty(c.DocFileId) &&
+                    !context.DocCatalogs.Any(child =>
+                        child.BranchLanguageId == item.Id &&
+                        child.ParentId == c.Id &&
+                        !child.IsDeleted)))
                 .ToListAsync();
 
             // 只有当分支有内容时才添加
@@ -195,16 +202,34 @@ public class RepositoryDocsService(
         }
 
         // 构建树形结构
-        var catalogMap = catalogs.ToDictionary(c => c.Id);
+        var readyCatalogs = FilterToReadyWithAncestors(catalogs);
+        if (readyCatalogs.Count == 0)
+        {
+            return new RepositoryTreeResponse
+            {
+                Owner = repository.OrgName,
+                Repo = repository.RepoName,
+                Exists = true,
+                Status = repository.Status,
+                CurrentBranch = branchEntity.BranchName,
+                CurrentLanguage = language.LanguageCode,
+                HasGraphifyArtifact = graphifyState.HasArtifact,
+                GraphifyStatus = graphifyState.Status,
+                GraphifyStatusName = graphifyState.StatusName,
+                Nodes = []
+            };
+        }
+
+        var catalogMap = readyCatalogs.ToDictionary(c => c.Id);
         var rootNodes = new List<RepositoryTreeNodeResponse>();
 
-        foreach (var catalog in catalogs.Where(c => c.ParentId == null))
+        foreach (var catalog in readyCatalogs.Where(c => c.ParentId == null))
         {
             rootNodes.Add(BuildTreeNode(catalog, catalogMap));
         }
 
         // 递归查找第一个有实际内容的文档
-        var defaultSlug = FindFirstContentSlug(catalogs, null) ?? string.Empty;
+        var defaultSlug = FindFirstContentSlug(readyCatalogs, null) ?? string.Empty;
 
         return new RepositoryTreeResponse
         {
@@ -279,7 +304,8 @@ public class RepositoryDocsService(
 
         foreach (var catalog in catalogs)
         {
-            if (string.IsNullOrEmpty(catalog.DocFileId))
+            var hasChildren = catalogs.Any(child => child.ParentId == catalog.Id);
+            if (hasChildren || string.IsNullOrEmpty(catalog.DocFileId))
             {
                 continue;
             }
@@ -348,7 +374,16 @@ public class RepositoryDocsService(
             .AsNoTracking()
             .FirstOrDefaultAsync(item => item.BranchLanguageId == language.Id && item.Path == normalizedSlug && !item.IsDeleted);
 
-        if (catalog is null || catalog.DocFileId is null)
+        if (catalog is null)
+        {
+            return new RepositoryDocResponse { Slug = normalizedSlug, Exists = false };
+        }
+
+        var hasChildren = await context.DocCatalogs
+            .AsNoTracking()
+            .AnyAsync(item => item.BranchLanguageId == language.Id && item.ParentId == catalog.Id && !item.IsDeleted);
+
+        if (hasChildren || string.IsNullOrEmpty(catalog.DocFileId))
         {
             return new RepositoryDocResponse { Slug = normalizedSlug, Exists = false };
         }
@@ -522,8 +557,10 @@ public class RepositoryDocsService(
 
         foreach (var child in children)
         {
+            var hasChildren = catalogs.Any(c => c.ParentId == child.Id);
+
             // 如果当前节点有内容，返回它的路径
-            if (!string.IsNullOrEmpty(child.DocFileId))
+            if (!hasChildren && !string.IsNullOrEmpty(child.DocFileId))
             {
                 return NormalizePath(child.Path);
             }
@@ -745,9 +782,10 @@ public class RepositoryDocsService(
         foreach (var catalog in currentLevelItems)
         {
             var itemName = EnsureUniqueName(SanitizeZipNameSegment(catalog.Title), usedNames);
+            var children = catalogs.Where(c => c.ParentId == catalog.Id).ToList();
 
             // 如果有文档文件，创建文件条目
-            if (catalog.DocFile != null)
+            if (catalog.DocFile != null && children.Count == 0)
             {
                 // 使用 .md 扩展名
                 var fileName = $"{itemName}.md";
@@ -760,15 +798,11 @@ public class RepositoryDocsService(
             }
 
             // 递归处理子目录
-            var children = catalogs.Where(c => c.ParentId == catalog.Id).ToList();
             if (children.Count > 0)
             {
                 // 如果没有文档文件但有子项，创建 ZIP 目录条目
-                if (catalog.DocFile == null)
-                {
-                    var dirPath = CombineZipPath(parentZipPath, itemName);
-                    archive.CreateEntry(dirPath.EndsWith('/') ? dirPath : dirPath + '/');
-                }
+                var dirPath = CombineZipPath(parentZipPath, itemName);
+                archive.CreateEntry(dirPath.EndsWith('/') ? dirPath : dirPath + '/');
 
                 var nextParentZipPath = CombineZipPath(parentZipPath, itemName);
                 await AddFilesToArchive(archive, catalogs, catalog.Id, nextParentZipPath);

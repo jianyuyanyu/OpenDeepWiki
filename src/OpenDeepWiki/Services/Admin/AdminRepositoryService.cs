@@ -706,17 +706,31 @@ public class AdminRepositoryService : IAdminRepositoryService
         }
 
         var normalizedPath = NormalizeDocPath(request.DocumentPath);
-        var catalogExists = await _context.DocCatalogs.AnyAsync(
+        var catalog = await _context.DocCatalogs.FirstOrDefaultAsync(
             c => c.BranchLanguageId == branchLanguage.Id &&
                  c.Path == normalizedPath &&
                  !c.IsDeleted,
             cancellationToken);
-        if (!catalogExists)
+        if (catalog == null)
         {
             return new AdminRepositoryOperationResult
             {
                 Success = false,
                 Message = "文档不存在"
+            };
+        }
+
+        var hasChildren = await _context.DocCatalogs.AnyAsync(
+            c => c.BranchLanguageId == branchLanguage.Id &&
+                 c.ParentId == catalog.Id &&
+                 !c.IsDeleted,
+            cancellationToken);
+        if (hasChildren)
+        {
+            return new AdminRepositoryOperationResult
+            {
+                Success = false,
+                Message = "Navigation catalog nodes do not generate documents. Select a child document to regenerate."
             };
         }
 
@@ -835,6 +849,20 @@ public class AdminRepositoryService : IAdminRepositoryService
             {
                 Success = false,
                 Message = "文档不存在或不可编辑"
+            };
+        }
+
+        var hasChildren = await _context.DocCatalogs.AnyAsync(
+            c => c.BranchLanguageId == branchLanguage.Id &&
+                 c.ParentId == catalog.Id &&
+                 !c.IsDeleted,
+            cancellationToken);
+        if (hasChildren)
+        {
+            return new AdminRepositoryOperationResult
+            {
+                Success = false,
+                Message = "Navigation catalog nodes cannot be edited as documents. Select a child document instead."
             };
         }
 

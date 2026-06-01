@@ -26,7 +26,7 @@ public class WikiService(IContext context)
 
         var catalogs = await context.DocCatalogs
             .AsNoTracking()
-            .Where(c => c.BranchLanguageId == language.Id)
+            .Where(c => c.BranchLanguageId == language.Id && !c.IsDeleted)
             .OrderBy(c => c.Order)
             .ToListAsync();
 
@@ -66,6 +66,15 @@ public class WikiService(IContext context)
         if (catalog is null)
         {
             throw new KeyNotFoundException($"文档路径 '{normalizedPath}' 不存在");
+        }
+
+        var hasChildren = await context.DocCatalogs
+            .AsNoTracking()
+            .AnyAsync(c => c.BranchLanguageId == language.Id && c.ParentId == catalog.Id && !c.IsDeleted);
+
+        if (hasChildren)
+        {
+            throw new KeyNotFoundException($"Document path '{normalizedPath}' is a navigation node and has no readable document content.");
         }
 
         if (string.IsNullOrEmpty(catalog.DocFileId))
@@ -147,13 +156,17 @@ public class WikiService(IContext context)
     {
         return lookup[parentId]
             .OrderBy(c => c.Order)
-            .Select(c => new WikiCatalogItemResponse
+            .Select(c =>
             {
-                Title = c.Title,
-                Path = c.Path,
-                Order = c.Order,
-                HasContent = !string.IsNullOrEmpty(c.DocFileId),
-                Children = BuildChildren(lookup, c.Id)
+                var children = BuildChildren(lookup, c.Id);
+                return new WikiCatalogItemResponse
+                {
+                    Title = c.Title,
+                    Path = c.Path,
+                    Order = c.Order,
+                    HasContent = children.Count == 0 && !string.IsNullOrEmpty(c.DocFileId),
+                    Children = children
+                };
             })
             .ToList();
     }

@@ -73,6 +73,22 @@ function collectParentSlugs(items: RepoTreeNode[], targetPath: string) {
   return parents;
 }
 
+function findFirstLeafSlug(node: RepoTreeNode): string | null {
+  const children = node.children ?? [];
+  if (children.length === 0) {
+    return node.slug;
+  }
+
+  for (const child of children) {
+    const slug = findFirstLeafSlug(child);
+    if (slug) {
+      return slug;
+    }
+  }
+
+  return null;
+}
+
 function SidebarTree({
   nodes,
   owner,
@@ -135,10 +151,14 @@ function SidebarTree({
         const children = node.children ?? [];
         const isDirectory = children.length > 0;
         const isExpanded = expandedSlugs.has(node.slug);
-        const isActive = currentPath === node.slug;
-        const href = queryString
-          ? `${buildRepoDocPath(owner, repo, node.slug)}?${queryString}`
-          : buildRepoDocPath(owner, repo, node.slug);
+        const isActive = !isDirectory && currentPath === node.slug;
+        const targetSlug = isDirectory ? findFirstLeafSlug(node) : node.slug;
+        const href = targetSlug
+          ? queryString
+            ? `${buildRepoDocPath(owner, repo, targetSlug)}?${queryString}`
+            : buildRepoDocPath(owner, repo, targetSlug)
+          : null;
+        const nodeHref = href ?? buildRepoDocPath(owner, repo, node.slug);
 
         return (
           <li key={node.slug} className="min-w-0">
@@ -162,23 +182,26 @@ function SidebarTree({
                 <span className="size-5 shrink-0" aria-hidden="true" />
               )}
 
-              {isDirectory ? (
+              {isDirectory && href ? (
+                <Link
+                  href={nodeHref}
+                  title={node.title}
+                  className="min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-[13px] font-medium leading-5 text-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  {node.title}
+                </Link>
+              ) : isDirectory ? (
                 <button
                   type="button"
                   title={node.title}
                   onClick={() => toggleExpand(node.slug)}
-                  className={cn(
-                    "min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-[13px] leading-5 transition-colors",
-                    isActive
-                      ? "bg-primary/10 font-medium text-primary ring-1 ring-primary/15"
-                      : "text-foreground/80 hover:bg-muted hover:text-foreground"
-                  )}
+                  className="min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-left text-[13px] font-medium leading-5 text-foreground/80 transition-colors hover:bg-muted hover:text-foreground"
                 >
                   {node.title}
                 </button>
               ) : (
                 <Link
-                  href={href}
+                  href={nodeHref}
                   title={node.title}
                   className={cn(
                     "block min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-[13px] leading-5 transition-colors",

@@ -117,6 +117,10 @@ public class CatalogStorage
         // Update the existing catalog
         existingCatalog.Title = updatedItem.Title;
         existingCatalog.Order = updatedItem.Order;
+        if (updatedItem.Children.Count > 0)
+        {
+            existingCatalog.DocFileId = null;
+        }
         existingCatalog.UpdateTimestamp();
 
         // Handle children updates if provided
@@ -231,6 +235,10 @@ public class CatalogStorage
                 existingCatalog.Title = item.Title;
                 existingCatalog.Order = item.Order;
                 existingCatalog.IsDeleted = false;
+                if (item.Children.Count > 0)
+                {
+                    existingCatalog.DocFileId = null;
+                }
                 existingCatalog.UpdateTimestamp();
                 catalogId = existingCatalog.Id;
             }

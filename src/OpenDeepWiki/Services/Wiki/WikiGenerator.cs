@@ -769,7 +769,6 @@ Please start executing the task.";
 
 2. **Document Structure** (Must Include)
    - Title (H1): Must match catalog title
-   - Relevant source files: List the real files that define this page's implementation boundary
    - Purpose and Scope: Explain what this page covers and what related catalog topics are intentionally left to sibling pages
    - Overview: Explain purpose and use cases
    - Architecture Diagram: Use Mermaid to illustrate component relationships, data flow, or system architecture
@@ -783,10 +782,12 @@ Please start executing the task.";
    - This is a right-sized DeepWiki-style catalog, so each leaf page must be a LONG, comprehensive, source-backed reference for its specific topic — not a thin summary or a catch-all replacement for sibling pages
 
 3. **File Reference Links** (IMPORTANT)
-   - When referencing source files, use the runtime File Reference Base URL
-   - Example: [<file_base_url>/src/Example.cs](<file_base_url>/src/Example.cs)
-   - For specific line references: <file_base_url>/<file_path>#L<line_number>
+   - When referencing source files, use the actual runtime File Reference Base URL shown below
+   - Example for this task: [Example.cs]({gitBaseUrl}/src/Example.cs#L10-L20)
+   - Use the exact runtime File Reference Base URL prefix shown in the example; never output literal placeholder text for the base URL
+   - For specific line references, append #L<line_number> or #L<start>-L<end> to the real file URL
    - Always provide clickable links to source files mentioned in the document
+   - Do NOT add a source-file list section to the Markdown body; source files are tracked and rendered separately by the framework
 
 4. **Mermaid Diagram Requirements** (IMPORTANT)
    - Include at least one architecture or flow diagram using Mermaid
@@ -821,7 +822,7 @@ Please start executing the task.";
 
 6. **Output Requirements**
    - Write the document INCREMENTALLY so its length is not capped by a single response:
-     * Call WriteDoc(content) first with the title, relevant source files, purpose and scope, overview, and architecture section
+     * Call WriteDoc(content) first with the title, purpose and scope, overview, and architecture section
      * Then call AppendDoc(content) repeatedly to add each remaining major section
    - Keep appending until the entire capability is fully documented — aim for a long, thorough page
    - Source files are automatically tracked from files you read

@@ -83,6 +83,14 @@ content: '# Overview\n\nThis is the overview section...'")]
                 return $"ERROR: Catalog item with path '{catalogPath}' not found. Please ensure the catalog item exists before writing content.";
             }
 
+            if (await HasChildCatalogsAsync(catalog.Id, cancellationToken))
+            {
+                catalog.DocFileId = null;
+                catalog.UpdateTimestamp();
+                await SaveChangesWithRetryAsync(cancellationToken);
+                return $"ERROR: Catalog item '{catalogPath}' has child catalog items and is a navigation node. Documents can only be written to leaf catalog items.";
+            }
+
             // 从 GitTool 获取读取的文件列表
             string? sourceFilesJson = null;
             if (_gitTool != null)
@@ -183,6 +191,14 @@ content: '\n## Failure Modes\n\nThe service handles ... '")]
             if (catalog == null)
             {
                 return $"ERROR: Catalog item with path '{catalogPath}' not found. Please ensure the catalog item exists before writing content.";
+            }
+
+            if (await HasChildCatalogsAsync(catalog.Id, cancellationToken))
+            {
+                catalog.DocFileId = null;
+                catalog.UpdateTimestamp();
+                await SaveChangesWithRetryAsync(cancellationToken);
+                return $"ERROR: Catalog item '{catalogPath}' has child catalog items and is a navigation node. Documents can only be appended to leaf catalog items.";
             }
 
             // 从 GitTool 获取读取的文件列表
@@ -287,6 +303,11 @@ newContent: '## New Section\n\nUpdated content here'")]
                 return $"ERROR: Catalog item with path '{catalogPath}' not found.";
             }
 
+            if (await HasChildCatalogsAsync(catalog.Id, cancellationToken))
+            {
+                return $"ERROR: Catalog item '{catalogPath}' has child catalog items and is a navigation node. Documents can only be edited on leaf catalog items.";
+            }
+
             if (string.IsNullOrEmpty(catalog.DocFileId))
             {
                 return $"ERROR: No document associated with catalog item '{catalogPath}'. Use WriteAsync to create a document first.";
@@ -351,7 +372,8 @@ Usage:
                                       c.Path == catalogPath && 
                                       !c.IsDeleted, cancellationToken);
 
-        if (catalog == null || string.IsNullOrEmpty(catalog.DocFileId))
+        if (catalog == null || string.IsNullOrEmpty(catalog.DocFileId) ||
+            await HasChildCatalogsAsync(catalog.Id, cancellationToken))
         {
             return null;
         }
@@ -393,7 +415,8 @@ Usage:
                                       c.Path == catalogPath && 
                                       !c.IsDeleted, cancellationToken);
 
-        if (catalog == null || string.IsNullOrEmpty(catalog.DocFileId))
+        if (catalog == null || string.IsNullOrEmpty(catalog.DocFileId) ||
+            await HasChildCatalogsAsync(catalog.Id, cancellationToken))
         {
             return false;
         }
@@ -436,6 +459,14 @@ Usage:
     private string? ResolveCatalogPath(string? path)
     {
         return NormalizeCatalogPath(path) ?? _catalogPath;
+    }
+
+    private async Task<bool> HasChildCatalogsAsync(string catalogId, CancellationToken cancellationToken)
+    {
+        return await _context.DocCatalogs
+            .AnyAsync(c => c.BranchLanguageId == _branchLanguageId &&
+                           c.ParentId == catalogId &&
+                           !c.IsDeleted, cancellationToken);
     }
 
     private static string? NormalizeCatalogPath(string? path)

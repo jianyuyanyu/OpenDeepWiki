@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { fetchRepoDoc } from "@/lib/repository-api";
+import { notFound, redirect } from "next/navigation";
+import { fetchRepoDoc, fetchRepoTree } from "@/lib/repository-api";
 import { extractHeadings } from "@/lib/markdown";
 import { MarkdownRenderer } from "@/components/repo/markdown-renderer";
 import { SourceFiles } from "@/components/repo/source-files";
-import { decodeRouteSegment } from "@/lib/repo-route";
+import { buildRepoDocPath, decodeRouteSegment } from "@/lib/repo-route";
+import type { RepoTreeNode } from "@/types/repository";
 import {
   createMarkdownDescription,
   createTechArticleJsonLd,
@@ -40,6 +41,60 @@ async function getDocData(owner: string, repo: string, slug: string, branch?: st
   } catch {
     return null;
   }
+}
+
+function findNodeBySlug(nodes: RepoTreeNode[], slug: string): RepoTreeNode | null {
+  for (const node of nodes) {
+    if (node.slug === slug) {
+      return node;
+    }
+
+    const match = findNodeBySlug(node.children ?? [], slug);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+function findFirstLeafSlug(node: RepoTreeNode): string | null {
+  const children = node.children ?? [];
+  if (children.length === 0) {
+    return node.slug;
+  }
+
+  for (const child of children) {
+    const slug = findFirstLeafSlug(child);
+    if (slug) {
+      return slug;
+    }
+  }
+
+  return null;
+}
+
+async function getDirectoryRedirectSlug(owner: string, repo: string, slug: string, branch?: string, lang?: string) {
+  try {
+    const tree = await fetchRepoTree(owner, repo, branch, lang);
+    const node = findNodeBySlug(tree.nodes, slug);
+    if (!node || (node.children ?? []).length === 0) {
+      return null;
+    }
+
+    const leafSlug = findFirstLeafSlug(node);
+    return leafSlug && leafSlug !== slug ? leafSlug : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildQueryString(branch?: string, lang?: string) {
+  const params = new URLSearchParams();
+  if (branch) params.set("branch", branch);
+  if (lang) params.set("lang", lang);
+  const query = params.toString();
+  return query ? `?${query}` : "";
 }
 
 export async function generateMetadata({ params, searchParams }: RepoDocPageProps): Promise<Metadata> {
@@ -90,6 +145,11 @@ export default async function RepoDocPage({ params, searchParams }: RepoDocPageP
   
   // 文档不存在，但保留侧边栏（由layout提供）
   if (!data) {
+    const redirectSlug = await getDirectoryRedirectSlug(decodedOwner, decodedRepo, slug, branch, lang);
+    if (redirectSlug) {
+      redirect(`${buildRepoDocPath(decodedOwner, decodedRepo, redirectSlug)}${buildQueryString(branch, lang)}`);
+    }
+
     notFound();
   }
 
