@@ -83,8 +83,10 @@ public class RepositoryService(
             forkCount);
     }
 
-    [HttpPost("/submit-archive")]
-    public async Task<Repository> SubmitArchiveAsync([FromForm] ArchiveRepositorySubmitRequest request)
+    // Mapped manually in RepositoryUploadEndpoints: the MiniApi source generator drops the
+    // [FromForm] binding and treats the request as a JSON body, which makes multipart uploads
+    // fail with 415. Keeping this method attribute-free excludes it from the generated mapping.
+    public async Task<Repository> SubmitArchiveAsync(ArchiveRepositorySubmitRequest request)
     {
         var currentUserId = GetCurrentUserId();
 
