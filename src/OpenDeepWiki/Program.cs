@@ -383,6 +383,7 @@ try
     }
 
     app.MapMiniApis();
+    app.MapRepositoryUploadEndpoints();
     app.MapAuthEndpoints();
     app.MapApiKeyEndpoints();
     app.MapOAuthEndpoints();
