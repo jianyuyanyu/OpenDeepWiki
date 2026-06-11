@@ -544,11 +544,23 @@ Execute the workflow now. Read entry point files to understand the architecture,
             $"Document generation complete, success: {successCount}, generated: {generatedCount}, skipped: {skippedCount}, failures: {failCount}, time: {stopwatch.ElapsedMilliseconds}ms",
             cancellationToken);
 
-        if (failCount > 0)
+        if (ShouldFailDocumentGeneration(successCount, failCount))
         {
             throw new InvalidOperationException(
                 $"Document generation completed with {failCount} failures out of {catalogItems.Count} documents.");
         }
+
+        if (failCount > 0)
+        {
+            _logger.LogWarning(
+                "Document generation completed with partial failures. Repository: {Org}/{Repo}, Language: {Language}, Success: {SuccessCount}, Failed: {FailCount}",
+                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, successCount, failCount);
+        }
+    }
+
+    internal static bool ShouldFailDocumentGeneration(int successCount, int failCount)
+    {
+        return failCount > 0 && successCount == 0;
     }
 
     /// <inheritdoc />

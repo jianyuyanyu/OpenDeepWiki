@@ -7,6 +7,7 @@
     ports:
       - "8080:8080"
     restart: unless-stopped
+    user: "0:0"
     environment:
       # ASP.NET Core 环境
       - ASPNETCORE_ENVIRONMENT=Production
