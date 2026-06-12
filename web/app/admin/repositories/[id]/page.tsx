@@ -54,6 +54,7 @@ import {
   triggerRepositoryIncrementalUpdate,
   updateRepositoryDocumentContent,
 } from "@/lib/admin-api";
+import { getRepositorySourceTypeLabelKey, isGitRepositorySource } from "@/lib/repository-source";
 import { fetchProcessingLogs, fetchRepoDoc, fetchRepoTree } from "@/lib/repository-api";
 import type { ProcessingLogResponse, RepoDocResponse, RepoTreeNode } from "@/types/repository";
 
@@ -131,17 +132,6 @@ function normalizeTaskStatus(status: string) {
   if (value.includes("failed") || value.includes("失败")) return "failed";
   if (value.includes("cancel") || value.includes("取消")) return "cancelled";
   return "other";
-}
-
-function getSourceTypeLabelKey(sourceType: AdminRepository["sourceType"]) {
-  switch (sourceType) {
-    case "Archive":
-      return "sourceTypeArchive";
-    case "LocalDirectory":
-      return "sourceTypeLocal";
-    default:
-      return "sourceTypeGit";
-  }
 }
 
 export default function AdminRepositoryManagementPage() {
@@ -293,7 +283,9 @@ export default function AdminRepositoryManagementPage() {
     );
   }, [selectedLanguageInfo]);
 
-  const supportsGitOperations = repository?.sourceType === "Git";
+  const supportsGitOperations = repository
+    ? isGitRepositorySource(repository.sourceType, repository.sourceTypeName)
+    : false;
 
   const processingFlow = useMemo(() => {
     const steps = [
@@ -964,7 +956,7 @@ export default function AdminRepositoryManagementPage() {
           <h1 className="text-2xl font-bold">{repository.orgName}/{repository.repoName}</h1>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-xs">
-              {t(`admin.repositories.${getSourceTypeLabelKey(repository.sourceType)}`)}
+              {t(`admin.repositories.${getRepositorySourceTypeLabelKey(repository.sourceType, repository.sourceTypeName)}`)}
             </span>
             <span className="break-all">{repository.sourceLocation || repository.gitUrl}</span>
           </div>

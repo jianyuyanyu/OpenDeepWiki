@@ -1,3 +1,4 @@
+import type { RepositorySourceTypeName, RepositorySourceTypeValue } from "@/lib/repository-source";
 import { getApiProxyUrl } from "./env";
 import { getToken } from "./auth-api";
 
@@ -224,8 +225,8 @@ export async function getMcpUsageLogs(filter: McpUsageLogFilter): Promise<PagedR
 export interface AdminRepository {
   id: string;
   gitUrl: string;
-  sourceType: "Git" | "Archive" | "LocalDirectory";
-  sourceTypeName: "Git" | "Archive" | "LocalDirectory";
+  sourceType: RepositorySourceTypeValue;
+  sourceTypeName: RepositorySourceTypeName;
   sourceLocation: string;
   repoName: string;
   orgName: string;

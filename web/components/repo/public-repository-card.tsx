@@ -8,9 +8,9 @@ import { useTranslations } from "@/hooks/use-translations";
 import { useAuth } from "@/contexts/auth-context";
 import type {
   RepositoryItemResponse,
-  RepositorySourceType,
   RepositoryStatus,
 } from "@/types/repository";
+import { getRepositorySourceTypeLabelKey } from "@/lib/repository-source";
 import {
   Clock,
   Loader2,
@@ -75,18 +75,6 @@ function StatusBadge({ status }: { status: RepositoryStatus }) {
     </span>
   );
 }
-
-function getSourceTypeLabelKey(sourceType: RepositorySourceType) {
-  switch (sourceType) {
-    case "Archive":
-      return "sourceTypeArchive";
-    case "LocalDirectory":
-      return "sourceTypeLocal";
-    default:
-      return "sourceTypeGit";
-  }
-}
-
 
 interface PublicRepositoryCardProps {
   repository: RepositoryItemResponse;
@@ -185,7 +173,7 @@ export function PublicRepositoryCard({ repository }: PublicRepositoryCardProps) 
             </div>
             <div className="flex items-center justify-between gap-2">
               <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">
-                {t(`home.repository.${getSourceTypeLabelKey(repository.sourceType)}`)}
+                {t(`home.repository.${getRepositorySourceTypeLabelKey(repository.sourceType, repository.sourceTypeName)}`)}
               </span>
               <p className="truncate text-xs text-muted-foreground">
                 {repository.sourceLocation || repository.gitUrl}

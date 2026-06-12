@@ -48,6 +48,7 @@ import {
   AdminRepository,
   RepositoryListResponse,
 } from "@/lib/admin-api";
+import { getRepositorySourceTypeLabelKey, isGitRepositorySource } from "@/lib/repository-source";
 import {
   Loader2,
   Search,
@@ -81,17 +82,6 @@ const statusBarColors: Record<number, string> = {
   2: "bg-emerald-500/90",
   3: "bg-red-500/90",
 };
-
-function getSourceTypeLabelKey(sourceType: AdminRepository["sourceType"]) {
-  switch (sourceType) {
-    case "Archive":
-      return "sourceTypeArchive";
-    case "LocalDirectory":
-      return "sourceTypeLocal";
-    default:
-      return "sourceTypeGit";
-  }
-}
 
 export default function AdminRepositoriesPage() {
   const router = useRouter();
@@ -269,7 +259,7 @@ export default function AdminRepositoriesPage() {
   const selectedGitRepoIds = useMemo(() => {
     const items = data?.items ?? [];
     return items
-      .filter((item) => selectedIds.has(item.id) && item.sourceType === "Git")
+      .filter((item) => selectedIds.has(item.id) && isGitRepositorySource(item.sourceType, item.sourceTypeName))
       .map((item) => item.id);
   }, [data, selectedIds]);
   const overview = useMemo(() => {
@@ -513,7 +503,7 @@ export default function AdminRepositoriesPage() {
                             </p>
                             <p className="mt-1">
                               <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">
-                                {t(`admin.repositories.${getSourceTypeLabelKey(repo.sourceType)}`)}
+                                {t(`admin.repositories.${getRepositorySourceTypeLabelKey(repo.sourceType, repo.sourceTypeName)}`)}
                               </span>
                             </p>
                           </div>
@@ -592,8 +582,8 @@ export default function AdminRepositoriesPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleSyncStats(repo.id)}
-                              disabled={syncing === repo.id || repo.sourceType !== "Git"}
-                              title={repo.sourceType === "Git" ? t('admin.repositories.syncStats') : t('admin.repositories.syncStatsNotSupported')}
+                              disabled={syncing === repo.id || !isGitRepositorySource(repo.sourceType, repo.sourceTypeName)}
+                              title={isGitRepositorySource(repo.sourceType, repo.sourceTypeName) ? t('admin.repositories.syncStats') : t('admin.repositories.syncStatsNotSupported')}
                               className="transition-all duration-200 hover:-translate-y-0.5"
                             >
                               {syncing === repo.id ? (
@@ -684,7 +674,7 @@ export default function AdminRepositoriesPage() {
               </div>
               <div>
                 <label className="text-sm font-medium">{t('admin.repositories.sourceType')}</label>
-                <p>{t(`admin.repositories.${getSourceTypeLabelKey(selectedRepo.sourceType)}`)}</p>
+                <p>{t(`admin.repositories.${getRepositorySourceTypeLabelKey(selectedRepo.sourceType, selectedRepo.sourceTypeName)}`)}</p>
               </div>
               <div>
                 <label className="text-sm font-medium">{t('admin.repositories.sourceLocation')}</label>

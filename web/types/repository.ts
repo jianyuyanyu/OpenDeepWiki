@@ -1,3 +1,5 @@
+import type { RepositorySourceTypeName, RepositorySourceTypeValue } from "@/lib/repository-source";
+
 export interface RepoTreeNode {
   title: string;
   slug: string;
@@ -43,7 +45,7 @@ export interface GitBranchItem {
   isDefault: boolean;
 }
 
-export type RepositorySourceType = "Git" | "Archive" | "LocalDirectory";
+export type RepositorySourceType = RepositorySourceTypeName;
 
 export interface RepoDocResponse {
   exists: boolean;
@@ -98,7 +100,7 @@ export interface RepositoryItemResponse {
   orgName: string;
   repoName: string;
   gitUrl: string;
-  sourceType: RepositorySourceType;
+  sourceType: RepositorySourceTypeValue;
   sourceTypeName: RepositorySourceType;
   sourceLocation: string;
   status: number;
