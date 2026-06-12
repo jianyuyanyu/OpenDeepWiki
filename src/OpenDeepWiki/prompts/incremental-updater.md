@@ -230,7 +230,7 @@ GitTool.Grep("\\[UserService\\]", "*.md")
 **Best Practices:**
 - ✅ Prefer EditAsync over WriteAsync for targeted changes
 - ✅ Use for updating individual items affected by code changes
-- ❌ Avoid using for bulk updates; use WriteAsync instead
+- ❌ Never use WriteAsync during incremental updates; it replaces the entire catalog
 
 ---
 
@@ -505,7 +505,7 @@ When updating catalog structure:
 | JSON format error | Check and correct format, resubmit |
 | Required field missing | Add missing fields (children defaults to []) |
 | Path format error | Convert to URL-friendly format (lowercase, hyphens) |
-| Node not found | Use WriteAsync to create new structure if needed |
+| Node not found | Re-read the catalog (ReadAsync) and retry with an existing path; never rewrite the whole catalog |
 
 ### 7.3 Document Operation Errors
 

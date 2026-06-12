@@ -70,6 +70,16 @@ public class CatalogStorage
             .Where(c => c.BranchLanguageId == _branchLanguageId && !c.IsDeleted)
             .ToListAsync(cancellationToken);
 
+        // Refuse a destructive replacement: a populated catalog must not shrink drastically.
+        // A partial-view agent run must use EditCatalog instead of rewriting everything.
+        static int CountItems(List<CatalogItem> items) => items.Sum(i => 1 + CountItems(i.Children));
+        var newCount = CountItems(root.Items);
+        if (existingCatalogs.Count >= 10 && newCount < existingCatalogs.Count / 2)
+        {
+            throw new InvalidOperationException(
+                $"Refusing to replace catalog: new structure has {newCount} items but {existingCatalogs.Count} exist. Use EditCatalog for partial updates.");
+        }
+
         foreach (var catalog in existingCatalogs)
         {
             catalog.MarkAsDeleted();
