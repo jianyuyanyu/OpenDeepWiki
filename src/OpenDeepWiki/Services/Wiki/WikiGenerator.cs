@@ -546,8 +546,17 @@ Execute the workflow now. Read entry point files to understand the architecture,
 
         if (ShouldFailDocumentGeneration(successCount, failCount))
         {
-            throw new InvalidOperationException(
-                $"Document generation completed with {failCount} failures out of {catalogItems.Count} documents.");
+            if (_options.ThrowOnPartialFailure)
+            {
+                throw new InvalidOperationException(
+                    $"Document generation completed with {failCount} failures out of {catalogItems.Count} documents.");
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Document generation completed with {FailCount} failures out of {TotalCount} documents. Continuing with partial results.",
+                    failCount, catalogItems.Count);
+            }
         }
 
         if (failCount > 0)
