@@ -124,7 +124,14 @@ export function RepositoryProcessingStatus({
       setTotalDocuments(logsResponse.totalDocuments);
       setCompletedDocuments(logsResponse.completedDocuments);
       if (logsResponse.startedAt) {
-        setStartedAt(new Date(logsResponse.startedAt));
+        // 确保正确解析 UTC 时间，后端存储的是 UTC 时间
+        const startedAtStr = logsResponse.startedAt;
+        if (startedAtStr.endsWith('Z') || startedAtStr.includes('+00:00')) {
+          setStartedAt(new Date(startedAtStr));
+        } else {
+          // 如果没有时区标记，假设是 UTC 时间
+          setStartedAt(new Date(startedAtStr + 'Z'));
+        }
       }
       setCurrentStep(logsResponse.currentStepName);
 
@@ -152,7 +159,14 @@ export function RepositoryProcessingStatus({
         setTotalDocuments(logsResponse.totalDocuments);
         setCompletedDocuments(logsResponse.completedDocuments);
         if (logsResponse.startedAt) {
-          setStartedAt(new Date(logsResponse.startedAt));
+          // 确保正确解析 UTC 时间，后端存储的是 UTC 时间
+          const startedAtStr = logsResponse.startedAt;
+          if (startedAtStr.endsWith('Z') || startedAtStr.includes('+00:00')) {
+            setStartedAt(new Date(startedAtStr));
+          } else {
+            // 如果没有时区标记，假设是 UTC 时间
+            setStartedAt(new Date(startedAtStr + 'Z'));
+          }
         }
       } catch (error) {
         console.error("Failed to load initial logs:", error);
@@ -184,7 +198,11 @@ export function RepositoryProcessingStatus({
     if ((status === "Processing" || status === "Pending") && startedAt) {
       const updateElapsed = () => {
         const now = new Date();
-        const elapsed = Math.floor((now.getTime() - startedAt.getTime()) / 1000);
+        const nowUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 
+                                now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds());
+        const startedUtc = Date.UTC(startedAt.getUTCFullYear(), startedAt.getUTCMonth(), startedAt.getDate(),
+                                    startedAt.getUTCHours(), startedAt.getUTCMinutes(), startedAt.getUTCSeconds());
+        const elapsed = Math.floor((nowUtc - startedUtc) / 1000);
         setElapsedTime(elapsed);
       };
 
