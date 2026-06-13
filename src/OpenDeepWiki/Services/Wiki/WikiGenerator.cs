@@ -664,8 +664,10 @@ Execute the workflow now. Read entry point files to understand the architecture,
             var catalogTool = new CatalogTool(catalogStorage);
             var docTool = new DocTool(_context, branchLanguage.Id, string.Empty, gitTool);
 
+            // Incremental updates must never replace the whole catalog: exclude WriteCatalog
+            // so the agent can only modify existing structure via EditCatalog.
             var tools = BuildTools(gitTool.GetTools()
-                .Concat(catalogTool.GetTools())
+                .Concat(catalogTool.GetTools().Where(t => t.Name != "WriteCatalog"))
                 .Concat(docTool.GetTools()),
                 toolSnapshot);
 
@@ -692,7 +694,7 @@ Execute the workflow now. Read entry point files to understand the architecture,
    - Use ReadDoc(path) to read documents that need updating
    - For minor changes, use EditDoc(oldContent, newContent, path) for precise replacements
    - For major changes, use WriteDoc(content, path) to rewrite entire document
-   - If new catalog items needed, use EditCatalog or WriteCatalog
+   - If new catalog items needed, use EditCatalog to add or update individual nodes; never rewrite the whole catalog
 
 4. **Quality Requirements**
    - Ensure code examples match current implementation
