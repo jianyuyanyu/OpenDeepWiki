@@ -144,4 +144,10 @@ public class WikiGeneratorOptions
     {
         return string.IsNullOrWhiteSpace(TranslationModel) ? ContentModel : TranslationModel;
     }
+    /// <summary>
+    /// Whether to throw an exception when some documents fail to generate.
+    /// When set to false, the generator will log warnings but continue processing.
+    /// Default: false (continue on partial failure)
+    /// </summary>
+    public bool ThrowOnPartialFailure { get; set; } = false;
 }
