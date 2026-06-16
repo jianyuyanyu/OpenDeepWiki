@@ -416,6 +416,8 @@ public class RepositoryDocsService(
             Slug = normalizedSlug,
             Content = docFile.Content,
             SourceFiles = sourceFiles,
+            GitUrl = repository.GitUrl,
+            Branch = branchEntity.BranchName,
             Exists = true
         };
     }

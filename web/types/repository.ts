@@ -52,6 +52,8 @@ export interface RepoDocResponse {
   slug: string;
   content: string;
   sourceFiles: string[];
+  gitUrl: string | null;
+  branch: string | null;
 }
 
 export interface RepoHeading {

@@ -176,9 +176,10 @@ export default async function RepoDocPage({ params, searchParams }: RepoDocPageP
           dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
         />
         <MarkdownRenderer content={doc.content} language={locale} />
-        <SourceFiles 
-          files={doc.sourceFiles || []} 
-          branch={branch}
+        <SourceFiles
+          files={doc.sourceFiles || []}
+          gitUrl={doc.gitUrl ?? undefined}
+          branch={doc.branch ?? branch}
         />
       </article>
       {headings.length > 0 && (
