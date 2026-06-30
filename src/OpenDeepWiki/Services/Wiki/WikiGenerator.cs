@@ -313,13 +313,21 @@ Execute the workflow now. Read entry point files to understand the architecture,
                     modelId: catalogAi.ModelId),
                 cancellationToken);
 
+            var catalogItemCount = await _context.DocCatalogs
+                .CountAsync(c => c.BranchLanguageId == branchLanguage.Id && !c.IsDeleted, cancellationToken);
+            if (catalogItemCount == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Catalog generation completed without producing any catalog items for {workspace.Organization}/{workspace.RepositoryName} ({branchLanguage.LanguageCode}).");
+            }
+
             stopwatch.Stop();
             _logger.LogInformation(
-                "Catalog generation completed successfully. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms",
-                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, stopwatch.ElapsedMilliseconds);
+                "Catalog generation completed successfully. Repository: {Org}/{Repo}, Language: {Language}, CatalogItems: {CatalogItemCount}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, catalogItemCount, stopwatch.ElapsedMilliseconds);
 
             await LogProcessingAsync(ProcessingStep.Catalog, 
-                $"Catalog generation complete, time: {stopwatch.ElapsedMilliseconds}ms", 
+                $"Catalog generation complete, items: {catalogItemCount}, time: {stopwatch.ElapsedMilliseconds}ms",
                 cancellationToken);
         }
         catch (Exception ex)
@@ -352,6 +360,12 @@ Execute the workflow now. Read entry point files to understand the architecture,
         var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
         var catalogJson = await catalogStorage.GetCatalogJsonAsync(cancellationToken);
         var catalogItems = GetAllCatalogPaths(catalogJson);
+        if (catalogItems.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Document generation cannot start because no catalog items exist for {workspace.Organization}/{workspace.RepositoryName} ({branchLanguage.LanguageCode}).");
+        }
+
         var duplicatePathCount = catalogItems
             .GroupBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
             .Where(group => group.Count() > 1)

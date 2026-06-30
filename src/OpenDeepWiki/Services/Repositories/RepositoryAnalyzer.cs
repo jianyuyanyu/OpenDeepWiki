@@ -352,20 +352,78 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
         CopyDirectory(workspace.SourceLocation, workspace.WorkingDirectory);
     }
 
-    private static void CopyDirectory(string sourceDirectory, string destinationDirectory)
+    private void CopyDirectory(string sourceDirectory, string destinationDirectory)
     {
         var sourceInfo = new DirectoryInfo(sourceDirectory);
         Directory.CreateDirectory(destinationDirectory);
 
         foreach (var directory in sourceInfo.GetDirectories())
         {
+            if (IsSymbolicLink(directory))
+            {
+                _logger.LogWarning(
+                    "Skipping symbolic link directory while copying local repository. Source: {SourcePath}, LinkTarget: {LinkTarget}",
+                    directory.FullName,
+                    directory.LinkTarget);
+                continue;
+            }
+
+            if (IsBrokenSymbolicLink(directory))
+            {
+                _logger.LogWarning(
+                    "Skipping broken symbolic link while copying local repository directory. Source: {SourcePath}, LinkTarget: {LinkTarget}",
+                    directory.FullName,
+                    directory.LinkTarget);
+                continue;
+            }
+
             CopyDirectory(directory.FullName, Path.Combine(destinationDirectory, directory.Name));
         }
 
         foreach (var file in sourceInfo.GetFiles())
         {
-            file.CopyTo(Path.Combine(destinationDirectory, file.Name), overwrite: true);
+            if (IsBrokenSymbolicLink(file))
+            {
+                _logger.LogWarning(
+                    "Skipping broken symbolic link while copying local repository file. Source: {SourcePath}, LinkTarget: {LinkTarget}",
+                    file.FullName,
+                    file.LinkTarget);
+                continue;
+            }
+
+            TryCopyFile(file, Path.Combine(destinationDirectory, file.Name));
         }
+    }
+
+    private void TryCopyFile(FileInfo file, string destinationPath)
+    {
+        try
+        {
+            file.CopyTo(destinationPath, overwrite: true);
+        }
+        catch (FileNotFoundException) when (IsSymbolicLink(file) || !File.Exists(file.FullName))
+        {
+            _logger.LogWarning(
+                "Skipping unresolved symbolic link while copying local repository file. Source: {SourcePath}, LinkTarget: {LinkTarget}",
+                file.FullName,
+                file.LinkTarget);
+        }
+    }
+
+    private static bool IsBrokenSymbolicLink(FileSystemInfo fileSystemInfo)
+    {
+        if (string.IsNullOrEmpty(fileSystemInfo.LinkTarget))
+        {
+            return false;
+        }
+
+        return !File.Exists(fileSystemInfo.FullName) && !Directory.Exists(fileSystemInfo.FullName);
+    }
+
+    private static bool IsSymbolicLink(FileSystemInfo fileSystemInfo)
+    {
+        return !string.IsNullOrEmpty(fileSystemInfo.LinkTarget) ||
+               fileSystemInfo.Attributes.HasFlag(FileAttributes.ReparsePoint);
     }
 
     private static string ComputeDirectorySnapshotId(string directoryPath)

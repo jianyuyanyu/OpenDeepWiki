@@ -26,6 +26,8 @@ import {
   ExternalLink,
   RefreshCw,
   GitBranch,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildRepoBasePath } from "@/lib/repo-route";
@@ -36,6 +38,8 @@ interface RepositoryListProps {
   ownerId?: string;
   refreshTrigger?: number;
 }
+
+const PAGE_SIZE = 20;
 
 const STATUS_CONFIG: Record<RepositoryStatus, {
   icon: typeof Clock;
@@ -196,20 +200,29 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryingRepoId, setRetryingRepoId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const loadRepositories = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetchRepositoryList({ ownerId });
+      const response = await fetchRepositoryList({
+        ownerId,
+        page,
+        pageSize: PAGE_SIZE,
+      });
       setRepositories(response.items);
+      setTotal(response.total);
     } catch (err) {
       setError("Failed to load repositories");
       console.error("Failed to fetch repositories:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [ownerId]);
+  }, [ownerId, page]);
 
   // 处理可见性变化，更新本地状态
   const handleVisibilityChange = useCallback((repoId: string, newIsPublic: boolean) => {
@@ -246,6 +259,10 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
   useEffect(() => {
     loadRepositories();
   }, [loadRepositories, refreshTrigger]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [ownerId]);
 
   // Auto-refresh for pending/processing repositories
   useEffect(() => {
@@ -314,7 +331,7 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
         </div>
         {repositories.length > 0 && (
           <CardDescription>
-            {repositories.length} {repositories.length === 1 ? "repository" : "repositories"}
+            {total} {total === 1 ? "repository" : "repositories"}
           </CardDescription>
         )}
       </CardHeader>
@@ -337,6 +354,33 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
                 isRetrying={retryingRepoId === repo.id}
               />
             ))}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-4 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page === 1 || isLoading}
+                >
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  {t("home.bookmarks.previous")}
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {t("home.bookmarks.pageInfo")
+                    .replace("{current}", page.toString())
+                    .replace("{total}", totalPages.toString())}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={page === totalPages || isLoading}
+                >
+                  {t("home.bookmarks.next")}
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
