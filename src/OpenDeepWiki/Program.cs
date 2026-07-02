@@ -339,6 +339,7 @@ try
                     return Task.CompletedTask;
                 };
             })
+            .WithTools<McpGlobalTools>()
             .WithTools<McpRepositoryTools>();
     }
 

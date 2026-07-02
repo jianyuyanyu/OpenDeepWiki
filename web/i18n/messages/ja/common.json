@@ -187,6 +187,7 @@
     "apiKeyRequired": "API Key 必須",
     "apiKeyHint": "接続時は Authorization ヘッダーに自分の API Key を設定してください。",
     "getApiKey": "API Key を取得",
+    "allToolsUnrestricted": "すべてのツール（制限なし）",
     "claudeHint": "上記設定を Claude Desktop の設定ファイルに追加し、再起動してください。",
     "cursorHint": "上記設定を Cursor MCP 設定ファイル (.cursor/mcp.json) に追加してください。",
     "generalGuide": "API リファレンス",

@@ -92,23 +92,19 @@ export default function McpPage() {
   const t = useTranslations();
   const [providers, setProviders] = useState<McpProviderPublic[]>([]);
   const [loading, setLoading] = useState(true);
-  const [origin, setOrigin] = useState("");
 
-  function buildRepositoryScopedServerUrl(serverUrl: string) {
-    const template = (serverUrl || "/api/mcp/{owner}/{repo}")
-      .replace("{owner}", "<owner>")
-      .replace("{repo}", "<repo>");
+  function buildServerUrl(serverUrl: string) {
+    const endpoint = serverUrl || "/api/mcp";
+    const currentOrigin = typeof window === "undefined" ? "" : window.location.origin;
 
-    if (!origin || /^https?:\/\//.test(template)) {
-      return template;
+    if (!currentOrigin || /^https?:\/\//.test(endpoint)) {
+      return endpoint;
     }
 
-    return `${origin}${template.startsWith("/") ? "" : "/"}${template}`;
+    return `${currentOrigin}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
   }
 
   useEffect(() => {
-    setOrigin(window.location.origin);
-
     api
       .get<{ success: boolean; data: McpProviderPublic[] }>("/api/mcp-providers", {
         skipAuth: true,
@@ -190,7 +186,7 @@ export default function McpPage() {
           ) : (
             <div className="space-y-4">
               {providers.map((provider) => {
-                const repositoryScopedServerUrl = buildRepositoryScopedServerUrl(provider.serverUrl);
+                const serverUrl = buildServerUrl(provider.serverUrl);
 
                 return (
                 <Card key={provider.id}>
@@ -233,18 +229,16 @@ export default function McpPage() {
                         <TabsTrigger value="config">{t("common.mcp.tabConfig")}</TabsTrigger>
                         <TabsTrigger value="claude">{t("common.mcp.tabClaude")}</TabsTrigger>
                         <TabsTrigger value="cursor">{t("common.mcp.tabCursor")}</TabsTrigger>
-                        {provider.allowedTools && (
-                          <TabsTrigger value="tools">{t("common.mcp.tabTools")}</TabsTrigger>
-                        )}
+                        <TabsTrigger value="tools">{t("common.mcp.tabTools")}</TabsTrigger>
                       </TabsList>
 
                       <TabsContent value="config" className="space-y-3">
                         <div className="flex items-center gap-2 text-sm">
                           <span className="text-muted-foreground w-28 shrink-0">{t("common.mcp.serverUrl")}:</span>
                           <code className="font-mono text-xs bg-muted px-2 py-1 rounded flex-1 break-all">
-                            {repositoryScopedServerUrl}
+                            {serverUrl}
                           </code>
-                          <CopyButton text={repositoryScopedServerUrl} />
+                          <CopyButton text={serverUrl} />
                         </div>
                         <div className="flex items-center gap-2 text-sm">
                           <span className="text-muted-foreground w-28 shrink-0">{t("common.mcp.transport")}:</span>
@@ -285,7 +279,7 @@ export default function McpPage() {
                                   args: [
                                     "-y",
                                     "@modelcontextprotocol/client-http",
-                                    repositoryScopedServerUrl,
+                                    serverUrl,
                                   ],
                                   ...(provider.requiresApiKey
                                     ? {
@@ -313,7 +307,7 @@ export default function McpPage() {
                             {
                               mcpServers: {
                                 [provider.name.toLowerCase().replace(/\s+/g, "-")]: {
-                                  url: repositoryScopedServerUrl,
+                                  url: serverUrl,
                                   transport: provider.transportType,
                                   ...(provider.requiresApiKey
                                     ? {
@@ -334,10 +328,10 @@ export default function McpPage() {
                         </p>
                       </TabsContent>
 
-                      {provider.allowedTools && (
-                        <TabsContent value="tools">
-                          <div className="flex flex-wrap gap-2">
-                            {(() => {
+                      <TabsContent value="tools">
+                        <div className="flex flex-wrap gap-2">
+                          {provider.allowedTools ? (
+                            (() => {
                               try {
                                 const tools: string[] = JSON.parse(provider.allowedTools);
                                 return tools.map((tool) => (
@@ -350,10 +344,14 @@ export default function McpPage() {
                                   <code className="text-xs text-muted-foreground">{provider.allowedTools}</code>
                                 );
                               }
-                            })()}
-                          </div>
-                        </TabsContent>
-                      )}
+                            })()
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              {t("common.mcp.allToolsUnrestricted")}
+                            </Badge>
+                          )}
+                        </div>
+                      </TabsContent>
                     </Tabs>
                   </CardContent>
                 </Card>
@@ -381,7 +379,7 @@ Host: <your-server>
     {
       "id": "...",
       "name": "My MCP Provider",
-      "serverUrl": "/api/mcp/{owner}/{repo}",
+      "serverUrl": "/api/mcp",
       "transportType": "streamable_http",
       "requiresApiKey": true
     }

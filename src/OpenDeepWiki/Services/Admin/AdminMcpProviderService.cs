@@ -10,7 +10,7 @@ namespace OpenDeepWiki.Services.Admin;
 /// </summary>
 public class AdminMcpProviderService : IAdminMcpProviderService
 {
-    private const string RepositoryScopedMcpPathTemplate = "/api/mcp/{owner}/{repo}";
+    private const string GlobalMcpPath = "/api/mcp";
 
     private readonly IContext _context;
     private readonly ILogger<AdminMcpProviderService> _logger;
@@ -46,7 +46,7 @@ public class AdminMcpProviderService : IAdminMcpProviderService
             Id = p.Id,
             Name = p.Name,
             Description = p.Description,
-            ServerUrl = RepositoryScopedMcpPathTemplate,
+            ServerUrl = GlobalMcpPath,
             TransportType = p.TransportType,
             RequiresApiKey = p.RequiresApiKey,
             ApiKeyObtainUrl = p.ApiKeyObtainUrl,
@@ -66,7 +66,7 @@ public class AdminMcpProviderService : IAdminMcpProviderService
             Id = Guid.NewGuid().ToString(),
             Name = request.Name,
             Description = request.Description,
-            ServerUrl = RepositoryScopedMcpPathTemplate,
+            ServerUrl = GlobalMcpPath,
             TransportType = request.TransportType,
             RequiresApiKey = request.RequiresApiKey,
             ApiKeyObtainUrl = request.ApiKeyObtainUrl,
@@ -96,7 +96,7 @@ public class AdminMcpProviderService : IAdminMcpProviderService
             Id = provider.Id,
             Name = provider.Name,
             Description = provider.Description,
-            ServerUrl = RepositoryScopedMcpPathTemplate,
+            ServerUrl = GlobalMcpPath,
             TransportType = provider.TransportType,
             RequiresApiKey = provider.RequiresApiKey,
             ApiKeyObtainUrl = provider.ApiKeyObtainUrl,
@@ -118,7 +118,7 @@ public class AdminMcpProviderService : IAdminMcpProviderService
 
         provider.Name = request.Name;
         provider.Description = request.Description;
-        provider.ServerUrl = RepositoryScopedMcpPathTemplate;
+        provider.ServerUrl = GlobalMcpPath;
         provider.TransportType = request.TransportType;
         provider.RequiresApiKey = request.RequiresApiKey;
         provider.ApiKeyObtainUrl = request.ApiKeyObtainUrl;

@@ -105,7 +105,7 @@
     "edit": "编辑提供商",
     "dialogDescription": "配置 MCP 提供商的访问方式、限流与绑定模型。",
     "fieldName": "名称",
-    "fieldServerUrl": "服务地址模板",
+    "fieldServerUrl": "服务地址",
     "fieldDescription": "描述",
     "fieldTransportType": "传输方式",
     "fieldModel": "绑定模型",
@@ -124,7 +124,7 @@
     "transportSse": "SSE",
     "deleteTitle": "确认删除 MCP",
     "deleteDescription": "删除后该 MCP 提供商将不可用，操作无法撤销。",
-    "serverUrlTemplateHint": "固定路径模板；后端会从仓库中解析 owner/repo。"
+    "serverUrlTemplateHint": "固定全局 MCP 地址；后端会根据问题自动路由仓库。"
   },
   "repositories": {
     "title": "仓库管理",

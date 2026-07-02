@@ -51,6 +51,9 @@ public static class DbInitializer
             }
         }
 
+        // 初始化默认 MCP 提供商
+        await InitializeMcpProvidersAsync(context);
+
         // 初始化系统设置默认值（仅在首次运行时从环境变量创建）
         await BackfillOpenAIResponsesModelProviderTypesAsync(context);
 
@@ -241,6 +244,52 @@ public static class DbInitializer
         }
 
         await context.SaveChangesAsync();
+    }
+
+    private static async Task InitializeMcpProvidersAsync(IContext context)
+    {
+        const string providerName = "OpenDeepWiki Global MCP";
+        const string globalMcpPath = "/api/mcp";
+
+        var provider = await context.McpProviders
+            .FirstOrDefaultAsync(p => p.Name == providerName);
+
+        if (provider is { IsDeleted: true })
+        {
+            return;
+        }
+
+        if (provider is null)
+        {
+            context.McpProviders.Add(new McpProvider
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = providerName,
+                Description = "Global OpenDeepWiki MCP endpoint that routes questions across repositories.",
+                ServerUrl = globalMcpPath,
+                TransportType = "streamable_http",
+                RequiresApiKey = false,
+                IsActive = true,
+                SortOrder = 0,
+                AllowedTools = """["list_repositories","search_repositories","search_docs","read_doc"]""",
+                CreatedAt = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+            return;
+        }
+
+        var changed = false;
+        if (provider.ServerUrl != globalMcpPath)
+        {
+            provider.ServerUrl = globalMcpPath;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            provider.UpdatedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync();
+        }
     }
 
     private static async Task MigrateSqliteAsync(DbContext ctx)

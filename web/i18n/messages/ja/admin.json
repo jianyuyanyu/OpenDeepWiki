@@ -580,7 +580,7 @@
     "edit": "プロバイダーを編集",
     "dialogDescription": "この MCP プロバイダーの接続方法、制御、モデル連携を設定します。",
     "fieldName": "名前",
-    "fieldServerUrl": "サーバー URL テンプレート",
+    "fieldServerUrl": "サーバー URL",
     "fieldDescription": "説明",
     "fieldTransportType": "転送方式",
     "fieldModel": "連携モデル",
@@ -599,7 +599,7 @@
     "transportSse": "SSE",
     "deleteTitle": "MCP プロバイダーを削除",
     "deleteDescription": "削除するとこのプロバイダーは利用できなくなります。この操作は元に戻せません。",
-    "serverUrlTemplateHint": "固定パステンプレートです。バックエンドがリポジトリから owner/repo を解決します。"
+    "serverUrlTemplateHint": "固定のグローバル MCP エンドポイントです。バックエンドが質問をリポジトリへ自動的にルーティングします。"
   },
   "mcps": {
     "title": "MCP管理",

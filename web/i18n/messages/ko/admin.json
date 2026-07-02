@@ -580,7 +580,7 @@
     "edit": "제공자 편집",
     "dialogDescription": "이 MCP 제공자의 접근 방식, 제한, 모델 연결을 설정하세요.",
     "fieldName": "이름",
-    "fieldServerUrl": "서버 URL 템플릿",
+    "fieldServerUrl": "서버 URL",
     "fieldDescription": "설명",
     "fieldTransportType": "전송 방식",
     "fieldModel": "연결된 모델",
@@ -599,7 +599,7 @@
     "transportSse": "SSE",
     "deleteTitle": "MCP 제공자 삭제",
     "deleteDescription": "삭제 후 이 제공자는 사용할 수 없게 됩니다. 이 작업은 되돌릴 수 없습니다.",
-    "serverUrlTemplateHint": "고정 경로 템플릿입니다. 백엔드가 저장소에서 owner/repo를 해석합니다."
+    "serverUrlTemplateHint": "고정된 글로벌 MCP 엔드포인트입니다. 백엔드가 질문을 리포지토리로 자동 라우팅합니다."
   },
   "mcps": {
     "title": "MCP 관리",

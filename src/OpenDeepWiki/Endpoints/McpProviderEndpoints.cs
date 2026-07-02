@@ -8,7 +8,7 @@ namespace OpenDeepWiki.Endpoints;
 /// </summary>
 public static class McpProviderEndpoints
 {
-    private const string RepositoryScopedMcpPathTemplate = "/api/mcp/{owner}/{repo}";
+    private const string GlobalMcpPath = "/api/mcp";
 
     public static void MapMcpProviderEndpoints(this WebApplication app)
     {
@@ -27,7 +27,7 @@ public static class McpProviderEndpoints
                     p.Id,
                     p.Name,
                     p.Description,
-                    ServerUrl = RepositoryScopedMcpPathTemplate,
+                    ServerUrl = GlobalMcpPath,
                     p.TransportType,
                     p.RequiresApiKey,
                     p.ApiKeyObtainUrl,
