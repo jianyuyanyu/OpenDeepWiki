@@ -8,6 +8,8 @@ import { ChatMessage as ChatMessageType, ToolCall, ToolResult, ContentBlock, Quo
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 
+const PreContext = React.createContext<boolean>(false)
+
 /**
  * 消息组件属性
  */
@@ -146,6 +148,33 @@ function ToolResultDisplay({ toolResult }: { toolResult: ToolResult }) {
 }
 
 /**
+ * Markdown 代码渲染组件
+ */
+interface MarkdownCodeProps extends React.HTMLAttributes<HTMLElement> {
+  className?: string
+  children?: React.ReactNode
+}
+
+function MarkdownCode({ className, children, ...props }: MarkdownCodeProps) {
+  const isInPre = React.useContext(PreContext)
+
+  if (!isInPre) {
+    // 行内代码
+    return (
+      <code className={cn("rounded px-1.5 py-0.5 text-xs text-zinc-200 font-mono break-all !border-0", className)} style={{ backgroundColor: '#27272a' }} {...props}>
+        {children}
+      </code>
+    )
+  }
+  // 代码块内的 code
+  return (
+    <code className={cn("text-sm text-zinc-100 font-mono block !bg-transparent !p-0 !border-0", className)} style={{ backgroundColor: 'transparent', padding: 0, border: 'none' }} {...props}>
+      {children}
+    </code>
+  )
+}
+
+/**
  * 文本内容显示组件
  */
 function TextContentDisplay({ content }: { content: string }) {
@@ -156,28 +185,13 @@ function TextContentDisplay({ content }: { content: string }) {
           remarkPlugins={[remarkGfm]}
           components={{
             pre: ({ children }) => (
-              <pre className="overflow-x-auto rounded-lg p-4 text-sm my-2 max-w-full" style={{ backgroundColor: '#18181b' }}>
-                {children}
-              </pre>
-            ),
-            code: ({ className, children, ...props }) => {
-              const match = /language-(\w+)/.exec(className || '')
-              
-              if (!className && !match) {
-                // 行内代码
-                return (
-                  <code className="rounded px-1.5 py-0.5 text-xs text-zinc-200 font-mono break-all" style={{ backgroundColor: '#27272a' }} {...props}>
-                    {children}
-                  </code>
-                )
-              }
-              // 代码块内的 code
-              return (
-                <code className="text-sm text-zinc-100 font-mono block" {...props}>
+              <PreContext.Provider value={true}>
+                <pre className="overflow-x-auto rounded-lg p-4 text-sm my-2 max-w-full wiki-scrollbar" style={{ backgroundColor: '#18181b' }}>
                   {children}
-                </code>
-              )
-            },
+                </pre>
+              </PreContext.Provider>
+            ),
+            code: MarkdownCode,
           }}
         >
           {content}
@@ -317,25 +331,13 @@ export function ChatMessageItem({ message }: ChatMessageProps) {
                       remarkPlugins={[remarkGfm]}
                       components={{
                         pre: ({ children }) => (
-                          <pre className="overflow-x-auto rounded-lg p-4 text-sm my-2 max-w-full" style={{ backgroundColor: '#18181b' }}>
-                            {children}
-                          </pre>
-                        ),
-                        code: ({ className, children, ...props }) => {
-                          const match = /language-(\w+)/.exec(className || '')
-                          if (!className && !match) {
-                            return (
-                              <code className="rounded px-1.5 py-0.5 text-xs text-zinc-200 font-mono break-all" style={{ backgroundColor: '#27272a' }} {...props}>
-                                {children}
-                              </code>
-                            )
-                          }
-                          return (
-                            <code className="text-sm text-zinc-100 font-mono block" {...props}>
+                          <PreContext.Provider value={true}>
+                            <pre className="overflow-x-auto rounded-lg p-4 text-sm my-2 max-w-full wiki-scrollbar" style={{ backgroundColor: '#18181b' }}>
                               {children}
-                            </code>
-                          )
-                        },
+                            </pre>
+                          </PreContext.Provider>
+                        ),
+                        code: MarkdownCode,
                       }}
                     >
                       {message.content}
