@@ -14,8 +14,8 @@ export type { ChatMessage, ToolCall, ToolResult, QuotedText }
 
 const API_BASE_URL = getApiProxyUrl()
 
-/** 默认请求超时时间（毫秒） */
-const DEFAULT_TIMEOUT_MS = 30000
+/** 默认请求超时时间（毫秒）。0 表示流式对话不设置固定超时，只由用户取消或网络断开中止。 */
+const DEFAULT_TIMEOUT_MS = 0
 
 /** 默认重试次数 */
 const DEFAULT_MAX_RETRIES = 2
@@ -310,7 +310,7 @@ function parseSSELine(line: string): SSEEvent | null {
  * 流式对话选项
  */
 export interface StreamChatOptions {
-  /** 超时时间（毫秒），默认30秒 */
+  /** 超时时间（毫秒），默认不超时；传入正数可启用固定超时 */
   timeoutMs?: number
   /** 最大重试次数，默认2次 */
   maxRetries?: number
@@ -320,25 +320,57 @@ export interface StreamChatOptions {
   signal?: AbortSignal
 }
 
-/**
- * 创建带超时的fetch请求
- */
+function createAbortSignal(timeoutMs: number, externalSignal?: AbortSignal) {
+  const hasTimeout = timeoutMs > 0
+  if (!hasTimeout && !externalSignal) {
+    return {
+      signal: undefined,
+      cleanup: () => {},
+    }
+  }
+
+  const controller = new AbortController()
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+  const abortFromExternal = () => controller.abort()
+
+  if (externalSignal?.aborted) {
+    controller.abort()
+  } else {
+    externalSignal?.addEventListener('abort', abortFromExternal, { once: true })
+  }
+
+  if (hasTimeout) {
+    timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      externalSignal?.removeEventListener('abort', abortFromExternal)
+    },
+  }
+}
+
 async function fetchWithTimeout(
   url: string,
   options: RequestInit,
-  timeoutMs: number
+  timeoutMs: number,
+  externalSignal?: AbortSignal
 ): Promise<Response> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-  
+  const abortSignal = createAbortSignal(timeoutMs, externalSignal)
+
   try {
     const response = await fetch(url, {
       ...options,
-      signal: controller.signal,
+      signal: abortSignal.signal,
     })
     return response
   } finally {
-    clearTimeout(timeoutId)
+    abortSignal.cleanup()
   }
 }
 
@@ -408,7 +440,8 @@ export async function* streamChat(
           headers,
           body: JSON.stringify(request),
         },
-        timeoutMs
+        timeoutMs,
+        signal
       )
       
       if (!response.ok) {
@@ -523,6 +556,18 @@ export async function* streamChat(
     } catch (err) {
       // 处理超时错误
       if (err instanceof Error && err.name === 'AbortError') {
+        if (signal?.aborted) {
+          yield {
+            type: 'error',
+            data: {
+              code: 'ABORTED',
+              message: '请求已取消',
+              retryable: false,
+            },
+          }
+          return
+        }
+
         const errorInfo: ErrorInfo = {
           code: ChatErrorCodes.REQUEST_TIMEOUT,
           message: '请求超时，请重试',

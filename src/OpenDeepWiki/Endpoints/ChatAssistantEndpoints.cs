@@ -157,9 +157,14 @@ public static class ChatAssistantEndpoints
         httpContext.Response.ContentType = "text/event-stream";
         httpContext.Response.Headers.CacheControl = "no-cache";
         httpContext.Response.Headers.Connection = "keep-alive";
+        httpContext.Response.Headers["X-Accel-Buffering"] = "no";
 
         try
         {
+            await httpContext.Response.StartAsync(cancellationToken);
+            await httpContext.Response.WriteAsync(": connected\n\n", cancellationToken);
+            await httpContext.Response.Body.FlushAsync(cancellationToken);
+
             await foreach (var sseEvent in chatAssistantService.StreamChatAsync(request, cancellationToken))
             {
                 var eventData = FormatSSEEvent(sseEvent);
