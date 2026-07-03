@@ -1,9 +1,8 @@
 "use client";
 
 import { FileCode2, ExternalLink } from "lucide-react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
-import { decodeRouteSegment } from "@/lib/repo-route";
 
 interface SourceFilesProps {
   files: string[];
@@ -12,20 +11,26 @@ interface SourceFilesProps {
 }
 
 /**
- * 构建文件的 Git 平台链接
+ * Build a link to a file on the repository's Git hosting platform.
+ * Returns an empty string when the repository URL is unknown.
  */
 function buildFileUrl(gitUrl: string, branch: string, filePath: string): string {
-  // 规范化 URL
+  // Without a known repository URL we cannot build a reliable link
+  if (!gitUrl) {
+    return "";
+  }
+
+  // Normalize the URL
   let normalizedUrl = gitUrl.replace(/\.git$/, "").trim();
-  
-  // 转换 SSH 格式为 HTTPS
+
+  // Convert SSH format to HTTPS
   if (normalizedUrl.startsWith("git@")) {
     normalizedUrl = normalizedUrl.replace("git@", "https://").replace(":", "/");
   }
-  
+
   normalizedUrl = normalizedUrl.replace(/\/$/, "");
-  
-  // 根据平台构建 URL
+
+  // Build the URL according to the hosting platform
   if (normalizedUrl.includes("github.com")) {
     return `${normalizedUrl}/blob/${branch}/${filePath}`;
   } else if (normalizedUrl.includes("gitlab.com") || normalizedUrl.includes("gitlab")) {
@@ -34,23 +39,23 @@ function buildFileUrl(gitUrl: string, branch: string, filePath: string): string 
     return `${normalizedUrl}/blob/${branch}/${filePath}`;
   } else if (normalizedUrl.includes("bitbucket.org")) {
     return `${normalizedUrl}/src/${branch}/${filePath}`;
+  } else if (normalizedUrl.includes("dev.azure.com") || normalizedUrl.includes("visualstudio.com")) {
+    // Azure DevOps: https://dev.azure.com/org/project/_git/repo?version=GBbranch&path=/path
+    return `${normalizedUrl}?version=GB${branch}&path=/${filePath}`;
   }
-  
-  // 默认使用 GitHub 格式
+
+  // Default: assume a GitHub-like format
   return `${normalizedUrl}/blob/${branch}/${filePath}`;
 }
 
 export function SourceFiles({ files, gitUrl, branch }: SourceFilesProps) {
-  const params = useParams();
   const searchParams = useSearchParams();
-  
-  // 从 URL 参数获取仓库信息
-  const owner = decodeRouteSegment(params.owner as string);
-  const repo = decodeRouteSegment(params.repo as string);
+
+  // Resolve the branch to link against
   const currentBranch = searchParams.get("branch") || branch || "main";
-  
-  // 构建默认的 Git URL
-  const defaultGitUrl = gitUrl || `https://github.com/${owner}/${repo}`;
+
+  // Only build links when the real repository URL is known
+  const repoGitUrl = gitUrl ?? "";
   
   // 对文件进行分组（按目录）
   const groupedFiles = useMemo(() => {
@@ -97,8 +102,22 @@ export function SourceFiles({ files, gitUrl, branch }: SourceFilesProps) {
             <div className="flex flex-wrap gap-2">
               {dirFiles.map(file => {
                 const fileName = file.split("/").pop() || file;
-                const fileUrl = buildFileUrl(defaultGitUrl, currentBranch, file);
-                
+                const fileUrl = buildFileUrl(repoGitUrl, currentBranch, file);
+
+                // Render a plain label when we cannot build a valid link
+                if (!fileUrl) {
+                  return (
+                    <span
+                      key={file}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-sm bg-fd-secondary rounded-md text-fd-foreground"
+                      title={file}
+                    >
+                      <FileCode2 className="h-3.5 w-3.5 text-fd-muted-foreground" />
+                      <span className="max-w-[200px] truncate">{fileName}</span>
+                    </span>
+                  );
+                }
+
                 return (
                   <a
                     key={file}
