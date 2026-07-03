@@ -63,11 +63,19 @@ namespace OpenDeepWiki.Agents
         private readonly AiRequestOptions? _options = options?.Value;
 
         /// <summary>
-        /// 创建带拦截功能的 HttpClient
+        /// Creates an HttpClient with the full handler chain:
+        ///   FinishReasonNormalizingHandler -> LoggingHttpHandler -> HttpClientHandler
+        ///
+        /// FinishReasonNormalizingHandler is outermost so it transforms the SSE response
+        /// AFTER LoggingHttpHandler's retry logic has delivered the final response.
+        /// This ensures Gemini's non-OpenAI finish_reason values (STOP, MAX_TOKENS,
+        /// SAFETY, etc.) are mapped to the OpenAI SDK's expected set before deserialization.
         /// </summary>
         private static HttpClient CreateHttpClient()
         {
-            var handler = new LoggingHttpHandler();
+            var handler = new FinishReasonNormalizingHandler(
+                new LoggingHttpHandler(
+                    new HttpClientHandler()));
             return new HttpClient(handler)
             {
                 Timeout = TimeSpan.FromSeconds(300)
