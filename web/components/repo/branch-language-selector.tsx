@@ -120,9 +120,8 @@ export function BranchLanguageSelector({
         </div>
       )}
 
-      {currentBranchData && branches.repositoryId && (
+      {currentBranchData && (
         <BranchGenerationStatus
-          repositoryId={branches.repositoryId}
           branchId={currentBranchData.id}
           branchName={currentBranchData.name}
           generationStatus={currentBranchData.generationStatus}

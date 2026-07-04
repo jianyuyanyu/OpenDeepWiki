@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.Auth;
 using OpenDeepWiki.Services.Repositories;
 
 namespace OpenDeepWiki.Endpoints;
@@ -32,27 +33,51 @@ public static class BranchGenerationEndpoints
     private static async Task<IResult> EnqueueFullGenerationAsync(
         string repositoryId,
         string branchId,
+        [FromServices] IContext context,
+        [FromServices] IUserContext userContext,
         [FromServices] IBranchGenerationTaskService taskService,
         CancellationToken cancellationToken)
     {
+        var authorizationResult = await AuthorizeRepositoryMutationAsync(context, userContext, repositoryId, cancellationToken);
+        if (authorizationResult is not null)
+        {
+            return authorizationResult;
+        }
+
         var result = await taskService.EnqueueFullGenerationAsync(repositoryId, branchId, cancellationToken: cancellationToken);
         return ToResult(result, StatusCodes.Status201Created);
     }
 
     private static async Task<IResult> RetryAsync(
         string taskId,
+        [FromServices] IContext context,
+        [FromServices] IUserContext userContext,
         [FromServices] IBranchGenerationTaskService taskService,
         CancellationToken cancellationToken)
     {
+        var authorizationResult = await AuthorizeTaskMutationAsync(context, userContext, taskId, cancellationToken);
+        if (authorizationResult is not null)
+        {
+            return authorizationResult;
+        }
+
         var result = await taskService.RetryAsync(taskId, cancellationToken);
         return ToResult(result);
     }
 
     private static async Task<IResult> CancelAsync(
         string taskId,
+        [FromServices] IContext context,
+        [FromServices] IUserContext userContext,
         [FromServices] IBranchGenerationTaskService taskService,
         CancellationToken cancellationToken)
     {
+        var authorizationResult = await AuthorizeTaskMutationAsync(context, userContext, taskId, cancellationToken);
+        if (authorizationResult is not null)
+        {
+            return authorizationResult;
+        }
+
         var result = await taskService.CancelAsync(taskId, cancellationToken);
         return ToResult(result);
     }
@@ -71,6 +96,63 @@ public static class BranchGenerationEndpoints
         return task is null
             ? Results.NotFound(new BranchGenerationErrorResponse(false, "TASK_NOT_FOUND", "任务不存在"))
             : Results.Ok(BranchGenerationTaskResponse.FromTask(task));
+    }
+
+    public static async Task<IResult?> AuthorizeRepositoryMutationAsync(
+        IContext context,
+        IUserContext userContext,
+        string repositoryId,
+        CancellationToken cancellationToken)
+    {
+        if (!userContext.IsAuthenticated || string.IsNullOrWhiteSpace(userContext.UserId))
+        {
+            return Results.Json(
+                new BranchGenerationErrorResponse(false, "UNAUTHORIZED", "请先登录"),
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var repository = await context.Repositories
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == repositoryId && !item.IsDeleted, cancellationToken);
+
+        if (repository is null)
+        {
+            return Results.NotFound(new BranchGenerationErrorResponse(false, "REPOSITORY_NOT_FOUND", "仓库不存在"));
+        }
+
+        if (repository.OwnerUserId == userContext.UserId || userContext.User?.IsInRole("Admin") == true)
+        {
+            return null;
+        }
+
+        return Results.Json(
+            new BranchGenerationErrorResponse(false, "FORBIDDEN", "无权限操作该仓库"),
+            statusCode: StatusCodes.Status403Forbidden);
+    }
+
+    public static async Task<IResult?> AuthorizeTaskMutationAsync(
+        IContext context,
+        IUserContext userContext,
+        string taskId,
+        CancellationToken cancellationToken)
+    {
+        if (!userContext.IsAuthenticated || string.IsNullOrWhiteSpace(userContext.UserId))
+        {
+            return Results.Json(
+                new BranchGenerationErrorResponse(false, "UNAUTHORIZED", "请先登录"),
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
+
+        var task = await context.BranchGenerationTasks
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == taskId && !item.IsDeleted, cancellationToken);
+
+        if (task is null)
+        {
+            return Results.NotFound(new BranchGenerationErrorResponse(false, "TASK_NOT_FOUND", "任务不存在"));
+        }
+
+        return await AuthorizeRepositoryMutationAsync(context, userContext, task.RepositoryId, cancellationToken);
     }
 
     private static IResult ToResult(BranchGenerationTaskResult result, int successStatusCode = StatusCodes.Status200OK)
