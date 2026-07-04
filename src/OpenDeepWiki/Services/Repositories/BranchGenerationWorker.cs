@@ -41,6 +41,8 @@ public sealed class BranchGenerationWorker(
         var lockService = scope.ServiceProvider.GetRequiredService<IRepositoryGenerationLockService>();
         var processingLogService = scope.ServiceProvider.GetService<IProcessingLogService>();
 
+        await RecoverProcessingTasksWithoutLocksAsync(context, processingLogService, stoppingToken);
+
         var pendingTasks = await context.BranchGenerationTasks
             .AsNoTracking()
             .Where(item => !item.IsDeleted && item.Status == BranchGenerationTaskStatus.Pending)
@@ -117,44 +119,20 @@ public sealed class BranchGenerationWorker(
 
             await context.SaveChangesAsync(stoppingToken);
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        catch (OperationCanceledException ex) when (stoppingToken.IsCancellationRequested)
         {
-            throw;
+            logger.LogWarning(ex, "Branch generation task cancelled while processing. TaskId: {TaskId}", task.Id);
+            await MarkTaskFailedAsync(
+                context,
+                processingLogService,
+                task,
+                "Branch generation was cancelled while processing",
+                CancellationToken.None);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Branch generation task failed. TaskId: {TaskId}", task.Id);
-
-            task.Status = BranchGenerationTaskStatus.Failed;
-            task.ErrorMessage = ex.Message;
-            task.CompletedAt = DateTime.UtcNow;
-            task.RetryCount++;
-            task.UpdateTimestamp();
-
-            var branch = await context.RepositoryBranches
-                .FirstOrDefaultAsync(item => item.Id == task.BranchId && !item.IsDeleted, CancellationToken.None);
-
-            if (branch is not null)
-            {
-                branch.GenerationStatus = BranchGenerationTaskStatus.Failed;
-                branch.LastGenerationTaskId = task.Id;
-                branch.LastGenerationError = ex.Message;
-                branch.LastGenerationCompletedAt = task.CompletedAt;
-                branch.UpdateTimestamp();
-            }
-
-            if (processingLogService is not null)
-            {
-                await processingLogService.LogAsync(
-                    task.RepositoryId,
-                    task.BranchId,
-                    task.Id,
-                    ProcessingStep.Content,
-                    $"Branch generation failed: {ex.Message}",
-                    cancellationToken: CancellationToken.None);
-            }
-
-            await context.SaveChangesAsync(CancellationToken.None);
+            await MarkTaskFailedAsync(context, processingLogService, task, ex.Message, CancellationToken.None);
         }
         finally
         {
@@ -280,6 +258,77 @@ public sealed class BranchGenerationWorker(
 
         await context.SaveChangesAsync(stoppingToken);
         return new ClaimedBranchGenerationTask(fallbackTask, fallbackRepository, fallbackBranch);
+    }
+
+    private async Task RecoverProcessingTasksWithoutLocksAsync(
+        IContext context,
+        IProcessingLogService? processingLogService,
+        CancellationToken cancellationToken)
+    {
+        var orphanedTasks = await context.BranchGenerationTasks
+            .Where(task => !task.IsDeleted &&
+                           task.Status == BranchGenerationTaskStatus.Processing &&
+                           !context.RepositoryGenerationLocks.Any(generationLock =>
+                               !generationLock.IsDeleted &&
+                               generationLock.RepositoryId == task.RepositoryId &&
+                               generationLock.OwnerType == RepositoryGenerationLockOwnerType.BranchTask &&
+                               generationLock.OwnerId == task.Id))
+            .Take(10)
+            .ToListAsync(cancellationToken);
+
+        foreach (var task in orphanedTasks)
+        {
+            logger.LogWarning(
+                "Recovering branch generation task stuck in Processing without active lock. TaskId: {TaskId}, RepositoryId: {RepositoryId}, BranchId: {BranchId}",
+                task.Id,
+                task.RepositoryId,
+                task.BranchId);
+            await MarkTaskFailedAsync(
+                context,
+                processingLogService,
+                task,
+                "Branch generation stopped before reaching a terminal state",
+                cancellationToken);
+        }
+    }
+
+    private async Task MarkTaskFailedAsync(
+        IContext context,
+        IProcessingLogService? processingLogService,
+        BranchGenerationTask task,
+        string errorMessage,
+        CancellationToken cancellationToken)
+    {
+        task.Status = BranchGenerationTaskStatus.Failed;
+        task.ErrorMessage = errorMessage;
+        task.CompletedAt = DateTime.UtcNow;
+        task.RetryCount++;
+        task.UpdateTimestamp();
+
+        var branch = await context.RepositoryBranches
+            .FirstOrDefaultAsync(item => item.Id == task.BranchId && !item.IsDeleted, cancellationToken);
+
+        if (branch is not null)
+        {
+            branch.GenerationStatus = BranchGenerationTaskStatus.Failed;
+            branch.LastGenerationTaskId = task.Id;
+            branch.LastGenerationError = errorMessage;
+            branch.LastGenerationCompletedAt = task.CompletedAt;
+            branch.UpdateTimestamp();
+        }
+
+        if (processingLogService is not null)
+        {
+            await processingLogService.LogAsync(
+                task.RepositoryId,
+                task.BranchId,
+                task.Id,
+                ProcessingStep.Content,
+                $"Branch generation failed: {errorMessage}",
+                cancellationToken: cancellationToken);
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     private sealed record ClaimedBranchGenerationTask(

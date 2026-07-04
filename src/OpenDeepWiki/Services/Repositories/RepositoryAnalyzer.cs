@@ -128,7 +128,7 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
             SourceLocation = sourceInfo.Location,
             GitUrl = sourceInfo.SourceType == RepositorySourceType.Git ? sourceInfo.Location : string.Empty,
             PreviousCommitId = previousCommitId,
-            WorkingDirectory = GetWorkingDirectory(repository.OrgName, repository.RepoName),
+            WorkingDirectory = GetWorkingDirectory(repository.OrgName, repository.RepoName, branchName),
             SupportsIncrementalUpdates = sourceInfo.SourceType == RepositorySourceType.Git,
             LocalDirectoryImportModeUsed = LocalDirectoryImportMode.Copy
         };
@@ -291,15 +291,16 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
 
     /// <summary>
     /// Gets the working directory path for a repository.
-    /// Format: {RepositoriesDirectory}/{organization}/{name}/tree/
+    /// Format: {RepositoriesDirectory}/{organization}/{name}/branches/{branch}/tree/
     /// </summary>
-    private string GetWorkingDirectory(string organization, string repositoryName)
+    private string GetWorkingDirectory(string organization, string repositoryName, string branchName)
     {
         // Sanitize organization and repository names to prevent path traversal
         var safeOrg = SanitizePathComponent(organization);
         var safeRepo = SanitizePathComponent(repositoryName);
+        var safeBranch = SanitizePathComponent(branchName);
 
-        return Path.Combine(_options.RepositoriesDirectory, safeOrg, safeRepo, "tree");
+        return Path.Combine(_options.RepositoriesDirectory, safeOrg, safeRepo, "branches", safeBranch, "tree");
     }
 
     private async Task PrepareArchiveWorkspaceAsync(
@@ -597,26 +598,8 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
                 {
                     GitRepository.Clone(workspace.GitUrl, workspace.WorkingDirectory, cloneOptions);
                     
-                    // Explicitly checkout the target branch after clone
                     using var repo = new GitRepository(workspace.WorkingDirectory);
-                    var targetBranch = repo.Branches[workspace.BranchName] 
-                        ?? repo.Branches[$"origin/{workspace.BranchName}"];
-                    
-                    if (targetBranch != null)
-                    {
-                        if (targetBranch.IsRemote)
-                        {
-                            // Create local tracking branch from remote
-                            var localBranch = repo.Branches[workspace.BranchName];
-                            if (localBranch == null)
-                            {
-                                localBranch = repo.CreateBranch(workspace.BranchName, targetBranch.Tip);
-                                repo.Branches.Update(localBranch, b => b.TrackedBranch = targetBranch.CanonicalName);
-                            }
-                            targetBranch = localBranch;
-                        }
-                        Commands.Checkout(repo, targetBranch);
-                    }
+                    CheckoutRemoteBranchHard(repo, workspace.BranchName);
                 }, cancellationToken);
 
                 stopwatch.Stop();
@@ -703,48 +686,7 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
                     _logger.LogDebug("Fetching from remote 'origin'");
                     Commands.Fetch(repo, remote.Name, refSpecs, fetchOptions, null);
 
-                    // Checkout the target branch
-                    var branch = repo.Branches[workspace.BranchName] 
-                        ?? repo.Branches[$"origin/{workspace.BranchName}"];
-
-                    if (branch == null)
-                    {
-                        throw new InvalidOperationException($"Branch '{workspace.BranchName}' not found");
-                    }
-
-                    _logger.LogDebug("Found branch: {BranchName}, IsRemote: {IsRemote}", 
-                        branch.FriendlyName, branch.IsRemote);
-
-                    // If it's a remote tracking branch, create a local branch
-                    if (branch.IsRemote)
-                    {
-                        var localBranch = repo.Branches[workspace.BranchName];
-                        if (localBranch == null)
-                        {
-                            _logger.LogDebug("Creating local branch from remote tracking branch");
-                            localBranch = repo.CreateBranch(workspace.BranchName, branch.Tip);
-                            repo.Branches.Update(localBranch, b => b.TrackedBranch = branch.CanonicalName);
-                        }
-                        branch = localBranch;
-                    }
-
-                    _logger.LogDebug("Checking out branch: {BranchName}", branch.FriendlyName);
-                    Commands.Checkout(repo, branch);
-
-                    // Pull (merge) changes
-                    var pullOptions = new PullOptions
-                    {
-                        FetchOptions = fetchOptions,
-                        MergeOptions = new MergeOptions
-                        {
-                            FastForwardStrategy = FastForwardStrategy.Default
-                        }
-                    };
-
-                    var signature = new Signature("OpenDeepWiki", "wiki@opendeepwiki.local", DateTimeOffset.Now);
-                    _logger.LogDebug("Pulling changes");
-                    Commands.Pull(repo, signature, pullOptions);
-
+                    CheckoutRemoteBranchHard(repo, workspace.BranchName);
                 }, cancellationToken);
 
                 stopwatch.Stop();
@@ -783,6 +725,39 @@ public class RepositoryAnalyzer : IRepositoryAnalyzer
         throw new InvalidOperationException(
             $"Failed to pull repository after {_options.MaxRetryAttempts} attempts",
             lastException);
+    }
+
+    private void CheckoutRemoteBranchHard(GitRepository repo, string branchName)
+    {
+        var remoteBranch = repo.Branches[$"origin/{branchName}"];
+        if (remoteBranch is null)
+        {
+            throw new InvalidOperationException($"Remote branch 'origin/{branchName}' not found");
+        }
+
+        var localBranch = repo.Branches[branchName];
+        if (localBranch is null)
+        {
+            _logger.LogDebug("Creating local branch from remote branch. Branch: {BranchName}", branchName);
+            localBranch = repo.CreateBranch(branchName, remoteBranch.Tip);
+        }
+        else if (localBranch.Tip?.Sha != remoteBranch.Tip.Sha)
+        {
+            _logger.LogDebug(
+                "Local branch differs from remote tip; hard reset will align it. Branch: {BranchName}, LocalTip: {LocalTip}, RemoteTip: {RemoteTip}",
+                branchName,
+                localBranch.Tip?.Sha ?? "none",
+                remoteBranch.Tip.Sha);
+        }
+
+        repo.Branches.Update(localBranch, b => b.TrackedBranch = remoteBranch.CanonicalName);
+        Commands.Checkout(repo, localBranch);
+        repo.Reset(ResetMode.Hard, remoteBranch.Tip);
+
+        _logger.LogDebug(
+            "Checked out branch at remote tip. Branch: {BranchName}, Commit: {CommitId}",
+            branchName,
+            remoteBranch.Tip.Sha);
     }
 
 

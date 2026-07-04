@@ -4,6 +4,10 @@ using Microsoft.Extensions.Options;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Services.Repositories;
 using Xunit;
+using GitCommitOptions = LibGit2Sharp.CommitOptions;
+using GitCommands = LibGit2Sharp.Commands;
+using GitRepository = LibGit2Sharp.Repository;
+using GitSignature = LibGit2Sharp.Signature;
 
 namespace OpenDeepWiki.Tests.Services.Repositories;
 
@@ -136,6 +140,35 @@ public class RepositoryAnalyzerSourceTests
         Assert.False(workspace.IsIncremental);
     }
 
+    [Fact]
+    public async Task PrepareWorkspaceAsync_WhenRepositoryHasMultipleBranches_UsesTargetBranchContent()
+    {
+        var repositoriesRoot = CreateTempDirectory();
+        var sourceRoot = CreateTempDirectory();
+        var (aCommit, bCommit) = CreateGitRepositoryWithBranches(
+            sourceRoot,
+            "smart-hw/os_services_develop",
+            "smart-hw/rv1106_develop");
+        var analyzer = CreateAnalyzer(repositoriesRoot);
+        var repository = new Repository
+        {
+            Id = Guid.NewGuid().ToString(),
+            OwnerUserId = Guid.NewGuid().ToString(),
+            OrgName = "YD_HW/services",
+            RepoName = "youdao-input-event-monitor",
+            GitUrl = sourceRoot
+        };
+
+        var aWorkspace = await analyzer.PrepareWorkspaceAsync(repository, "smart-hw/os_services_develop");
+        var bWorkspace = await analyzer.PrepareWorkspaceAsync(repository, "smart-hw/rv1106_develop");
+
+        Assert.Equal(aCommit, aWorkspace.CommitId);
+        Assert.Equal("A branch", File.ReadAllText(Path.Combine(aWorkspace.WorkingDirectory, "branch.txt")));
+        Assert.Equal(bCommit, bWorkspace.CommitId);
+        Assert.Equal("B branch", File.ReadAllText(Path.Combine(bWorkspace.WorkingDirectory, "branch.txt")));
+        Assert.NotEqual(aWorkspace.WorkingDirectory, bWorkspace.WorkingDirectory);
+    }
+
     private static RepositoryAnalyzer CreateAnalyzer(string repositoriesRoot, RepositoryAnalyzerOptions? options = null)
     {
         return new RepositoryAnalyzer(
@@ -167,5 +200,29 @@ public class RepositoryAnalyzerSourceTests
             using var writer = new StreamWriter(entry.Open());
             writer.Write(content);
         }
+    }
+
+    private static (string ACommit, string BCommit) CreateGitRepositoryWithBranches(
+        string repositoryPath,
+        string branchA,
+        string branchB)
+    {
+        GitRepository.Init(repositoryPath);
+        using var repository = new GitRepository(repositoryPath);
+        var signature = new GitSignature("OpenDeepWiki Tests", "tests@opendeepwiki.local", DateTimeOffset.UtcNow);
+
+        File.WriteAllText(Path.Combine(repositoryPath, "branch.txt"), "A branch");
+        GitCommands.Stage(repository, "branch.txt");
+        var commitOptions = new GitCommitOptions();
+        var aCommit = repository.Commit("A branch", signature, signature, commitOptions);
+        repository.Branches.Add(branchA, aCommit);
+
+        var bBranch = repository.Branches.Add(branchB, aCommit);
+        GitCommands.Checkout(repository, bBranch);
+        File.WriteAllText(Path.Combine(repositoryPath, "branch.txt"), "B branch");
+        GitCommands.Stage(repository, "branch.txt");
+        var bCommit = repository.Commit("B branch", signature, signature, commitOptions);
+
+        return (aCommit.Sha, bCommit.Sha);
     }
 }
