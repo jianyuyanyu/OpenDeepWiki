@@ -50,7 +50,7 @@ public class GitTool
         }
 
         // 解析 .gitignore 文件
-        _gitIgnoreRules = ParseGitIgnore(_workingDirectory);
+        _gitIgnoreRules = RepositoryFileFilter.ParseGitIgnore(_workingDirectory);
     }
 
     /// <summary>
@@ -324,7 +324,7 @@ Pattern Examples:
             try
             {
                 var files = EnumerateFilesWithGlob(glob)
-                    .Where(f => !IsBinaryFile(f) && !IsHiddenPath(f));
+                    .Where(f => !RepositoryFileFilter.IsBinaryFile(f) && !IsHiddenPath(f));
 
                 Parallel.ForEach(files, new ParallelOptions
                     {

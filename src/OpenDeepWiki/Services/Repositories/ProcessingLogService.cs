@@ -196,6 +196,14 @@ public class ProcessingLogService : IProcessingLogService
 
     private static string? NormalizeProgressMessage(ProcessingStep step, string message)
     {
+        if (step == ProcessingStep.Workspace &&
+            (message.StartsWith("Resolved scan plan:", StringComparison.Ordinal) ||
+             message.StartsWith("Scan plan:", StringComparison.Ordinal) ||
+             message.StartsWith("Repository directory tree collected. ScanPlanSource:", StringComparison.Ordinal)))
+        {
+            return message;
+        }
+
         if (step != ProcessingStep.Content)
         {
             return $"Step progress ({step})";

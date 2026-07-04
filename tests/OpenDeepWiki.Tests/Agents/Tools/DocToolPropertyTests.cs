@@ -2,6 +2,7 @@ using FsCheck;
 using FsCheck.Fluent;
 using FsCheck.Xunit;
 using Microsoft.EntityFrameworkCore;
+using OpenDeepWiki.Agents.Tools;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using Xunit;
@@ -276,6 +277,25 @@ public class DocToolPropertyTests : IDisposable
         var content = await tool.ReadAsync("1-overview");
         Assert.Contains("Updated content", content);
         Assert.DoesNotContain("Original content", content);
+    }
+
+    [Fact]
+    public async Task DocTool_Append_ShouldStopPersistingAfterAppendBudget()
+    {
+        await CreateCatalogItemAsync("1-overview", "Overview");
+        var tool = new DocTool(_context, _branchLanguageId, "1-overview", maxAppendOperations: 1);
+
+        var firstResult = await tool.AppendAsync("# Overview\n\nInitial content.");
+        var secondResult = await tool.AppendAsync("\n\n## Extra\n\nThis should not be appended.");
+
+        Assert.Contains("SUCCESS", firstResult);
+        Assert.Contains("Append budget reached", secondResult);
+
+        var catalog = await _context.DocCatalogs.SingleAsync(catalog => catalog.Path == "1-overview");
+        Assert.False(string.IsNullOrEmpty(catalog.DocFileId));
+        var docFile = await _context.DocFiles.SingleAsync(file => file.Id == catalog.DocFileId);
+        Assert.Contains("Initial content", docFile.Content);
+        Assert.DoesNotContain("This should not be appended", docFile.Content);
     }
 }
 
