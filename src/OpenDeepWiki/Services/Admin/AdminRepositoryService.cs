@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
@@ -18,6 +19,7 @@ public class AdminRepositoryService : IAdminRepositoryService
     private readonly IWikiGenerator _wikiGenerator;
     private readonly IRepositoryFullRegenerationCleaner _fullRegenerationCleaner;
     private readonly IRepositoryScanPlanResolver _scanPlanResolver;
+    private readonly IRepositoryGenerationLockService _generationLockService;
 
     public AdminRepositoryService(
         IContext context,
@@ -25,7 +27,8 @@ public class AdminRepositoryService : IAdminRepositoryService
         IRepositoryAnalyzer repositoryAnalyzer,
         IWikiGenerator wikiGenerator,
         IRepositoryFullRegenerationCleaner fullRegenerationCleaner,
-        IRepositoryScanPlanResolver scanPlanResolver)
+        IRepositoryScanPlanResolver scanPlanResolver,
+        IRepositoryGenerationLockService generationLockService)
     {
         _context = context;
         _gitPlatformService = gitPlatformService;
@@ -33,6 +36,7 @@ public class AdminRepositoryService : IAdminRepositoryService
         _wikiGenerator = wikiGenerator;
         _fullRegenerationCleaner = fullRegenerationCleaner;
         _scanPlanResolver = scanPlanResolver;
+        _generationLockService = generationLockService;
     }
 
     public async Task<AdminRepositoryListResponse> GetRepositoriesAsync(int page, int pageSize, string? search, int? status)
@@ -742,15 +746,64 @@ public class AdminRepositoryService : IAdminRepositoryService
             return new AdminRepositoryOperationResult
             {
                 Success = false,
-                Message = "仓库正在处理中，无法重复触发"
+                Message = "仓库正在处理中，无法重复触发",
+                StatusCode = StatusCodes.Status409Conflict
             };
         }
 
-        await _fullRegenerationCleaner.CleanAsync(_context, repository);
+        await using var transaction = await EfContextTransaction.BeginIfSupportedAsync(_context, CancellationToken.None);
+        var lockAcquired = await _generationLockService.TryAcquireAsync(
+            _context,
+            repository.Id,
+            RepositoryGenerationLockOwnerType.Repository,
+            repository.Id,
+            RepositoryGenerationLockScope.Repository);
 
-        repository.Status = RepositoryStatus.Pending;
-        repository.UpdateTimestamp();
-        await _context.SaveChangesAsync();
+        if (!lockAcquired)
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync();
+            }
+
+            return new AdminRepositoryOperationResult
+            {
+                Success = false,
+                Message = "仓库已有 branch 生成任务正在排队或处理中",
+                StatusCode = StatusCodes.Status409Conflict
+            };
+        }
+
+        try
+        {
+            await _fullRegenerationCleaner.CleanAsync(_context, repository);
+
+            repository.Status = RepositoryStatus.Pending;
+            repository.UpdateTimestamp();
+            await _context.SaveChangesAsync();
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync();
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync();
+            }
+            else
+            {
+                await _generationLockService.ReleaseAsync(
+                    _context,
+                    repository.Id,
+                    RepositoryGenerationLockOwnerType.Repository,
+                    repository.Id,
+                    CancellationToken.None);
+            }
+
+            throw;
+        }
 
         return new AdminRepositoryOperationResult
         {

@@ -461,6 +461,49 @@ public class RepositorySourceSubmitTests
     }
 
     [Fact]
+    public async Task AdminRegenerateRepositoryAsync_WhenBranchGenerationLockExists_ReturnsConflictWithoutCleaning()
+    {
+        using var context = CreateContext();
+        var seeded = await SeedRepositoryWithDocumentAsync(context, RepositoryStatus.Completed);
+        context.RepositoryGenerationLocks.Add(new RepositoryGenerationLock
+        {
+            Id = "branch-lock",
+            RepositoryId = seeded.RepositoryId,
+            OwnerType = RepositoryGenerationLockOwnerType.BranchTask,
+            OwnerId = "branch-task",
+            Scope = RepositoryGenerationLockScope.Branch
+        });
+        await context.SaveChangesAsync();
+        var service = CreateAdminService(context);
+
+        var result = await service.RegenerateRepositoryAsync(seeded.RepositoryId);
+
+        Assert.False(result.Success);
+        Assert.Equal(StatusCodes.Status409Conflict, result.StatusCode);
+        Assert.Equal(RepositoryStatus.Completed, (await context.Repositories.SingleAsync()).Status);
+        Assert.Single(await context.DocCatalogs.ToListAsync());
+        Assert.Single(await context.DocFiles.ToListAsync());
+        Assert.NotNull(await context.RepositoryGenerationLocks.SingleOrDefaultAsync(item => item.Id == "branch-lock"));
+    }
+
+    [Fact]
+    public async Task AdminRegenerateRepositoryAsync_WhenQueued_KeepsRepositoryLockForWorker()
+    {
+        using var context = CreateContext();
+        var seeded = await SeedRepositoryWithDocumentAsync(context, RepositoryStatus.Completed);
+        var service = CreateAdminService(context);
+
+        var result = await service.RegenerateRepositoryAsync(seeded.RepositoryId);
+
+        Assert.True(result.Success);
+        Assert.Equal(RepositoryStatus.Pending, (await context.Repositories.SingleAsync()).Status);
+        var generationLock = await context.RepositoryGenerationLocks.SingleAsync();
+        Assert.Equal(seeded.RepositoryId, generationLock.RepositoryId);
+        Assert.Equal(RepositoryGenerationLockOwnerType.Repository, generationLock.OwnerType);
+        Assert.Equal(seeded.RepositoryId, generationLock.OwnerId);
+    }
+
+    [Fact]
     public void RepositoryStatus_ProcessingMatchesAdminApiStatusValue()
     {
         Assert.Equal(0, (int)RepositoryStatus.Pending);
@@ -704,7 +747,8 @@ public class RepositorySourceSubmitTests
             repositoryAnalyzer ?? Mock.Of<IRepositoryAnalyzer>(),
             Mock.Of<IWikiGenerator>(),
             new RepositoryFullRegenerationCleaner(),
-            CreateScanPlanResolver());
+            CreateScanPlanResolver(),
+            new RepositoryGenerationLockService(context));
     }
 
     private static RepositoryScanPlanResolver CreateScanPlanResolver()

@@ -42,6 +42,7 @@ public sealed class BranchGenerationWorker(
         var processingLogService = scope.ServiceProvider.GetService<IProcessingLogService>();
 
         var pendingTasks = await context.BranchGenerationTasks
+            .AsNoTracking()
             .Where(item => !item.IsDeleted && item.Status == BranchGenerationTaskStatus.Pending)
             .OrderByDescending(item => item.Priority)
             .ThenBy(item => item.CreatedAt)
@@ -63,48 +64,26 @@ public sealed class BranchGenerationWorker(
         BranchGenerationTask task,
         CancellationToken stoppingToken)
     {
-        var lockAcquired = await lockService.TryAcquireAsync(
-            context,
-            task.RepositoryId,
-            RepositoryGenerationLockOwnerType.BranchTask,
-            task.Id,
-            RepositoryGenerationLockScope.Branch,
-            stoppingToken);
-
-        if (!lockAcquired)
+        var claim = await TryClaimTaskAsync(context, lockService, task, stoppingToken);
+        if (claim is null)
         {
             logger.LogInformation(
-                "Branch generation task is blocked by repository lock. TaskId: {TaskId}, RepositoryId: {RepositoryId}",
+                "Branch generation task was not claimed. TaskId: {TaskId}, RepositoryId: {RepositoryId}",
                 task.Id, task.RepositoryId);
             return;
         }
 
+        task = claim.Task;
+
         try
         {
-            var repository = await context.Repositories
-                .FirstOrDefaultAsync(item => item.Id == task.RepositoryId && !item.IsDeleted, stoppingToken);
-            var branch = await context.RepositoryBranches
-                .FirstOrDefaultAsync(item => item.Id == task.BranchId && item.RepositoryId == task.RepositoryId && !item.IsDeleted, stoppingToken);
+            var repository = claim.Repository;
+            var branch = claim.Branch;
 
             if (repository is null || branch is null)
             {
                 throw new InvalidOperationException($"Repository or branch not found. RepositoryId: {task.RepositoryId}, BranchId: {task.BranchId}");
             }
-
-            task.Status = BranchGenerationTaskStatus.Processing;
-            task.StartedAt = DateTime.UtcNow;
-            task.CompletedAt = null;
-            task.ErrorMessage = null;
-            task.UpdateTimestamp();
-
-            branch.GenerationStatus = BranchGenerationTaskStatus.Processing;
-            branch.LastGenerationTaskId = task.Id;
-            branch.LastGenerationError = null;
-            branch.LastGenerationStartedAt = task.StartedAt;
-            branch.LastGenerationCompletedAt = null;
-            branch.UpdateTimestamp();
-
-            await context.SaveChangesAsync(stoppingToken);
 
             if (processingLogService is not null)
             {
@@ -187,4 +166,124 @@ public sealed class BranchGenerationWorker(
                 CancellationToken.None);
         }
     }
+
+    private async Task<ClaimedBranchGenerationTask?> TryClaimTaskAsync(
+        IContext context,
+        IRepositoryGenerationLockService lockService,
+        BranchGenerationTask pendingTask,
+        CancellationToken stoppingToken)
+    {
+        var now = DateTime.UtcNow;
+
+        if (context is DbContext dbContext &&
+            !string.Equals(dbContext.Database.ProviderName, "Microsoft.EntityFrameworkCore.InMemory", StringComparison.Ordinal))
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(stoppingToken);
+            var updatedRows = await context.BranchGenerationTasks
+                .Where(item => item.Id == pendingTask.Id &&
+                               !item.IsDeleted &&
+                               item.Status == BranchGenerationTaskStatus.Pending)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(item => item.Status, BranchGenerationTaskStatus.Processing)
+                        .SetProperty(item => item.StartedAt, now)
+                        .SetProperty(item => item.CompletedAt, (DateTime?)null)
+                        .SetProperty(item => item.ErrorMessage, (string?)null)
+                        .SetProperty(item => item.UpdatedAt, now),
+                    stoppingToken);
+
+            if (updatedRows != 1)
+            {
+                await transaction.RollbackAsync(stoppingToken);
+                return null;
+            }
+
+            var lockAcquired = await lockService.TryAcquireAsync(
+                context,
+                pendingTask.RepositoryId,
+                RepositoryGenerationLockOwnerType.BranchTask,
+                pendingTask.Id,
+                RepositoryGenerationLockScope.Branch,
+                stoppingToken);
+
+            if (!lockAcquired)
+            {
+                await transaction.RollbackAsync(stoppingToken);
+                return null;
+            }
+
+            var task = await context.BranchGenerationTasks
+                .FirstAsync(item => item.Id == pendingTask.Id, stoppingToken);
+            var repository = await context.Repositories
+                .FirstOrDefaultAsync(item => item.Id == task.RepositoryId && !item.IsDeleted, stoppingToken);
+            var branch = await context.RepositoryBranches
+                .FirstOrDefaultAsync(item => item.Id == task.BranchId && item.RepositoryId == task.RepositoryId && !item.IsDeleted, stoppingToken);
+
+            if (branch is not null)
+            {
+                branch.GenerationStatus = BranchGenerationTaskStatus.Processing;
+                branch.LastGenerationTaskId = task.Id;
+                branch.LastGenerationError = null;
+                branch.LastGenerationStartedAt = now;
+                branch.LastGenerationCompletedAt = null;
+                branch.UpdateTimestamp();
+                await context.SaveChangesAsync(stoppingToken);
+            }
+
+            await transaction.CommitAsync(stoppingToken);
+            return new ClaimedBranchGenerationTask(task, repository, branch);
+        }
+
+        var fallbackTask = await context.BranchGenerationTasks
+            .FirstOrDefaultAsync(item => item.Id == pendingTask.Id &&
+                                         !item.IsDeleted &&
+                                         item.Status == BranchGenerationTaskStatus.Pending,
+                stoppingToken);
+        if (fallbackTask is null)
+        {
+            return null;
+        }
+
+        var fallbackLockAcquired = await lockService.TryAcquireAsync(
+            context,
+            fallbackTask.RepositoryId,
+            RepositoryGenerationLockOwnerType.BranchTask,
+            fallbackTask.Id,
+            RepositoryGenerationLockScope.Branch,
+            stoppingToken);
+
+        if (!fallbackLockAcquired)
+        {
+            return null;
+        }
+
+        var fallbackRepository = await context.Repositories
+            .FirstOrDefaultAsync(item => item.Id == fallbackTask.RepositoryId && !item.IsDeleted, stoppingToken);
+        var fallbackBranch = await context.RepositoryBranches
+            .FirstOrDefaultAsync(item => item.Id == fallbackTask.BranchId && item.RepositoryId == fallbackTask.RepositoryId && !item.IsDeleted, stoppingToken);
+
+        fallbackTask.Status = BranchGenerationTaskStatus.Processing;
+        fallbackTask.StartedAt = now;
+        fallbackTask.CompletedAt = null;
+        fallbackTask.ErrorMessage = null;
+        fallbackTask.UpdateTimestamp();
+
+        if (fallbackBranch is not null)
+        {
+            fallbackBranch.GenerationStatus = BranchGenerationTaskStatus.Processing;
+            fallbackBranch.LastGenerationTaskId = fallbackTask.Id;
+            fallbackBranch.LastGenerationError = null;
+            fallbackBranch.LastGenerationStartedAt = now;
+            fallbackBranch.LastGenerationCompletedAt = null;
+            fallbackBranch.UpdateTimestamp();
+        }
+
+        await context.SaveChangesAsync(stoppingToken);
+        return new ClaimedBranchGenerationTask(fallbackTask, fallbackRepository, fallbackBranch);
+    }
+
+    private sealed record ClaimedBranchGenerationTask(
+        BranchGenerationTask Task,
+        Repository? Repository,
+        RepositoryBranch? Branch);
 }

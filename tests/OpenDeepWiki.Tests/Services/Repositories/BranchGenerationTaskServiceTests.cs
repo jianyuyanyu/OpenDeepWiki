@@ -94,6 +94,23 @@ public class BranchGenerationTaskServiceTests
         Assert.Equal("active-task", result.Task?.Id);
     }
 
+    [Fact]
+    public async Task EnqueueFullGenerationAsync_WhenTaskSaveFails_ReleasesRepositoryLock()
+    {
+        await using var context = CreateFailingContext();
+        var repository = SeedRepository(context, RepositoryStatus.Completed);
+        var branch = SeedBranchWithDocument(context, repository.Id, "main");
+        await context.SaveChangesAsync();
+        context.ThrowOnSaveNumber = context.SaveCount + 2;
+        var service = CreateService(context);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.EnqueueFullGenerationAsync(repository.Id, branch.BranchId));
+
+        Assert.Empty(await context.RepositoryGenerationLocks.ToListAsync());
+        Assert.Empty(await context.BranchGenerationTasks.ToListAsync());
+    }
+
     private static BranchGenerationTaskService CreateService(TestDbContext context)
     {
         return new BranchGenerationTaskService(
@@ -167,5 +184,30 @@ public class BranchGenerationTaskServiceTests
         return new TestDbContext(options);
     }
 
-    private sealed class TestDbContext(DbContextOptions<TestDbContext> options) : MasterDbContext(options);
+    private static TestDbContext CreateFailingContext()
+    {
+        var options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        return new TestDbContext(options);
+    }
+
+    private sealed class TestDbContext(DbContextOptions<TestDbContext> options) : MasterDbContext(options)
+    {
+        public int SaveCount { get; private set; }
+
+        public int? ThrowOnSaveNumber { get; set; }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            SaveCount++;
+            if (ThrowOnSaveNumber == SaveCount)
+            {
+                throw new InvalidOperationException("Simulated task save failure");
+            }
+
+            return base.SaveChangesAsync(cancellationToken);
+        }
+    }
 }

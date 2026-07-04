@@ -81,6 +81,7 @@ public sealed class BranchGenerationTaskService(
             CreatedAt = DateTime.UtcNow
         };
 
+        await using var transaction = await EfContextTransaction.BeginIfSupportedAsync(context, cancellationToken);
         var lockAcquired = await lockService.TryAcquireAsync(
             context,
             repositoryId,
@@ -91,6 +92,11 @@ public sealed class BranchGenerationTaskService(
 
         if (!lockAcquired)
         {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
             return new BranchGenerationTaskResult(
                 false,
                 ErrorCode: "GENERATION_LOCK_CONFLICT",
@@ -107,7 +113,33 @@ public sealed class BranchGenerationTaskService(
 
         context.BranchGenerationTasks.Add(task);
         context.RepositoryBranches.Update(branch);
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            else
+            {
+                EfContextTransaction.ClearPendingChanges(context);
+                await lockService.ReleaseAsync(
+                    context,
+                    repositoryId,
+                    RepositoryGenerationLockOwnerType.BranchTask,
+                    task.Id,
+                    CancellationToken.None);
+            }
+
+            throw;
+        }
 
         return new BranchGenerationTaskResult(true, task);
     }
@@ -135,6 +167,7 @@ public sealed class BranchGenerationTaskService(
             return new BranchGenerationTaskResult(false, activeBranchTask, "BRANCH_GENERATION_ACTIVE", "已有进行中的 branch 生成任务");
         }
 
+        await using var transaction = await EfContextTransaction.BeginIfSupportedAsync(context, cancellationToken);
         var lockAcquired = await lockService.TryAcquireAsync(
             context,
             task.RepositoryId,
@@ -145,6 +178,11 @@ public sealed class BranchGenerationTaskService(
 
         if (!lockAcquired)
         {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+
             return new BranchGenerationTaskResult(
                 false,
                 task,
@@ -172,7 +210,33 @@ public sealed class BranchGenerationTaskService(
 
         branch.LastGenerationTaskId = task.Id;
         context.BranchGenerationTasks.Update(task);
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+            }
+            else
+            {
+                EfContextTransaction.ClearPendingChanges(context);
+                await lockService.ReleaseAsync(
+                    context,
+                    task.RepositoryId,
+                    RepositoryGenerationLockOwnerType.BranchTask,
+                    task.Id,
+                    CancellationToken.None);
+            }
+
+            throw;
+        }
 
         return new BranchGenerationTaskResult(true, task);
     }

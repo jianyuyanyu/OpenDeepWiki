@@ -158,7 +158,12 @@ public static class AdminRepositoryEndpoints
             [FromServices] IAdminRepositoryService repositoryService) =>
         {
             var result = await repositoryService.RegenerateRepositoryAsync(id);
-            return Results.Ok(new { success = result.Success, message = result.Message, data = result });
+            var response = new { success = result.Success, message = result.Message, data = result };
+            return result.Success
+                ? Results.Ok(response)
+                : result.StatusCode == StatusCodes.Status409Conflict
+                    ? Results.Conflict(response)
+                    : Results.BadRequest(response);
         })
         .WithName("AdminRegenerateRepository")
         .WithSummary("触发仓库全量重生成");
