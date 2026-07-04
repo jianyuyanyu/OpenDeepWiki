@@ -143,6 +143,18 @@
     "submitError": "Failed to submit repository",
     "listTitle": "My Repositories",
     "noRepositories": "No repositories found",
+    "view": {
+      "tree": "Tree",
+      "grid": "Grid"
+    },
+    "tree": {
+      "title": "Repository tree",
+      "all": "All repositories",
+      "count": "{count} repositories",
+      "emptyFolder": "No repositories in this folder",
+      "expandFolder": "Expand folder",
+      "collapseFolder": "Collapse folder"
+    },
     "status": {
       "pending": "Pending",
       "processing": "Processing",

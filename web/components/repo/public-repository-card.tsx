@@ -64,12 +64,15 @@ function StatusBadge({ status }: { status: RepositoryStatus }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
+        "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium",
         config.className
       )}
     >
       <Icon
-        className={cn("h-3.5 w-3.5", status === "Processing" && "animate-spin")}
+        className={cn(
+          "h-3.5 w-3.5 shrink-0",
+          status === "Processing" && "animate-spin"
+        )}
       />
       {t(`home.repository.status.${config.labelKey}`)}
     </span>
@@ -78,13 +81,27 @@ function StatusBadge({ status }: { status: RepositoryStatus }) {
 
 interface PublicRepositoryCardProps {
   repository: RepositoryItemResponse;
+  variant?: "default" | "tree";
 }
 
-export function PublicRepositoryCard({ repository }: PublicRepositoryCardProps) {
+function getRepositoryLeafName(repository: RepositoryItemResponse) {
+  const repoSegments = repository.repoName.split("/").filter(Boolean);
+
+  return repoSegments.at(-1) || repository.repoName || repository.orgName;
+}
+
+export function PublicRepositoryCard({
+  repository,
+  variant = "default",
+}: PublicRepositoryCardProps) {
   const t = useTranslations();
   const { user } = useAuth();
   const createdDate = new Date(repository.createdAt).toLocaleDateString();
   const wikiUrl = buildRepoBasePath(repository.orgName, repository.repoName);
+  const isTreeVariant = variant === "tree";
+  const repositoryName = isTreeVariant
+    ? getRepositoryLeafName(repository)
+    : `${repository.orgName}/${repository.repoName}`;
 
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -158,49 +175,65 @@ export function PublicRepositoryCard({ repository }: PublicRepositoryCardProps) 
   }, [user, repository.id, isSubscribed, subscribeLoading, t]);
 
   return (
-    <Link href={wikiUrl}>
-      <Card className="h-full transition-all hover:shadow-md hover:border-primary/50 cursor-pointer">
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
+    <Link href={wikiUrl} className="block h-full">
+      <Card className="h-full min-h-[176px] cursor-pointer overflow-hidden transition-all hover:border-primary/50 hover:shadow-md">
+        <CardContent className="flex h-full p-4">
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <div
+              className={cn(
+                "grid min-w-0 gap-3",
+                isTreeVariant
+                  ? "grid-cols-1"
+                  : "grid-cols-[minmax(0,1fr)_auto] items-start"
+              )}
+            >
+              <div className="flex min-w-0 items-center gap-2">
                 <GitBranch className="h-4 w-4 text-muted-foreground shrink-0" />
                 <h3 className="font-medium truncate">
-                  {repository.orgName}/{repository.repoName}
+                  {repositoryName}
                 </h3>
               </div>
-              <StatusBadge status={repository.statusName} />
+              <div className={cn(isTreeVariant && "flex justify-start")}>
+                <StatusBadge status={repository.statusName} />
+              </div>
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">
-                {t(`home.repository.${getRepositorySourceTypeLabelKey(repository.sourceType, repository.sourceTypeName)}`)}
+            <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
+              <span className="inline-flex max-w-[9rem] shrink-0 rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">
+                <span className="truncate">
+                  {t(
+                    `home.repository.${getRepositorySourceTypeLabelKey(
+                      repository.sourceType,
+                      repository.sourceTypeName
+                    )}`
+                  )}
+                </span>
               </span>
-              <p className="truncate text-xs text-muted-foreground">
+              <p className="min-w-0 truncate text-xs text-muted-foreground">
                 {repository.sourceLocation || repository.gitUrl}
               </p>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-3.5 w-3.5" />
-                  <span>{createdDate}</span>
+            <div className="mt-auto flex min-w-0 items-center justify-between gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <div className="flex min-w-0 items-center gap-1">
+                  <Calendar className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{createdDate}</span>
                 </div>
                 {typeof repository.starCount === "number" && (
                   <div className="flex items-center gap-1">
-                    <Star className="h-3.5 w-3.5" />
+                    <Star className="h-3.5 w-3.5 shrink-0" />
                     <span>{repository.starCount.toLocaleString()}</span>
                   </div>
                 )}
                 {typeof repository.forkCount === "number" && (
                   <div className="flex items-center gap-1">
-                    <GitFork className="h-3.5 w-3.5" />
+                    <GitFork className="h-3.5 w-3.5 shrink-0" />
                     <span>{repository.forkCount.toLocaleString()}</span>
                   </div>
                 )}
               </div>
               {/* 收藏和订阅按钮 - 仅登录用户可见 */}
               {user && (
-                <div className="flex items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1">
                   <Button
                     variant="ghost"
                     size="icon"
