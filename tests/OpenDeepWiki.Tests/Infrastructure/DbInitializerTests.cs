@@ -76,6 +76,72 @@ public class DbInitializerTests
     }
 
     [Fact]
+    public async Task InitializeAsync_WhenSqliteDatabaseIsMissingBranchGenerationSchema_CreatesTablesAndColumns()
+    {
+        var dbPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.db");
+
+        try
+        {
+            await using (var setupContext = CreateContext(dbPath))
+            {
+                await setupContext.Database.EnsureCreatedAsync();
+                await setupContext.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys=OFF");
+                await setupContext.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS RepositoryGenerationLocks");
+                await setupContext.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS BranchGenerationTasks");
+                await setupContext.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS RepositoryProcessingLogs");
+                await setupContext.Database.ExecuteSqlRawAsync(@"
+                    CREATE TABLE RepositoryProcessingLogs (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        RepositoryId TEXT NOT NULL,
+                        Step INTEGER NOT NULL,
+                        Message TEXT NOT NULL,
+                        IsAiOutput INTEGER NOT NULL,
+                        ToolName TEXT,
+                        CreatedAt TEXT NOT NULL,
+                        UpdatedAt TEXT,
+                        DeletedAt TEXT,
+                        IsDeleted INTEGER NOT NULL,
+                        Version BLOB
+                    )");
+                await setupContext.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS RepositoryBranches");
+                await setupContext.Database.ExecuteSqlRawAsync(@"
+                    CREATE TABLE RepositoryBranches (
+                        Id TEXT NOT NULL PRIMARY KEY,
+                        RepositoryId TEXT NOT NULL,
+                        BranchName TEXT NOT NULL,
+                        LastCommitId TEXT,
+                        LastProcessedAt TEXT,
+                        CreatedAt TEXT NOT NULL,
+                        UpdatedAt TEXT,
+                        DeletedAt TEXT,
+                        IsDeleted INTEGER NOT NULL,
+                        Version BLOB
+                    )");
+                await setupContext.Database.ExecuteSqlRawAsync(
+                    "CREATE UNIQUE INDEX IX_RepositoryBranches_RepositoryId_BranchName ON RepositoryBranches (RepositoryId, BranchName)");
+                await setupContext.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys=ON");
+            }
+
+            await RunInitializerAsync(dbPath);
+
+            await using var verificationContext = CreateContext(dbPath);
+            Assert.True(await TableExistsAsync(verificationContext, "BranchGenerationTasks"));
+            Assert.True(await TableExistsAsync(verificationContext, "RepositoryGenerationLocks"));
+            Assert.True(await ColumnExistsAsync(verificationContext, "RepositoryBranches", "GenerationStatus"));
+            Assert.True(await ColumnExistsAsync(verificationContext, "RepositoryBranches", "LastGenerationTaskId"));
+            Assert.True(await ColumnExistsAsync(verificationContext, "RepositoryBranches", "LastGenerationError"));
+            Assert.True(await ColumnExistsAsync(verificationContext, "RepositoryBranches", "LastGenerationStartedAt"));
+            Assert.True(await ColumnExistsAsync(verificationContext, "RepositoryBranches", "LastGenerationCompletedAt"));
+            Assert.True(await ColumnExistsAsync(verificationContext, "RepositoryProcessingLogs", "BranchId"));
+            Assert.True(await ColumnExistsAsync(verificationContext, "RepositoryProcessingLogs", "GenerationTaskId"));
+        }
+        finally
+        {
+            DeleteDatabase(dbPath);
+        }
+    }
+
+    [Fact]
     public async Task InitializeAsync_WhenGpt5ModelProviderTypeIsMissing_BackfillsResponses()
     {
         var dbPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.db");

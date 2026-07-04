@@ -163,6 +163,64 @@ public class RepositorySourceSubmitTests
     }
 
     [Fact]
+    public async Task SubmitAsync_WhenRepositoryExistsWithDifferentBranch_AddsBranchToExistingRepository()
+    {
+        using var context = CreateContext();
+        var repository = new Repository
+        {
+            Id = Guid.NewGuid().ToString(),
+            OwnerUserId = "user-1",
+            GitUrl = "https://github.com/YD-HW/services-youdao-input-event-monitor.git",
+            OrgName = "YD_HW/services",
+            RepoName = "youdao-input-event-monitor",
+            Status = RepositoryStatus.Completed,
+            IsPublic = false
+        };
+        var existingBranch = new RepositoryBranch
+        {
+            Id = Guid.NewGuid().ToString(),
+            RepositoryId = repository.Id,
+            BranchName = "smart-hw/os_services_develop",
+            LastCommitId = "a-commit",
+            LastProcessedAt = DateTime.UtcNow
+        };
+        context.Repositories.Add(repository);
+        context.RepositoryBranches.Add(existingBranch);
+        context.BranchLanguages.Add(new BranchLanguage
+        {
+            Id = Guid.NewGuid().ToString(),
+            RepositoryBranchId = existingBranch.Id,
+            LanguageCode = "zh",
+            IsDefault = true
+        });
+        await context.SaveChangesAsync();
+        var service = CreateService(context, new RepositoryAnalyzerOptions());
+
+        var returnedRepository = await service.SubmitAsync(new RepositorySubmitRequest
+        {
+            GitUrl = repository.GitUrl,
+            OrgName = repository.OrgName,
+            RepoName = repository.RepoName,
+            BranchName = "smart-hw/rv1106_develop",
+            LanguageCode = "zh",
+            IsPublic = false
+        });
+
+        Assert.Equal(repository.Id, returnedRepository.Id);
+        Assert.Equal(RepositoryStatus.Completed, returnedRepository.Status);
+        Assert.Equal(1, await context.Repositories.CountAsync());
+        var branches = await context.RepositoryBranches
+            .Where(branch => branch.RepositoryId == repository.Id)
+            .OrderBy(branch => branch.BranchName)
+            .ToListAsync();
+        Assert.Equal(["smart-hw/os_services_develop", "smart-hw/rv1106_develop"], branches.Select(branch => branch.BranchName));
+        var newBranch = branches.Single(branch => branch.BranchName == "smart-hw/rv1106_develop");
+        var newLanguage = await context.BranchLanguages.SingleAsync(language => language.RepositoryBranchId == newBranch.Id);
+        Assert.Equal("zh", newLanguage.LanguageCode);
+        Assert.True(newLanguage.IsDefault);
+    }
+
+    [Fact]
     public async Task SubmitAsync_WhenGenerateSkillIsFalse_ShouldPersistFalse()
     {
         using var context = CreateContext();

@@ -28,21 +28,39 @@ public class RepositoryService(
     {
         var currentUserId = GetCurrentUserId();
 
-        if (!request.IsPublic && string.IsNullOrWhiteSpace(request.AuthAccount) && string.IsNullOrWhiteSpace(request.AuthPassword))
-        {
-            throw new InvalidOperationException("仓库凭据为空时不允许设置为私有");
-        }
+        var branchName = NormalizeBranchName(request.BranchName);
 
         // 校验是否已存在相同仓库（相同 GitUrl + BranchName）
         var exists = await context.Repositories
             .AsNoTracking()
             .Where(r => r.GitUrl == request.GitUrl && !r.IsDeleted)
             .Join(context.RepositoryBranches, r => r.Id, b => b.RepositoryId, (r, b) => b)
-            .AnyAsync(b => b.BranchName == request.BranchName);
+            .AnyAsync(b => b.BranchName == branchName);
 
         if (exists)
         {
             throw new InvalidOperationException("该仓库的相同分支已存在，请勿重复提交");
+        }
+
+        var existingRepository = await context.Repositories
+            .FirstOrDefaultAsync(r =>
+                r.GitUrl == request.GitUrl &&
+                r.OrgName == request.OrgName &&
+                r.RepoName == request.RepoName &&
+                !r.IsDeleted);
+
+        if (existingRepository is not null)
+        {
+            return await AddBranchToExistingRepositoryAsync(
+                existingRepository,
+                currentUserId,
+                branchName,
+                request.LanguageCode);
+        }
+
+        if (!request.IsPublic && string.IsNullOrWhiteSpace(request.AuthAccount) && string.IsNullOrWhiteSpace(request.AuthPassword))
+        {
+            throw new InvalidOperationException("仓库凭据为空时不允许设置为私有");
         }
 
         // 获取公开仓库的star和fork数
@@ -75,7 +93,7 @@ public class RepositoryService(
             request.GitUrl,
             request.RepoName,
             request.OrgName,
-            request.BranchName,
+            branchName,
             request.LanguageCode,
             effectiveIsPublic,
             request.GenerateSkill,
@@ -647,6 +665,51 @@ public class RepositoryService(
         context.BranchLanguages.Add(language);
 
         await context.SaveChangesAsync();
+        return repository;
+    }
+
+    private async Task<Repository> AddBranchToExistingRepositoryAsync(
+        Repository repository,
+        string currentUserId,
+        string branchName,
+        string languageCode)
+    {
+        if (repository.OwnerUserId != currentUserId && userContext.User?.IsInRole("Admin") != true)
+        {
+            throw new UnauthorizedAccessException("无权限向该仓库添加分支");
+        }
+
+        var branchExists = await context.RepositoryBranches
+            .AnyAsync(branch =>
+                branch.RepositoryId == repository.Id &&
+                branch.BranchName == branchName &&
+                !branch.IsDeleted);
+
+        if (branchExists)
+        {
+            throw new InvalidOperationException("该仓库的相同分支已存在，请勿重复提交");
+        }
+
+        var branch = new RepositoryBranch
+        {
+            Id = Guid.NewGuid().ToString(),
+            RepositoryId = repository.Id,
+            BranchName = branchName
+        };
+
+        var language = new BranchLanguage
+        {
+            Id = Guid.NewGuid().ToString(),
+            RepositoryBranchId = branch.Id,
+            LanguageCode = languageCode,
+            UpdateSummary = string.Empty,
+            IsDefault = true
+        };
+
+        context.RepositoryBranches.Add(branch);
+        context.BranchLanguages.Add(language);
+        await context.SaveChangesAsync();
+
         return repository;
     }
 
