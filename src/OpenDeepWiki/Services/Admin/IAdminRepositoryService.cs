@@ -33,6 +33,12 @@ public interface IAdminRepositoryService
     /// </summary>
     Task<AdminRepositoryManagementDto?> GetRepositoryManagementAsync(string id);
 
+    Task<AdminRepositoryScanPlanDto?> GetScanPlanAsync(string id);
+
+    Task<AdminRepositoryScanPlanDto?> UpdateScanPlanAsync(string id, UpdateRepositoryScanPlanRequest request);
+
+    Task<AdminRepositoryScanPlanOperationResult?> ReevaluateScanPlanAsync(string id, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// 管理端触发全量重生成
     /// </summary>

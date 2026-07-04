@@ -29,6 +29,8 @@ public class AdminRepositoryDto
     public bool GenerateSkill { get; set; }
     public int Status { get; set; }
     public string StatusText { get; set; } = string.Empty;
+    public string ScanDepthMode { get; set; } = RepositoryScanDepthMode.Auto.ToString();
+    public AdminRepositoryScanPlanDto? ScanPlan { get; set; }
     public int StarCount { get; set; }
     public int ForkCount { get; set; }
     public int BookmarkCount { get; set; }
@@ -115,6 +117,41 @@ public class AdminRepositoryManagementDto
     public string StatusText { get; set; } = string.Empty;
     public List<AdminRepositoryBranchDto> Branches { get; set; } = new();
     public List<AdminIncrementalTaskDto> RecentIncrementalTasks { get; set; } = new();
+    public AdminRepositoryScanPlanDto? ScanPlan { get; set; }
+}
+
+public class AdminRepositoryScanPlanDto
+{
+    public string Source { get; set; } = string.Empty;
+    public string Mode { get; set; } = RepositoryScanDepthMode.Auto.ToString();
+    public int DirectoryTreeDepth { get; set; }
+    public int FileListDepth { get; set; }
+    public int MaxTreeNodes { get; set; }
+    public int MaxFilesPerDirectory { get; set; }
+    public int MaxTotalFiles { get; set; }
+    public List<string> ExtraExcludedDirs { get; set; } = new();
+    public string? ProfileHash { get; set; }
+    public string? Reason { get; set; }
+    public double? Confidence { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+public class UpdateRepositoryScanPlanRequest
+{
+    public string Mode { get; set; } = RepositoryScanDepthMode.Auto.ToString();
+    public int? DirectoryTreeDepth { get; set; }
+    public int? FileListDepth { get; set; }
+    public int? MaxTreeNodes { get; set; }
+    public int? MaxFilesPerDirectory { get; set; }
+    public int? MaxTotalFiles { get; set; }
+    public List<string>? ExtraExcludedDirs { get; set; }
+}
+
+public class AdminRepositoryScanPlanOperationResult
+{
+    public bool Success { get; set; }
+    public string? Message { get; set; }
+    public AdminRepositoryScanPlanDto? ScanPlan { get; set; }
 }
 
 /// <summary>

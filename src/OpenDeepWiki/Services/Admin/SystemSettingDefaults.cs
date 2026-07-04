@@ -30,11 +30,20 @@ public static class SystemSettingDefaults
         ("WIKI_LANGUAGES", "ai", "Supported languages (comma-separated)"),
         ("WIKI_PARALLEL_COUNT", "ai", "Number of parallel document generation tasks"),
         ("WIKI_MAX_OUTPUT_TOKENS", "ai", "Maximum output token count"),
+        ("WIKI_MAX_DOCUMENT_APPEND_OPERATIONS", "ai", "Maximum AppendDoc calls per generated document"),
+        ("WIKI_MAX_DOCUMENT_SOURCE_TOOL_CALLS", "ai", "Maximum ReadFile/ListFiles/Grep calls per generated document"),
+        ("WIKI_MAX_DOCUMENT_TOOL_CALLS", "ai", "Maximum total tool calls per generated document before early completion"),
+        ("WIKI_MAX_CATALOG_SOURCE_TOOL_CALLS", "ai", "Maximum ReadFile/ListFiles/Grep calls during catalog generation"),
         ("WIKI_DOCUMENT_GENERATION_TIMEOUT_MINUTES", "ai", "Document generation timeout (minutes)"),
         ("WIKI_TRANSLATION_TIMEOUT_MINUTES", "ai", "Translation timeout (minutes)"),
         ("WIKI_TITLE_TRANSLATION_TIMEOUT_MINUTES", "ai", "Title translation timeout (minutes)"),
         ("WIKI_README_MAX_LENGTH", "ai", "Maximum README content length"),
         ("WIKI_DIRECTORY_TREE_MAX_DEPTH", "ai", "Maximum directory tree depth"),
+        ("WIKI_FILE_LIST_MAX_DEPTH", "ai", "Maximum file list depth"),
+        ("WIKI_MAX_TREE_NODES", "ai", "Maximum directory tree nodes"),
+        ("WIKI_MAX_FILES_PER_DIRECTORY", "ai", "Maximum files shown per directory"),
+        ("WIKI_MAX_TOTAL_TREE_FILES", "ai", "Maximum total files shown in directory tree"),
+        ("WIKI_ENABLE_AI_SCAN_PROFILE", "ai", "Enable AI-assisted repository scan profiling"),
         ("WIKI_MAX_RETRY_ATTEMPTS", "ai", "Maximum retry attempts"),
         ("WIKI_RETRY_DELAY_MS", "ai", "Retry delay (milliseconds)"),
         ("WIKI_PROMPTS_DIRECTORY", "ai", "Prompt templates directory")
@@ -117,11 +126,20 @@ public static class SystemSettingDefaults
             "WIKI_LANGUAGES" => options.Languages,
             "WIKI_PARALLEL_COUNT" => options.ParallelCount.ToString(),
             "WIKI_MAX_OUTPUT_TOKENS" => options.MaxOutputTokens.ToString(),
+            "WIKI_MAX_DOCUMENT_APPEND_OPERATIONS" => options.MaxDocumentAppendOperations.ToString(),
+            "WIKI_MAX_DOCUMENT_SOURCE_TOOL_CALLS" => options.MaxDocumentSourceToolCalls.ToString(),
+            "WIKI_MAX_DOCUMENT_TOOL_CALLS" => options.MaxDocumentToolCalls.ToString(),
+            "WIKI_MAX_CATALOG_SOURCE_TOOL_CALLS" => options.MaxCatalogSourceToolCalls.ToString(),
             "WIKI_DOCUMENT_GENERATION_TIMEOUT_MINUTES" => options.DocumentGenerationTimeoutMinutes.ToString(),
             "WIKI_TRANSLATION_TIMEOUT_MINUTES" => options.TranslationTimeoutMinutes.ToString(),
             "WIKI_TITLE_TRANSLATION_TIMEOUT_MINUTES" => options.TitleTranslationTimeoutMinutes.ToString(),
             "WIKI_README_MAX_LENGTH" => options.ReadmeMaxLength.ToString(),
             "WIKI_DIRECTORY_TREE_MAX_DEPTH" => options.DirectoryTreeMaxDepth.ToString(),
+            "WIKI_FILE_LIST_MAX_DEPTH" => options.FileListMaxDepth.ToString(),
+            "WIKI_MAX_TREE_NODES" => options.MaxTreeNodes.ToString(),
+            "WIKI_MAX_FILES_PER_DIRECTORY" => options.MaxFilesPerDirectory.ToString(),
+            "WIKI_MAX_TOTAL_TREE_FILES" => options.MaxTotalTreeFiles.ToString(),
+            "WIKI_ENABLE_AI_SCAN_PROFILE" => options.EnableAiScanProfile.ToString(),
             "WIKI_MAX_RETRY_ATTEMPTS" => options.MaxRetryAttempts.ToString(),
             "WIKI_RETRY_DELAY_MS" => options.RetryDelayMs.ToString(),
             "WIKI_PROMPTS_DIRECTORY" => options.PromptsDirectory,
@@ -160,6 +178,18 @@ public static class SystemSettingDefaults
             case "WIKI_MAX_OUTPUT_TOKENS" when int.TryParse(value, out var maxTokens):
                 options.MaxOutputTokens = maxTokens;
                 break;
+            case "WIKI_MAX_DOCUMENT_APPEND_OPERATIONS" when int.TryParse(value, out var maxDocumentAppendOperations):
+                options.MaxDocumentAppendOperations = maxDocumentAppendOperations;
+                break;
+            case "WIKI_MAX_DOCUMENT_SOURCE_TOOL_CALLS" when int.TryParse(value, out var maxDocumentSourceToolCalls):
+                options.MaxDocumentSourceToolCalls = maxDocumentSourceToolCalls;
+                break;
+            case "WIKI_MAX_DOCUMENT_TOOL_CALLS" when int.TryParse(value, out var maxDocumentToolCalls):
+                options.MaxDocumentToolCalls = maxDocumentToolCalls;
+                break;
+            case "WIKI_MAX_CATALOG_SOURCE_TOOL_CALLS" when int.TryParse(value, out var maxCatalogSourceToolCalls):
+                options.MaxCatalogSourceToolCalls = maxCatalogSourceToolCalls;
+                break;
             case "WIKI_DOCUMENT_GENERATION_TIMEOUT_MINUTES" when int.TryParse(value, out var docTimeout):
                 options.DocumentGenerationTimeoutMinutes = docTimeout;
                 break;
@@ -174,6 +204,21 @@ public static class SystemSettingDefaults
                 break;
             case "WIKI_DIRECTORY_TREE_MAX_DEPTH" when int.TryParse(value, out var treeDepth):
                 options.DirectoryTreeMaxDepth = treeDepth;
+                break;
+            case "WIKI_FILE_LIST_MAX_DEPTH" when int.TryParse(value, out var fileDepth):
+                options.FileListMaxDepth = fileDepth;
+                break;
+            case "WIKI_MAX_TREE_NODES" when int.TryParse(value, out var maxTreeNodes):
+                options.MaxTreeNodes = maxTreeNodes;
+                break;
+            case "WIKI_MAX_FILES_PER_DIRECTORY" when int.TryParse(value, out var maxFilesPerDirectory):
+                options.MaxFilesPerDirectory = maxFilesPerDirectory;
+                break;
+            case "WIKI_MAX_TOTAL_TREE_FILES" when int.TryParse(value, out var maxTotalTreeFiles):
+                options.MaxTotalTreeFiles = maxTotalTreeFiles;
+                break;
+            case "WIKI_ENABLE_AI_SCAN_PROFILE" when bool.TryParse(value, out var enableAiScanProfile):
+                options.EnableAiScanProfile = enableAiScanProfile;
                 break;
             case "WIKI_MAX_RETRY_ATTEMPTS" when int.TryParse(value, out var retryAttempts):
                 options.MaxRetryAttempts = retryAttempts;

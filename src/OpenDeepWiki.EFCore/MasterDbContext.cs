@@ -122,6 +122,15 @@ public abstract class MasterDbContext : DbContext, IContext
         modelBuilder.Entity<Repository>()
             .Property(repository => repository.GenerateSkill)
             .HasAnnotation("Relational:DefaultValue", true);
+        modelBuilder.Entity<Repository>()
+            .Property(repository => repository.ScanDepthMode)
+            .HasAnnotation("Relational:DefaultValue", RepositoryScanDepthMode.Auto);
+        modelBuilder.Entity<Repository>()
+            .Property(repository => repository.ExtraExcludedDirsJson)
+            .HasMaxLength(2000);
+        modelBuilder.Entity<Repository>()
+            .Property(repository => repository.ScanProfileConfidence)
+            .HasPrecision(5, 4);
 
         modelBuilder.Entity<RepositoryBranch>()
             .HasIndex(branch => new { branch.RepositoryId, branch.BranchName })

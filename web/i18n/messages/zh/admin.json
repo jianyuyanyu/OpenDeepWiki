@@ -316,7 +316,37 @@
         "actions": "操作"
       },
       "retryFailedTask": "重试此失败任务",
-      "retryOnlyFailed": "仅失败任务可以重试"
+      "retryOnlyFailed": "仅失败任务可以重试",
+      "scanPlan": {
+        "title": "扫描策略配置",
+        "hint": "策略应用于该仓库所有分支。",
+        "mode": "策略模式",
+        "modeAuto": "自动评估 (Auto)",
+        "modeManual": "手动配置 (Manual)",
+        "resolvedPlan": "生效的扫描策略 (Resolved Plan)",
+        "source": "策略来源",
+        "directoryTreeDepth": "目录树最大深度",
+        "fileListDepth": "文件列表最大深度",
+        "maxTreeNodes": "最大目录树节点数",
+        "maxFilesPerDirectory": "每目录最大文件数",
+        "maxTotalFiles": "最大总文件数",
+        "extraExcludedDirs": "额外排除目录 (逗号分隔)",
+        "reason": "评估原因 / 依据",
+        "confidence": "置信度",
+        "updatedAt": "更新时间",
+        "reevaluate": "重新评估",
+        "reevaluating": "评估中...",
+        "save": "保存配置",
+        "saving": "保存中...",
+        "saveSuccess": "扫描策略保存成功",
+        "reevaluateSuccess": "扫描策略重新评估成功",
+        "invalidNumber": "请输入有效的数字",
+        "minLimit": "数值不能小于 0",
+        "manualConfig": "手动参数配置",
+        "autoPlanTitle": "评估计划参数",
+        "noPlan": "暂无策略数据",
+        "saveFirst": "扫描策略已被修改，请先保存"
+      }
     }
   },
   "users": {

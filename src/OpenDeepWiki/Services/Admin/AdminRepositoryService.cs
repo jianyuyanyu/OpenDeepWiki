@@ -16,17 +16,23 @@ public class AdminRepositoryService : IAdminRepositoryService
     private readonly IGitPlatformService _gitPlatformService;
     private readonly IRepositoryAnalyzer _repositoryAnalyzer;
     private readonly IWikiGenerator _wikiGenerator;
+    private readonly IRepositoryFullRegenerationCleaner _fullRegenerationCleaner;
+    private readonly IRepositoryScanPlanResolver _scanPlanResolver;
 
     public AdminRepositoryService(
         IContext context,
         IGitPlatformService gitPlatformService,
         IRepositoryAnalyzer repositoryAnalyzer,
-        IWikiGenerator wikiGenerator)
+        IWikiGenerator wikiGenerator,
+        IRepositoryFullRegenerationCleaner fullRegenerationCleaner,
+        IRepositoryScanPlanResolver scanPlanResolver)
     {
         _context = context;
         _gitPlatformService = gitPlatformService;
         _repositoryAnalyzer = repositoryAnalyzer;
         _wikiGenerator = wikiGenerator;
+        _fullRegenerationCleaner = fullRegenerationCleaner;
+        _scanPlanResolver = scanPlanResolver;
     }
 
     public async Task<AdminRepositoryListResponse> GetRepositoriesAsync(int page, int pageSize, string? search, int? status)
@@ -60,6 +66,7 @@ public class AdminRepositoryService : IAdminRepositoryService
                 GenerateSkill = r.GenerateSkill,
                 Status = (int)r.Status,
                 StatusText = GetStatusText(r.Status),
+                ScanDepthMode = r.ScanDepthMode.ToString(),
                 StarCount = r.StarCount,
                 ForkCount = r.ForkCount,
                 BookmarkCount = r.BookmarkCount,
@@ -99,6 +106,8 @@ public class AdminRepositoryService : IAdminRepositoryService
             GenerateSkill = repo.GenerateSkill,
             Status = (int)repo.Status,
             StatusText = GetStatusText(repo.Status),
+            ScanDepthMode = repo.ScanDepthMode.ToString(),
+            ScanPlan = ToScanPlanDto(_scanPlanResolver.Resolve(repo)),
             StarCount = repo.StarCount,
             ForkCount = repo.ForkCount,
             BookmarkCount = repo.BookmarkCount,
@@ -326,6 +335,25 @@ public class AdminRepositoryService : IAdminRepositoryService
         RepositoryStatus.Failed => "失败",
         _ => "未知"
     };
+
+    private static AdminRepositoryScanPlanDto ToScanPlanDto(ResolvedRepositoryScanPlan plan)
+    {
+        return new AdminRepositoryScanPlanDto
+        {
+            Source = plan.Source,
+            Mode = plan.Mode.ToString(),
+            DirectoryTreeDepth = plan.DirectoryTreeDepth,
+            FileListDepth = plan.FileListDepth,
+            MaxTreeNodes = plan.MaxTreeNodes,
+            MaxFilesPerDirectory = plan.MaxFilesPerDirectory,
+            MaxTotalFiles = plan.MaxTotalFiles,
+            ExtraExcludedDirs = plan.ExtraExcludedDirs.ToList(),
+            ProfileHash = plan.ProfileHash,
+            Reason = plan.Reason,
+            Confidence = plan.Confidence,
+            UpdatedAt = plan.UpdatedAt
+        };
+    }
 
     public async Task<SyncStatsResult> SyncRepositoryStatsAsync(string id)
     {
@@ -564,8 +592,135 @@ public class AdminRepositoryService : IAdminRepositoryService
             Status = (int)repository.Status,
             StatusText = GetStatusText(repository.Status),
             Branches = branchDtos,
-            RecentIncrementalTasks = taskDtos
+            RecentIncrementalTasks = taskDtos,
+            ScanPlan = ToScanPlanDto(_scanPlanResolver.Resolve(repository))
         };
+    }
+
+    public async Task<AdminRepositoryScanPlanDto?> GetScanPlanAsync(string id)
+    {
+        var repository = await _context.Repositories
+            .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
+        return repository == null ? null : ToScanPlanDto(_scanPlanResolver.Resolve(repository));
+    }
+
+    public async Task<AdminRepositoryScanPlanDto?> UpdateScanPlanAsync(string id, UpdateRepositoryScanPlanRequest request)
+    {
+        var repository = await _context.Repositories
+            .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
+        if (repository == null)
+        {
+            return null;
+        }
+
+        var previousMode = repository.ScanDepthMode;
+        var requestedMode = ParseScanDepthMode(request.Mode);
+        var hasExplicitPlanValues =
+            request.DirectoryTreeDepth.HasValue ||
+            request.FileListDepth.HasValue ||
+            request.MaxTreeNodes.HasValue ||
+            request.MaxFilesPerDirectory.HasValue ||
+            request.MaxTotalFiles.HasValue ||
+            request.ExtraExcludedDirs is { Count: > 0 };
+
+        repository.ScanDepthMode = requestedMode;
+        if (requestedMode == RepositoryScanDepthMode.Auto && !hasExplicitPlanValues)
+        {
+            if (previousMode == RepositoryScanDepthMode.Manual)
+            {
+                repository.DirectoryTreeDepthOverride = null;
+                repository.FileListDepthOverride = null;
+                repository.MaxTreeNodes = null;
+                repository.MaxFilesPerDirectory = null;
+                repository.MaxTotalFiles = null;
+                repository.ExtraExcludedDirsJson = null;
+                repository.ScanProfileHash = null;
+                repository.ScanProfileReason = null;
+                repository.ScanProfileConfidence = null;
+                repository.ScanProfileUpdatedAt = null;
+            }
+        }
+        else
+        {
+            repository.DirectoryTreeDepthOverride = request.DirectoryTreeDepth;
+            repository.FileListDepthOverride = request.FileListDepth;
+            repository.MaxTreeNodes = request.MaxTreeNodes;
+            repository.MaxFilesPerDirectory = request.MaxFilesPerDirectory;
+            repository.MaxTotalFiles = request.MaxTotalFiles;
+            repository.ExtraExcludedDirsJson = RepositoryScanPlanResolver.SerializeExcludedDirs(request.ExtraExcludedDirs);
+        }
+
+        if (repository.ScanDepthMode == RepositoryScanDepthMode.Manual)
+        {
+            repository.ScanProfileHash = null;
+            repository.ScanProfileReason = null;
+            repository.ScanProfileConfidence = null;
+            repository.ScanProfileUpdatedAt = null;
+        }
+        repository.UpdateTimestamp();
+
+        _context.Repositories.Update(repository);
+        await _context.SaveChangesAsync();
+
+        return ToScanPlanDto(_scanPlanResolver.Resolve(repository));
+    }
+
+    public async Task<AdminRepositoryScanPlanOperationResult?> ReevaluateScanPlanAsync(string id, CancellationToken cancellationToken = default)
+    {
+        var repository = await _context.Repositories
+            .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted, cancellationToken);
+        if (repository == null)
+        {
+            return null;
+        }
+
+        if (repository.Status is RepositoryStatus.Pending or RepositoryStatus.Processing)
+        {
+            return new AdminRepositoryScanPlanOperationResult
+            {
+                Success = false,
+                Message = "仓库正在处理中，无法重新评估扫描策略",
+                ScanPlan = ToScanPlanDto(_scanPlanResolver.Resolve(repository))
+            };
+        }
+
+        var branch = await _context.RepositoryBranches
+            .Where(b => b.RepositoryId == id && !b.IsDeleted)
+            .OrderByDescending(b => b.LastProcessedAt)
+            .ThenBy(b => b.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (branch == null)
+        {
+            return new AdminRepositoryScanPlanOperationResult
+            {
+                Success = false,
+                Message = "仓库没有可评估的分支",
+                ScanPlan = ToScanPlanDto(_scanPlanResolver.Resolve(repository))
+            };
+        }
+
+        var workspace = await _repositoryAnalyzer.PrepareWorkspaceAsync(repository, branch.BranchName, branch.LastCommitId, cancellationToken);
+        try
+        {
+            var plan = await _scanPlanResolver.ReevaluateAsync(_context, repository, workspace.WorkingDirectory, cancellationToken);
+            return new AdminRepositoryScanPlanOperationResult
+            {
+                Success = true,
+                Message = "扫描策略已重新评估",
+                ScanPlan = ToScanPlanDto(plan)
+            };
+        }
+        finally
+        {
+            await _repositoryAnalyzer.CleanupWorkspaceAsync(workspace, cancellationToken);
+        }
+    }
+
+    private static RepositoryScanDepthMode ParseScanDepthMode(string? mode)
+    {
+        return Enum.TryParse<RepositoryScanDepthMode>(mode, ignoreCase: true, out var parsed)
+            ? parsed
+            : RepositoryScanDepthMode.Auto;
     }
 
     public async Task<AdminRepositoryOperationResult> RegenerateRepositoryAsync(string id)
@@ -591,52 +746,7 @@ public class AdminRepositoryService : IAdminRepositoryService
             };
         }
 
-        if (repository.Status == RepositoryStatus.Completed)
-        {
-            // Full regeneration for completed repositories starts from a clean document set.
-            var branchLanguageIds = await _context.RepositoryBranches
-                .Where(b => b.RepositoryId == repository.Id && !b.IsDeleted)
-                .Join(
-                    _context.BranchLanguages.Where(l => !l.IsDeleted),
-                    b => b.Id,
-                    l => l.RepositoryBranchId,
-                    (b, l) => l.Id)
-                .ToListAsync();
-
-            var oldCatalogs = await _context.DocCatalogs
-                .Where(c => branchLanguageIds.Contains(c.BranchLanguageId) && !c.IsDeleted)
-                .ToListAsync();
-
-            var docFileIds = oldCatalogs
-                .Where(c => c.DocFileId != null)
-                .Select(c => c.DocFileId!)
-                .Distinct()
-                .ToList();
-
-            if (oldCatalogs.Count > 0)
-            {
-                _context.DocCatalogs.RemoveRange(oldCatalogs);
-            }
-
-            if (docFileIds.Count > 0)
-            {
-                var oldDocFiles = await _context.DocFiles
-                    .Where(file => docFileIds.Contains(file.Id))
-                    .ToListAsync();
-                if (oldDocFiles.Count > 0)
-                {
-                    _context.DocFiles.RemoveRange(oldDocFiles);
-                }
-            }
-        }
-
-        var oldLogs = await _context.RepositoryProcessingLogs
-            .Where(log => log.RepositoryId == repository.Id)
-            .ToListAsync();
-        if (oldLogs.Count > 0)
-        {
-            _context.RepositoryProcessingLogs.RemoveRange(oldLogs);
-        }
+        await _fullRegenerationCleaner.CleanAsync(_context, repository);
 
         repository.Status = RepositoryStatus.Pending;
         repository.UpdateTimestamp();

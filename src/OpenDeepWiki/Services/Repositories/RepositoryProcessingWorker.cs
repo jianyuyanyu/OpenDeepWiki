@@ -58,6 +58,7 @@ public class RepositoryProcessingWorker(
         var wikiGenerator = scope.ServiceProvider.GetService<IWikiGenerator>();
         var processingLogService = scope.ServiceProvider.GetService<IProcessingLogService>();
         var skillMarkdownBuilder = scope.ServiceProvider.GetService<IRepositorySkillMarkdownBuilder>();
+        var scanPlanResolver = scope.ServiceProvider.GetService<IRepositoryScanPlanResolver>();
 
         if (context is null)
         {
@@ -128,6 +129,7 @@ public class RepositoryProcessingWorker(
                     repositoryAnalyzer, 
                     wikiGenerator,
                     skillMarkdownBuilder,
+                    scanPlanResolver,
                     processingLogService,
                     stoppingToken);
 
@@ -186,6 +188,7 @@ public class RepositoryProcessingWorker(
         IRepositoryAnalyzer repositoryAnalyzer,
         IWikiGenerator wikiGenerator,
         IRepositorySkillMarkdownBuilder? skillMarkdownBuilder,
+        IRepositoryScanPlanResolver? scanPlanResolver,
         IProcessingLogService? processingLogService,
         CancellationToken stoppingToken)
     {
@@ -217,6 +220,7 @@ public class RepositoryProcessingWorker(
                 repositoryAnalyzer,
                 wikiGenerator,
                 skillMarkdownBuilder,
+                scanPlanResolver,
                 processingLogService,
                 stoppingToken);
         }
@@ -232,6 +236,7 @@ public class RepositoryProcessingWorker(
         IRepositoryAnalyzer repositoryAnalyzer,
         IWikiGenerator wikiGenerator,
         IRepositorySkillMarkdownBuilder? skillMarkdownBuilder,
+        IRepositoryScanPlanResolver? scanPlanResolver,
         IProcessingLogService? processingLogService,
         CancellationToken stoppingToken)
     {
@@ -257,6 +262,34 @@ public class RepositoryProcessingWorker(
         logger.LogDebug(
             "Workspace prepared. WorkingDirectory: {WorkingDirectory}, CurrentCommit: {CurrentCommit}, PreviousCommit: {PreviousCommit}, IsIncremental: {IsIncremental}",
             workspace.WorkingDirectory, workspace.CommitId, workspace.PreviousCommitId ?? "none", workspace.IsIncremental);
+
+        if (scanPlanResolver != null)
+        {
+            var scanPlan = await scanPlanResolver.ResolveAndEnsureAsync(
+                context,
+                repository,
+                workspace.WorkingDirectory,
+                stoppingToken);
+            logger.LogInformation(
+                "Resolved repository scan plan. RepositoryId: {RepositoryId}, Source: {Source}, DirectoryDepth: {DirectoryDepth}, FileDepth: {FileDepth}, MaxTreeNodes: {MaxTreeNodes}, MaxFilesPerDirectory: {MaxFilesPerDirectory}, MaxTotalFiles: {MaxTotalFiles}, ProfileHash: {ProfileHash}",
+                repository.Id,
+                scanPlan.Source,
+                scanPlan.DirectoryTreeDepth,
+                scanPlan.FileListDepth,
+                scanPlan.MaxTreeNodes,
+                scanPlan.MaxFilesPerDirectory,
+                scanPlan.MaxTotalFiles,
+                scanPlan.ProfileHash ?? "none");
+
+            if (processingLogService != null)
+            {
+                await processingLogService.LogAsync(
+                    repository.Id,
+                    ProcessingStep.Workspace,
+                    $"Resolved scan plan: {scanPlan.Source}, directoryDepth={scanPlan.DirectoryTreeDepth}, fileDepth={scanPlan.FileListDepth}, maxNodes={scanPlan.MaxTreeNodes}, maxFilesPerDirectory={scanPlan.MaxFilesPerDirectory}, maxTotalFiles={scanPlan.MaxTotalFiles}, profileHash={scanPlan.ProfileHash ?? "none"}",
+                    cancellationToken: stoppingToken);
+            }
+        }
 
         // 记录工作区准备完成
         if (processingLogService != null)

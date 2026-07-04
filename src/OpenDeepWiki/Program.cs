@@ -169,6 +169,8 @@ try
             }
         });
     builder.Services.AddScoped<IRepositoryAnalyzer, RepositoryAnalyzer>();
+    builder.Services.AddScoped<IRepositoryFullRegenerationCleaner, RepositoryFullRegenerationCleaner>();
+    builder.Services.AddScoped<IRepositoryScanPlanResolver, RepositoryScanPlanResolver>();
 
     // Configure Graphify artifact generation
     builder.Services.AddOptions<GraphifyOptions>()

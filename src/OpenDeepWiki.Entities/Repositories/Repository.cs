@@ -15,6 +15,15 @@ public enum RepositoryStatus
 }
 
 /// <summary>
+/// 仓库扫描策略模式
+/// </summary>
+public enum RepositoryScanDepthMode
+{
+    Auto = 0,
+    Manual = 1
+}
+
+/// <summary>
 /// 仓库实体
 /// </summary>
 public class Repository : AggregateRoot<string>
@@ -81,6 +90,33 @@ public class Repository : AggregateRoot<string>
     /// This is unrelated to the system managed agent skills registry.
     /// </summary>
     public bool GenerateSkill { get; set; } = true;
+
+    /// <summary>
+    /// 仓库扫描策略模式。默认 Auto，兼容旧仓库。
+    /// </summary>
+    public RepositoryScanDepthMode ScanDepthMode { get; set; } = RepositoryScanDepthMode.Auto;
+
+    public int? DirectoryTreeDepthOverride { get; set; }
+
+    public int? FileListDepthOverride { get; set; }
+
+    public int? MaxTreeNodes { get; set; }
+
+    public int? MaxFilesPerDirectory { get; set; }
+
+    public int? MaxTotalFiles { get; set; }
+
+    public string? ExtraExcludedDirsJson { get; set; }
+
+    [StringLength(128)]
+    public string? ScanProfileHash { get; set; }
+
+    [StringLength(1000)]
+    public string? ScanProfileReason { get; set; }
+
+    public double? ScanProfileConfidence { get; set; }
+
+    public DateTime? ScanProfileUpdatedAt { get; set; }
 
     /// <summary>
     /// 仓库处理状态

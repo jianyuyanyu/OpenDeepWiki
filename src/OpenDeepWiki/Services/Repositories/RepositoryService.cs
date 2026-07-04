@@ -19,6 +19,7 @@ public class RepositoryService(
     IUserContext userContext,
     IGitHubAppService gitHubAppService,
     IOrganizationService organizationService,
+    IRepositoryFullRegenerationCleaner fullRegenerationCleaner,
     IOptions<RepositoryAnalyzerOptions> repositoryOptions)
 {
     [HttpPost("/submit")]
@@ -470,51 +471,7 @@ public class RepositoryService(
             };
         }
 
-        if (repository.Status == RepositoryStatus.Completed)
-        {
-            // Full regeneration for completed repositories starts from a clean document set.
-            var branchLanguageIds = await context.RepositoryBranches
-                .Where(b => b.RepositoryId == repository.Id)
-                .Join(context.BranchLanguages, b => b.Id, l => l.RepositoryBranchId, (b, l) => l.Id)
-                .ToListAsync();
-
-            var oldCatalogs = await context.DocCatalogs
-                .Where(c => branchLanguageIds.Contains(c.BranchLanguageId))
-                .ToListAsync();
-
-            var docFileIds = oldCatalogs
-                .Where(c => c.DocFileId != null)
-                .Select(c => c.DocFileId!)
-                .Distinct()
-                .ToList();
-
-            if (oldCatalogs.Count > 0)
-            {
-                context.DocCatalogs.RemoveRange(oldCatalogs);
-            }
-
-            if (docFileIds.Count > 0)
-            {
-                var oldDocFiles = await context.DocFiles
-                    .Where(f => docFileIds.Contains(f.Id))
-                    .ToListAsync();
-
-                if (oldDocFiles.Count > 0)
-                {
-                    context.DocFiles.RemoveRange(oldDocFiles);
-                }
-            }
-        }
-
-        // 清空之前的处理日志
-        var oldLogs = await context.RepositoryProcessingLogs
-            .Where(log => log.RepositoryId == repository.Id)
-            .ToListAsync();
-        
-        if (oldLogs.Count > 0)
-        {
-            context.RepositoryProcessingLogs.RemoveRange(oldLogs);
-        }
+        await fullRegenerationCleaner.CleanAsync(context, repository);
 
         // 重置状态为 Pending，Worker 会自动拾取处理
         repository.Status = RepositoryStatus.Pending;

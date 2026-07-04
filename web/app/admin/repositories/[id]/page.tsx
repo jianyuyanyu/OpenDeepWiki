@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -53,6 +54,11 @@ import {
   syncRepositoryStats,
   triggerRepositoryIncrementalUpdate,
   updateRepositoryDocumentContent,
+  getRepositoryScanPlan,
+  updateRepositoryScanPlan,
+  reevaluateRepositoryScanPlan,
+  AdminRepositoryScanPlan,
+  UpdateRepositoryScanPlanPayload,
 } from "@/lib/admin-api";
 import { getRepositorySourceTypeLabelKey, isGitRepositorySource } from "@/lib/repository-source";
 import { fetchProcessingLogs, fetchRepoDoc, fetchRepoTree } from "@/lib/repository-api";
@@ -159,6 +165,17 @@ export default function AdminRepositoryManagementPage() {
   const [docDraft, setDocDraft] = useState("");
   const [savingDoc, setSavingDoc] = useState(false);
 
+  const [scanPlan, setScanPlan] = useState<AdminRepositoryScanPlan | null>(null);
+  const [scanMode, setScanMode] = useState<"Auto" | "Manual">("Auto");
+  const [directoryTreeDepthInput, setDirectoryTreeDepthInput] = useState<string>("");
+  const [fileListDepthInput, setFileListDepthInput] = useState<string>("");
+  const [maxTreeNodesInput, setMaxTreeNodesInput] = useState<string>("");
+  const [maxFilesPerDirectoryInput, setMaxFilesPerDirectoryInput] = useState<string>("");
+  const [maxTotalFilesInput, setMaxTotalFilesInput] = useState<string>("");
+  const [extraExcludedDirsInput, setExtraExcludedDirsInput] = useState<string>("");
+  const [savingScanPlan, setSavingScanPlan] = useState(false);
+  const [reevaluatingScanPlan, setReevaluatingScanPlan] = useState(false);
+
   const [selectedBranchId, setSelectedBranchId] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("");
   const [selectedDocSlug, setSelectedDocSlug] = useState("");
@@ -203,6 +220,39 @@ export default function AdminRepositoryManagementPage() {
     () => isEditingDoc && doc?.exists && docDraft !== (doc.content ?? ""),
     [isEditingDoc, doc, docDraft]
   );
+
+  const isScanPlanDirty = useMemo(() => {
+    if (!scanPlan) return false;
+    if (scanMode !== scanPlan.mode) return true;
+    if (scanMode === "Manual") {
+      const extraExcludedStr = (scanPlan.extraExcludedDirs ?? []).join(",");
+      const currentExtraExcludedStr = extraExcludedDirsInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+        .join(",");
+      if (
+        directoryTreeDepthInput !== (scanPlan.directoryTreeDepth?.toString() ?? "") ||
+        fileListDepthInput !== (scanPlan.fileListDepth?.toString() ?? "") ||
+        maxTreeNodesInput !== (scanPlan.maxTreeNodes?.toString() ?? "") ||
+        maxFilesPerDirectoryInput !== (scanPlan.maxFilesPerDirectory?.toString() ?? "") ||
+        maxTotalFilesInput !== (scanPlan.maxTotalFiles?.toString() ?? "") ||
+        currentExtraExcludedStr !== extraExcludedStr
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [
+    scanPlan,
+    scanMode,
+    directoryTreeDepthInput,
+    fileListDepthInput,
+    maxTreeNodesInput,
+    maxFilesPerDirectoryInput,
+    maxTotalFilesInput,
+    extraExcludedDirsInput,
+  ]);
 
   const confirmDiscardUnsavedChanges = useCallback(() => {
     if (!isDocDirty) return true;
@@ -388,14 +438,16 @@ export default function AdminRepositoryManagementPage() {
 
     setPageLoading(true);
     try {
-      const [repoData, managementData, graphifyData] = await Promise.all([
+      const [repoData, managementData, graphifyData, scanPlanData] = await Promise.all([
         getRepository(repositoryId),
         getRepositoryManagement(repositoryId),
         getRepositoryGraphifyArtifacts(repositoryId),
+        getRepositoryScanPlan(repositoryId),
       ]);
       setRepository(repoData);
       setManagement(managementData);
       setGraphifyArtifacts(graphifyData);
+      setScanPlan(scanPlanData);
     } catch (error) {
       console.error("Failed to load repository management data:", error);
       toast.error(t("admin.repositories.management.toasts.loadManagementFailed"));
@@ -551,6 +603,18 @@ export default function AdminRepositoryManagementPage() {
   }, [loadDoc]);
 
   useEffect(() => {
+    if (scanPlan) {
+      setScanMode(scanPlan.mode);
+      setDirectoryTreeDepthInput(scanPlan.directoryTreeDepth?.toString() ?? "");
+      setFileListDepthInput(scanPlan.fileListDepth?.toString() ?? "");
+      setMaxTreeNodesInput(scanPlan.maxTreeNodes?.toString() ?? "");
+      setMaxFilesPerDirectoryInput(scanPlan.maxFilesPerDirectory?.toString() ?? "");
+      setMaxTotalFilesInput(scanPlan.maxTotalFiles?.toString() ?? "");
+      setExtraExcludedDirsInput((scanPlan.extraExcludedDirs ?? []).join(", "));
+    }
+  }, [scanPlan]);
+
+  useEffect(() => {
     if (!isGraphifyArtifactActive || !repositoryId) {
       return;
     }
@@ -659,6 +723,10 @@ export default function AdminRepositoryManagementPage() {
 
   const handleRegenerateRepository = async () => {
     if (!repositoryId) return;
+    if (isScanPlanDirty) {
+      toast.warning(t("admin.repositories.management.scanPlan.saveFirst") || "扫描策略已被修改，请先保存");
+      return;
+    }
     if (!window.confirm(t("admin.repositories.management.confirmRegenerateAll"))) return;
 
     setRegeneratingRepo(true);
@@ -807,6 +875,10 @@ export default function AdminRepositoryManagementPage() {
       toast.warning(t("admin.repositories.management.incrementalNotSupported"));
       return;
     }
+    if (isScanPlanDirty) {
+      toast.warning(t("admin.repositories.management.scanPlan.saveFirst") || "扫描策略已被修改，请先保存");
+      return;
+    }
 
     setTriggeringIncremental(true);
     try {
@@ -822,6 +894,83 @@ export default function AdminRepositoryManagementPage() {
       toast.error(t("admin.repositories.management.toasts.triggerIncrementalFailed"));
     } finally {
       setTriggeringIncremental(false);
+    }
+  };
+
+  const handleSaveScanPlan = async () => {
+    if (!repositoryId) return;
+
+    const payload: UpdateRepositoryScanPlanPayload = {
+      mode: scanMode,
+    };
+
+    if (scanMode === "Manual") {
+      const dirTreeDepth = parseInt(directoryTreeDepthInput, 10);
+      const fileDepth = parseInt(fileListDepthInput, 10);
+      const treeNodes = parseInt(maxTreeNodesInput, 10);
+      const filesPerDir = parseInt(maxFilesPerDirectoryInput, 10);
+      const totalFiles = parseInt(maxTotalFilesInput, 10);
+
+      if (
+        isNaN(dirTreeDepth) ||
+        isNaN(fileDepth) ||
+        isNaN(treeNodes) ||
+        isNaN(filesPerDir) ||
+        isNaN(totalFiles)
+      ) {
+        toast.error(t("admin.repositories.management.scanPlan.invalidNumber"));
+        return;
+      }
+
+      if (dirTreeDepth < 0 || fileDepth < 0 || treeNodes < 0 || filesPerDir < 0 || totalFiles < 0) {
+        toast.error(t("admin.repositories.management.scanPlan.minLimit"));
+        return;
+      }
+
+      payload.directoryTreeDepth = dirTreeDepth;
+      payload.fileListDepth = fileDepth;
+      payload.maxTreeNodes = treeNodes;
+      payload.maxFilesPerDirectory = filesPerDir;
+      payload.maxTotalFiles = totalFiles;
+      payload.extraExcludedDirs = extraExcludedDirsInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+    }
+
+    setSavingScanPlan(true);
+    try {
+      const updatedPlan = await updateRepositoryScanPlan(repositoryId, payload);
+      setScanPlan(updatedPlan);
+      toast.success(t("admin.repositories.management.scanPlan.saveSuccess"));
+    } catch (error) {
+      console.error("Failed to save scan plan:", error);
+      toast.error(t("admin.repositories.management.toasts.saveScanPlanFailed") || "保存扫描策略失败");
+    } finally {
+      setSavingScanPlan(false);
+    }
+  };
+
+  const handleReevaluateScanPlan = async () => {
+    if (!repositoryId) return;
+
+    setReevaluatingScanPlan(true);
+    try {
+      const result = await reevaluateRepositoryScanPlan(repositoryId);
+      if (result.success) {
+        setScanPlan(result.data);
+        toast.success(result.message || t("admin.repositories.management.scanPlan.reevaluateSuccess"));
+      } else {
+        toast.error(result.message || t("admin.repositories.management.toasts.reevaluateScanPlanFailed") || "重新评估扫描策略失败");
+        if (result.data) {
+          setScanPlan(result.data);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to reevaluate scan plan:", error);
+      toast.error(t("admin.repositories.management.toasts.reevaluateScanPlanFailed") || "重新评估扫描策略失败");
+    } finally {
+      setReevaluatingScanPlan(false);
     }
   };
 
@@ -1052,6 +1201,179 @@ export default function AdminRepositoryManagementPage() {
                 </p>
               )}
             </Card>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-4 transition-all duration-300 hover:shadow-sm">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                {t("admin.repositories.management.scanPlan.title")}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {t("admin.repositories.management.scanPlan.hint")}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={scanMode} onValueChange={(val) => setScanMode(val as "Auto" | "Manual")}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder={t("admin.repositories.management.scanPlan.mode")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Auto">{t("admin.repositories.management.scanPlan.modeAuto")}</SelectItem>
+                  <SelectItem value="Manual">{t("admin.repositories.management.scanPlan.modeManual")}</SelectItem>
+                </SelectContent>
+              </Select>
+              {scanMode === "Auto" ? (
+                <>
+                  {isScanPlanDirty && (
+                    <Button onClick={handleSaveScanPlan} disabled={savingScanPlan}>
+                      {savingScanPlan ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      {t("admin.repositories.management.scanPlan.save")}
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={handleReevaluateScanPlan} disabled={reevaluatingScanPlan || isScanPlanDirty}>
+                    {reevaluatingScanPlan ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    {t("admin.repositories.management.scanPlan.reevaluate")}
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={handleSaveScanPlan} disabled={savingScanPlan || !isScanPlanDirty}>
+                  {savingScanPlan ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  {t("admin.repositories.management.scanPlan.save")}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Display/Edit Scan plan parameters */}
+            <div className="space-y-4 rounded-lg border bg-muted/10 p-4">
+              <h3 className="text-sm font-semibold text-muted-foreground border-b pb-2">
+                {scanMode === "Manual"
+                  ? t("admin.repositories.management.scanPlan.manualConfig")
+                  : t("admin.repositories.management.scanPlan.autoPlanTitle")}
+              </h3>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("admin.repositories.management.scanPlan.directoryTreeDepth")}
+                  </label>
+                  <Input
+                    type="number"
+                    value={directoryTreeDepthInput}
+                    onChange={(e) => setDirectoryTreeDepthInput(e.target.value)}
+                    disabled={scanMode === "Auto"}
+                    min="0"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("admin.repositories.management.scanPlan.fileListDepth")}
+                  </label>
+                  <Input
+                    type="number"
+                    value={fileListDepthInput}
+                    onChange={(e) => setFileListDepthInput(e.target.value)}
+                    disabled={scanMode === "Auto"}
+                    min="0"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("admin.repositories.management.scanPlan.maxTreeNodes")}
+                  </label>
+                  <Input
+                    type="number"
+                    value={maxTreeNodesInput}
+                    onChange={(e) => setMaxTreeNodesInput(e.target.value)}
+                    disabled={scanMode === "Auto"}
+                    min="0"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("admin.repositories.management.scanPlan.maxFilesPerDirectory")}
+                  </label>
+                  <Input
+                    type="number"
+                    value={maxFilesPerDirectoryInput}
+                    onChange={(e) => setMaxFilesPerDirectoryInput(e.target.value)}
+                    disabled={scanMode === "Auto"}
+                    min="0"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("admin.repositories.management.scanPlan.maxTotalFiles")}
+                  </label>
+                  <Input
+                    type="number"
+                    value={maxTotalFilesInput}
+                    onChange={(e) => setMaxTotalFilesInput(e.target.value)}
+                    disabled={scanMode === "Auto"}
+                    min="0"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("admin.repositories.management.scanPlan.extraExcludedDirs")}
+                  </label>
+                  <Input
+                    type="text"
+                    value={extraExcludedDirsInput}
+                    onChange={(e) => setExtraExcludedDirsInput(e.target.value)}
+                    disabled={scanMode === "Auto"}
+                    placeholder="e.g. build, temp, dist"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Resolved plan status metadata */}
+            <div className="space-y-4 rounded-lg border bg-muted/10 p-4">
+              <h3 className="text-sm font-semibold text-muted-foreground border-b pb-2">
+                {t("admin.repositories.management.scanPlan.resolvedPlan")}
+              </h3>
+              {scanPlan ? (
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between border-b border-muted py-1">
+                    <span className="text-muted-foreground">{t("admin.repositories.management.scanPlan.source")}</span>
+                    <Badge variant={scanPlan.source === "Database" ? "secondary" : "outline"}>
+                      {scanPlan.source}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-muted py-1">
+                    <span className="text-muted-foreground">{t("admin.repositories.management.scanPlan.confidence")}</span>
+                    <span className="font-medium">
+                      {scanPlan.confidence !== undefined && scanPlan.confidence !== null
+                        ? `${(scanPlan.confidence * 100).toFixed(0)}%`
+                        : "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-muted py-1">
+                    <span className="text-muted-foreground">{t("admin.repositories.management.scanPlan.updatedAt")}</span>
+                    <span className="font-mono text-xs">
+                      {scanPlan.updatedAt ? new Date(scanPlan.updatedAt).toLocaleString(dateLocale) : "N/A"}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-xs font-medium text-muted-foreground">{t("admin.repositories.management.scanPlan.reason")}</span>
+                    <p className="rounded border bg-muted/30 p-2.5 text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                      {scanPlan.reason || "N/A"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-[200px] items-center justify-center text-muted-foreground text-xs">
+                  {t("admin.repositories.management.scanPlan.noPlan")}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </Card>

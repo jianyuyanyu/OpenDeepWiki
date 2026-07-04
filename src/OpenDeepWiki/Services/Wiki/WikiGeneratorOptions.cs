@@ -69,6 +69,33 @@ public class WikiGeneratorOptions
     public int MaxOutputTokens { get; set; } = 32000;
 
     /// <summary>
+    /// Maximum AppendDoc calls allowed for a single generated document.
+    /// This prevents one page from monopolizing full regeneration with an
+    /// unbounded write/append loop. Set to 0 or less to disable the budget.
+    /// </summary>
+    public int MaxDocumentAppendOperations { get; set; } = 4;
+
+    /// <summary>
+    /// Maximum source-discovery tool calls allowed for a single generated document.
+    /// This caps ReadFile/ListFiles/Grep loops before the model must write and finish.
+    /// Set to 0 or less to disable the budget.
+    /// </summary>
+    public int MaxDocumentSourceToolCalls { get; set; } = 6;
+
+    /// <summary>
+    /// Maximum total tool calls allowed for a single generated document before
+    /// the service may stop the agent early once document content has persisted.
+    /// </summary>
+    public int MaxDocumentToolCalls { get; set; } = 14;
+
+    /// <summary>
+    /// Maximum source-discovery tool calls allowed during catalog generation.
+    /// The catalog prompt already includes the collected directory tree and README,
+    /// so source tools should be used only for quick confirmation.
+    /// </summary>
+    public int MaxCatalogSourceToolCalls { get; set; } = 4;
+
+    /// <summary>
     /// Timeout in minutes for document generation tasks.
     /// Default: 30 minutes
     /// </summary>
@@ -97,6 +124,31 @@ public class WikiGeneratorOptions
     /// Default: 2 levels
     /// </summary>
     public int DirectoryTreeMaxDepth { get; set; } = 2;
+
+    /// <summary>
+    /// Maximum depth for file listing inside the directory tree.
+    /// </summary>
+    public int FileListMaxDepth { get; set; } = 1;
+
+    /// <summary>
+    /// Maximum number of tree nodes emitted into the catalog prompt.
+    /// </summary>
+    public int MaxTreeNodes { get; set; } = 1200;
+
+    /// <summary>
+    /// Maximum number of files shown in each directory.
+    /// </summary>
+    public int MaxFilesPerDirectory { get; set; } = 20;
+
+    /// <summary>
+    /// Maximum total number of files shown in the directory tree.
+    /// </summary>
+    public int MaxTotalTreeFiles { get; set; } = 500;
+
+    /// <summary>
+    /// Whether Auto scan profiling may use an AI model. Rules are always the default and fallback.
+    /// </summary>
+    public bool EnableAiScanProfile { get; set; } = false;
 
     /// <summary>
     /// Comma-separated list of language codes for multi-language wiki generation.

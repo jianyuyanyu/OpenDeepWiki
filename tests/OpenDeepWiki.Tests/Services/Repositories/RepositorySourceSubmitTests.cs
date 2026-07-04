@@ -6,6 +6,7 @@ using Moq;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Models;
+using OpenDeepWiki.Models.Admin;
 using OpenDeepWiki.Services.Admin;
 using OpenDeepWiki.Services.Auth;
 using OpenDeepWiki.Services.GitHub;
@@ -366,10 +367,10 @@ public class RepositorySourceSubmitTests
     }
 
     [Fact]
-    public async Task RegenerateAsync_WhenRepositoryFailed_PreservesExistingDocumentsForResume()
+    public async Task RegenerateAsync_WhenRepositoryFailed_ClearsDocumentsForFreshRun()
     {
         using var context = CreateContext();
-        var (_, catalogId, docFileId) = await SeedRepositoryWithDocumentAsync(
+        await SeedRepositoryWithDocumentAsync(
             context,
             RepositoryStatus.Failed);
         var service = CreateService(context, new RepositoryAnalyzerOptions());
@@ -382,8 +383,8 @@ public class RepositorySourceSubmitTests
 
         Assert.True(result.Success);
         Assert.Equal(RepositoryStatus.Pending, (await context.Repositories.SingleAsync()).Status);
-        Assert.True(await context.DocCatalogs.AnyAsync(c => c.Id == catalogId && c.DocFileId == docFileId));
-        Assert.True(await context.DocFiles.AnyAsync(f => f.Id == docFileId));
+        Assert.Empty(await context.DocCatalogs.ToListAsync());
+        Assert.Empty(await context.DocFiles.ToListAsync());
     }
 
     [Fact]
@@ -405,6 +406,215 @@ public class RepositorySourceSubmitTests
         Assert.Empty(await context.DocFiles.ToListAsync());
     }
 
+    [Fact]
+    public async Task RegenerateAsync_ClearsBranchCommitAndOnlyUnfinishedIncrementalTasks()
+    {
+        using var context = CreateContext();
+        var seeded = await SeedRepositoryWithDocumentAsync(context, RepositoryStatus.Completed);
+        context.IncrementalUpdateTasks.AddRange(
+            new IncrementalUpdateTask
+            {
+                Id = "pending-task",
+                RepositoryId = seeded.RepositoryId,
+                BranchId = seeded.BranchId,
+                Status = IncrementalUpdateStatus.Pending
+            },
+            new IncrementalUpdateTask
+            {
+                Id = "processing-task",
+                RepositoryId = seeded.RepositoryId,
+                BranchId = seeded.BranchId,
+                Status = IncrementalUpdateStatus.Processing
+            },
+            new IncrementalUpdateTask
+            {
+                Id = "completed-task",
+                RepositoryId = seeded.RepositoryId,
+                BranchId = seeded.BranchId,
+                Status = IncrementalUpdateStatus.Completed
+            },
+            new IncrementalUpdateTask
+            {
+                Id = "failed-task",
+                RepositoryId = seeded.RepositoryId,
+                BranchId = seeded.BranchId,
+                Status = IncrementalUpdateStatus.Failed
+            });
+        await context.SaveChangesAsync();
+        var service = CreateService(context, new RepositoryAnalyzerOptions());
+
+        var result = await service.RegenerateAsync(new RegenerateRequest
+        {
+            Owner = "AIDotNet",
+            Repo = "OpenCowork"
+        });
+
+        Assert.True(result.Success);
+        var branch = await context.RepositoryBranches.SingleAsync();
+        Assert.Null(branch.LastCommitId);
+        Assert.Null(branch.LastProcessedAt);
+        var remainingTaskIds = await context.IncrementalUpdateTasks
+            .OrderBy(task => task.Id)
+            .Select(task => task.Id)
+            .ToListAsync();
+        Assert.Equal(new[] { "completed-task", "failed-task" }, remainingTaskIds);
+    }
+
+    [Fact]
+    public void RepositoryStatus_ProcessingMatchesAdminApiStatusValue()
+    {
+        Assert.Equal(0, (int)RepositoryStatus.Pending);
+        Assert.Equal(1, (int)RepositoryStatus.Processing);
+    }
+
+    [Theory]
+    [InlineData(RepositoryStatus.Pending)]
+    [InlineData(RepositoryStatus.Processing)]
+    public async Task ReevaluateScanPlanAsync_WhenRepositoryPendingOrProcessing_RejectsWithoutMutatingPlan(RepositoryStatus status)
+    {
+        using var context = CreateContext();
+        var updatedAt = DateTime.UtcNow.AddMinutes(-15);
+        context.Repositories.Add(new Repository
+        {
+            Id = "repo-processing",
+            OwnerUserId = "user-1",
+            GitUrl = "https://github.com/AIDotNet/OpenCowork.git",
+            OrgName = "AIDotNet",
+            RepoName = "OpenCowork",
+            Status = status,
+            ScanDepthMode = RepositoryScanDepthMode.Auto,
+            DirectoryTreeDepthOverride = 3,
+            FileListDepthOverride = 2,
+            MaxTreeNodes = 900,
+            MaxFilesPerDirectory = 18,
+            MaxTotalFiles = 400,
+            ExtraExcludedDirsJson = "[\"vendor\"]",
+            ScanProfileHash = "hash-before",
+            ScanProfileReason = "Existing auto plan",
+            ScanProfileConfidence = 0.8,
+            ScanProfileUpdatedAt = updatedAt
+        });
+        context.RepositoryBranches.Add(new RepositoryBranch
+        {
+            Id = "branch-processing",
+            RepositoryId = "repo-processing",
+            BranchName = "main",
+            LastCommitId = "abc123",
+            LastProcessedAt = updatedAt
+        });
+        await context.SaveChangesAsync();
+        var analyzer = new Mock<IRepositoryAnalyzer>(MockBehavior.Strict);
+        var service = CreateAdminService(context, analyzer.Object);
+
+        var result = await service.ReevaluateScanPlanAsync("repo-processing");
+
+        Assert.NotNull(result);
+        Assert.False(result.Success);
+        Assert.Contains("处理中", result.Message);
+        analyzer.Verify(
+            item => item.PrepareWorkspaceAsync(
+                It.IsAny<Repository>(),
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+        var repository = await context.Repositories.AsNoTracking().SingleAsync();
+        Assert.Equal(status, repository.Status);
+        Assert.Equal(RepositoryScanDepthMode.Auto, repository.ScanDepthMode);
+        Assert.Equal(3, repository.DirectoryTreeDepthOverride);
+        Assert.Equal(2, repository.FileListDepthOverride);
+        Assert.Equal(900, repository.MaxTreeNodes);
+        Assert.Equal(18, repository.MaxFilesPerDirectory);
+        Assert.Equal(400, repository.MaxTotalFiles);
+        Assert.Equal("[\"vendor\"]", repository.ExtraExcludedDirsJson);
+        Assert.Equal("hash-before", repository.ScanProfileHash);
+        Assert.Equal("Existing auto plan", repository.ScanProfileReason);
+        Assert.True(repository.ScanProfileConfidence.HasValue);
+        Assert.Equal(0.8, repository.ScanProfileConfidence.Value);
+        Assert.Equal(updatedAt, repository.ScanProfileUpdatedAt);
+    }
+
+    [Fact]
+    public async Task UpdateScanPlanAsync_WhenSwitchingManualToAutoWithoutPlan_ClearsManualOverrides()
+    {
+        using var context = CreateContext();
+        context.Repositories.Add(new Repository
+        {
+            Id = "repo-manual",
+            OwnerUserId = "user-1",
+            GitUrl = "https://github.com/AIDotNet/OpenCowork.git",
+            OrgName = "AIDotNet",
+            RepoName = "OpenCowork",
+            Status = RepositoryStatus.Completed,
+            ScanDepthMode = RepositoryScanDepthMode.Manual,
+            DirectoryTreeDepthOverride = 4,
+            FileListDepthOverride = 3,
+            MaxTreeNodes = 1400,
+            MaxFilesPerDirectory = 25,
+            MaxTotalFiles = 700,
+            ExtraExcludedDirsJson = "[\"vendor\"]"
+        });
+        await context.SaveChangesAsync();
+        var service = CreateAdminService(context);
+
+        var plan = await service.UpdateScanPlanAsync(
+            "repo-manual",
+            new UpdateRepositoryScanPlanRequest { Mode = "Auto" });
+
+        Assert.NotNull(plan);
+        Assert.Equal("Global", plan.Source);
+        var repository = await context.Repositories.SingleAsync();
+        Assert.Equal(RepositoryScanDepthMode.Auto, repository.ScanDepthMode);
+        Assert.Null(repository.DirectoryTreeDepthOverride);
+        Assert.Null(repository.FileListDepthOverride);
+        Assert.Null(repository.MaxTreeNodes);
+        Assert.Null(repository.MaxFilesPerDirectory);
+        Assert.Null(repository.MaxTotalFiles);
+        Assert.Null(repository.ExtraExcludedDirsJson);
+    }
+
+    [Fact]
+    public async Task UpdateScanPlanAsync_WhenSavingAutoWithoutPlan_PreservesSavedAutoPlan()
+    {
+        using var context = CreateContext();
+        context.Repositories.Add(new Repository
+        {
+            Id = "repo-auto",
+            OwnerUserId = "user-1",
+            GitUrl = "https://github.com/AIDotNet/OpenCowork.git",
+            OrgName = "AIDotNet",
+            RepoName = "OpenCowork",
+            Status = RepositoryStatus.Completed,
+            ScanDepthMode = RepositoryScanDepthMode.Auto,
+            DirectoryTreeDepthOverride = 3,
+            FileListDepthOverride = 2,
+            MaxTreeNodes = 900,
+            MaxFilesPerDirectory = 18,
+            MaxTotalFiles = 400,
+            ExtraExcludedDirsJson = "[\"vendor\"]",
+            ScanProfileHash = "hash-1",
+            ScanProfileReason = "Existing auto plan",
+            ScanProfileConfidence = 0.8,
+            ScanProfileUpdatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+        var service = CreateAdminService(context);
+
+        var plan = await service.UpdateScanPlanAsync(
+            "repo-auto",
+            new UpdateRepositoryScanPlanRequest { Mode = "Auto" });
+
+        Assert.NotNull(plan);
+        Assert.Equal("Auto", plan.Source);
+        Assert.Equal(3, plan.DirectoryTreeDepth);
+        Assert.Equal(2, plan.FileListDepth);
+        var repository = await context.Repositories.SingleAsync();
+        Assert.Equal(3, repository.DirectoryTreeDepthOverride);
+        Assert.Equal(2, repository.FileListDepthOverride);
+        Assert.Equal(900, repository.MaxTreeNodes);
+        Assert.Equal("hash-1", repository.ScanProfileHash);
+    }
+
     private static RepositoryService CreateService(
         TestDbContext context,
         RepositoryAnalyzerOptions analyzerOptions,
@@ -417,10 +627,11 @@ public class RepositorySourceSubmitTests
             new TestUserContext(userId),
             Mock.Of<IGitHubAppService>(),
             Mock.Of<IOrganizationService>(),
+            new RepositoryFullRegenerationCleaner(),
             Options.Create(analyzerOptions));
     }
 
-    private static async Task<(string RepositoryId, string CatalogId, string DocFileId)> SeedRepositoryWithDocumentAsync(
+    private static async Task<(string RepositoryId, string BranchId, string CatalogId, string DocFileId)> SeedRepositoryWithDocumentAsync(
         TestDbContext context,
         RepositoryStatus status)
     {
@@ -443,7 +654,9 @@ public class RepositorySourceSubmitTests
         {
             Id = branchId,
             RepositoryId = repositoryId,
-            BranchName = "main"
+            BranchName = "main",
+            LastCommitId = "abc123",
+            LastProcessedAt = DateTime.UtcNow
         });
         context.BranchLanguages.Add(new BranchLanguage
         {
@@ -468,16 +681,27 @@ public class RepositorySourceSubmitTests
         });
 
         await context.SaveChangesAsync();
-        return (repositoryId, catalogId, docFileId);
+        return (repositoryId, branchId, catalogId, docFileId);
     }
 
-    private static AdminRepositoryService CreateAdminService(TestDbContext context)
+    private static AdminRepositoryService CreateAdminService(
+        TestDbContext context,
+        IRepositoryAnalyzer? repositoryAnalyzer = null)
     {
         return new AdminRepositoryService(
             context,
             Mock.Of<IGitPlatformService>(),
-            Mock.Of<IRepositoryAnalyzer>(),
-            Mock.Of<IWikiGenerator>());
+            repositoryAnalyzer ?? Mock.Of<IRepositoryAnalyzer>(),
+            Mock.Of<IWikiGenerator>(),
+            new RepositoryFullRegenerationCleaner(),
+            CreateScanPlanResolver());
+    }
+
+    private static RepositoryScanPlanResolver CreateScanPlanResolver()
+    {
+        var monitor = new Mock<IOptionsMonitor<WikiGeneratorOptions>>();
+        monitor.SetupGet(item => item.CurrentValue).Returns(new WikiGeneratorOptions());
+        return new RepositoryScanPlanResolver(monitor.Object);
     }
 
     private static TestDbContext CreateContext()

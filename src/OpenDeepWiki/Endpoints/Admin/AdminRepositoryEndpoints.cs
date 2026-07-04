@@ -109,6 +109,49 @@ public static class AdminRepositoryEndpoints
         .WithName("AdminSyncRepositoryStats")
         .WithSummary("同步仓库统计信息");
 
+        // 获取仓库扫描策略
+        repoGroup.MapGet("/{id}/scan-plan", async (
+            string id,
+            [FromServices] IAdminRepositoryService repositoryService) =>
+        {
+            var result = await repositoryService.GetScanPlanAsync(id);
+            if (result == null)
+                return Results.NotFound(new { success = false, message = "仓库不存在" });
+            return Results.Ok(new { success = true, data = result });
+        })
+        .WithName("AdminGetRepositoryScanPlan")
+        .WithSummary("获取仓库扫描策略");
+
+        // 更新仓库扫描策略
+        repoGroup.MapPut("/{id}/scan-plan", async (
+            string id,
+            [FromBody] UpdateRepositoryScanPlanRequest request,
+            [FromServices] IAdminRepositoryService repositoryService) =>
+        {
+            var result = await repositoryService.UpdateScanPlanAsync(id, request);
+            if (result == null)
+                return Results.NotFound(new { success = false, message = "仓库不存在" });
+            return Results.Ok(new { success = true, data = result });
+        })
+        .WithName("AdminUpdateRepositoryScanPlan")
+        .WithSummary("更新仓库扫描策略");
+
+        // 重新评估仓库扫描策略
+        repoGroup.MapPost("/{id}/scan-plan/reevaluate", async (
+            string id,
+            [FromServices] IAdminRepositoryService repositoryService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await repositoryService.ReevaluateScanPlanAsync(id, cancellationToken);
+            if (result == null)
+                return Results.NotFound(new { success = false, message = "仓库不存在" });
+
+            var response = new { success = result.Success, message = result.Message, data = result.ScanPlan };
+            return result.Success ? Results.Ok(response) : Results.Conflict(response);
+        })
+        .WithName("AdminReevaluateRepositoryScanPlan")
+        .WithSummary("重新评估仓库扫描策略");
+
         // 触发仓库全量重生成
         repoGroup.MapPost("/{id}/regenerate", async (
             string id,
