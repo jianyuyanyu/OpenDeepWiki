@@ -114,6 +114,7 @@ public class RepositoryDocsService(
 
         return new RepositoryBranchesResponse
         {
+            RepositoryId = repository.Id,
             Branches = branchItems,
             Languages = allLanguages.ToList(),
             DefaultBranch = defaultBranch,

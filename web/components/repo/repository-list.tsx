@@ -35,6 +35,7 @@ import {
   ChevronRight,
   LayoutGrid,
   ListTree,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildRepoBasePath } from "@/lib/repo-route";
@@ -139,6 +140,22 @@ function RepositoryCard({
             <p className="mt-2 text-xs text-muted-foreground">
               {t("home.repository.createdAt")}: {createdDate}
             </p>
+            {((repo.branchGenerationActiveCount ?? 0) > 0 || (repo.branchGenerationFailedCount ?? 0) > 0) && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {(repo.branchGenerationActiveCount ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-1 text-xs text-blue-600">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    branch running {repo.branchGenerationActiveCount}
+                  </span>
+                )}
+                {(repo.branchGenerationFailedCount ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-1 text-xs text-red-600">
+                    <AlertTriangle className="h-3 w-3" />
+                    branch failed {repo.branchGenerationFailedCount}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <StatusBadge status={repo.statusName} />

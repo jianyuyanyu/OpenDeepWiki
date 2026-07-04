@@ -403,8 +403,6 @@ export function RepoShell({
       {branches && (
         <div className="-mx-3 -mt-3">
           <BranchLanguageSelector
-            owner={owner}
-            repo={repo}
             branches={branches}
             currentBranch={currentBranch}
             currentLanguage={currentLanguage}

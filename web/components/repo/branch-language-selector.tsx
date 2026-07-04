@@ -12,18 +12,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { RepoBranchesResponse } from "@/types/repository";
+import { BranchGenerationStatus } from "./branch-generation-status";
+import { Loader2, XCircle } from "lucide-react";
 
 interface BranchLanguageSelectorProps {
-  owner: string;
-  repo: string;
   branches: RepoBranchesResponse;
   currentBranch: string;
   currentLanguage: string;
 }
 
 export function BranchLanguageSelector({
-  owner,
-  repo,
   branches,
   currentBranch,
   currentLanguage,
@@ -86,11 +84,19 @@ export function BranchLanguageSelector({
               <SelectValue placeholder={t("branch.selectBranch")} />
             </SelectTrigger>
             <SelectContent>
-              {branches.branches.map((branch) => (
-                <SelectItem key={branch.name} value={branch.name}>
-                  {branch.name}
-                </SelectItem>
-              ))}
+              {branches.branches.map((branch) => {
+                const isPending = branch.generationStatus === "Pending" || branch.generationStatus === "Processing";
+                const isFailed = branch.generationStatus === "Failed";
+                return (
+                  <SelectItem key={branch.name} value={branch.name}>
+                    <div className="flex items-center gap-2">
+                      <span>{branch.name}</span>
+                      {isPending && <Loader2 className="h-3 w-3 animate-spin text-sky-500" />}
+                      {isFailed && <XCircle className="h-3 w-3 text-red-500" />}
+                    </div>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -112,6 +118,17 @@ export function BranchLanguageSelector({
             </SelectContent>
           </Select>
         </div>
+      )}
+
+      {currentBranchData && branches.repositoryId && (
+        <BranchGenerationStatus
+          repositoryId={branches.repositoryId}
+          branchId={currentBranchData.id}
+          branchName={currentBranchData.name}
+          generationStatus={currentBranchData.generationStatus}
+          lastGenerationTaskId={currentBranchData.lastGenerationTaskId}
+          lastGenerationError={currentBranchData.lastGenerationError}
+        />
       )}
     </div>
   );

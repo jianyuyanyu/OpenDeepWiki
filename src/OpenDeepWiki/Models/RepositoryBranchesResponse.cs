@@ -6,6 +6,11 @@ namespace OpenDeepWiki.Models;
 public class RepositoryBranchesResponse
 {
     /// <summary>
+    /// 仓库ID
+    /// </summary>
+    public string RepositoryId { get; set; } = string.Empty;
+
+    /// <summary>
     /// 分支列表
     /// </summary>
     public List<BranchItem> Branches { get; set; } = [];

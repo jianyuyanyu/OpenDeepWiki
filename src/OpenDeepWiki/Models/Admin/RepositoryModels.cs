@@ -35,6 +35,8 @@ public class AdminRepositoryDto
     public int ForkCount { get; set; }
     public int BookmarkCount { get; set; }
     public int ViewCount { get; set; }
+    public int BranchGenerationActiveCount { get; set; }
+    public int BranchGenerationFailedCount { get; set; }
     public string? OwnerUserId { get; set; }
     public string? OwnerUserName { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -117,6 +119,7 @@ public class AdminRepositoryManagementDto
     public string StatusText { get; set; } = string.Empty;
     public List<AdminRepositoryBranchDto> Branches { get; set; } = new();
     public List<AdminIncrementalTaskDto> RecentIncrementalTasks { get; set; } = new();
+    public List<AdminBranchGenerationTaskDto> RecentBranchGenerationTasks { get; set; } = new();
     public AdminRepositoryScanPlanDto? ScanPlan { get; set; }
 }
 
@@ -163,6 +166,11 @@ public class AdminRepositoryBranchDto
     public string Name { get; set; } = string.Empty;
     public string? LastCommitId { get; set; }
     public DateTime? LastProcessedAt { get; set; }
+    public string? GenerationStatus { get; set; }
+    public string? LastGenerationTaskId { get; set; }
+    public string? LastGenerationError { get; set; }
+    public DateTime? LastGenerationStartedAt { get; set; }
+    public DateTime? LastGenerationCompletedAt { get; set; }
     public List<AdminBranchLanguageDto> Languages { get; set; } = new();
 }
 
@@ -194,6 +202,28 @@ public class AdminIncrementalTaskDto
     public string? PreviousCommitId { get; set; }
     public string? TargetCommitId { get; set; }
     public string? ErrorMessage { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+/// <summary>
+/// 管理端 branch full generation 任务信息
+/// </summary>
+public class AdminBranchGenerationTaskDto
+{
+    public string TaskId { get; set; } = string.Empty;
+    public string RepositoryId { get; set; } = string.Empty;
+    public string BranchId { get; set; } = string.Empty;
+    public string? BranchName { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string Mode { get; set; } = string.Empty;
+    public int Priority { get; set; }
+    public bool IsManualTrigger { get; set; }
+    public int RetryCount { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? RequestedBy { get; set; }
+    public string? TargetCommitId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }

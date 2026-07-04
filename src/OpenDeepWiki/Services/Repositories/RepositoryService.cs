@@ -258,26 +258,55 @@ public class RepositoryService(
             .Take(pageSize)
             .ToListAsync();
 
+        var repositoryIds = repositories.Select(item => item.Id).ToArray();
+        var branchGenerationSummary = repositoryIds.Length == 0
+            ? new Dictionary<string, (int Active, int Failed)>()
+            : (await context.RepositoryBranches
+                .AsNoTracking()
+                .Where(branch => repositoryIds.Contains(branch.RepositoryId) &&
+                                 !branch.IsDeleted &&
+                                 branch.GenerationStatus != null)
+                .Select(branch => new
+                {
+                    branch.RepositoryId,
+                    branch.GenerationStatus
+                })
+                .ToListAsync())
+            .GroupBy(branch => branch.RepositoryId)
+            .ToDictionary(
+                group => group.Key,
+                group => (
+                    Active: group.Count(branch =>
+                        branch.GenerationStatus is BranchGenerationTaskStatus.Pending
+                            or BranchGenerationTaskStatus.Processing),
+                    Failed: group.Count(branch => branch.GenerationStatus == BranchGenerationTaskStatus.Failed)));
+
         return new RepositoryListResponse
         {
             Total = total,
-            Items = repositories.Select(r => new RepositoryItemResponse
+            Items = repositories.Select(r =>
             {
-                Id = r.Id,
-                OrgName = r.OrgName,
-                RepoName = r.RepoName,
-                GitUrl = r.SourceLocation,
-                SourceType = r.SourceType,
-                SourceLocation = r.SourceLocation,
-                Status = r.Status,
-                IsPublic = r.IsPublic,
-                GenerateSkill = r.GenerateSkill,
-                HasPassword = !string.IsNullOrWhiteSpace(r.AuthPassword),
-                CreatedAt = r.CreatedAt,
-                UpdatedAt = r.UpdatedAt,
-                StarCount = r.StarCount,
-                ForkCount = r.ForkCount,
-                PrimaryLanguage = r.PrimaryLanguage
+                branchGenerationSummary.TryGetValue(r.Id, out var summary);
+                return new RepositoryItemResponse
+                {
+                    Id = r.Id,
+                    OrgName = r.OrgName,
+                    RepoName = r.RepoName,
+                    GitUrl = r.SourceLocation,
+                    SourceType = r.SourceType,
+                    SourceLocation = r.SourceLocation,
+                    Status = r.Status,
+                    IsPublic = r.IsPublic,
+                    GenerateSkill = r.GenerateSkill,
+                    HasPassword = !string.IsNullOrWhiteSpace(r.AuthPassword),
+                    CreatedAt = r.CreatedAt,
+                    UpdatedAt = r.UpdatedAt,
+                    StarCount = r.StarCount,
+                    ForkCount = r.ForkCount,
+                    PrimaryLanguage = r.PrimaryLanguage,
+                    BranchGenerationActiveCount = summary.Active,
+                    BranchGenerationFailedCount = summary.Failed
+                };
             }).ToList()
         };
     }

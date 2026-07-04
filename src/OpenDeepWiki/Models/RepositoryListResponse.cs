@@ -107,4 +107,14 @@ public class RepositoryItemResponse
     /// 主要编程语言
     /// </summary>
     public string? PrimaryLanguage { get; set; }
+
+    /// <summary>
+    /// 正在排队或处理的 branch full generation 数量
+    /// </summary>
+    public int BranchGenerationActiveCount { get; set; }
+
+    /// <summary>
+    /// 失败的 branch full generation 数量
+    /// </summary>
+    public int BranchGenerationFailedCount { get; set; }
 }

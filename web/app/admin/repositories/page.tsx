@@ -64,6 +64,7 @@ import {
   GitFork,
   ChevronDown,
   Check,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
@@ -506,6 +507,22 @@ export default function AdminRepositoriesPage() {
                                 {t(`admin.repositories.${getRepositorySourceTypeLabelKey(repo.sourceType, repo.sourceTypeName)}`)}
                               </span>
                             </p>
+                            {(repo.branchGenerationActiveCount > 0 || repo.branchGenerationFailedCount > 0) && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {repo.branchGenerationActiveCount > 0 && (
+                                  <Badge variant="secondary" className="gap-1">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    branch running {repo.branchGenerationActiveCount}
+                                  </Badge>
+                                )}
+                                {repo.branchGenerationFailedCount > 0 && (
+                                  <Badge variant="destructive" className="gap-1">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    branch failed {repo.branchGenerationFailedCount}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3">

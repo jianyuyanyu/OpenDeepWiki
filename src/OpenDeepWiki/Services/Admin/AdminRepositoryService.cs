@@ -81,6 +81,43 @@ public class AdminRepositoryService : IAdminRepositoryService
             })
             .ToListAsync();
 
+        var itemIds = items.Select(item => item.Id).ToArray();
+        if (itemIds.Length > 0)
+        {
+            var generationBranches = await _context.RepositoryBranches
+                .AsNoTracking()
+                .Where(branch => itemIds.Contains(branch.RepositoryId) &&
+                                 !branch.IsDeleted &&
+                                 branch.GenerationStatus != null)
+                .Select(branch => new
+                {
+                    branch.RepositoryId,
+                    branch.GenerationStatus
+                })
+                .ToListAsync();
+
+            var generationSummary = generationBranches
+                .GroupBy(branch => branch.RepositoryId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => new
+                    {
+                        Active = group.Count(branch =>
+                            branch.GenerationStatus is BranchGenerationTaskStatus.Pending
+                                or BranchGenerationTaskStatus.Processing),
+                        Failed = group.Count(branch => branch.GenerationStatus == BranchGenerationTaskStatus.Failed)
+                    });
+
+            foreach (var item in items)
+            {
+                if (generationSummary.TryGetValue(item.Id, out var summary))
+                {
+                    item.BranchGenerationActiveCount = summary.Active;
+                    item.BranchGenerationFailedCount = summary.Failed;
+                }
+            }
+        }
+
         return new AdminRepositoryListResponse
         {
             Items = items,
@@ -112,6 +149,18 @@ public class AdminRepositoryService : IAdminRepositoryService
             StatusText = GetStatusText(repo.Status),
             ScanDepthMode = repo.ScanDepthMode.ToString(),
             ScanPlan = ToScanPlanDto(_scanPlanResolver.Resolve(repo)),
+            BranchGenerationActiveCount = await _context.RepositoryBranches
+                .AsNoTracking()
+                .CountAsync(branch => branch.RepositoryId == repo.Id &&
+                                      !branch.IsDeleted &&
+                                      branch.GenerationStatus != null &&
+                                      (branch.GenerationStatus == BranchGenerationTaskStatus.Pending ||
+                                       branch.GenerationStatus == BranchGenerationTaskStatus.Processing)),
+            BranchGenerationFailedCount = await _context.RepositoryBranches
+                .AsNoTracking()
+                .CountAsync(branch => branch.RepositoryId == repo.Id &&
+                                      !branch.IsDeleted &&
+                                      branch.GenerationStatus == BranchGenerationTaskStatus.Failed),
             StarCount = repo.StarCount,
             ForkCount = repo.ForkCount,
             BookmarkCount = repo.BookmarkCount,
@@ -559,6 +608,11 @@ public class AdminRepositoryService : IAdminRepositoryService
                 Name = branch.BranchName,
                 LastCommitId = branch.LastCommitId,
                 LastProcessedAt = branch.LastProcessedAt,
+                GenerationStatus = branch.GenerationStatus?.ToString(),
+                LastGenerationTaskId = branch.LastGenerationTaskId,
+                LastGenerationError = branch.LastGenerationError,
+                LastGenerationStartedAt = branch.LastGenerationStartedAt,
+                LastGenerationCompletedAt = branch.LastGenerationCompletedAt,
                 Languages = languageDtos
             };
         }).ToList();
@@ -588,6 +642,33 @@ public class AdminRepositoryService : IAdminRepositoryService
                 CompletedAt = task.CompletedAt
             }).ToList();
 
+        var branchGenerationTasks = await _context.BranchGenerationTasks
+            .AsNoTracking()
+            .Where(t => t.RepositoryId == id && !t.IsDeleted)
+            .OrderByDescending(t => t.CreatedAt)
+            .Take(20)
+            .ToListAsync();
+
+        var branchTaskDtos = branchGenerationTasks.Select(task =>
+            new AdminBranchGenerationTaskDto
+            {
+                TaskId = task.Id,
+                RepositoryId = task.RepositoryId,
+                BranchId = task.BranchId,
+                BranchName = branchNameMap.GetValueOrDefault(task.BranchId),
+                Status = task.Status.ToString(),
+                Mode = task.Mode.ToString(),
+                Priority = task.Priority,
+                IsManualTrigger = task.IsManualTrigger,
+                RetryCount = task.RetryCount,
+                ErrorMessage = task.ErrorMessage,
+                RequestedBy = task.RequestedBy,
+                TargetCommitId = task.TargetCommitId,
+                CreatedAt = task.CreatedAt,
+                StartedAt = task.StartedAt,
+                CompletedAt = task.CompletedAt
+            }).ToList();
+
         return new AdminRepositoryManagementDto
         {
             RepositoryId = repository.Id,
@@ -597,6 +678,7 @@ public class AdminRepositoryService : IAdminRepositoryService
             StatusText = GetStatusText(repository.Status),
             Branches = branchDtos,
             RecentIncrementalTasks = taskDtos,
+            RecentBranchGenerationTasks = branchTaskDtos,
             ScanPlan = ToScanPlanDto(_scanPlanResolver.Resolve(repository))
         };
     }

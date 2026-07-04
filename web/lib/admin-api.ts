@@ -26,7 +26,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || `Request failed: ${response.status}`);
+    throw new Error(error.message || error.error || error.errorMessage || `Request failed: ${response.status}`);
   }
 
   return response.json();
@@ -240,6 +240,8 @@ export interface AdminRepository {
   forkCount: number;
   bookmarkCount: number;
   viewCount: number;
+  branchGenerationActiveCount: number;
+  branchGenerationFailedCount: number;
   ownerUserId?: string;
   ownerUserName?: string;
   createdAt: string;
@@ -373,6 +375,11 @@ export interface AdminRepositoryBranch {
   name: string;
   lastCommitId?: string;
   lastProcessedAt?: string;
+  generationStatus?: string;
+  lastGenerationTaskId?: string;
+  lastGenerationError?: string;
+  lastGenerationStartedAt?: string;
+  lastGenerationCompletedAt?: string;
   languages: AdminBranchLanguage[];
 }
 
@@ -400,12 +407,31 @@ export interface AdminRepositoryManagement {
   statusText: string;
   branches: AdminRepositoryBranch[];
   recentIncrementalTasks: AdminIncrementalTask[];
+  recentBranchGenerationTasks: AdminBranchGenerationTask[];
   scanPlan?: AdminRepositoryScanPlan;
 }
 
 export interface AdminRepositoryOperationResult {
   success: boolean;
   message: string;
+}
+
+export interface AdminBranchGenerationTask {
+  taskId: string;
+  repositoryId: string;
+  branchId: string;
+  branchName?: string;
+  status: string;
+  mode: string;
+  priority: number;
+  isManualTrigger: boolean;
+  retryCount: number;
+  errorMessage?: string;
+  requestedBy?: string;
+  targetCommitId?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
 }
 
 export interface AdminRepositoryScanPlan {
@@ -471,6 +497,24 @@ export async function regenerateRepository(id: string): Promise<AdminRepositoryO
   const url = buildApiUrl(`/api/admin/repositories/${id}/regenerate`);
   const result = await fetchWithAuth(url, { method: "POST" });
   return result.data;
+}
+
+export async function enqueueBranchFullGeneration(
+  repositoryId: string,
+  branchId: string
+): Promise<AdminBranchGenerationTask> {
+  const url = buildApiUrl(`/api/v1/repositories/${repositoryId}/branches/${branchId}/generation-tasks/full`);
+  return fetchWithAuth(url, { method: "POST" });
+}
+
+export async function retryBranchGenerationTask(taskId: string): Promise<AdminBranchGenerationTask> {
+  const url = buildApiUrl(`/api/v1/branch-generation-tasks/${taskId}/retry`);
+  return fetchWithAuth(url, { method: "POST" });
+}
+
+export async function cancelBranchGenerationTask(taskId: string): Promise<AdminBranchGenerationTask> {
+  const url = buildApiUrl(`/api/v1/branch-generation-tasks/${taskId}/cancel`);
+  return fetchWithAuth(url, { method: "POST" });
 }
 
 export async function getRepositoryScanPlan(id: string): Promise<AdminRepositoryScanPlan> {
