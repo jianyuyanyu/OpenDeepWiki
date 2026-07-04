@@ -70,13 +70,22 @@ public class RepositoryDocsService(
                         !child.IsDeleted)))
                 .ToListAsync();
 
-            // 只有当分支有内容时才添加
-            if (languagesWithContent.Count > 0)
+            var hasActiveOrFailedGeneration = branch.GenerationStatus is BranchGenerationTaskStatus.Pending
+                or BranchGenerationTaskStatus.Processing
+                or BranchGenerationTaskStatus.Failed;
+
+            if (languagesWithContent.Count > 0 || hasActiveOrFailedGeneration)
             {
                 branchItems.Add(new BranchItem
                 {
+                    Id = branch.Id,
                     Name = branch.BranchName,
-                    Languages = languagesWithContent.Select(l => l.LanguageCode).ToList()
+                    Languages = languagesWithContent.Select(l => l.LanguageCode).ToList(),
+                    GenerationStatus = branch.GenerationStatus?.ToString(),
+                    LastGenerationTaskId = branch.LastGenerationTaskId,
+                    LastGenerationError = branch.LastGenerationError,
+                    LastGenerationStartedAt = branch.LastGenerationStartedAt,
+                    LastGenerationCompletedAt = branch.LastGenerationCompletedAt
                 });
 
                 foreach (var lang in languagesWithContent)

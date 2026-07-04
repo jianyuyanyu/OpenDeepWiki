@@ -80,6 +80,8 @@ public class WikiGenerator : IWikiGenerator
     // Use AsyncLocal for thread-safe repository ID tracking in concurrent scenarios
     private static readonly AsyncLocal<string?> _currentRepositoryId = new();
     private static readonly AsyncLocal<string?> _currentRepositoryDisplayName = new();
+    private static readonly AsyncLocal<string?> _currentBranchId = new();
+    private static readonly AsyncLocal<string?> _currentGenerationTaskId = new();
 
     private sealed record WikiToolSnapshot(IReadOnlyList<AITool> SkillTools, string ToolsetHash);
 
@@ -121,6 +123,12 @@ public class WikiGenerator : IWikiGenerator
     {
         _currentRepositoryId.Value = repositoryId;
         _currentRepositoryDisplayName.Value = repositoryDisplayName;
+    }
+
+    public void SetCurrentGenerationContext(string? branchId, string? generationTaskId)
+    {
+        _currentBranchId.Value = branchId;
+        _currentGenerationTaskId.Value = generationTaskId;
     }
 
     /// <inheritdoc />
@@ -1489,6 +1497,8 @@ Please start executing the task.";
         {
             await _processingLogService.LogAsync(
                 repositoryId,
+                _currentBranchId.Value,
+                _currentGenerationTaskId.Value,
                 step,
                 message,
                 isAiOutput,
@@ -2299,6 +2309,8 @@ Translated mind map:";
             {
                 await _processingLogService.LogAsync(
                     repositoryId,
+                    _currentBranchId.Value,
+                    _currentGenerationTaskId.Value,
                     ProcessingStep.Workspace,
                     collectLogMessage,
                     cancellationToken: cancellationToken);

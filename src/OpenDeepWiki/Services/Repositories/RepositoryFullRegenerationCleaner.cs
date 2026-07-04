@@ -76,6 +76,11 @@ public sealed class RepositoryFullRegenerationCleaner : IRepositoryFullRegenerat
         {
             branch.LastCommitId = null;
             branch.LastProcessedAt = null;
+            branch.GenerationStatus = null;
+            branch.LastGenerationTaskId = null;
+            branch.LastGenerationError = null;
+            branch.LastGenerationStartedAt = null;
+            branch.LastGenerationCompletedAt = null;
             branch.UpdateTimestamp();
         }
 

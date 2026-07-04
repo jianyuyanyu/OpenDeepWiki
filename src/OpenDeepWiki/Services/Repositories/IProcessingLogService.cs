@@ -18,9 +18,27 @@ public interface IProcessingLogService
         string? toolName = null,
         CancellationToken cancellationToken = default);
 
+    Task LogAsync(
+        string repositoryId,
+        string? branchId,
+        string? generationTaskId,
+        ProcessingStep step,
+        string message,
+        bool isAiOutput = false,
+        string? toolName = null,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// 获取仓库的处理日志
     /// </summary>
+    Task<ProcessingLogResponse> GetLogsAsync(
+        string repositoryId,
+        string? branchId,
+        string? generationTaskId,
+        DateTime? since,
+        int limit,
+        CancellationToken cancellationToken = default);
+
     Task<ProcessingLogResponse> GetLogsAsync(
         string repositoryId,
         DateTime? since = null,
@@ -63,6 +81,8 @@ public class ProcessingLogResponse
 public class ProcessingLogItem
 {
     public string Id { get; set; } = string.Empty;
+    public string? BranchId { get; set; }
+    public string? GenerationTaskId { get; set; }
     public ProcessingStep Step { get; set; }
     public string Message { get; set; } = string.Empty;
     public bool IsAiOutput { get; set; }

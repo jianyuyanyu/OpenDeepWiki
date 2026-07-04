@@ -20,6 +20,7 @@ public class RepositoryService(
     IGitHubAppService gitHubAppService,
     IOrganizationService organizationService,
     IRepositoryFullRegenerationCleaner fullRegenerationCleaner,
+    IRepositoryGenerationLockService generationLockService,
     IOptions<RepositoryAnalyzerOptions> repositoryOptions)
 {
     [HttpPost("/submit")]
@@ -409,15 +410,20 @@ public class RepositoryService(
     /// 重新生成仓库文档
     /// </summary>
     [HttpPost("/regenerate")]
-    public async Task<RegenerateResponse> RegenerateAsync([FromBody] RegenerateRequest request)
+    public async Task<IResult> RegenerateAsync([FromBody] RegenerateRequest request)
     {
         var currentUserId = userContext.UserId;
         if (string.IsNullOrWhiteSpace(currentUserId))
         {
+            return Results.Unauthorized();
+        }
+
+        RegenerateResponse Error(string message)
+        {
             return new RegenerateResponse
             {
                 Success = false,
-                ErrorMessage = "用户未登录"
+                ErrorMessage = message
             };
         }
 
@@ -426,11 +432,7 @@ public class RepositoryService(
 
         if (repository is null)
         {
-            return new RegenerateResponse
-            {
-                Success = false,
-                ErrorMessage = "仓库不存在"
-            };
+            return Results.NotFound(Error("仓库不存在"));
         }
 
         // 验证所有权
@@ -453,34 +455,51 @@ public class RepositoryService(
 
             if (!allowed)
             {
-                return new RegenerateResponse
-                {
-                    Success = false,
-                    ErrorMessage = "无权限操作此仓库"
-                };
+                return Results.Forbid();
             }
         }
 
         // 只有失败或完成状态才能重新生成
         if (repository.Status != RepositoryStatus.Failed && repository.Status != RepositoryStatus.Completed)
         {
-            return new RegenerateResponse
-            {
-                Success = false,
-                ErrorMessage = "仓库正在处理中，无法重新生成"
-            };
+            return Results.Conflict(Error("仓库正在处理中，无法重新生成"));
         }
 
-        await fullRegenerationCleaner.CleanAsync(context, repository);
+        var lockAcquired = await generationLockService.TryAcquireAsync(
+            context,
+            repository.Id,
+            RepositoryGenerationLockOwnerType.Repository,
+            repository.Id,
+            RepositoryGenerationLockScope.Repository);
 
-        // 重置状态为 Pending，Worker 会自动拾取处理
-        repository.Status = RepositoryStatus.Pending;
-        await context.SaveChangesAsync();
-
-        return new RegenerateResponse
+        if (!lockAcquired)
         {
-            Success = true
-        };
+            return Results.Conflict(Error("仓库已有 branch 生成任务正在排队或处理中"));
+        }
+
+        try
+        {
+            await fullRegenerationCleaner.CleanAsync(context, repository);
+
+            // 重置状态为 Pending，Worker 会自动拾取处理
+            repository.Status = RepositoryStatus.Pending;
+            await context.SaveChangesAsync();
+
+            return Results.Ok(new RegenerateResponse
+            {
+                Success = true
+            });
+        }
+        catch
+        {
+            await generationLockService.ReleaseAsync(
+                context,
+                repository.Id,
+                RepositoryGenerationLockOwnerType.Repository,
+                repository.Id,
+                CancellationToken.None);
+            throw;
+        }
     }
 
     /// <summary>

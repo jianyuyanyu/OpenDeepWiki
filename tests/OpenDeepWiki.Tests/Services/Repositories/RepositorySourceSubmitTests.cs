@@ -375,7 +375,7 @@ public class RepositorySourceSubmitTests
             RepositoryStatus.Failed);
         var service = CreateService(context, new RepositoryAnalyzerOptions());
 
-        var result = await service.RegenerateAsync(new RegenerateRequest
+        var result = await RegenerateAsync(service, new RegenerateRequest
         {
             Owner = "AIDotNet",
             Repo = "OpenCowork"
@@ -394,7 +394,7 @@ public class RepositorySourceSubmitTests
         await SeedRepositoryWithDocumentAsync(context, RepositoryStatus.Completed);
         var service = CreateService(context, new RepositoryAnalyzerOptions());
 
-        var result = await service.RegenerateAsync(new RegenerateRequest
+        var result = await RegenerateAsync(service, new RegenerateRequest
         {
             Owner = "AIDotNet",
             Repo = "OpenCowork"
@@ -443,7 +443,7 @@ public class RepositorySourceSubmitTests
         await context.SaveChangesAsync();
         var service = CreateService(context, new RepositoryAnalyzerOptions());
 
-        var result = await service.RegenerateAsync(new RegenerateRequest
+        var result = await RegenerateAsync(service, new RegenerateRequest
         {
             Owner = "AIDotNet",
             Repo = "OpenCowork"
@@ -628,7 +628,17 @@ public class RepositorySourceSubmitTests
             Mock.Of<IGitHubAppService>(),
             Mock.Of<IOrganizationService>(),
             new RepositoryFullRegenerationCleaner(),
+            new RepositoryGenerationLockService(context),
             Options.Create(analyzerOptions));
+    }
+
+    private static async Task<RegenerateResponse> RegenerateAsync(
+        RepositoryService service,
+        RegenerateRequest request)
+    {
+        var result = await service.RegenerateAsync(request);
+        var ok = Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.Ok<RegenerateResponse>>(result);
+        return ok.Value!;
     }
 
     private static async Task<(string RepositoryId, string BranchId, string CatalogId, string DocFileId)> SeedRepositoryWithDocumentAsync(

@@ -34,6 +34,26 @@ public class RepositoryBranch : AggregateRoot<string>
     public DateTime? LastProcessedAt { get; set; }
 
     /// <summary>
+    /// Branch-scoped full generation status for UI and retry recovery.
+    /// </summary>
+    public BranchGenerationTaskStatus? GenerationStatus { get; set; }
+
+    /// <summary>
+    /// Latest branch generation task ID.
+    /// </summary>
+    [StringLength(36)]
+    public string? LastGenerationTaskId { get; set; }
+
+    /// <summary>
+    /// Last branch generation failure message.
+    /// </summary>
+    public string? LastGenerationError { get; set; }
+
+    public DateTime? LastGenerationStartedAt { get; set; }
+
+    public DateTime? LastGenerationCompletedAt { get; set; }
+
+    /// <summary>
     /// 仓库导航属性
     /// </summary>
     [ForeignKey("RepositoryId")]

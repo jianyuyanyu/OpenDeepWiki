@@ -45,6 +45,8 @@ public interface IContext : IDisposable
     DbSet<ChatLog> ChatLogs { get; set; }
     DbSet<TranslationTask> TranslationTasks { get; set; }
     DbSet<IncrementalUpdateTask> IncrementalUpdateTasks { get; set; }
+    DbSet<BranchGenerationTask> BranchGenerationTasks { get; set; }
+    DbSet<RepositoryGenerationLock> RepositoryGenerationLocks { get; set; }
     DbSet<GraphifyArtifact> GraphifyArtifacts { get; set; }
     DbSet<McpProvider> McpProviders { get; set; }
     DbSet<McpUsageLog> McpUsageLogs { get; set; }
@@ -100,6 +102,8 @@ public abstract class MasterDbContext : DbContext, IContext
     public DbSet<ChatLog> ChatLogs { get; set; } = null!;
     public DbSet<TranslationTask> TranslationTasks { get; set; } = null!;
     public DbSet<IncrementalUpdateTask> IncrementalUpdateTasks { get; set; } = null!;
+    public DbSet<BranchGenerationTask> BranchGenerationTasks { get; set; } = null!;
+    public DbSet<RepositoryGenerationLock> RepositoryGenerationLocks { get; set; } = null!;
     public DbSet<GraphifyArtifact> GraphifyArtifacts { get; set; } = null!;
     public DbSet<McpProvider> McpProviders { get; set; } = null!;
     public DbSet<McpUsageLog> McpUsageLogs { get; set; } = null!;
@@ -172,6 +176,9 @@ public abstract class MasterDbContext : DbContext, IContext
         // RepositoryProcessingLog 索引（按仓库ID和创建时间查询）
         modelBuilder.Entity<RepositoryProcessingLog>()
             .HasIndex(log => new { log.RepositoryId, log.CreatedAt });
+
+        modelBuilder.Entity<RepositoryProcessingLog>()
+            .HasIndex(log => new { log.RepositoryId, log.BranchId, log.GenerationTaskId, log.CreatedAt });
 
         // TokenUsage 索引（按记录时间查询统计）
         modelBuilder.Entity<TokenUsage>(builder =>
@@ -333,6 +340,24 @@ public abstract class MasterDbContext : DbContext, IContext
         // IncrementalUpdateTask 优先级和创建时间索引（用于按优先级排序处理）
         modelBuilder.Entity<IncrementalUpdateTask>()
             .HasIndex(t => new { t.Priority, t.CreatedAt });
+
+        modelBuilder.Entity<BranchGenerationTask>()
+            .HasIndex(t => new { t.Status, t.Priority, t.CreatedAt });
+
+        modelBuilder.Entity<BranchGenerationTask>()
+            .HasIndex(t => new { t.RepositoryId, t.Status });
+
+        modelBuilder.Entity<BranchGenerationTask>()
+            .HasIndex(t => new { t.BranchId, t.Status });
+
+        modelBuilder.Entity<BranchGenerationTask>()
+            .HasIndex(t => new { t.BranchId, t.Status, t.Mode })
+            .IsUnique()
+            .HasAnnotation("Relational:Filter", "\"Status\" IN (0, 1)");
+
+        modelBuilder.Entity<RepositoryGenerationLock>()
+            .HasIndex(l => l.RepositoryId)
+            .IsUnique();
 
         // GraphifyArtifact 仓库分支唯一索引（每个分支保留一个最新图谱）
         modelBuilder.Entity<GraphifyArtifact>()

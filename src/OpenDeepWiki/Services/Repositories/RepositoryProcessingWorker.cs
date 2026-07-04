@@ -59,6 +59,8 @@ public class RepositoryProcessingWorker(
         var processingLogService = scope.ServiceProvider.GetService<IProcessingLogService>();
         var skillMarkdownBuilder = scope.ServiceProvider.GetService<IRepositorySkillMarkdownBuilder>();
         var scanPlanResolver = scope.ServiceProvider.GetService<IRepositoryScanPlanResolver>();
+        var branchProcessor = scope.ServiceProvider.GetService<IRepositoryBranchProcessor>();
+        var generationLockService = scope.ServiceProvider.GetService<IRepositoryGenerationLockService>();
 
         if (context is null)
         {
@@ -78,6 +80,18 @@ public class RepositoryProcessingWorker(
             return;
         }
 
+        if (branchProcessor is null)
+        {
+            logger.LogWarning("IRepositoryBranchProcessor is not registered, skip repository processing");
+            return;
+        }
+
+        if (generationLockService is null)
+        {
+            logger.LogWarning("IRepositoryGenerationLockService is not registered, skip repository processing");
+            return;
+        }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             // Get the oldest pending repository (ordered by creation time)
@@ -91,11 +105,29 @@ public class RepositoryProcessingWorker(
                 break;
             }
 
-            // 清除旧的处理日志
-            if (processingLogService != null)
+            var lockAcquired = await generationLockService.TryAcquireAsync(
+                context,
+                repository.Id,
+                RepositoryGenerationLockOwnerType.Repository,
+                repository.Id,
+                RepositoryGenerationLockScope.Repository,
+                stoppingToken);
+
+            if (!lockAcquired)
             {
-                await processingLogService.ClearLogsAsync(repository.Id, stoppingToken);
+                logger.LogInformation(
+                    "Repository processing is blocked by an active generation lock. RepositoryId: {RepositoryId}",
+                    repository.Id);
+                break;
             }
+
+            try
+            {
+                // 清除旧的处理日志
+                if (processingLogService != null)
+                {
+                    await processingLogService.ClearLogsAsync(repository.Id, stoppingToken);
+                }
 
             // 设置当前仓库ID到WikiGenerator
             if (wikiGenerator is WikiGenerator generator)
@@ -128,6 +160,7 @@ public class RepositoryProcessingWorker(
                     context, 
                     repositoryAnalyzer, 
                     wikiGenerator,
+                    branchProcessor,
                     skillMarkdownBuilder,
                     scanPlanResolver,
                     processingLogService,
@@ -173,9 +206,19 @@ public class RepositoryProcessingWorker(
                 }
             }
 
-            repository.UpdateTimestamp();
-            context.Repositories.Update(repository);
-            await context.SaveChangesAsync(stoppingToken);
+                repository.UpdateTimestamp();
+                context.Repositories.Update(repository);
+                await context.SaveChangesAsync(stoppingToken);
+            }
+            finally
+            {
+                await generationLockService.ReleaseAsync(
+                    context,
+                    repository.Id,
+                    RepositoryGenerationLockOwnerType.Repository,
+                    repository.Id,
+                    CancellationToken.None);
+            }
         }
     }
 
@@ -187,6 +230,7 @@ public class RepositoryProcessingWorker(
         IContext context,
         IRepositoryAnalyzer repositoryAnalyzer,
         IWikiGenerator wikiGenerator,
+        IRepositoryBranchProcessor branchProcessor,
         IRepositorySkillMarkdownBuilder? skillMarkdownBuilder,
         IRepositoryScanPlanResolver? scanPlanResolver,
         IProcessingLogService? processingLogService,
@@ -213,15 +257,12 @@ public class RepositoryProcessingWorker(
         {
             stoppingToken.ThrowIfCancellationRequested();
 
-            await ProcessBranchAsync(
+            await branchProcessor.ProcessBranchAsync(
+                context,
                 repository,
                 branch,
-                context,
-                repositoryAnalyzer,
-                wikiGenerator,
-                skillMarkdownBuilder,
-                scanPlanResolver,
-                processingLogService,
+                generationTaskId: null,
+                forceFullGeneration: false,
                 stoppingToken);
         }
     }

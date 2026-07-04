@@ -170,6 +170,10 @@ try
         });
     builder.Services.AddScoped<IRepositoryAnalyzer, RepositoryAnalyzer>();
     builder.Services.AddScoped<IRepositoryFullRegenerationCleaner, RepositoryFullRegenerationCleaner>();
+    builder.Services.AddScoped<IBranchFullGenerationCleaner, BranchFullGenerationCleaner>();
+    builder.Services.AddScoped<IRepositoryGenerationLockService, RepositoryGenerationLockService>();
+    builder.Services.AddScoped<IRepositoryBranchProcessor, RepositoryBranchProcessor>();
+    builder.Services.AddScoped<IBranchGenerationTaskService, BranchGenerationTaskService>();
     builder.Services.AddScoped<IRepositoryScanPlanResolver, RepositoryScanPlanResolver>();
 
     // Configure Graphify artifact generation
@@ -246,6 +250,7 @@ try
     builder.Services.AddScoped<ITranslationService, TranslationService>();
 
     builder.Services.AddHostedService<RepositoryProcessingWorker>();
+    builder.Services.AddHostedService<BranchGenerationWorker>();
     builder.Services.AddHostedService<TranslationWorker>();
     builder.Services.AddHostedService<MindMapWorker>();
     builder.Services.AddHostedService<GraphifyArtifactWorker>();
@@ -400,6 +405,7 @@ try
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }));
     app.MapSystemEndpoints();
     app.MapIncrementalUpdateEndpoints();
+    app.MapBranchGenerationEndpoints();
     app.MapMcpProviderEndpoints();
 
     // 初始化数据库（创建默认数据）

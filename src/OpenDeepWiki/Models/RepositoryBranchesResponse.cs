@@ -36,6 +36,18 @@ public class BranchItem
     /// </summary>
     public string Name { get; set; } = string.Empty;
 
+    public string? Id { get; set; }
+
+    public string? GenerationStatus { get; set; }
+
+    public string? LastGenerationTaskId { get; set; }
+
+    public string? LastGenerationError { get; set; }
+
+    public DateTime? LastGenerationStartedAt { get; set; }
+
+    public DateTime? LastGenerationCompletedAt { get; set; }
+
     /// <summary>
     /// 该分支支持的语言列表
     /// </summary>
