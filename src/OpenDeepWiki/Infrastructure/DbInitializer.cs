@@ -424,6 +424,17 @@ public static class DbInitializer
             await connection.OpenAsync();
         await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "Description", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "GenerateSkill", "INTEGER NOT NULL DEFAULT 1");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "ScanDepthMode", "INTEGER NOT NULL DEFAULT 0");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "DirectoryTreeDepthOverride", "INTEGER");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "FileListDepthOverride", "INTEGER");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "MaxTreeNodes", "INTEGER");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "MaxFilesPerDirectory", "INTEGER");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "MaxTotalFiles", "INTEGER");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "ExtraExcludedDirsJson", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "ScanProfileHash", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "ScanProfileReason", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "ScanProfileConfidence", "REAL");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "ScanProfileUpdatedAt", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "BranchLanguages", "SkillGeneratedAt", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "BranchLanguages", "SkillMarkdown", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "ModelConfigs", "AiProviderId", "TEXT");
@@ -598,6 +609,17 @@ public static class DbInitializer
         await ctx.Database.ExecuteSqlRawAsync(@"
             ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""Description"" TEXT;
             ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""GenerateSkill"" BOOLEAN NOT NULL DEFAULT TRUE;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""ScanDepthMode"" INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""DirectoryTreeDepthOverride"" INTEGER;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""FileListDepthOverride"" INTEGER;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""MaxTreeNodes"" INTEGER;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""MaxFilesPerDirectory"" INTEGER;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""MaxTotalFiles"" INTEGER;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""ExtraExcludedDirsJson"" TEXT;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""ScanProfileHash"" TEXT;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""ScanProfileReason"" TEXT;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""ScanProfileConfidence"" NUMERIC(5, 4);
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""ScanProfileUpdatedAt"" TIMESTAMP WITH TIME ZONE;
             ALTER TABLE ""BranchLanguages"" ADD COLUMN IF NOT EXISTS ""SkillGeneratedAt"" TIMESTAMP WITH TIME ZONE;
             ALTER TABLE ""BranchLanguages"" ADD COLUMN IF NOT EXISTS ""SkillMarkdown"" TEXT;
             ALTER TABLE ""ModelConfigs"" ADD COLUMN IF NOT EXISTS ""AiProviderId"" TEXT;
