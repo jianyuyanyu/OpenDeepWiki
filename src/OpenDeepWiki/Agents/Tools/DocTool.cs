@@ -17,6 +17,8 @@ public class DocTool
     private readonly string _branchLanguageId;
     private readonly string? _catalogPath;
     private readonly GitTool? _gitTool;
+    private readonly int? _maxAppendOperations;
+    private int _appendOperations;
     private const int MaxDatabaseWriteAttempts = 3;
     private const int DatabaseWriteRetryBaseDelayMs = 250;
 
@@ -27,12 +29,19 @@ public class DocTool
     /// <param name="branchLanguageId">The branch language ID to operate on.</param>
     /// <param name="catalogPath">The catalog item path this tool operates on.</param>
     /// <param name="gitTool">Optional GitTool instance to track read files.</param>
-    public DocTool(IContext context, string branchLanguageId, string? catalogPath, GitTool? gitTool = null)
+    /// <param name="maxAppendOperations">Optional maximum AppendDoc calls for this document.</param>
+    public DocTool(
+        IContext context,
+        string branchLanguageId,
+        string? catalogPath,
+        GitTool? gitTool = null,
+        int? maxAppendOperations = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _branchLanguageId = branchLanguageId ?? throw new ArgumentNullException(nameof(branchLanguageId));
         _catalogPath = NormalizeCatalogPath(catalogPath);
         _gitTool = gitTool;
+        _maxAppendOperations = maxAppendOperations is > 0 ? maxAppendOperations : null;
     }
 
     /// <summary>
@@ -182,6 +191,11 @@ content: '\n## Failure Modes\n\nThe service handles ... '")]
 
         try
         {
+            if (_maxAppendOperations.HasValue && _appendOperations >= _maxAppendOperations.Value)
+            {
+                return $"SUCCESS: Append budget reached ({_appendOperations}/{_maxAppendOperations.Value}). The document already has persisted content; stop appending and provide the final summary.";
+            }
+
             // Find the catalog item
             var catalog = await _context.DocCatalogs
                 .FirstOrDefaultAsync(c => c.BranchLanguageId == _branchLanguageId &&
@@ -227,6 +241,7 @@ content: '\n## Failure Modes\n\nThe service handles ... '")]
                     }
                     existingDoc.UpdateTimestamp();
                     await SaveChangesWithRetryAsync(cancellationToken);
+                    _appendOperations++;
                     return $"SUCCESS: Appended content to document '{catalogPath}'. Current length: {existingDoc.Content.Length} characters.";
                 }
             }
@@ -245,6 +260,7 @@ content: '\n## Failure Modes\n\nThe service handles ... '")]
             catalog.UpdateTimestamp();
 
             await SaveChangesWithRetryAsync(cancellationToken);
+            _appendOperations++;
             return $"SUCCESS: Created document '{catalogPath}' and wrote initial content. Current length: {content.Length} characters.";
         }
         catch (Exception ex)

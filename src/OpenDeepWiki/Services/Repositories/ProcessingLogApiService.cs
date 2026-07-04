@@ -21,7 +21,9 @@ public class ProcessingLogApiService(IContext context, IProcessingLogService pro
         string owner,
         string repo,
         [FromQuery] DateTime? since,
-        [FromQuery] int limit = 100)
+        [FromQuery] int limit = 100,
+        [FromQuery] string? branchId = null,
+        [FromQuery] string? taskId = null)
     {
         (owner, repo) = RepositoryRouteDecoder.DecodeOwnerAndRepo(owner, repo);
 
@@ -35,7 +37,9 @@ public class ProcessingLogApiService(IContext context, IProcessingLogService pro
             return Results.NotFound(new { error = "仓库不存在" });
         }
 
-        var response = await processingLogService.GetLogsAsync(repository.Id, since, limit);
+        var response = string.IsNullOrWhiteSpace(branchId) && string.IsNullOrWhiteSpace(taskId)
+            ? await processingLogService.GetLogsAsync(repository.Id, since, limit)
+            : await processingLogService.GetLogsAsync(repository.Id, branchId, taskId, since, limit);
 
         return Results.Ok(new ProcessingLogApiResponse
         {
@@ -46,7 +50,18 @@ public class ProcessingLogApiService(IContext context, IProcessingLogService pro
             TotalDocuments = response.TotalDocuments,
             CompletedDocuments = response.CompletedDocuments,
             StartedAt = response.StartedAt,
-            Logs = []
+            Logs = response.Logs.Select(log => new ProcessingLogApiItem
+            {
+                Id = log.Id,
+                BranchId = log.BranchId,
+                GenerationTaskId = log.GenerationTaskId,
+                Step = log.Step,
+                StepName = log.Step.ToString(),
+                Message = log.Message,
+                IsAiOutput = log.IsAiOutput,
+                ToolName = log.ToolName,
+                CreatedAt = log.CreatedAt
+            }).ToList()
         });
     }
 
@@ -94,6 +109,8 @@ public class ProcessingLogApiResponse
 public class ProcessingLogApiItem
 {
     public string Id { get; set; } = string.Empty;
+    public string? BranchId { get; set; }
+    public string? GenerationTaskId { get; set; }
     public ProcessingStep Step { get; set; }
     public string StepName { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;

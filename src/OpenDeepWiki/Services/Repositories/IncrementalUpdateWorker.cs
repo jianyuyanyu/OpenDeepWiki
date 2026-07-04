@@ -313,6 +313,22 @@ public class IncrementalUpdateWorker : BackgroundService
                     continue;
                 }
 
+                var activeBranchGenerationTask = await context.BranchGenerationTasks
+                    .AnyAsync(t => !t.IsDeleted &&
+                                   t.RepositoryId == repository.Id &&
+                                   t.BranchId == branch.Id &&
+                                   (t.Status == BranchGenerationTaskStatus.Pending ||
+                                    t.Status == BranchGenerationTaskStatus.Processing),
+                        stoppingToken);
+
+                if (activeBranchGenerationTask)
+                {
+                    _logger.LogDebug(
+                        "Skipping scheduled update, branch full generation is active. Repository: {Org}/{Repo}, Branch: {Branch}",
+                        repository.OrgName, repository.RepoName, branch.BranchName);
+                    continue;
+                }
+
                 if (!isGitRepository)
                 {
                     CreateScheduledTask(context, repository, branch, branch.LastCommitId, null);

@@ -75,10 +75,13 @@ public class WikiGenerator : IWikiGenerator
     private readonly IProcessingLogService _processingLogService;
     private readonly ISkillToolConverter _skillToolConverter;
     private readonly IAiProviderResolver _aiProviderResolver;
+    private readonly IRepositoryScanPlanResolver _scanPlanResolver;
 
     // Use AsyncLocal for thread-safe repository ID tracking in concurrent scenarios
     private static readonly AsyncLocal<string?> _currentRepositoryId = new();
     private static readonly AsyncLocal<string?> _currentRepositoryDisplayName = new();
+    private static readonly AsyncLocal<string?> _currentBranchId = new();
+    private static readonly AsyncLocal<string?> _currentGenerationTaskId = new();
 
     private sealed record WikiToolSnapshot(IReadOnlyList<AITool> SkillTools, string ToolsetHash);
 
@@ -94,7 +97,8 @@ public class WikiGenerator : IWikiGenerator
         ILogger<WikiGenerator> logger,
         IProcessingLogService processingLogService,
         ISkillToolConverter skillToolConverter,
-        IAiProviderResolver aiProviderResolver)
+        IAiProviderResolver aiProviderResolver,
+        IRepositoryScanPlanResolver scanPlanResolver)
     {
         _agentFactory = agentFactory ?? throw new ArgumentNullException(nameof(agentFactory));
         _promptPlugin = promptPlugin ?? throw new ArgumentNullException(nameof(promptPlugin));
@@ -105,6 +109,7 @@ public class WikiGenerator : IWikiGenerator
         _processingLogService = processingLogService ?? throw new ArgumentNullException(nameof(processingLogService));
         _skillToolConverter = skillToolConverter ?? throw new ArgumentNullException(nameof(skillToolConverter));
         _aiProviderResolver = aiProviderResolver ?? throw new ArgumentNullException(nameof(aiProviderResolver));
+        _scanPlanResolver = scanPlanResolver ?? throw new ArgumentNullException(nameof(scanPlanResolver));
 
         _logger.LogDebug(
             "WikiGenerator initialized. CatalogModel: {CatalogModel}, ContentModel: {ContentModel}, MaxRetryAttempts: {MaxRetry}",
@@ -118,6 +123,12 @@ public class WikiGenerator : IWikiGenerator
     {
         _currentRepositoryId.Value = repositoryId;
         _currentRepositoryDisplayName.Value = repositoryDisplayName;
+    }
+
+    public void SetCurrentGenerationContext(string? branchId, string? generationTaskId)
+    {
+        _currentBranchId.Value = branchId;
+        _currentGenerationTaskId.Value = generationTaskId;
     }
 
     /// <inheritdoc />
@@ -261,17 +272,26 @@ Remember to call WriteMindMapAsync with the complete mind map content.
             _logger.LogDebug("Initializing tools for catalog generation");
             var toolSnapshot = await CreateToolSnapshotAsync(cancellationToken);
             var gitTool = new GitTool(workspace.WorkingDirectory);
+            var sourceTool = new DocumentSourceToolBudget(gitTool, _options.MaxCatalogSourceToolCalls);
             var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
             var catalogTool = new CatalogTool(catalogStorage);
             var tools = BuildTools(
-                gitTool.GetTools().Concat(catalogTool.GetTools()),
+                sourceTool.GetTools().Concat(catalogTool.GetTools()),
                 toolSnapshot);
-            _logger.LogDebug("Tools initialized. ToolCount: {ToolCount}, Tools: {ToolNames}",
-                tools.Length, string.Join(", ", tools.Select(t => t.Name)));
+            _logger.LogInformation(
+                "Catalog generation tool budget. Repository: {Org}/{Repo}, Language: {Language}, SourceToolBudget: {SourceToolBudget}",
+                workspace.Organization,
+                workspace.RepositoryName,
+                branchLanguage.LanguageCode,
+                _options.MaxCatalogSourceToolCalls);
+            _logger.LogDebug(
+                "Tools initialized. ToolCount: {ToolCount}, Tools: {ToolNames}",
+                tools.Length,
+                string.Join(", ", tools.Select(t => t.Name)));
 
             var userMessage = $@"Generate Wiki catalog for the repository described in the runtime context.
 
-Execute the workflow now. Read entry point files to understand the architecture, then generate a comprehensive catalog in {branchLanguage.LanguageCode}.";
+Execute the workflow now. The runtime context already contains the directory tree, README, key files, and entry points. Use at most {_options.MaxCatalogSourceToolCalls} total calls across ListFiles, Grep, and ReadFile only for quick confirmation. If a source tool returns SOURCE_TOOL_BUDGET_REACHED, stop exploring and write the catalog immediately. Generate a focused catalog in {branchLanguage.LanguageCode}.";
 
             userMessage += $@"
 
@@ -313,13 +333,21 @@ Execute the workflow now. Read entry point files to understand the architecture,
                     modelId: catalogAi.ModelId),
                 cancellationToken);
 
+            var catalogItemCount = await _context.DocCatalogs
+                .CountAsync(c => c.BranchLanguageId == branchLanguage.Id && !c.IsDeleted, cancellationToken);
+            if (catalogItemCount == 0)
+            {
+                throw new InvalidOperationException(
+                    $"Catalog generation completed without producing any catalog items for {workspace.Organization}/{workspace.RepositoryName} ({branchLanguage.LanguageCode}).");
+            }
+
             stopwatch.Stop();
             _logger.LogInformation(
-                "Catalog generation completed successfully. Repository: {Org}/{Repo}, Language: {Language}, Duration: {Duration}ms",
-                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, stopwatch.ElapsedMilliseconds);
+                "Catalog generation completed successfully. Repository: {Org}/{Repo}, Language: {Language}, CatalogItems: {CatalogItemCount}, Duration: {Duration}ms",
+                workspace.Organization, workspace.RepositoryName, branchLanguage.LanguageCode, catalogItemCount, stopwatch.ElapsedMilliseconds);
 
             await LogProcessingAsync(ProcessingStep.Catalog, 
-                $"Catalog generation complete, time: {stopwatch.ElapsedMilliseconds}ms", 
+                $"Catalog generation complete, items: {catalogItemCount}, time: {stopwatch.ElapsedMilliseconds}ms",
                 cancellationToken);
         }
         catch (Exception ex)
@@ -352,6 +380,12 @@ Execute the workflow now. Read entry point files to understand the architecture,
         var catalogStorage = new CatalogStorage(_context, branchLanguage.Id);
         var catalogJson = await catalogStorage.GetCatalogJsonAsync(cancellationToken);
         var catalogItems = GetAllCatalogPaths(catalogJson);
+        if (catalogItems.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Document generation cannot start because no catalog items exist for {workspace.Organization}/{workspace.RepositoryName} ({branchLanguage.LanguageCode}).");
+        }
+
         var duplicatePathCount = catalogItems
             .GroupBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
             .Where(group => group.Count() > 1)
@@ -785,10 +819,10 @@ Please start executing the task.";
 ## Task Requirements
 
 1. **Gather Source Material**
-   - Use ListFiles to find source files related to the runtime catalog title
-   - Read key implementation files and configuration files
-   - Read interface definitions only when they are directly used or necessary for this document (skip unused/irrelevant interfaces)
-   - Use Grep to search for related classes, functions, API endpoints
+   - Source-discovery budget: at most {_options.MaxDocumentSourceToolCalls} total calls across ListFiles, Grep, and ReadFile for this page.
+   - Use at most 1-2 ListFiles/Grep calls to find source files related to the runtime catalog title.
+   - Read only the top 2-4 key implementation/configuration files. Use small excerpts; do not read whole large files.
+   - When any source tool reports SOURCE_TOOL_BUDGET_REACHED, immediately stop exploring and write the document with the evidence already collected.
 
 2. **Document Structure** (Must Include)
    - Title (H1): Must match catalog title
@@ -802,7 +836,7 @@ Please start executing the task.";
    - Failure Modes, Edge Cases & Concurrency (when source evidence exists)
    - Performance / Operational notes and Extension Points (when applicable)
    - Related Links: Links to related documentation and source files
-   - This is a right-sized DeepWiki-style catalog, so each leaf page must be a LONG, comprehensive, source-backed reference for its specific topic — not a thin summary or a catch-all replacement for sibling pages
+   - This is a right-sized DeepWiki-style catalog, so each leaf page must be a concise, source-backed reference for its specific topic — not a catch-all replacement for sibling pages
 
 3. **File Reference Links** (IMPORTANT)
    - When referencing source files, use the actual runtime File Reference Base URL shown below
@@ -844,21 +878,22 @@ Please start executing the task.";
    - Keep code identifiers in original form, do not translate
 
 6. **Output Requirements**
-   - Write the document INCREMENTALLY so its length is not capped by a single response:
+     - Write the document INCREMENTALLY so its length is not capped by a single response:
      * Call WriteDoc(content) first with the title, purpose and scope, overview, and architecture section
-     * Then call AppendDoc(content) repeatedly to add each remaining major section
-   - Keep appending until the entire capability is fully documented — aim for a long, thorough page
+     * Then call AppendDoc(content) only when a major required section does not fit in WriteDoc
+   - AppendDoc budget: at most {_options.MaxDocumentAppendOperations} calls for this page. When the budget is reached, stop appending and provide the final summary.
+   - Keep the page bounded; prioritize the most important architecture, workflow, configuration, and source-code entry points.
    - Source files are automatically tracked from files you read
 
 ## Execution Steps
 
 1. Analyze catalog title to determine document scope (treat it as a broad subsystem)
-2. Use ListFiles and Grep to find related source files; read widely, not just one or two files
-3. Read key files, extract information and code examples
+2. Use ListFiles and Grep sparingly to find related source files
+3. Read a small number of key files, extract information and code examples
 4. Design appropriate Mermaid diagrams to illustrate architecture/flow
 5. Organize content following document structure template
 6. Ensure all file references use the correct URL format with branch
-7. Call WriteDoc(content) for the opening sections, then AppendDoc(content) for each remaining section until complete
+7. Call WriteDoc(content), then at most the configured AppendDoc budget for remaining major sections. Stop when source or append budget is reached.
 
 ## Runtime Context
 
@@ -884,14 +919,26 @@ Please start executing the task.";
                 // entities in a stale state even when SaveChanges did not persist.
                 using var context = _contextFactory.CreateContext();
                 var gitTool = new GitTool(workspace.WorkingDirectory);
-                var docTool = new DocTool(context, branchLanguage.Id, catalogPath, gitTool);
+                var sourceTool = new DocumentSourceToolBudget(gitTool, _options.MaxDocumentSourceToolCalls);
+                var docTool = new DocTool(
+                    context,
+                    branchLanguage.Id,
+                    catalogPath,
+                    gitTool,
+                    _options.MaxDocumentAppendOperations);
                 var tools = BuildTools(
-                    gitTool.GetTools().Concat(docTool.GetTools()),
+                    sourceTool.GetTools().Concat(docTool.GetTools()),
                     toolSnapshot);
 
-                _logger.LogDebug(
-                    "Starting document persistence attempt {Attempt}/{MaxAttempts}. Path: {Path}, Title: {Title}",
-                    attempt, persistenceAttempts, catalogPath, catalogTitle);
+                _logger.LogInformation(
+                    "Starting document persistence attempt {Attempt}/{MaxAttempts}. Path: {Path}, Title: {Title}, SourceToolBudget: {SourceToolBudget}, AppendBudget: {AppendBudget}, MaxToolCalls: {MaxToolCalls}",
+                    attempt,
+                    persistenceAttempts,
+                    catalogPath,
+                    catalogTitle,
+                    _options.MaxDocumentSourceToolCalls,
+                    _options.MaxDocumentAppendOperations,
+                    _options.MaxDocumentToolCalls);
 
                 var attemptStartedAt = DateTime.UtcNow.AddSeconds(-1);
                 await ExecuteAgentWithRetryAsync(
@@ -908,7 +955,13 @@ Please start executing the task.";
                         branchLanguage,
                         catalogPath,
                         contentAi.ModelId),
-                    cancellationToken);
+                    cancellationToken,
+                    maxToolCallsBeforeEarlyCompletion: _options.MaxDocumentToolCalls,
+                    earlyCompletionCheck: ct => HasPersistedDocumentContentAsync(
+                        branchLanguage.Id,
+                        catalogPath,
+                        attemptStartedAt,
+                        ct));
 
                 if (await HasPersistedDocumentContentAsync(branchLanguage.Id, catalogPath, attemptStartedAt, cancellationToken))
                 {
@@ -1109,7 +1162,9 @@ Please start executing the task.";
         string operationName,
         ProcessingStep step,
         AiExecutionContext executionContext,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? maxToolCallsBeforeEarlyCompletion = null,
+        Func<CancellationToken, Task<bool>>? earlyCompletionCheck = null)
     {
         var model = ai.ModelId;
         var requestOptions = ai.ToRequestOptions();
@@ -1171,7 +1226,7 @@ Please start executing the task.";
                                         3. After completing all tool calls, provide a brief summary of what was accomplished.
                                         4. If you encounter errors, retry with adjusted parameters or report the issue.
                                         5. Do NOT output the full document content in your response - write it using the tools instead.
-                                        6. When generating document content, build LONG, comprehensive pages: start with WriteDoc for the opening sections, then call AppendDoc repeatedly to add each remaining section. Keep going until the whole topic is fully covered; do not stop early.
+                                        6. When generating document content, use source tools sparingly, then build bounded pages. If a source tool returns SOURCE_TOOL_BUDGET_REACHED, stop exploring immediately and write the document. Respect the configured AppendDoc budget and stop when the budget is reached.
                                         </system-remind>
                                         """),
                         new TextContent(userMessage)
@@ -1182,6 +1237,7 @@ Please start executing the task.";
                 var contentBuilder = new StringBuilder();
                 var usageAccumulator = new AiUsageAccumulator();
                 var toolCallCount = 0;
+                var stoppedAfterPersistedContent = false;
 
                 _logger.LogDebug("Starting streaming response. Operation: {Operation}", operationName);
 
@@ -1207,8 +1263,6 @@ Please start executing the task.";
                         }
                     }
 
-                    usageAccumulator.Add(update);
-
                     if (update.RawRepresentation is StreamingChatCompletionUpdate chatCompletionUpdate &&
                         chatCompletionUpdate.ToolCallUpdates.Count > 0)
                     {
@@ -1224,6 +1278,24 @@ Please start executing the task.";
                         }
                     }
 
+                    usageAccumulator.Add(update);
+
+                    if (!stoppedAfterPersistedContent &&
+                        maxToolCallsBeforeEarlyCompletion is > 0 &&
+                        toolCallCount >= maxToolCallsBeforeEarlyCompletion.Value &&
+                        earlyCompletionCheck != null &&
+                        await earlyCompletionCheck(cancellationToken))
+                    {
+                        stoppedAfterPersistedContent = true;
+                        _logger.LogInformation(
+                            "Stopping AI agent early after persisted content. Operation: {Operation}, Model: {Model}, ToolCalls: {ToolCalls}, MaxToolCalls: {MaxToolCalls}",
+                            operationName,
+                            model,
+                            toolCallCount,
+                            maxToolCallsBeforeEarlyCompletion.Value);
+                        break;
+                    }
+
                 }
 
 
@@ -1234,19 +1306,24 @@ Please start executing the task.";
                 if (usageSnapshot.HasUsage)
                 {
                     _logger.LogInformation(
-                        "AI agent completed. Operation: {Operation}, Model: {Model}, InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}, ToolCalls: {ToolCalls}, Duration: {Duration}ms",
+                        "AI agent completed. Operation: {Operation}, Model: {Model}, InputTokens: {InputTokens}, OutputTokens: {OutputTokens}, TotalTokens: {TotalTokens}, ToolCalls: {ToolCalls}, Duration: {Duration}ms, EarlyStopAfterPersistedContent: {EarlyStopAfterPersistedContent}",
                         operationName, model,
                         usageSnapshot.InputTokens,
                         usageSnapshot.OutputTokens,
                         usageSnapshot.TotalTokens,
                         toolCallCount,
-                        attemptStopwatch.ElapsedMilliseconds);
+                        attemptStopwatch.ElapsedMilliseconds,
+                        stoppedAfterPersistedContent);
                 }
                 else
                 {
                     _logger.LogInformation(
-                        "AI agent completed. Operation: {Operation}, Model: {Model}, ToolCalls: {ToolCalls}, Duration: {Duration}ms (no usage data)",
-                        operationName, model, toolCallCount, attemptStopwatch.ElapsedMilliseconds);
+                        "AI agent completed. Operation: {Operation}, Model: {Model}, ToolCalls: {ToolCalls}, Duration: {Duration}ms (no usage data), EarlyStopAfterPersistedContent: {EarlyStopAfterPersistedContent}",
+                        operationName,
+                        model,
+                        toolCallCount,
+                        attemptStopwatch.ElapsedMilliseconds,
+                        stoppedAfterPersistedContent);
                 }
 
                 await RecordTokenUsageAsync(
@@ -1420,6 +1497,8 @@ Please start executing the task.";
         {
             await _processingLogService.LogAsync(
                 repositoryId,
+                _currentBranchId.Value,
+                _currentGenerationTaskId.Value,
                 step,
                 message,
                 isAiOutput,
@@ -2178,7 +2257,8 @@ Translated mind map:";
     /// </summary>
     private async Task<RepositoryContext> CollectRepositoryContextAsync(string workingDirectory, CancellationToken cancellationToken)
     {
-        return await Task.Run(() =>
+        var scanPlan = await ResolveScanPlanAsync(workingDirectory, cancellationToken);
+        return await Task.Run(async () =>
         {
             var context = new RepositoryContext();
             var rootDir = new DirectoryInfo(workingDirectory);
@@ -2194,8 +2274,47 @@ Translated mind map:";
             context.ProjectType = DetectProjectType(rootDir);
             
             // 2. Collect directory structure as tree data and serialize with Toon
-            var treeData = CollectDirectoryTreeData(rootDir, excludedDirs, maxDepth: _options.DirectoryTreeMaxDepth, currentDepth: 0);
+            foreach (var excludedDir in scanPlan.ExtraExcludedDirs)
+            {
+                excludedDirs.Add(excludedDir);
+            }
+
+            var filter = new RepositoryFileFilter(rootDir.FullName);
+            var treeBudget = new DirectoryTreeBudget(scanPlan.MaxTreeNodes, scanPlan.MaxTotalFiles);
+            var treeData = CollectDirectoryTreeData(
+                rootDir,
+                excludedDirs,
+                filter,
+                scanPlan,
+                treeBudget,
+                currentDepth: 0);
             context.DirectoryTree = ToonSerializer.Serialize(treeData);
+            _logger.LogInformation(
+                "Repository directory tree collected. ScanPlanSource: {Source}, DirectoryDepth: {DirectoryDepth}, FileDepth: {FileDepth}, MaxTreeNodes: {MaxTreeNodes}, MaxFilesPerDirectory: {MaxFilesPerDirectory}, MaxTotalFiles: {MaxTotalFiles}, EmittedNodes: {EmittedNodes}, EmittedFiles: {EmittedFiles}, OmittedEntries: {OmittedEntries}, ExcludedEntries: {ExcludedEntries}, ProfileHash: {ProfileHash}",
+                scanPlan.Source,
+                scanPlan.DirectoryTreeDepth,
+                scanPlan.FileListDepth,
+                scanPlan.MaxTreeNodes,
+                scanPlan.MaxFilesPerDirectory,
+                scanPlan.MaxTotalFiles,
+                treeBudget.EmittedNodes,
+                treeBudget.EmittedFiles,
+                treeBudget.OmittedEntries,
+                treeBudget.ExcludedEntries,
+                scanPlan.ProfileHash ?? "none");
+
+            var collectLogMessage = $"Repository directory tree collected. ScanPlanSource: {scanPlan.Source}, DirectoryDepth: {scanPlan.DirectoryTreeDepth}, FileDepth: {scanPlan.FileListDepth}, MaxTreeNodes: {scanPlan.MaxTreeNodes}, MaxFilesPerDirectory: {scanPlan.MaxFilesPerDirectory}, MaxTotalFiles: {scanPlan.MaxTotalFiles}";
+            var repositoryId = _currentRepositoryId.Value;
+            if (!string.IsNullOrEmpty(repositoryId))
+            {
+                await _processingLogService.LogAsync(
+                    repositoryId,
+                    _currentBranchId.Value,
+                    _currentGenerationTaskId.Value,
+                    ProcessingStep.Workspace,
+                    collectLogMessage,
+                    cancellationToken: cancellationToken);
+            }
             
             // 3. Read README content (truncated if too long)
             context.ReadmeContent = ReadReadmeContent(rootDir, _options.ReadmeMaxLength);
@@ -2208,6 +2327,29 @@ Translated mind map:";
             
             return context;
         }, cancellationToken);
+    }
+
+    private async Task<ResolvedRepositoryScanPlan> ResolveScanPlanAsync(string workingDirectory, CancellationToken cancellationToken)
+    {
+        var repositoryId = _currentRepositoryId.Value;
+        if (string.IsNullOrWhiteSpace(repositoryId))
+        {
+            return _scanPlanResolver.Resolve(new Repository());
+        }
+
+        var repository = await _context.Repositories
+            .FirstOrDefaultAsync(repository => repository.Id == repositoryId && !repository.IsDeleted, cancellationToken);
+        if (repository == null)
+        {
+            return _scanPlanResolver.Resolve(new Repository());
+        }
+
+        var plan = await _scanPlanResolver.ResolveAndEnsureAsync(_context, repository, workingDirectory, cancellationToken);
+        await LogProcessingAsync(
+            ProcessingStep.Workspace,
+            $"Scan plan: {plan.Source}, directoryDepth={plan.DirectoryTreeDepth}, fileDepth={plan.FileListDepth}, maxNodes={plan.MaxTreeNodes}, maxFilesPerDirectory={plan.MaxFilesPerDirectory}, maxTotalFiles={plan.MaxTotalFiles}, profileHash={plan.ProfileHash ?? "none"}",
+            cancellationToken);
+        return plan;
     }
 
     /// <summary>
@@ -2260,19 +2402,34 @@ Translated mind map:";
     private static List<FileTreeNode> CollectDirectoryTreeData(
         DirectoryInfo dir,
         HashSet<string> excludedDirs,
-        int maxDepth,
+        RepositoryFileFilter filter,
+        ResolvedRepositoryScanPlan scanPlan,
+        DirectoryTreeBudget budget,
         int currentDepth)
     {
         var result = new List<FileTreeNode>();
-        if (currentDepth > maxDepth) return result;
+        if (currentDepth > scanPlan.DirectoryTreeDepth || budget.IsNodeBudgetExhausted) return result;
 
         try
         {
             // Get directories
             foreach (var subDir in dir.GetDirectories().OrderBy(d => d.Name))
             {
-                if (subDir.Name.StartsWith('.') || excludedDirs.Contains(subDir.Name))
+                if (subDir.Name.StartsWith('.') ||
+                    excludedDirs.Contains(subDir.Name) ||
+                    excludedDirs.Contains(filter.GetRelativePath(subDir.FullName)) ||
+                    filter.IsIgnored(subDir.FullName))
+                {
+                    budget.ExcludedEntries++;
                     continue;
+                }
+
+                if (!budget.TryEmitNode())
+                {
+                    budget.OmittedEntries++;
+                    result.Add(new FileTreeNode { Name = "... entries omitted", Type = "summary" });
+                    break;
+                }
 
                 var node = new FileTreeNode
                 {
@@ -2280,33 +2437,57 @@ Translated mind map:";
                     Type = "dir"
                 };
 
-                if (currentDepth < maxDepth)
+                if (currentDepth < scanPlan.DirectoryTreeDepth)
                 {
-                    node.Children = CollectDirectoryTreeData(subDir, excludedDirs, maxDepth, currentDepth + 1);
+                    node.Children = CollectDirectoryTreeData(subDir, excludedDirs, filter, scanPlan, budget, currentDepth + 1);
                 }
 
                 result.Add(node);
             }
 
-            // Get files (only at depth 0 and 1 to reduce noise)
-            if (currentDepth <= 1)
+            if (currentDepth <= scanPlan.FileListDepth)
             {
+                var shownInDirectory = 0;
+                var omittedInDirectory = 0;
                 foreach (var file in dir.GetFiles().OrderBy(f => f.Name))
                 {
-                    if (file.Name.StartsWith('.'))
+                    if (file.Name.StartsWith('.') || filter.IsIgnored(file.FullName) || filter.IsLowValueFile(file.FullName))
+                    {
+                        budget.ExcludedEntries++;
                         continue;
+                    }
+
+                    if (shownInDirectory >= scanPlan.MaxFilesPerDirectory ||
+                        budget.IsFileBudgetExhausted ||
+                        !budget.TryEmitNode())
+                    {
+                        omittedInDirectory++;
+                        budget.OmittedEntries++;
+                        continue;
+                    }
 
                     result.Add(new FileTreeNode
                     {
                         Name = file.Name,
                         Type = "file"
                     });
+                    shownInDirectory++;
+                    budget.EmittedFiles++;
+                }
+
+                if (omittedInDirectory > 0)
+                {
+                    result.Add(new FileTreeNode
+                    {
+                        Name = $"... {omittedInDirectory} files omitted",
+                        Type = "summary"
+                    });
                 }
             }
         }
         catch (UnauthorizedAccessException)
         {
-            // Skip inaccessible directories
+            budget.ExcludedEntries++;
         }
 
         return result;
@@ -2320,6 +2501,27 @@ Translated mind map:";
         public string Name { get; set; } = "";
         public string Type { get; set; } = "file"; // "file" or "dir"
         public List<FileTreeNode>? Children { get; set; }
+    }
+
+    private sealed class DirectoryTreeBudget(int maxNodes, int maxFiles)
+    {
+        public int EmittedNodes { get; private set; }
+        public int EmittedFiles { get; set; }
+        public int OmittedEntries { get; set; }
+        public int ExcludedEntries { get; set; }
+        public bool IsNodeBudgetExhausted => EmittedNodes >= maxNodes;
+        public bool IsFileBudgetExhausted => EmittedFiles >= maxFiles;
+
+        public bool TryEmitNode()
+        {
+            if (IsNodeBudgetExhausted)
+            {
+                return false;
+            }
+
+            EmittedNodes++;
+            return true;
+        }
     }
 
     /// <summary>

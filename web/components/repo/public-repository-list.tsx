@@ -4,11 +4,21 @@ import { useEffect, useState, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "@/hooks/use-translations";
-import { fetchRepositoryList } from "@/lib/repository-api";
+import { fetchAllRepositoryList, fetchRepositoryList } from "@/lib/repository-api";
 import { PublicRepositoryCard } from "./public-repository-card";
+import { RepositoryExplorerView } from "./repository-explorer-view";
 import { LanguageTags } from "./language-tags";
 import type { RepositoryItemResponse } from "@/types/repository";
-import { GitBranch, XCircle, RefreshCw, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  GitBranch,
+  XCircle,
+  RefreshCw,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  ListTree,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PublicRepositoryListProps {
@@ -42,24 +52,31 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"tree" | "grid">("tree");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
-  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const isTreeView = viewMode === "tree";
+  const totalPages = isTreeView ? 1 : Math.ceil(total / PAGE_SIZE);
 
   const loadRepositories = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetchRepositoryList({
+      const params = {
         isPublic: true,
         sortBy: "status",
         keyword: keyword || undefined,
         language: selectedLanguage || undefined,
-        page,
-        pageSize: PAGE_SIZE,
-      });
+      } as const;
+      const response = isTreeView
+        ? await fetchAllRepositoryList(params)
+        : await fetchRepositoryList({
+            ...params,
+            page,
+            pageSize: PAGE_SIZE,
+          });
 
       setRepositories(response.items);
       setTotal(response.total);
@@ -69,7 +86,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
     } finally {
       setIsLoading(false);
     }
-  }, [keyword, page, selectedLanguage, t]);
+  }, [isTreeView, keyword, page, selectedLanguage, t]);
 
   useEffect(() => {
     loadRepositories();
@@ -77,7 +94,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
 
   useEffect(() => {
     setPage(1);
-  }, [keyword, selectedLanguage]);
+  }, [keyword, selectedLanguage, viewMode]);
 
   const handleLanguageChange = (language: string | null) => {
     setSelectedLanguage(language);
@@ -94,6 +111,35 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
       setPage(page + 1);
     }
   };
+
+  const pagination =
+    totalPages > 1 ? (
+      <div className="flex items-center justify-center gap-4 mt-8">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handlePrevPage}
+          disabled={page === 1 || isLoading}
+        >
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          {t("home.bookmarks.previous")}
+        </Button>
+        <span className="text-sm text-muted-foreground">
+          {t("home.bookmarks.pageInfo")
+            .replace("{current}", page.toString())
+            .replace("{total}", totalPages.toString())}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleNextPage}
+          disabled={page === totalPages || isLoading}
+        >
+          {t("home.bookmarks.next")}
+          <ChevronRight className="h-4 w-4 ml-1" />
+        </Button>
+      </div>
+    ) : null;
 
   if (isLoading && repositories.length === 0) {
     return (
@@ -133,18 +179,41 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
 
   return (
     <div className={cn("w-full", className)}>
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold">
           {t("home.publicRepository.title")}
         </h2>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={loadRepositories}
-          disabled={isLoading}
-        >
-          <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-        </Button>
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <div className="grid flex-1 grid-cols-2 rounded-lg border bg-muted/30 p-1 sm:flex sm:flex-none">
+            <Button
+              variant={viewMode === "tree" ? "secondary" : "ghost"}
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setViewMode("tree")}
+            >
+              <ListTree className="h-4 w-4" />
+              {t("home.repository.view.tree")}
+            </Button>
+            <Button
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setViewMode("grid")}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              {t("home.repository.view.grid")}
+            </Button>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0"
+            onClick={loadRepositories}
+            disabled={isLoading}
+          >
+            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+          </Button>
+        </div>
       </div>
 
       <LanguageTags
@@ -169,39 +238,31 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {repositories.map((repo) => (
-              <PublicRepositoryCard key={repo.id} repository={repo} />
-            ))}
-          </div>
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 mt-8">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePrevPage}
-                disabled={page === 1 || isLoading}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                {t("home.bookmarks.previous")}
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                {t("home.bookmarks.pageInfo")
-                  .replace("{current}", page.toString())
-                  .replace("{total}", totalPages.toString())}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleNextPage}
-                disabled={page === totalPages || isLoading}
-              >
-                {t("home.bookmarks.next")}
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+          {viewMode === "tree" ? (
+            <RepositoryExplorerView
+              repositories={repositories}
+              emptyMessage={t("home.publicRepository.empty")}
+              labels={{
+                treeTitle: t("home.repository.tree.title"),
+                allRepositories: t("home.repository.tree.all"),
+                repositoryCount: (count) =>
+                  t("home.repository.tree.count").replace("{count}", count.toString()),
+                emptyFolder: t("home.repository.tree.emptyFolder"),
+                expandFolder: t("home.repository.tree.expandFolder"),
+                collapseFolder: t("home.repository.tree.collapseFolder"),
+              }}
+              renderRepository={(repo) => (
+                <PublicRepositoryCard repository={repo} variant="tree" />
+              )}
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {repositories.map((repo) => (
+                <PublicRepositoryCard key={repo.id} repository={repo} />
+              ))}
             </div>
           )}
+          {pagination}
         </>
       )}
     </div>

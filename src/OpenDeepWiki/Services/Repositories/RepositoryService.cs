@@ -19,6 +19,8 @@ public class RepositoryService(
     IUserContext userContext,
     IGitHubAppService gitHubAppService,
     IOrganizationService organizationService,
+    IRepositoryFullRegenerationCleaner fullRegenerationCleaner,
+    IRepositoryGenerationLockService generationLockService,
     IOptions<RepositoryAnalyzerOptions> repositoryOptions)
 {
     [HttpPost("/submit")]
@@ -26,21 +28,39 @@ public class RepositoryService(
     {
         var currentUserId = GetCurrentUserId();
 
-        if (!request.IsPublic && string.IsNullOrWhiteSpace(request.AuthAccount) && string.IsNullOrWhiteSpace(request.AuthPassword))
-        {
-            throw new InvalidOperationException("仓库凭据为空时不允许设置为私有");
-        }
+        var branchName = NormalizeBranchName(request.BranchName);
 
         // 校验是否已存在相同仓库（相同 GitUrl + BranchName）
         var exists = await context.Repositories
             .AsNoTracking()
             .Where(r => r.GitUrl == request.GitUrl && !r.IsDeleted)
             .Join(context.RepositoryBranches, r => r.Id, b => b.RepositoryId, (r, b) => b)
-            .AnyAsync(b => b.BranchName == request.BranchName);
+            .AnyAsync(b => b.BranchName == branchName);
 
         if (exists)
         {
             throw new InvalidOperationException("该仓库的相同分支已存在，请勿重复提交");
+        }
+
+        var existingRepository = await context.Repositories
+            .FirstOrDefaultAsync(r =>
+                r.GitUrl == request.GitUrl &&
+                r.OrgName == request.OrgName &&
+                r.RepoName == request.RepoName &&
+                !r.IsDeleted);
+
+        if (existingRepository is not null)
+        {
+            return await AddBranchToExistingRepositoryAsync(
+                existingRepository,
+                currentUserId,
+                branchName,
+                request.LanguageCode);
+        }
+
+        if (!request.IsPublic && string.IsNullOrWhiteSpace(request.AuthAccount) && string.IsNullOrWhiteSpace(request.AuthPassword))
+        {
+            throw new InvalidOperationException("仓库凭据为空时不允许设置为私有");
         }
 
         // 获取公开仓库的star和fork数
@@ -73,7 +93,7 @@ public class RepositoryService(
             request.GitUrl,
             request.RepoName,
             request.OrgName,
-            request.BranchName,
+            branchName,
             request.LanguageCode,
             effectiveIsPublic,
             request.GenerateSkill,
@@ -256,26 +276,55 @@ public class RepositoryService(
             .Take(pageSize)
             .ToListAsync();
 
+        var repositoryIds = repositories.Select(item => item.Id).ToArray();
+        var branchGenerationSummary = repositoryIds.Length == 0
+            ? new Dictionary<string, (int Active, int Failed)>()
+            : (await context.RepositoryBranches
+                .AsNoTracking()
+                .Where(branch => repositoryIds.Contains(branch.RepositoryId) &&
+                                 !branch.IsDeleted &&
+                                 branch.GenerationStatus != null)
+                .Select(branch => new
+                {
+                    branch.RepositoryId,
+                    branch.GenerationStatus
+                })
+                .ToListAsync())
+            .GroupBy(branch => branch.RepositoryId)
+            .ToDictionary(
+                group => group.Key,
+                group => (
+                    Active: group.Count(branch =>
+                        branch.GenerationStatus is BranchGenerationTaskStatus.Pending
+                            or BranchGenerationTaskStatus.Processing),
+                    Failed: group.Count(branch => branch.GenerationStatus == BranchGenerationTaskStatus.Failed)));
+
         return new RepositoryListResponse
         {
             Total = total,
-            Items = repositories.Select(r => new RepositoryItemResponse
+            Items = repositories.Select(r =>
             {
-                Id = r.Id,
-                OrgName = r.OrgName,
-                RepoName = r.RepoName,
-                GitUrl = r.SourceLocation,
-                SourceType = r.SourceType,
-                SourceLocation = r.SourceLocation,
-                Status = r.Status,
-                IsPublic = r.IsPublic,
-                GenerateSkill = r.GenerateSkill,
-                HasPassword = !string.IsNullOrWhiteSpace(r.AuthPassword),
-                CreatedAt = r.CreatedAt,
-                UpdatedAt = r.UpdatedAt,
-                StarCount = r.StarCount,
-                ForkCount = r.ForkCount,
-                PrimaryLanguage = r.PrimaryLanguage
+                branchGenerationSummary.TryGetValue(r.Id, out var summary);
+                return new RepositoryItemResponse
+                {
+                    Id = r.Id,
+                    OrgName = r.OrgName,
+                    RepoName = r.RepoName,
+                    GitUrl = r.SourceLocation,
+                    SourceType = r.SourceType,
+                    SourceLocation = r.SourceLocation,
+                    Status = r.Status,
+                    IsPublic = r.IsPublic,
+                    GenerateSkill = r.GenerateSkill,
+                    HasPassword = !string.IsNullOrWhiteSpace(r.AuthPassword),
+                    CreatedAt = r.CreatedAt,
+                    UpdatedAt = r.UpdatedAt,
+                    StarCount = r.StarCount,
+                    ForkCount = r.ForkCount,
+                    PrimaryLanguage = r.PrimaryLanguage,
+                    BranchGenerationActiveCount = summary.Active,
+                    BranchGenerationFailedCount = summary.Failed
+                };
             }).ToList()
         };
     }
@@ -408,15 +457,20 @@ public class RepositoryService(
     /// 重新生成仓库文档
     /// </summary>
     [HttpPost("/regenerate")]
-    public async Task<RegenerateResponse> RegenerateAsync([FromBody] RegenerateRequest request)
+    public async Task<IResult> RegenerateAsync([FromBody] RegenerateRequest request)
     {
         var currentUserId = userContext.UserId;
         if (string.IsNullOrWhiteSpace(currentUserId))
         {
+            return Results.Unauthorized();
+        }
+
+        RegenerateResponse Error(string message)
+        {
             return new RegenerateResponse
             {
                 Success = false,
-                ErrorMessage = "用户未登录"
+                ErrorMessage = message
             };
         }
 
@@ -425,11 +479,7 @@ public class RepositoryService(
 
         if (repository is null)
         {
-            return new RegenerateResponse
-            {
-                Success = false,
-                ErrorMessage = "仓库不存在"
-            };
+            return Results.NotFound(Error("仓库不存在"));
         }
 
         // 验证所有权
@@ -452,78 +502,51 @@ public class RepositoryService(
 
             if (!allowed)
             {
-                return new RegenerateResponse
-                {
-                    Success = false,
-                    ErrorMessage = "无权限操作此仓库"
-                };
+                return Results.Forbid();
             }
         }
 
         // 只有失败或完成状态才能重新生成
         if (repository.Status != RepositoryStatus.Failed && repository.Status != RepositoryStatus.Completed)
         {
-            return new RegenerateResponse
-            {
-                Success = false,
-                ErrorMessage = "仓库正在处理中，无法重新生成"
-            };
+            return Results.Conflict(Error("仓库正在处理中，无法重新生成"));
         }
 
-        if (repository.Status == RepositoryStatus.Completed)
+        var lockAcquired = await generationLockService.TryAcquireAsync(
+            context,
+            repository.Id,
+            RepositoryGenerationLockOwnerType.Repository,
+            repository.Id,
+            RepositoryGenerationLockScope.Repository);
+
+        if (!lockAcquired)
         {
-            // Full regeneration for completed repositories starts from a clean document set.
-            var branchLanguageIds = await context.RepositoryBranches
-                .Where(b => b.RepositoryId == repository.Id)
-                .Join(context.BranchLanguages, b => b.Id, l => l.RepositoryBranchId, (b, l) => l.Id)
-                .ToListAsync();
-
-            var oldCatalogs = await context.DocCatalogs
-                .Where(c => branchLanguageIds.Contains(c.BranchLanguageId))
-                .ToListAsync();
-
-            var docFileIds = oldCatalogs
-                .Where(c => c.DocFileId != null)
-                .Select(c => c.DocFileId!)
-                .Distinct()
-                .ToList();
-
-            if (oldCatalogs.Count > 0)
-            {
-                context.DocCatalogs.RemoveRange(oldCatalogs);
-            }
-
-            if (docFileIds.Count > 0)
-            {
-                var oldDocFiles = await context.DocFiles
-                    .Where(f => docFileIds.Contains(f.Id))
-                    .ToListAsync();
-
-                if (oldDocFiles.Count > 0)
-                {
-                    context.DocFiles.RemoveRange(oldDocFiles);
-                }
-            }
+            return Results.Conflict(Error("仓库已有 branch 生成任务正在排队或处理中"));
         }
 
-        // 清空之前的处理日志
-        var oldLogs = await context.RepositoryProcessingLogs
-            .Where(log => log.RepositoryId == repository.Id)
-            .ToListAsync();
-        
-        if (oldLogs.Count > 0)
+        try
         {
-            context.RepositoryProcessingLogs.RemoveRange(oldLogs);
+            await fullRegenerationCleaner.CleanAsync(context, repository);
+
+            // 重置状态为 Pending，Worker 会自动拾取处理
+            repository.Status = RepositoryStatus.Pending;
+            await context.SaveChangesAsync();
+
+            return Results.Ok(new RegenerateResponse
+            {
+                Success = true
+            });
         }
-
-        // 重置状态为 Pending，Worker 会自动拾取处理
-        repository.Status = RepositoryStatus.Pending;
-        await context.SaveChangesAsync();
-
-        return new RegenerateResponse
+        catch
         {
-            Success = true
-        };
+            await generationLockService.ReleaseAsync(
+                context,
+                repository.Id,
+                RepositoryGenerationLockOwnerType.Repository,
+                repository.Id,
+                CancellationToken.None);
+            throw;
+        }
     }
 
     /// <summary>
@@ -642,6 +665,51 @@ public class RepositoryService(
         context.BranchLanguages.Add(language);
 
         await context.SaveChangesAsync();
+        return repository;
+    }
+
+    private async Task<Repository> AddBranchToExistingRepositoryAsync(
+        Repository repository,
+        string currentUserId,
+        string branchName,
+        string languageCode)
+    {
+        if (repository.OwnerUserId != currentUserId && userContext.User?.IsInRole("Admin") != true)
+        {
+            throw new UnauthorizedAccessException("无权限向该仓库添加分支");
+        }
+
+        var branchExists = await context.RepositoryBranches
+            .AnyAsync(branch =>
+                branch.RepositoryId == repository.Id &&
+                branch.BranchName == branchName &&
+                !branch.IsDeleted);
+
+        if (branchExists)
+        {
+            throw new InvalidOperationException("该仓库的相同分支已存在，请勿重复提交");
+        }
+
+        var branch = new RepositoryBranch
+        {
+            Id = Guid.NewGuid().ToString(),
+            RepositoryId = repository.Id,
+            BranchName = branchName
+        };
+
+        var language = new BranchLanguage
+        {
+            Id = Guid.NewGuid().ToString(),
+            RepositoryBranchId = branch.Id,
+            LanguageCode = languageCode,
+            UpdateSummary = string.Empty,
+            IsDefault = true
+        };
+
+        context.RepositoryBranches.Add(branch);
+        context.BranchLanguages.Add(language);
+        await context.SaveChangesAsync();
+
         return repository;
     }
 

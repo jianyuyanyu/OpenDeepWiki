@@ -51,6 +51,9 @@ public static class DbInitializer
             }
         }
 
+        // 初始化默认 MCP 提供商
+        await InitializeMcpProvidersAsync(context);
+
         // 初始化系统设置默认值（仅在首次运行时从环境变量创建）
         await BackfillOpenAIResponsesModelProviderTypesAsync(context);
 
@@ -243,6 +246,52 @@ public static class DbInitializer
         await context.SaveChangesAsync();
     }
 
+    private static async Task InitializeMcpProvidersAsync(IContext context)
+    {
+        const string providerName = "OpenDeepWiki Global MCP";
+        const string globalMcpPath = "/api/mcp";
+
+        var provider = await context.McpProviders
+            .FirstOrDefaultAsync(p => p.Name == providerName);
+
+        if (provider is { IsDeleted: true })
+        {
+            return;
+        }
+
+        if (provider is null)
+        {
+            context.McpProviders.Add(new McpProvider
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = providerName,
+                Description = "Global OpenDeepWiki MCP endpoint that routes questions across repositories.",
+                ServerUrl = globalMcpPath,
+                TransportType = "streamable_http",
+                RequiresApiKey = false,
+                IsActive = true,
+                SortOrder = 0,
+                AllowedTools = """["list_repositories","search_repositories","search_docs","read_doc"]""",
+                CreatedAt = DateTime.UtcNow
+            });
+            await context.SaveChangesAsync();
+            return;
+        }
+
+        var changed = false;
+        if (provider.ServerUrl != globalMcpPath)
+        {
+            provider.ServerUrl = globalMcpPath;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            provider.UpdatedAt = DateTime.UtcNow;
+            await context.SaveChangesAsync();
+        }
+    }
+
     private static async Task MigrateSqliteAsync(DbContext ctx)
     {
         await ctx.Database.ExecuteSqlRawAsync(@"
@@ -369,12 +418,73 @@ public static class DbInitializer
         await ctx.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_AiModelConfigs_IsActive ON AiModelConfigs (IsActive)");
 
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS BranchGenerationTasks (
+                Id TEXT NOT NULL PRIMARY KEY,
+                RepositoryId TEXT NOT NULL,
+                BranchId TEXT NOT NULL,
+                Status INTEGER NOT NULL,
+                Mode INTEGER NOT NULL,
+                Priority INTEGER NOT NULL,
+                IsManualTrigger INTEGER NOT NULL,
+                RetryCount INTEGER NOT NULL,
+                ErrorMessage TEXT,
+                StartedAt TEXT,
+                CompletedAt TEXT,
+                RequestedBy TEXT,
+                TargetCommitId TEXT,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT,
+                DeletedAt TEXT,
+                IsDeleted INTEGER NOT NULL DEFAULT 0,
+                Version BLOB,
+                FOREIGN KEY (RepositoryId) REFERENCES Repositories(Id) ON DELETE CASCADE,
+                FOREIGN KEY (BranchId) REFERENCES RepositoryBranches(Id) ON DELETE CASCADE
+            )");
+        await ctx.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_BranchGenerationTasks_BranchId_Status ON BranchGenerationTasks (BranchId, Status)");
+        await ctx.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_BranchGenerationTasks_BranchId_Status_Mode ON BranchGenerationTasks (BranchId, Status, Mode) WHERE Status IN (0, 1)");
+        await ctx.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_BranchGenerationTasks_RepositoryId_Status ON BranchGenerationTasks (RepositoryId, Status)");
+        await ctx.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_BranchGenerationTasks_Status_Priority_CreatedAt ON BranchGenerationTasks (Status, Priority, CreatedAt)");
+
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS RepositoryGenerationLocks (
+                Id TEXT NOT NULL PRIMARY KEY,
+                RepositoryId TEXT NOT NULL,
+                OwnerType INTEGER NOT NULL,
+                OwnerId TEXT NOT NULL,
+                Scope INTEGER NOT NULL,
+                AcquiredAt TEXT NOT NULL,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT,
+                DeletedAt TEXT,
+                IsDeleted INTEGER NOT NULL DEFAULT 0,
+                Version BLOB,
+                FOREIGN KEY (RepositoryId) REFERENCES Repositories(Id) ON DELETE CASCADE
+            )");
+        await ctx.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_RepositoryGenerationLocks_RepositoryId ON RepositoryGenerationLocks (RepositoryId)");
+
         // Add Description column if not exists
         var connection = ctx.Database.GetDbConnection();
         if (connection.State != System.Data.ConnectionState.Open)
             await connection.OpenAsync();
         await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "Description", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "GenerateSkill", "INTEGER NOT NULL DEFAULT 1");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "ScanDepthMode", "INTEGER NOT NULL DEFAULT 0");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "DirectoryTreeDepthOverride", "INTEGER");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "FileListDepthOverride", "INTEGER");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "MaxTreeNodes", "INTEGER");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "MaxFilesPerDirectory", "INTEGER");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "MaxTotalFiles", "INTEGER");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "ExtraExcludedDirsJson", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "ScanProfileHash", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "ScanProfileReason", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "ScanProfileConfidence", "REAL");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "Repositories", "ScanProfileUpdatedAt", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "BranchLanguages", "SkillGeneratedAt", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "BranchLanguages", "SkillMarkdown", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "ModelConfigs", "AiProviderId", "TEXT");
@@ -395,6 +505,19 @@ public static class DbInitializer
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "InputCost", "TEXT NOT NULL DEFAULT '0'");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "OutputCost", "TEXT NOT NULL DEFAULT '0'");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "TokenUsages", "TotalCost", "TEXT NOT NULL DEFAULT '0'");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "RepositoryBranches", "GenerationStatus", "INTEGER");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "RepositoryBranches", "LastGenerationTaskId", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "RepositoryBranches", "LastGenerationError", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "RepositoryBranches", "LastGenerationStartedAt", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "RepositoryBranches", "LastGenerationCompletedAt", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "RepositoryProcessingLogs", "BranchId", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "RepositoryProcessingLogs", "GenerationTaskId", "TEXT");
+        await ctx.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_RepositoryProcessingLogs_RepositoryId_BranchId_GenerationTaskId_CreatedAt ON RepositoryProcessingLogs (RepositoryId, BranchId, GenerationTaskId, CreatedAt)");
+        await ctx.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_RepositoryProcessingLogs_BranchId ON RepositoryProcessingLogs (BranchId)");
+        await ctx.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS IX_RepositoryProcessingLogs_GenerationTaskId ON RepositoryProcessingLogs (GenerationTaskId)");
     }
 
     private static async Task AddSqliteColumnIfMissingAsync(
@@ -545,10 +668,71 @@ public static class DbInitializer
         await ctx.Database.ExecuteSqlRawAsync(@"
             CREATE INDEX IF NOT EXISTS ""IX_AiModelConfigs_IsActive"" ON ""AiModelConfigs"" (""IsActive"")");
 
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ""BranchGenerationTasks"" (
+                ""Id"" TEXT NOT NULL PRIMARY KEY,
+                ""RepositoryId"" TEXT NOT NULL,
+                ""BranchId"" TEXT NOT NULL,
+                ""Status"" INTEGER NOT NULL,
+                ""Mode"" INTEGER NOT NULL,
+                ""Priority"" INTEGER NOT NULL,
+                ""IsManualTrigger"" BOOLEAN NOT NULL,
+                ""RetryCount"" INTEGER NOT NULL,
+                ""ErrorMessage"" TEXT,
+                ""StartedAt"" TIMESTAMP WITH TIME ZONE,
+                ""CompletedAt"" TIMESTAMP WITH TIME ZONE,
+                ""RequestedBy"" TEXT,
+                ""TargetCommitId"" TEXT,
+                ""CreatedAt"" TIMESTAMP WITH TIME ZONE NOT NULL,
+                ""UpdatedAt"" TIMESTAMP WITH TIME ZONE,
+                ""DeletedAt"" TIMESTAMP WITH TIME ZONE,
+                ""IsDeleted"" BOOLEAN NOT NULL DEFAULT FALSE,
+                ""Version"" BYTEA,
+                FOREIGN KEY (""RepositoryId"") REFERENCES ""Repositories""(""Id"") ON DELETE CASCADE,
+                FOREIGN KEY (""BranchId"") REFERENCES ""RepositoryBranches""(""Id"") ON DELETE CASCADE
+            )");
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE INDEX IF NOT EXISTS ""IX_BranchGenerationTasks_BranchId_Status"" ON ""BranchGenerationTasks"" (""BranchId"", ""Status"")");
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_BranchGenerationTasks_BranchId_Status_Mode"" ON ""BranchGenerationTasks"" (""BranchId"", ""Status"", ""Mode"") WHERE ""Status"" IN (0, 1)");
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE INDEX IF NOT EXISTS ""IX_BranchGenerationTasks_RepositoryId_Status"" ON ""BranchGenerationTasks"" (""RepositoryId"", ""Status"")");
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE INDEX IF NOT EXISTS ""IX_BranchGenerationTasks_Status_Priority_CreatedAt"" ON ""BranchGenerationTasks"" (""Status"", ""Priority"", ""CreatedAt"")");
+
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ""RepositoryGenerationLocks"" (
+                ""Id"" TEXT NOT NULL PRIMARY KEY,
+                ""RepositoryId"" TEXT NOT NULL,
+                ""OwnerType"" INTEGER NOT NULL,
+                ""OwnerId"" TEXT NOT NULL,
+                ""Scope"" INTEGER NOT NULL,
+                ""AcquiredAt"" TIMESTAMP WITH TIME ZONE NOT NULL,
+                ""CreatedAt"" TIMESTAMP WITH TIME ZONE NOT NULL,
+                ""UpdatedAt"" TIMESTAMP WITH TIME ZONE,
+                ""DeletedAt"" TIMESTAMP WITH TIME ZONE,
+                ""IsDeleted"" BOOLEAN NOT NULL DEFAULT FALSE,
+                ""Version"" BYTEA,
+                FOREIGN KEY (""RepositoryId"") REFERENCES ""Repositories""(""Id"") ON DELETE CASCADE
+            )");
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_RepositoryGenerationLocks_RepositoryId"" ON ""RepositoryGenerationLocks"" (""RepositoryId"")");
+
         // Add Description column if not exists
         await ctx.Database.ExecuteSqlRawAsync(@"
             ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""Description"" TEXT;
             ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""GenerateSkill"" BOOLEAN NOT NULL DEFAULT TRUE;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""ScanDepthMode"" INTEGER NOT NULL DEFAULT 0;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""DirectoryTreeDepthOverride"" INTEGER;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""FileListDepthOverride"" INTEGER;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""MaxTreeNodes"" INTEGER;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""MaxFilesPerDirectory"" INTEGER;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""MaxTotalFiles"" INTEGER;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""ExtraExcludedDirsJson"" TEXT;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""ScanProfileHash"" TEXT;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""ScanProfileReason"" TEXT;
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""ScanProfileConfidence"" NUMERIC(5, 4);
+            ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""ScanProfileUpdatedAt"" TIMESTAMP WITH TIME ZONE;
             ALTER TABLE ""BranchLanguages"" ADD COLUMN IF NOT EXISTS ""SkillGeneratedAt"" TIMESTAMP WITH TIME ZONE;
             ALTER TABLE ""BranchLanguages"" ADD COLUMN IF NOT EXISTS ""SkillMarkdown"" TEXT;
             ALTER TABLE ""ModelConfigs"" ADD COLUMN IF NOT EXISTS ""AiProviderId"" TEXT;
@@ -568,6 +752,19 @@ public static class DbInitializer
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""CacheCreationTokenPrice"" NUMERIC(18, 8);
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""InputCost"" NUMERIC(18, 8) NOT NULL DEFAULT 0;
             ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""OutputCost"" NUMERIC(18, 8) NOT NULL DEFAULT 0;
-            ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""TotalCost"" NUMERIC(18, 8) NOT NULL DEFAULT 0;");
+            ALTER TABLE ""TokenUsages"" ADD COLUMN IF NOT EXISTS ""TotalCost"" NUMERIC(18, 8) NOT NULL DEFAULT 0;
+            ALTER TABLE ""RepositoryBranches"" ADD COLUMN IF NOT EXISTS ""GenerationStatus"" INTEGER;
+            ALTER TABLE ""RepositoryBranches"" ADD COLUMN IF NOT EXISTS ""LastGenerationTaskId"" TEXT;
+            ALTER TABLE ""RepositoryBranches"" ADD COLUMN IF NOT EXISTS ""LastGenerationError"" TEXT;
+            ALTER TABLE ""RepositoryBranches"" ADD COLUMN IF NOT EXISTS ""LastGenerationStartedAt"" TIMESTAMP WITH TIME ZONE;
+            ALTER TABLE ""RepositoryBranches"" ADD COLUMN IF NOT EXISTS ""LastGenerationCompletedAt"" TIMESTAMP WITH TIME ZONE;
+            ALTER TABLE ""RepositoryProcessingLogs"" ADD COLUMN IF NOT EXISTS ""BranchId"" TEXT;
+            ALTER TABLE ""RepositoryProcessingLogs"" ADD COLUMN IF NOT EXISTS ""GenerationTaskId"" TEXT;");
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE INDEX IF NOT EXISTS ""IX_RepositoryProcessingLogs_RepositoryId_BranchId_GenerationTaskId_CreatedAt"" ON ""RepositoryProcessingLogs"" (""RepositoryId"", ""BranchId"", ""GenerationTaskId"", ""CreatedAt"")");
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE INDEX IF NOT EXISTS ""IX_RepositoryProcessingLogs_BranchId"" ON ""RepositoryProcessingLogs"" (""BranchId"")");
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE INDEX IF NOT EXISTS ""IX_RepositoryProcessingLogs_GenerationTaskId"" ON ""RepositoryProcessingLogs"" (""GenerationTaskId"")");
     }
 }

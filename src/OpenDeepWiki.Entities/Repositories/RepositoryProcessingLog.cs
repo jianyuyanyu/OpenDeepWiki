@@ -56,6 +56,12 @@ public class RepositoryProcessingLog : AggregateRoot<string>
     [StringLength(36)]
     public string RepositoryId { get; set; } = string.Empty;
 
+    [StringLength(36)]
+    public string? BranchId { get; set; }
+
+    [StringLength(36)]
+    public string? GenerationTaskId { get; set; }
+
     /// <summary>
     /// 当前处理步骤
     /// </summary>
@@ -83,4 +89,10 @@ public class RepositoryProcessingLog : AggregateRoot<string>
     /// </summary>
     [ForeignKey("RepositoryId")]
     public virtual Repository? Repository { get; set; }
+
+    [ForeignKey("BranchId")]
+    public virtual RepositoryBranch? RepositoryBranch { get; set; }
+
+    [ForeignKey("GenerationTaskId")]
+    public virtual BranchGenerationTask? GenerationTask { get; set; }
 }

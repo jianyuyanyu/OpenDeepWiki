@@ -22,6 +22,7 @@ export interface RepoTreeResponse {
 }
 
 export interface RepoBranchesResponse {
+  repositoryId: string;
   branches: BranchItem[];
   languages: string[];
   defaultBranch: string;
@@ -30,6 +31,12 @@ export interface RepoBranchesResponse {
 
 export interface BranchItem {
   name: string;
+  id?: string;
+  generationStatus?: string;
+  lastGenerationTaskId?: string;
+  lastGenerationError?: string;
+  lastGenerationStartedAt?: string;
+  lastGenerationCompletedAt?: string;
   languages: string[];
 }
 
@@ -115,6 +122,8 @@ export interface RepositoryItemResponse {
   starCount?: number;
   forkCount?: number;
   primaryLanguage?: string;
+  branchGenerationActiveCount?: number;
+  branchGenerationFailedCount?: number;
 }
 
 export interface RepositoryListResponse {
@@ -181,6 +190,8 @@ export const ProcessingStepMap: Record<number, ProcessingStep> = {
 
 export interface ProcessingLogItem {
   id: string;
+  branchId?: string;
+  generationTaskId?: string;
   step: number;
   stepName: ProcessingStep;
   message: string;
@@ -212,4 +223,41 @@ export interface GitRepoCheckResponse {
   avatarUrl: string | null;
   isPrivate: boolean;
   gitUrl: string | null;
+}
+
+// Branch generation task responses
+export interface BranchGenerationTaskResponse {
+  success: boolean;
+  taskId: string;
+  repositoryId: string;
+  branchId: string;
+  repositoryName?: string;
+  branchName?: string;
+  status: string;
+  mode: string;
+  priority: number;
+  isManualTrigger: boolean;
+  retryCount: number;
+  errorMessage?: string;
+  requestedBy?: string;
+  targetCommitId?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface BranchGenerationLockResponse {
+  repositoryId: string;
+  ownerType: string;
+  ownerId: string;
+  scope: string;
+  acquiredAt: string;
+}
+
+export interface BranchGenerationErrorResponse {
+  success: boolean;
+  errorCode: string;
+  error: string;
+  activeTask?: BranchGenerationTaskResponse;
+  activeLock?: BranchGenerationLockResponse;
 }

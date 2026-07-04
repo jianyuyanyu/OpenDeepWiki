@@ -5,7 +5,7 @@
       context: .
       dockerfile: src/OpenDeepWiki/Dockerfile
     ports:
-      - "8080:8080"
+      - "18081:8080"
     restart: unless-stopped
     user: "0:0"
     environment:
@@ -16,21 +16,24 @@
       - URLS=http://+:8080
 
       # 数据库配置 (支持: sqlite, postgresql)
-      - Database__Type=sqlite
-      - ConnectionStrings__Default=Data Source=/data/opendeepwiki.db
+      - Database__Type=${DB_TYPE:-sqlite}
+      - ConnectionStrings__Default=${CONNECTION_STRING:-Data Source=/data/opendeepwiki.db}
 
       # JWT 认证配置 (生产环境请修改)
-      - JWT_SECRET_KEY=OpenDeepWiki-Default-Secret-Key-Please-Change-In-Production-Environment-2024
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-OpenDeepWiki-Default-Secret-Key-Please-Change-In-Production-Environment-2024}
 
       # 仓库存储目录
       - REPOSITORIES_DIRECTORY=/data
+      - RepositoryAnalyzer__AllowedLocalPathRoots__0=${LOCAL_IMPORT_ROOT:-/host/home/zhangruibo}
 
       # AI 服务配置 (全局默认，用于 Chat 等功能)
-      - CHAT_API_KEY=your-chat-api-key
-      - ENDPOINT=https://api.openai.com/v1
-      - CHAT_REQUEST_TYPE=OpenAI
+      - CHAT_API_KEY=${CHAT_API_KEY:-your-chat-api-key}
+      - ENDPOINT=${ENDPOINT:-https://api.openai.com/v1}
+      - CHAT_REQUEST_TYPE=${CHAT_REQUEST_TYPE:-OpenAI}
 
       # Graphify artifact generation (optional)
+      - SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+      - REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
       - GRAPHIFY_BACKEND=${GRAPHIFY_BACKEND:-}
       - GRAPHIFY_MODEL=${GRAPHIFY_MODEL:-}
       - GRAPHIFY_OUTPUT_ROOT=/data/graphify-artifacts
@@ -46,16 +49,16 @@
       - OLLAMA_MODEL=${OLLAMA_MODEL:-}
 
       # Wiki 生成器配置 - 目录生成
-      - WIKI_CATALOG_MODEL=gpt-4o
-      - WIKI_CATALOG_ENDPOINT=https://api.openai.com/v1
-      - WIKI_CATALOG_API_KEY=your-catalog-api-key
-      - WIKI_CATALOG_REQUEST_TYPE=OpenAI
+      - WIKI_CATALOG_MODEL=${WIKI_CATALOG_MODEL:-gpt-4o}
+      - WIKI_CATALOG_ENDPOINT=${WIKI_CATALOG_ENDPOINT:-https://api.openai.com/v1}
+      - WIKI_CATALOG_API_KEY=${WIKI_CATALOG_API_KEY:-your-catalog-api-key}
+      - WIKI_CATALOG_REQUEST_TYPE=${WIKI_CATALOG_REQUEST_TYPE:-OpenAI}
 
       # Wiki 生成器配置 - 内容生成
-      - WIKI_CONTENT_MODEL=gpt-4o
-      - WIKI_CONTENT_ENDPOINT=https://api.openai.com/v1
-      - WIKI_CONTENT_API_KEY=your-content-api-key
-      - WIKI_CONTENT_REQUEST_TYPE=OpenAI
+      - WIKI_CONTENT_MODEL=${WIKI_CONTENT_MODEL:-gpt-4o}
+      - WIKI_CONTENT_ENDPOINT=${WIKI_CONTENT_ENDPOINT:-https://api.openai.com/v1}
+      - WIKI_CONTENT_API_KEY=${WIKI_CONTENT_API_KEY:-your-content-api-key}
+      - WIKI_CONTENT_REQUEST_TYPE=${WIKI_CONTENT_REQUEST_TYPE:-OpenAI}
 
       # Wiki 生成器配置 - 翻译 (可选，不配置则使用内容生成配置)
       # - WIKI_TRANSLATION_MODEL=gpt-4o
@@ -64,12 +67,14 @@
       # - WIKI_TRANSLATION_REQUEST_TYPE=OpenAI
 
       # Wiki 生成并行数 (默认: 5)
-      - WIKI_PARALLEL_COUNT=5
+      - WIKI_PARALLEL_COUNT=${WIKI_PARALLEL_COUNT:-5}
 
       # 多语言支持 (逗号分隔，如: en,zh,ja,ko)
-      - WIKI_LANGUAGES=en,zh
+      - WIKI_LANGUAGES=${WIKI_LANGUAGES:-en,zh}
     volumes:
       - ./data:/data
+      - /home/zhangruibo:/host/home/zhangruibo:ro
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
 
   web:
     image: crpi-j9ha7sxwhatgtvj4.cn-shenzhen.personal.cr.aliyuncs.com/open-deepwiki/opendeepwiki-web
@@ -77,7 +82,7 @@
       context: ./web
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "8090:3000"
     restart: unless-stopped
     environment:
       - NODE_ENV=production

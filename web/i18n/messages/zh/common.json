@@ -185,6 +185,7 @@
     "apiKeyRequired": "需要 API Key",
     "apiKeyHint": "连接时需要在 Authorization 请求头中提供你自己的 API Key。",
     "getApiKey": "获取 API Key",
+    "allToolsUnrestricted": "全部工具（未限制）",
     "claudeHint": "将以上配置添加到 Claude Desktop 配置文件，然后重启 Claude。",
     "cursorHint": "将以上配置添加到 Cursor 的 MCP 配置文件（.cursor/mcp.json）。",
     "generalGuide": "API 参考",

@@ -35,6 +35,20 @@ public class ProcessingLogService : IProcessingLogService
         string? toolName = null,
         CancellationToken cancellationToken = default)
     {
+        await LogAsync(repositoryId, null, null, step, message, isAiOutput, toolName, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task LogAsync(
+        string repositoryId,
+        string? branchId,
+        string? generationTaskId,
+        ProcessingStep step,
+        string message,
+        bool isAiOutput = false,
+        string? toolName = null,
+        CancellationToken cancellationToken = default)
+    {
         // 使用独立的 scope 来保存日志，避免影响其他操作
         if (isAiOutput || !string.IsNullOrWhiteSpace(toolName))
         {
@@ -54,6 +68,8 @@ public class ProcessingLogService : IProcessingLogService
         {
             Id = Guid.NewGuid().ToString(),
             RepositoryId = repositoryId,
+            BranchId = branchId,
+            GenerationTaskId = generationTaskId,
             Step = step,
             Message = normalizedMessage,
             IsAiOutput = isAiOutput,
@@ -66,10 +82,22 @@ public class ProcessingLogService : IProcessingLogService
     }
 
     /// <inheritdoc />
-    public async Task<ProcessingLogResponse> GetLogsAsync(
+    public Task<ProcessingLogResponse> GetLogsAsync(
         string repositoryId,
         DateTime? since = null,
         int limit = 100,
+        CancellationToken cancellationToken = default)
+    {
+        return GetLogsAsync(repositoryId, null, null, since, limit, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<ProcessingLogResponse> GetLogsAsync(
+        string repositoryId,
+        string? branchId,
+        string? generationTaskId,
+        DateTime? since,
+        int limit,
         CancellationToken cancellationToken = default)
     {
         using var scope = _scopeFactory.CreateScope();
@@ -77,6 +105,16 @@ public class ProcessingLogService : IProcessingLogService
 
         var query = context.RepositoryProcessingLogs
             .Where(log => log.RepositoryId == repositoryId);
+
+        if (!string.IsNullOrWhiteSpace(branchId))
+        {
+            query = query.Where(log => log.BranchId == branchId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(generationTaskId))
+        {
+            query = query.Where(log => log.GenerationTaskId == generationTaskId);
+        }
 
         if (since.HasValue)
         {
@@ -89,6 +127,8 @@ public class ProcessingLogService : IProcessingLogService
             .Select(log => new ProcessingLogItem
             {
                 Id = log.Id,
+                BranchId = log.BranchId,
+                GenerationTaskId = log.GenerationTaskId,
                 Step = log.Step,
                 Message = log.Message,
                 IsAiOutput = log.IsAiOutput,
@@ -196,6 +236,14 @@ public class ProcessingLogService : IProcessingLogService
 
     private static string? NormalizeProgressMessage(ProcessingStep step, string message)
     {
+        if (step == ProcessingStep.Workspace &&
+            (message.StartsWith("Resolved scan plan:", StringComparison.Ordinal) ||
+             message.StartsWith("Scan plan:", StringComparison.Ordinal) ||
+             message.StartsWith("Repository directory tree collected. ScanPlanSource:", StringComparison.Ordinal)))
+        {
+            return message;
+        }
+
         if (step != ProcessingStep.Content)
         {
             return $"Step progress ({step})";

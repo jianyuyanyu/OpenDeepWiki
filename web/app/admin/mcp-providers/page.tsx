@@ -65,12 +65,12 @@ import {
 } from "lucide-react";
 import { useTranslations } from "@/hooks/use-translations";
 
-const REPOSITORY_SCOPED_MCP_PATH_TEMPLATE = "/api/mcp/{owner}/{repo}";
+const GLOBAL_MCP_PATH = "/api/mcp";
 
 const defaultFormData: McpProviderRequest = {
   name: "",
   description: "",
-  serverUrl: REPOSITORY_SCOPED_MCP_PATH_TEMPLATE,
+  serverUrl: GLOBAL_MCP_PATH,
   transportType: "streamable_http",
   requiresApiKey: true,
   apiKeyObtainUrl: "",
@@ -141,7 +141,7 @@ export default function AdminMcpProvidersPage() {
     setFormData({
       name: provider.name,
       description: provider.description || "",
-      serverUrl: REPOSITORY_SCOPED_MCP_PATH_TEMPLATE,
+      serverUrl: provider.serverUrl || GLOBAL_MCP_PATH,
       transportType: provider.transportType,
       requiresApiKey: provider.requiresApiKey,
       apiKeyObtainUrl: provider.apiKeyObtainUrl || "",
@@ -393,7 +393,7 @@ export default function AdminMcpProvidersPage() {
               <div className="space-y-2">
                 <Label>{t("admin.mcpProviders.fieldServerUrl")}</Label>
                 <Input
-                  value={REPOSITORY_SCOPED_MCP_PATH_TEMPLATE}
+                  value={formData.serverUrl}
                   readOnly
                 />
                 <p className="text-xs text-muted-foreground">

@@ -301,6 +301,19 @@ public class IncrementalUpdateService : IIncrementalUpdateService
             return existingTask.Id;
         }
 
+        var activeBranchGenerationTask = await _context.BranchGenerationTasks
+            .AnyAsync(t => !t.IsDeleted &&
+                           t.RepositoryId == repositoryId &&
+                           t.BranchId == branchId &&
+                           (t.Status == BranchGenerationTaskStatus.Pending ||
+                            t.Status == BranchGenerationTaskStatus.Processing),
+                cancellationToken);
+
+        if (activeBranchGenerationTask)
+        {
+            throw new InvalidOperationException("该分支已有 full generation 任务正在排队或处理中");
+        }
+
         var branch = await _context.RepositoryBranches
             .FirstOrDefaultAsync(b => b.Id == branchId && !b.IsDeleted, cancellationToken);
 

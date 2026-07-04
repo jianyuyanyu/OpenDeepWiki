@@ -12,10 +12,26 @@ import type {
   UpdateVisibilityResponse,
   ProcessingLogResponse,
   GitRepoCheckResponse,
-  MindMapResponse
+  MindMapResponse,
+  BranchGenerationTaskResponse,
+  BranchGenerationErrorResponse
 } from "@/types/repository";
-import { api, buildApiUrl } from "./api-client";
+import { ApiError, api, buildApiUrl } from "./api-client";
 import { getServerToken } from "./auth-api";
+
+type RepositoryListParams = {
+  page?: number;
+  pageSize?: number;
+  ownerId?: string;
+  status?: number;
+  keyword?: string;
+  language?: string;
+  sortBy?: 'createdAt' | 'updatedAt' | 'status';
+  sortOrder?: 'asc' | 'desc';
+  isPublic?: boolean;
+};
+
+const LIST_ALL_PAGE_SIZE = 200;
 
 /**
  * Returns Authorization header for SSR fetches if a JWT cookie is present.
@@ -159,17 +175,7 @@ export async function submitLocalDirectoryRepository(
 /**
  * Fetch repository list with optional filters
  */
-export async function fetchRepositoryList(params?: {
-  page?: number;
-  pageSize?: number;
-  ownerId?: string;
-  status?: number;
-  keyword?: string;
-  language?: string;
-  sortBy?: 'createdAt' | 'updatedAt' | 'status';
-  sortOrder?: 'asc' | 'desc';
-  isPublic?: boolean;
-}): Promise<RepositoryListResponse> {
+export async function fetchRepositoryList(params?: RepositoryListParams): Promise<RepositoryListResponse> {
   const searchParams = new URLSearchParams();
   
   // page and pageSize are required by the backend API
@@ -193,6 +199,42 @@ export async function fetchRepositoryList(params?: {
   }
 
   return await response.json();
+}
+
+export async function fetchAllRepositoryList(
+  params?: Omit<RepositoryListParams, "page" | "pageSize">
+): Promise<RepositoryListResponse> {
+  const firstPage = await fetchRepositoryList({
+    ...params,
+    page: 1,
+    pageSize: LIST_ALL_PAGE_SIZE,
+  });
+
+  if (firstPage.items.length >= firstPage.total) {
+    return firstPage;
+  }
+
+  const items = [...firstPage.items];
+  const totalPages = Math.ceil(firstPage.total / LIST_ALL_PAGE_SIZE);
+
+  for (let page = 2; page <= totalPages; page += 1) {
+    const response = await fetchRepositoryList({
+      ...params,
+      page,
+      pageSize: LIST_ALL_PAGE_SIZE,
+    });
+
+    if (response.items.length === 0) {
+      break;
+    }
+
+    items.push(...response.items);
+  }
+
+  return {
+    ...firstPage,
+    items,
+  };
 }
 
 
@@ -231,13 +273,17 @@ export async function fetchProcessingLogs(
   owner: string,
   repo: string,
   since?: Date,
-  limit: number = 100
+  limit: number = 100,
+  branchId?: string,
+  taskId?: string
 ): Promise<ProcessingLogResponse> {
   const params = new URLSearchParams();
   if (since) {
     params.set("since", since.toISOString());
   }
   params.set("limit", limit.toString());
+  if (branchId) params.set("branchId", branchId);
+  if (taskId) params.set("taskId", taskId);
 
   const queryString = params.toString();
   const url = buildApiUrl(
@@ -325,4 +371,49 @@ export async function fetchMindMap(
   }
 
   return (await response.json()) as MindMapResponse;
+}
+
+export async function enqueueBranchFullGeneration(
+  repositoryId: string,
+  branchId: string
+): Promise<BranchGenerationTaskResponse | BranchGenerationErrorResponse> {
+  return postBranchGenerationAction(`/api/v1/repositories/${repositoryId}/branches/${branchId}/generation-tasks/full`);
+}
+
+export async function getBranchGenerationTask(
+  taskId: string
+): Promise<BranchGenerationTaskResponse | BranchGenerationErrorResponse> {
+  return api.get<BranchGenerationTaskResponse>(`/api/v1/branch-generation-tasks/${taskId}`)
+    .catch(toBranchGenerationError);
+}
+
+export async function retryBranchGenerationTask(
+  taskId: string
+): Promise<BranchGenerationTaskResponse | BranchGenerationErrorResponse> {
+  return postBranchGenerationAction(`/api/v1/branch-generation-tasks/${taskId}/retry`);
+}
+
+export async function cancelBranchGenerationTask(
+  taskId: string
+): Promise<BranchGenerationTaskResponse | BranchGenerationErrorResponse> {
+  return postBranchGenerationAction(`/api/v1/branch-generation-tasks/${taskId}/cancel`);
+}
+
+async function postBranchGenerationAction(path: string): Promise<BranchGenerationTaskResponse | BranchGenerationErrorResponse> {
+  return api.post<BranchGenerationTaskResponse>(path).catch(toBranchGenerationError);
+}
+
+function toBranchGenerationError(error: unknown): BranchGenerationErrorResponse {
+  if (error instanceof ApiError && error.data && typeof error.data === "object") {
+    const data = error.data as Partial<BranchGenerationErrorResponse>;
+    if (data.success === false && data.errorCode && data.error) {
+      return data as BranchGenerationErrorResponse;
+    }
+  }
+
+  return {
+    success: false,
+    errorCode: "BRANCH_GENERATION_REQUEST_FAILED",
+    error: error instanceof Error ? error.message : "Branch generation request failed",
+  };
 }

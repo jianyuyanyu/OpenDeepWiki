@@ -29,10 +29,14 @@ public class AdminRepositoryDto
     public bool GenerateSkill { get; set; }
     public int Status { get; set; }
     public string StatusText { get; set; } = string.Empty;
+    public string ScanDepthMode { get; set; } = RepositoryScanDepthMode.Auto.ToString();
+    public AdminRepositoryScanPlanDto? ScanPlan { get; set; }
     public int StarCount { get; set; }
     public int ForkCount { get; set; }
     public int BookmarkCount { get; set; }
     public int ViewCount { get; set; }
+    public int BranchGenerationActiveCount { get; set; }
+    public int BranchGenerationFailedCount { get; set; }
     public string? OwnerUserId { get; set; }
     public string? OwnerUserName { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -115,6 +119,42 @@ public class AdminRepositoryManagementDto
     public string StatusText { get; set; } = string.Empty;
     public List<AdminRepositoryBranchDto> Branches { get; set; } = new();
     public List<AdminIncrementalTaskDto> RecentIncrementalTasks { get; set; } = new();
+    public List<AdminBranchGenerationTaskDto> RecentBranchGenerationTasks { get; set; } = new();
+    public AdminRepositoryScanPlanDto? ScanPlan { get; set; }
+}
+
+public class AdminRepositoryScanPlanDto
+{
+    public string Source { get; set; } = string.Empty;
+    public string Mode { get; set; } = RepositoryScanDepthMode.Auto.ToString();
+    public int DirectoryTreeDepth { get; set; }
+    public int FileListDepth { get; set; }
+    public int MaxTreeNodes { get; set; }
+    public int MaxFilesPerDirectory { get; set; }
+    public int MaxTotalFiles { get; set; }
+    public List<string> ExtraExcludedDirs { get; set; } = new();
+    public string? ProfileHash { get; set; }
+    public string? Reason { get; set; }
+    public double? Confidence { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+}
+
+public class UpdateRepositoryScanPlanRequest
+{
+    public string Mode { get; set; } = RepositoryScanDepthMode.Auto.ToString();
+    public int? DirectoryTreeDepth { get; set; }
+    public int? FileListDepth { get; set; }
+    public int? MaxTreeNodes { get; set; }
+    public int? MaxFilesPerDirectory { get; set; }
+    public int? MaxTotalFiles { get; set; }
+    public List<string>? ExtraExcludedDirs { get; set; }
+}
+
+public class AdminRepositoryScanPlanOperationResult
+{
+    public bool Success { get; set; }
+    public string? Message { get; set; }
+    public AdminRepositoryScanPlanDto? ScanPlan { get; set; }
 }
 
 /// <summary>
@@ -126,6 +166,11 @@ public class AdminRepositoryBranchDto
     public string Name { get; set; } = string.Empty;
     public string? LastCommitId { get; set; }
     public DateTime? LastProcessedAt { get; set; }
+    public string? GenerationStatus { get; set; }
+    public string? LastGenerationTaskId { get; set; }
+    public string? LastGenerationError { get; set; }
+    public DateTime? LastGenerationStartedAt { get; set; }
+    public DateTime? LastGenerationCompletedAt { get; set; }
     public List<AdminBranchLanguageDto> Languages { get; set; } = new();
 }
 
@@ -157,6 +202,28 @@ public class AdminIncrementalTaskDto
     public string? PreviousCommitId { get; set; }
     public string? TargetCommitId { get; set; }
     public string? ErrorMessage { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? StartedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+/// <summary>
+/// 管理端 branch full generation 任务信息
+/// </summary>
+public class AdminBranchGenerationTaskDto
+{
+    public string TaskId { get; set; } = string.Empty;
+    public string RepositoryId { get; set; } = string.Empty;
+    public string BranchId { get; set; } = string.Empty;
+    public string? BranchName { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string Mode { get; set; } = string.Empty;
+    public int Priority { get; set; }
+    public bool IsManualTrigger { get; set; }
+    public int RetryCount { get; set; }
+    public string? ErrorMessage { get; set; }
+    public string? RequestedBy { get; set; }
+    public string? TargetCommitId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? StartedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
@@ -211,6 +278,7 @@ public class AdminRepositoryOperationResult
 {
     public bool Success { get; set; }
     public string Message { get; set; } = string.Empty;
+    public int? StatusCode { get; set; }
 }
 
 /// <summary>

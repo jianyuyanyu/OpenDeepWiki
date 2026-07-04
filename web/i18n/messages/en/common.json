@@ -187,6 +187,7 @@
     "apiKeyRequired": "API Key Required",
     "apiKeyHint": "You need to provide your own API key in the Authorization header when connecting.",
     "getApiKey": "Get API Key",
+    "allToolsUnrestricted": "All tools (unrestricted)",
     "claudeHint": "Add this to your Claude Desktop config file, then restart Claude.",
     "cursorHint": "Add this to your Cursor MCP config file (.cursor/mcp.json).",
     "generalGuide": "API Reference",

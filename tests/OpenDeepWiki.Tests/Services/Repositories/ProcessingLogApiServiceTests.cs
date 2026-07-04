@@ -65,6 +65,39 @@ public class ProcessingLogApiServiceTests
     }
 
     [Fact]
+    public async Task LogAsync_WhenWorkspaceScanPlanMessage_StoresOriginalMessage()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        await using var provider = CreateServiceProvider(databaseName);
+        var service = new ProcessingLogService(provider.GetRequiredService<IServiceScopeFactory>());
+        var repositoryId = Guid.NewGuid().ToString();
+        var message = "Resolved scan plan: Auto, directoryDepth=3, fileDepth=2";
+
+        await service.LogAsync(repositoryId, ProcessingStep.Workspace, message);
+
+        var response = await service.GetLogsAsync(repositoryId);
+
+        var log = Assert.Single(response.Logs);
+        Assert.Equal(message, log.Message);
+    }
+
+    [Fact]
+    public async Task LogAsync_WhenNonWorkspaceContainsScanPlanPhrase_NormalizesMessage()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        await using var provider = CreateServiceProvider(databaseName);
+        var service = new ProcessingLogService(provider.GetRequiredService<IServiceScopeFactory>());
+        var repositoryId = Guid.NewGuid().ToString();
+
+        await service.LogAsync(repositoryId, ProcessingStep.Catalog, "Resolved scan plan: user text");
+
+        var response = await service.GetLogsAsync(repositoryId);
+
+        var log = Assert.Single(response.Logs);
+        Assert.Equal("Step progress (Catalog)", log.Message);
+    }
+
+    [Fact]
     public async Task GetProcessingLogsAsync_WhenRepositoryRouteCasingDiffers_ResolvesLocalRepository()
     {
         await using var context = CreateContext();

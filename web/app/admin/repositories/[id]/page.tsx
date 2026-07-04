@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -39,9 +40,12 @@ import { useTranslations } from "@/hooks/use-translations";
 import { useLocale } from "next-intl";
 import {
   AdminGraphifyArtifact,
+  AdminBranchGenerationTask,
   AdminIncrementalTask,
   AdminRepository,
   AdminRepositoryManagement,
+  cancelBranchGenerationTask,
+  enqueueBranchFullGeneration,
   generateRepositoryGraphify,
   getIncrementalUpdateTask,
   getRepository,
@@ -49,10 +53,16 @@ import {
   getRepositoryManagement,
   regenerateRepository,
   regenerateRepositoryDocument,
+  retryBranchGenerationTask,
   retryIncrementalUpdateTask,
   syncRepositoryStats,
   triggerRepositoryIncrementalUpdate,
   updateRepositoryDocumentContent,
+  getRepositoryScanPlan,
+  updateRepositoryScanPlan,
+  reevaluateRepositoryScanPlan,
+  AdminRepositoryScanPlan,
+  UpdateRepositoryScanPlanPayload,
 } from "@/lib/admin-api";
 import { getRepositorySourceTypeLabelKey, isGitRepositorySource } from "@/lib/repository-source";
 import { fetchProcessingLogs, fetchRepoDoc, fetchRepoTree } from "@/lib/repository-api";
@@ -124,6 +134,13 @@ function mapTaskStatusToAdminTask(
   };
 }
 
+function mapBranchGenerationTask(source: AdminBranchGenerationTask): AdminBranchGenerationTask {
+  return {
+    ...source,
+    branchName: source.branchName,
+  };
+}
+
 function normalizeTaskStatus(status: string) {
   const value = status.toLowerCase();
   if (value.includes("completed") || value.includes("完成")) return "completed";
@@ -159,6 +176,17 @@ export default function AdminRepositoryManagementPage() {
   const [docDraft, setDocDraft] = useState("");
   const [savingDoc, setSavingDoc] = useState(false);
 
+  const [scanPlan, setScanPlan] = useState<AdminRepositoryScanPlan | null>(null);
+  const [scanMode, setScanMode] = useState<"Auto" | "Manual">("Auto");
+  const [directoryTreeDepthInput, setDirectoryTreeDepthInput] = useState<string>("");
+  const [fileListDepthInput, setFileListDepthInput] = useState<string>("");
+  const [maxTreeNodesInput, setMaxTreeNodesInput] = useState<string>("");
+  const [maxFilesPerDirectoryInput, setMaxFilesPerDirectoryInput] = useState<string>("");
+  const [maxTotalFilesInput, setMaxTotalFilesInput] = useState<string>("");
+  const [extraExcludedDirsInput, setExtraExcludedDirsInput] = useState<string>("");
+  const [savingScanPlan, setSavingScanPlan] = useState(false);
+  const [reevaluatingScanPlan, setReevaluatingScanPlan] = useState(false);
+
   const [selectedBranchId, setSelectedBranchId] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("");
   const [selectedDocSlug, setSelectedDocSlug] = useState("");
@@ -175,6 +203,11 @@ export default function AdminRepositoryManagementPage() {
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [taskRefreshingId, setTaskRefreshingId] = useState<string | null>(null);
   const [taskRetryingId, setTaskRetryingId] = useState<string | null>(null);
+  const [branchTaskActionId, setBranchTaskActionId] = useState<string | null>(null);
+  const [branchTaskCreatingId, setBranchTaskCreatingId] = useState<string | null>(null);
+  const [logBranchFilter, setLogBranchFilter] = useState("all");
+  const [logTaskFilter, setLogTaskFilter] = useState("");
+  const [activeTab, setActiveTab] = useState("docs");
   const graphifyRequestInFlightRef = useRef(false);
 
   const selectedBranch = useMemo(() => {
@@ -186,6 +219,38 @@ export default function AdminRepositoryManagementPage() {
     if (!selectedBranch) return null;
     return selectedBranch.languages.find((item) => item.languageCode === selectedLanguage) ?? null;
   }, [selectedBranch, selectedLanguage]);
+
+  const branchGenerationTasks = useMemo(
+    () => management?.recentBranchGenerationTasks ?? [],
+    [management?.recentBranchGenerationTasks]
+  );
+
+  const selectedBranchTask = useMemo(() => {
+    if (!selectedBranch) return null;
+    return branchGenerationTasks.find((task) => task.taskId === selectedBranch.lastGenerationTaskId)
+      ?? branchGenerationTasks.find((task) => task.branchId === selectedBranch.id)
+      ?? null;
+  }, [branchGenerationTasks, selectedBranch]);
+
+  const branchGenerationSummary = useMemo(() => {
+    const summary = {
+      total: branchGenerationTasks.length,
+      active: 0,
+      failed: 0,
+      completed: 0,
+      cancelled: 0,
+    };
+
+    branchGenerationTasks.forEach((task) => {
+      const status = normalizeTaskStatus(task.status);
+      if (status === "pending" || status === "processing") summary.active += 1;
+      if (status === "failed") summary.failed += 1;
+      if (status === "completed") summary.completed += 1;
+      if (status === "cancelled") summary.cancelled += 1;
+    });
+
+    return summary;
+  }, [branchGenerationTasks]);
 
   const selectedGraphifyArtifact = useMemo(() => {
     if (!selectedBranch) return null;
@@ -203,6 +268,39 @@ export default function AdminRepositoryManagementPage() {
     () => isEditingDoc && doc?.exists && docDraft !== (doc.content ?? ""),
     [isEditingDoc, doc, docDraft]
   );
+
+  const isScanPlanDirty = useMemo(() => {
+    if (!scanPlan) return false;
+    if (scanMode !== scanPlan.mode) return true;
+    if (scanMode === "Manual") {
+      const extraExcludedStr = (scanPlan.extraExcludedDirs ?? []).join(",");
+      const currentExtraExcludedStr = extraExcludedDirsInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+        .join(",");
+      if (
+        directoryTreeDepthInput !== (scanPlan.directoryTreeDepth?.toString() ?? "") ||
+        fileListDepthInput !== (scanPlan.fileListDepth?.toString() ?? "") ||
+        maxTreeNodesInput !== (scanPlan.maxTreeNodes?.toString() ?? "") ||
+        maxFilesPerDirectoryInput !== (scanPlan.maxFilesPerDirectory?.toString() ?? "") ||
+        maxTotalFilesInput !== (scanPlan.maxTotalFiles?.toString() ?? "") ||
+        currentExtraExcludedStr !== extraExcludedStr
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [
+    scanPlan,
+    scanMode,
+    directoryTreeDepthInput,
+    fileListDepthInput,
+    maxTreeNodesInput,
+    maxFilesPerDirectoryInput,
+    maxTotalFilesInput,
+    extraExcludedDirsInput,
+  ]);
 
   const confirmDiscardUnsavedChanges = useCallback(() => {
     if (!isDocDirty) return true;
@@ -388,14 +486,16 @@ export default function AdminRepositoryManagementPage() {
 
     setPageLoading(true);
     try {
-      const [repoData, managementData, graphifyData] = await Promise.all([
+      const [repoData, managementData, graphifyData, scanPlanData] = await Promise.all([
         getRepository(repositoryId),
         getRepositoryManagement(repositoryId),
         getRepositoryGraphifyArtifacts(repositoryId),
+        getRepositoryScanPlan(repositoryId),
       ]);
       setRepository(repoData);
       setManagement(managementData);
       setGraphifyArtifacts(graphifyData);
+      setScanPlan(scanPlanData);
     } catch (error) {
       console.error("Failed to load repository management data:", error);
       toast.error(t("admin.repositories.management.toasts.loadManagementFailed"));
@@ -408,7 +508,9 @@ export default function AdminRepositoryManagementPage() {
     if (!repository) return;
     setLogsLoading(true);
     try {
-      const logData = await fetchProcessingLogs(repository.orgName, repository.repoName, undefined, 200);
+      const branchId = logBranchFilter === "all" ? undefined : logBranchFilter;
+      const taskId = logTaskFilter.trim() || undefined;
+      const logData = await fetchProcessingLogs(repository.orgName, repository.repoName, undefined, 200, branchId, taskId);
       setLogs(logData);
     } catch (error) {
       console.error("Failed to load logs:", error);
@@ -418,7 +520,7 @@ export default function AdminRepositoryManagementPage() {
     } finally {
       setLogsLoading(false);
     }
-  }, [repository, t]);
+  }, [logBranchFilter, logTaskFilter, repository, t]);
 
   const loadTree = useCallback(async () => {
     if (!repository || !selectedBranch || !selectedLanguage) {
@@ -503,6 +605,38 @@ export default function AdminRepositoryManagementPage() {
     });
   }, []);
 
+  const updateBranchTaskInState = useCallback((task: AdminBranchGenerationTask) => {
+    setManagement((previous) => {
+      if (!previous) return previous;
+      const normalizedTask = mapBranchGenerationTask(task);
+      const index = previous.recentBranchGenerationTasks.findIndex((item) => item.taskId === normalizedTask.taskId);
+      const tasks = index >= 0
+        ? previous.recentBranchGenerationTasks.map((item) =>
+            item.taskId === normalizedTask.taskId ? normalizedTask : item
+          )
+        : [normalizedTask, ...previous.recentBranchGenerationTasks].slice(0, 20);
+
+      const branches = previous.branches.map((branch) =>
+        branch.id === normalizedTask.branchId
+          ? {
+              ...branch,
+              generationStatus: normalizedTask.status,
+              lastGenerationTaskId: normalizedTask.taskId,
+              lastGenerationError: normalizedTask.errorMessage,
+              lastGenerationStartedAt: normalizedTask.startedAt,
+              lastGenerationCompletedAt: normalizedTask.completedAt,
+            }
+          : branch
+      );
+
+      return {
+        ...previous,
+        branches,
+        recentBranchGenerationTasks: tasks,
+      };
+    });
+  }, []);
+
   useEffect(() => {
     loadBaseData();
   }, [loadBaseData]);
@@ -551,6 +685,18 @@ export default function AdminRepositoryManagementPage() {
   }, [loadDoc]);
 
   useEffect(() => {
+    if (scanPlan) {
+      setScanMode(scanPlan.mode);
+      setDirectoryTreeDepthInput(scanPlan.directoryTreeDepth?.toString() ?? "");
+      setFileListDepthInput(scanPlan.fileListDepth?.toString() ?? "");
+      setMaxTreeNodesInput(scanPlan.maxTreeNodes?.toString() ?? "");
+      setMaxFilesPerDirectoryInput(scanPlan.maxFilesPerDirectory?.toString() ?? "");
+      setMaxTotalFilesInput(scanPlan.maxTotalFiles?.toString() ?? "");
+      setExtraExcludedDirsInput((scanPlan.extraExcludedDirs ?? []).join(", "));
+    }
+  }, [scanPlan]);
+
+  useEffect(() => {
     if (!isGraphifyArtifactActive || !repositoryId) {
       return;
     }
@@ -569,6 +715,25 @@ export default function AdminRepositoryManagementPage() {
       window.clearInterval(intervalId);
     };
   }, [isGraphifyArtifactActive, repositoryId, loadLogs]);
+
+  useEffect(() => {
+    if (branchGenerationSummary.active === 0) {
+      return;
+    }
+
+    const intervalId = window.setInterval(async () => {
+      try {
+        await loadBaseData();
+        await loadLogs({ silent: true });
+      } catch (error) {
+        console.error("Failed to refresh branch generation tasks:", error);
+      }
+    }, 10000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [branchGenerationSummary.active, loadBaseData, loadLogs]);
 
   useEffect(() => {
     if (!selectedDocSlug || docTreeNodes.length === 0) return;
@@ -659,6 +824,10 @@ export default function AdminRepositoryManagementPage() {
 
   const handleRegenerateRepository = async () => {
     if (!repositoryId) return;
+    if (isScanPlanDirty) {
+      toast.warning(t("admin.repositories.management.scanPlan.saveFirst") || "扫描策略已被修改，请先保存");
+      return;
+    }
     if (!window.confirm(t("admin.repositories.management.confirmRegenerateAll"))) return;
 
     setRegeneratingRepo(true);
@@ -677,6 +846,67 @@ export default function AdminRepositoryManagementPage() {
     } finally {
       setRegeneratingRepo(false);
     }
+  };
+
+  const handleBranchFullGeneration = async (branchId: string) => {
+    if (!repositoryId) return;
+    setBranchTaskCreatingId(branchId);
+    try {
+      const task = await enqueueBranchFullGeneration(repositoryId, branchId);
+      updateBranchTaskInState(task);
+      setLogBranchFilter(task.branchId);
+      setLogTaskFilter(task.taskId);
+      toast.success("Branch full generation queued");
+      await loadBaseData();
+      await loadLogs({ silent: true });
+    } catch (error) {
+      console.error("Failed to enqueue branch full generation:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to enqueue branch full generation");
+    } finally {
+      setBranchTaskCreatingId((current) => (current === branchId ? null : current));
+    }
+  };
+
+  const handleRetryBranchGeneration = async (taskId: string) => {
+    setBranchTaskActionId(taskId);
+    try {
+      const task = await retryBranchGenerationTask(taskId);
+      updateBranchTaskInState(task);
+      setLogBranchFilter(task.branchId);
+      setLogTaskFilter(task.taskId);
+      toast.success("Branch generation retry queued");
+      await loadBaseData();
+      await loadLogs({ silent: true });
+    } catch (error) {
+      console.error("Failed to retry branch generation:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to retry branch generation");
+    } finally {
+      setBranchTaskActionId((current) => (current === taskId ? null : current));
+    }
+  };
+
+  const handleCancelBranchGeneration = async (taskId: string) => {
+    setBranchTaskActionId(taskId);
+    try {
+      const task = await cancelBranchGenerationTask(taskId);
+      updateBranchTaskInState(task);
+      setLogBranchFilter(task.branchId);
+      setLogTaskFilter(task.taskId);
+      toast.success("Branch generation task cancelled");
+      await loadBaseData();
+      await loadLogs({ silent: true });
+    } catch (error) {
+      console.error("Failed to cancel branch generation:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to cancel branch generation");
+    } finally {
+      setBranchTaskActionId((current) => (current === taskId ? null : current));
+    }
+  };
+
+  const handleViewBranchTaskLogs = (branchId: string, taskId?: string) => {
+    setLogBranchFilter(branchId);
+    setLogTaskFilter(taskId ?? "");
+    setActiveTab("logs");
   };
 
   const handleGenerateGraphify = async () => {
@@ -807,6 +1037,10 @@ export default function AdminRepositoryManagementPage() {
       toast.warning(t("admin.repositories.management.incrementalNotSupported"));
       return;
     }
+    if (isScanPlanDirty) {
+      toast.warning(t("admin.repositories.management.scanPlan.saveFirst") || "扫描策略已被修改，请先保存");
+      return;
+    }
 
     setTriggeringIncremental(true);
     try {
@@ -822,6 +1056,83 @@ export default function AdminRepositoryManagementPage() {
       toast.error(t("admin.repositories.management.toasts.triggerIncrementalFailed"));
     } finally {
       setTriggeringIncremental(false);
+    }
+  };
+
+  const handleSaveScanPlan = async () => {
+    if (!repositoryId) return;
+
+    const payload: UpdateRepositoryScanPlanPayload = {
+      mode: scanMode,
+    };
+
+    if (scanMode === "Manual") {
+      const dirTreeDepth = parseInt(directoryTreeDepthInput, 10);
+      const fileDepth = parseInt(fileListDepthInput, 10);
+      const treeNodes = parseInt(maxTreeNodesInput, 10);
+      const filesPerDir = parseInt(maxFilesPerDirectoryInput, 10);
+      const totalFiles = parseInt(maxTotalFilesInput, 10);
+
+      if (
+        isNaN(dirTreeDepth) ||
+        isNaN(fileDepth) ||
+        isNaN(treeNodes) ||
+        isNaN(filesPerDir) ||
+        isNaN(totalFiles)
+      ) {
+        toast.error(t("admin.repositories.management.scanPlan.invalidNumber"));
+        return;
+      }
+
+      if (dirTreeDepth < 0 || fileDepth < 0 || treeNodes < 0 || filesPerDir < 0 || totalFiles < 0) {
+        toast.error(t("admin.repositories.management.scanPlan.minLimit"));
+        return;
+      }
+
+      payload.directoryTreeDepth = dirTreeDepth;
+      payload.fileListDepth = fileDepth;
+      payload.maxTreeNodes = treeNodes;
+      payload.maxFilesPerDirectory = filesPerDir;
+      payload.maxTotalFiles = totalFiles;
+      payload.extraExcludedDirs = extraExcludedDirsInput
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+    }
+
+    setSavingScanPlan(true);
+    try {
+      const updatedPlan = await updateRepositoryScanPlan(repositoryId, payload);
+      setScanPlan(updatedPlan);
+      toast.success(t("admin.repositories.management.scanPlan.saveSuccess"));
+    } catch (error) {
+      console.error("Failed to save scan plan:", error);
+      toast.error(t("admin.repositories.management.toasts.saveScanPlanFailed") || "保存扫描策略失败");
+    } finally {
+      setSavingScanPlan(false);
+    }
+  };
+
+  const handleReevaluateScanPlan = async () => {
+    if (!repositoryId) return;
+
+    setReevaluatingScanPlan(true);
+    try {
+      const result = await reevaluateRepositoryScanPlan(repositoryId);
+      if (result.success) {
+        setScanPlan(result.data);
+        toast.success(result.message || t("admin.repositories.management.scanPlan.reevaluateSuccess"));
+      } else {
+        toast.error(result.message || t("admin.repositories.management.toasts.reevaluateScanPlanFailed") || "重新评估扫描策略失败");
+        if (result.data) {
+          setScanPlan(result.data);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to reevaluate scan plan:", error);
+      toast.error(t("admin.repositories.management.toasts.reevaluateScanPlanFailed") || "重新评估扫描策略失败");
+    } finally {
+      setReevaluatingScanPlan(false);
     }
   };
 
@@ -1052,11 +1363,200 @@ export default function AdminRepositoryManagementPage() {
                 </p>
               )}
             </Card>
+            <Card className="p-3 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-sm">
+              <p className="text-xs text-muted-foreground">Branch generation</p>
+              <p className="text-xl font-semibold">
+                {selectedBranchTask ? getLocalizedTaskStatus(selectedBranchTask.status) : "Idle"}
+              </p>
+              {selectedBranchTask?.taskId && (
+                <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={selectedBranchTask.taskId}>
+                  {selectedBranchTask.taskId}
+                </p>
+              )}
+              {selectedBranchTask?.errorMessage && (
+                <p className="mt-1 line-clamp-2 text-xs text-red-500" title={selectedBranchTask.errorMessage}>
+                  {selectedBranchTask.errorMessage}
+                </p>
+              )}
+            </Card>
           </div>
         </div>
       </Card>
 
-      <Tabs defaultValue="docs" className="w-full">
+      <Card className="p-4 transition-all duration-300 hover:shadow-sm">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+                {t("admin.repositories.management.scanPlan.title")}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {t("admin.repositories.management.scanPlan.hint")}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={scanMode} onValueChange={(val) => setScanMode(val as "Auto" | "Manual")}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder={t("admin.repositories.management.scanPlan.mode")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Auto">{t("admin.repositories.management.scanPlan.modeAuto")}</SelectItem>
+                  <SelectItem value="Manual">{t("admin.repositories.management.scanPlan.modeManual")}</SelectItem>
+                </SelectContent>
+              </Select>
+              {scanMode === "Auto" ? (
+                <>
+                  {isScanPlanDirty && (
+                    <Button onClick={handleSaveScanPlan} disabled={savingScanPlan}>
+                      {savingScanPlan ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      {t("admin.repositories.management.scanPlan.save")}
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={handleReevaluateScanPlan} disabled={reevaluatingScanPlan || isScanPlanDirty}>
+                    {reevaluatingScanPlan ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    {t("admin.repositories.management.scanPlan.reevaluate")}
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={handleSaveScanPlan} disabled={savingScanPlan || !isScanPlanDirty}>
+                  {savingScanPlan ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  {t("admin.repositories.management.scanPlan.save")}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Display/Edit Scan plan parameters */}
+            <div className="space-y-4 rounded-lg border bg-muted/10 p-4">
+              <h3 className="text-sm font-semibold text-muted-foreground border-b pb-2">
+                {scanMode === "Manual"
+                  ? t("admin.repositories.management.scanPlan.manualConfig")
+                  : t("admin.repositories.management.scanPlan.autoPlanTitle")}
+              </h3>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("admin.repositories.management.scanPlan.directoryTreeDepth")}
+                  </label>
+                  <Input
+                    type="number"
+                    value={directoryTreeDepthInput}
+                    onChange={(e) => setDirectoryTreeDepthInput(e.target.value)}
+                    disabled={scanMode === "Auto"}
+                    min="0"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("admin.repositories.management.scanPlan.fileListDepth")}
+                  </label>
+                  <Input
+                    type="number"
+                    value={fileListDepthInput}
+                    onChange={(e) => setFileListDepthInput(e.target.value)}
+                    disabled={scanMode === "Auto"}
+                    min="0"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("admin.repositories.management.scanPlan.maxTreeNodes")}
+                  </label>
+                  <Input
+                    type="number"
+                    value={maxTreeNodesInput}
+                    onChange={(e) => setMaxTreeNodesInput(e.target.value)}
+                    disabled={scanMode === "Auto"}
+                    min="0"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("admin.repositories.management.scanPlan.maxFilesPerDirectory")}
+                  </label>
+                  <Input
+                    type="number"
+                    value={maxFilesPerDirectoryInput}
+                    onChange={(e) => setMaxFilesPerDirectoryInput(e.target.value)}
+                    disabled={scanMode === "Auto"}
+                    min="0"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("admin.repositories.management.scanPlan.maxTotalFiles")}
+                  </label>
+                  <Input
+                    type="number"
+                    value={maxTotalFilesInput}
+                    onChange={(e) => setMaxTotalFilesInput(e.target.value)}
+                    disabled={scanMode === "Auto"}
+                    min="0"
+                  />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t("admin.repositories.management.scanPlan.extraExcludedDirs")}
+                  </label>
+                  <Input
+                    type="text"
+                    value={extraExcludedDirsInput}
+                    onChange={(e) => setExtraExcludedDirsInput(e.target.value)}
+                    disabled={scanMode === "Auto"}
+                    placeholder="e.g. build, temp, dist"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Resolved plan status metadata */}
+            <div className="space-y-4 rounded-lg border bg-muted/10 p-4">
+              <h3 className="text-sm font-semibold text-muted-foreground border-b pb-2">
+                {t("admin.repositories.management.scanPlan.resolvedPlan")}
+              </h3>
+              {scanPlan ? (
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between border-b border-muted py-1">
+                    <span className="text-muted-foreground">{t("admin.repositories.management.scanPlan.source")}</span>
+                    <Badge variant={scanPlan.source === "Database" ? "secondary" : "outline"}>
+                      {scanPlan.source}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-muted py-1">
+                    <span className="text-muted-foreground">{t("admin.repositories.management.scanPlan.confidence")}</span>
+                    <span className="font-medium">
+                      {scanPlan.confidence !== undefined && scanPlan.confidence !== null
+                        ? `${(scanPlan.confidence * 100).toFixed(0)}%`
+                        : "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-b border-muted py-1">
+                    <span className="text-muted-foreground">{t("admin.repositories.management.scanPlan.updatedAt")}</span>
+                    <span className="font-mono text-xs">
+                      {scanPlan.updatedAt ? new Date(scanPlan.updatedAt).toLocaleString(dateLocale) : "N/A"}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-xs font-medium text-muted-foreground">{t("admin.repositories.management.scanPlan.reason")}</span>
+                    <p className="rounded border bg-muted/30 p-2.5 text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                      {scanPlan.reason || "N/A"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex h-[200px] items-center justify-center text-muted-foreground text-xs">
+                  {t("admin.repositories.management.scanPlan.noPlan")}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 gap-2 md:grid-cols-4">
           <TabsTrigger value="branches" className="transition-all data-[state=active]:shadow-sm">
             <GitBranch className="mr-2 h-4 w-4" />
@@ -1088,12 +1588,18 @@ export default function AdminRepositoryManagementPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             {management.branches.map((branch, index) => {
               const isSelected = selectedBranchId === branch.id;
+              const branchStatus = branch.generationStatus ?? "Idle";
+              const normalizedStatus = normalizeTaskStatus(branchStatus);
+              const isBranchActive = normalizedStatus === "pending" || normalizedStatus === "processing";
+              const isBranchFailed = normalizedStatus === "failed";
+              const isBranchCancelled = normalizedStatus === "cancelled";
+              const canRetryBranch = (isBranchFailed || isBranchCancelled) && Boolean(branch.lastGenerationTaskId);
+              const canCancelBranch = normalizedStatus === "pending" && Boolean(branch.lastGenerationTaskId);
+              const actionBusy = branchTaskCreatingId === branch.id || branchTaskActionId === branch.lastGenerationTaskId;
               return (
-                <button
+                <div
                   key={branch.id}
-                  type="button"
                   className="text-left"
-                  onClick={() => handleBranchChange(branch.id)}
                 >
                   <Card
                     className={`p-4 animate-in fade-in-0 slide-in-from-bottom-1 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-sm ${
@@ -1102,8 +1608,20 @@ export default function AdminRepositoryManagementPage() {
                     style={{ animationDelay: `${Math.min(index * 35, 180)}ms` }}
                   >
                     <div className="mb-3 flex items-center justify-between">
-                      <h3 className="font-semibold">{branch.name}</h3>
-                      {isSelected && <Badge>{t("admin.repositories.management.branchSelected")}</Badge>}
+                      <button
+                        type="button"
+                        className="font-semibold text-left hover:text-primary hover:underline underline-offset-4"
+                        onClick={() => handleBranchChange(branch.id)}
+                      >
+                        {branch.name}
+                      </button>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Badge variant={isBranchFailed ? "destructive" : isBranchActive ? "secondary" : "outline"}>
+                          {isBranchActive && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                          {branchStatus}
+                        </Badge>
+                        {isSelected && <Badge>{t("admin.repositories.management.branchSelected")}</Badge>}
+                      </div>
                     </div>
                     <div className="space-y-2 text-sm">
                       <p className="text-muted-foreground">
@@ -1113,6 +1631,16 @@ export default function AdminRepositoryManagementPage() {
                         {t("admin.repositories.management.lastProcessed")}:{" "}
                         {branch.lastProcessedAt ? new Date(branch.lastProcessedAt).toLocaleString(dateLocale) : t("admin.repositories.management.notAvailable")}
                       </p>
+                      {branch.lastGenerationTaskId && (
+                        <p className="text-muted-foreground">
+                          Branch task: <span className="font-mono text-xs">{branch.lastGenerationTaskId}</span>
+                        </p>
+                      )}
+                      {branch.lastGenerationError && (
+                        <p className="rounded border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-600">
+                          {branch.lastGenerationError}
+                        </p>
+                      )}
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {branch.languages.map((language) => (
@@ -1125,8 +1653,45 @@ export default function AdminRepositoryManagementPage() {
                         </Badge>
                       ))}
                     </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleBranchFullGeneration(branch.id)}
+                        disabled={actionBusy || isBranchActive}
+                      >
+                        {branchTaskCreatingId === branch.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                        Branch full
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => branch.lastGenerationTaskId && handleRetryBranchGeneration(branch.lastGenerationTaskId)}
+                        disabled={actionBusy || !canRetryBranch}
+                      >
+                        {branchTaskActionId === branch.lastGenerationTaskId && canRetryBranch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+                        Retry
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => branch.lastGenerationTaskId && handleCancelBranchGeneration(branch.lastGenerationTaskId)}
+                        disabled={actionBusy || !canCancelBranch}
+                      >
+                        {branchTaskActionId === branch.lastGenerationTaskId && canCancelBranch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <X className="mr-2 h-4 w-4" />}
+                        Cancel pending
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleViewBranchTaskLogs(branch.id, branch.lastGenerationTaskId)}
+                      >
+                        <History className="mr-2 h-4 w-4" />
+                        Logs
+                      </Button>
+                    </div>
                   </Card>
-                </button>
+                </div>
               );
             })}
             {management.branches.length === 0 && (
@@ -1135,6 +1700,93 @@ export default function AdminRepositoryManagementPage() {
               </Card>
             )}
           </div>
+
+          <Card className="mt-4 overflow-hidden transition-all duration-300 hover:shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
+              <div>
+                <h3 className="font-semibold">Branch full generation tasks</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Active {branchGenerationSummary.active} · Failed {branchGenerationSummary.failed} · Total {branchGenerationSummary.total}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">Completed {branchGenerationSummary.completed}</Badge>
+                <Badge variant="outline">Cancelled {branchGenerationSummary.cancelled}</Badge>
+              </div>
+            </div>
+            <div className="max-h-[420px] overflow-auto">
+              <table className="w-full">
+                <thead className="sticky top-0 bg-muted/80 backdrop-blur border-b">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium">Task</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium">Branch</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium">Created</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium">Retry</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {branchGenerationTasks.map((task, index) => {
+                    const status = normalizeTaskStatus(task.status);
+                    const canRetry = status === "failed" || status === "cancelled";
+                    const canCancel = status === "pending";
+                    const busy = branchTaskActionId === task.taskId;
+                    return (
+                      <tr
+                        key={task.taskId}
+                        className="animate-in fade-in-0 slide-in-from-bottom-1 transition-colors hover:bg-muted/40"
+                        style={{ animationDelay: `${Math.min(index * 22, 220)}ms` }}
+                      >
+                        <td className="px-4 py-2 text-xs font-mono max-w-[220px] truncate">{task.taskId}</td>
+                        <td className="px-4 py-2 text-xs">{task.branchName || task.branchId}</td>
+                        <td className="px-4 py-2 text-xs">
+                          <span className={`inline-flex rounded px-2 py-1 text-xs ${statusBadgeClass(task.status)}`}>
+                            {getLocalizedTaskStatus(task.status)}
+                          </span>
+                          {task.errorMessage && (
+                            <p className="mt-1 max-w-[300px] truncate text-[11px] text-red-500">{task.errorMessage}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-xs whitespace-nowrap">{new Date(task.createdAt).toLocaleString(dateLocale)}</td>
+                        <td className="px-4 py-2 text-xs">{task.retryCount}</td>
+                        <td className="px-4 py-2">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewBranchTaskLogs(task.branchId, task.taskId)}
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRetryBranchGeneration(task.taskId)}
+                              disabled={busy || !canRetry}
+                            >
+                              {busy && canRetry ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCancelBranchGeneration(task.taskId)}
+                              disabled={busy || !canCancel}
+                            >
+                              {busy && canCancel ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {branchGenerationTasks.length === 0 && (
+                <div className="p-8 text-center text-sm text-muted-foreground">No branch full generation tasks</div>
+              )}
+            </div>
+          </Card>
         </TabsContent>
 
         <TabsContent value="docs" className="mt-4 space-y-4 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
@@ -1335,10 +1987,31 @@ export default function AdminRepositoryManagementPage() {
                   </p>
                 )}
               </div>
-              <Button variant="outline" onClick={() => loadLogs()} disabled={logsLoading} className="transition-all duration-200">
-                {logsLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                {t("admin.repositories.management.refreshLogs")}
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={logBranchFilter} onValueChange={setLogBranchFilter}>
+                  <SelectTrigger className="h-9 w-[180px]">
+                    <SelectValue placeholder="Branch logs" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All branches</SelectItem>
+                    {management.branches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={logTaskFilter}
+                  onChange={(event) => setLogTaskFilter(event.target.value)}
+                  placeholder="taskId"
+                  className="h-9 w-[240px] font-mono text-xs"
+                />
+                <Button variant="outline" onClick={() => loadLogs()} disabled={logsLoading} className="transition-all duration-200">
+                  {logsLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                  {t("admin.repositories.management.refreshLogs")}
+                </Button>
+              </div>
             </div>
             <div className="mt-3 rounded-lg border bg-muted/30 p-3">
               <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
@@ -1389,6 +2062,7 @@ export default function AdminRepositoryManagementPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium">{t("admin.repositories.management.logColumns.time")}</th>
                     <th className="px-4 py-3 text-left text-xs font-medium">{t("admin.repositories.management.logColumns.step")}</th>
                     <th className="px-4 py-3 text-left text-xs font-medium">{t("admin.repositories.management.logColumns.type")}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium">Scope</th>
                     <th className="px-4 py-3 text-left text-xs font-medium">{t("admin.repositories.management.logColumns.message")}</th>
                   </tr>
                 </thead>
@@ -1405,6 +2079,13 @@ export default function AdminRepositoryManagementPage() {
                       <td className="px-4 py-2 text-xs">{log.stepName}</td>
                       <td className="px-4 py-2 text-xs">
                         {log.isAiOutput ? <Badge variant="secondary">AI</Badge> : <Badge variant="outline">{t("admin.repositories.management.logTypeSystem")}</Badge>}
+                      </td>
+                      <td className="px-4 py-2 text-xs">
+                        <div className="space-y-1">
+                          {log.branchId && <Badge variant="outline" className="font-mono">branch {log.branchId}</Badge>}
+                          {log.generationTaskId && <Badge variant="secondary" className="font-mono">task {log.generationTaskId}</Badge>}
+                          {!log.branchId && !log.generationTaskId && <span className="text-muted-foreground">repository</span>}
+                        </div>
                       </td>
                       <td className="px-4 py-2 text-xs">{log.message}</td>
                     </tr>

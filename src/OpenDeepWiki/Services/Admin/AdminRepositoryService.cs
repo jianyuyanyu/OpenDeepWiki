@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
@@ -16,17 +17,26 @@ public class AdminRepositoryService : IAdminRepositoryService
     private readonly IGitPlatformService _gitPlatformService;
     private readonly IRepositoryAnalyzer _repositoryAnalyzer;
     private readonly IWikiGenerator _wikiGenerator;
+    private readonly IRepositoryFullRegenerationCleaner _fullRegenerationCleaner;
+    private readonly IRepositoryScanPlanResolver _scanPlanResolver;
+    private readonly IRepositoryGenerationLockService _generationLockService;
 
     public AdminRepositoryService(
         IContext context,
         IGitPlatformService gitPlatformService,
         IRepositoryAnalyzer repositoryAnalyzer,
-        IWikiGenerator wikiGenerator)
+        IWikiGenerator wikiGenerator,
+        IRepositoryFullRegenerationCleaner fullRegenerationCleaner,
+        IRepositoryScanPlanResolver scanPlanResolver,
+        IRepositoryGenerationLockService generationLockService)
     {
         _context = context;
         _gitPlatformService = gitPlatformService;
         _repositoryAnalyzer = repositoryAnalyzer;
         _wikiGenerator = wikiGenerator;
+        _fullRegenerationCleaner = fullRegenerationCleaner;
+        _scanPlanResolver = scanPlanResolver;
+        _generationLockService = generationLockService;
     }
 
     public async Task<AdminRepositoryListResponse> GetRepositoriesAsync(int page, int pageSize, string? search, int? status)
@@ -60,6 +70,7 @@ public class AdminRepositoryService : IAdminRepositoryService
                 GenerateSkill = r.GenerateSkill,
                 Status = (int)r.Status,
                 StatusText = GetStatusText(r.Status),
+                ScanDepthMode = r.ScanDepthMode.ToString(),
                 StarCount = r.StarCount,
                 ForkCount = r.ForkCount,
                 BookmarkCount = r.BookmarkCount,
@@ -69,6 +80,43 @@ public class AdminRepositoryService : IAdminRepositoryService
                 UpdatedAt = r.UpdatedAt
             })
             .ToListAsync();
+
+        var itemIds = items.Select(item => item.Id).ToArray();
+        if (itemIds.Length > 0)
+        {
+            var generationBranches = await _context.RepositoryBranches
+                .AsNoTracking()
+                .Where(branch => itemIds.Contains(branch.RepositoryId) &&
+                                 !branch.IsDeleted &&
+                                 branch.GenerationStatus != null)
+                .Select(branch => new
+                {
+                    branch.RepositoryId,
+                    branch.GenerationStatus
+                })
+                .ToListAsync();
+
+            var generationSummary = generationBranches
+                .GroupBy(branch => branch.RepositoryId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => new
+                    {
+                        Active = group.Count(branch =>
+                            branch.GenerationStatus is BranchGenerationTaskStatus.Pending
+                                or BranchGenerationTaskStatus.Processing),
+                        Failed = group.Count(branch => branch.GenerationStatus == BranchGenerationTaskStatus.Failed)
+                    });
+
+            foreach (var item in items)
+            {
+                if (generationSummary.TryGetValue(item.Id, out var summary))
+                {
+                    item.BranchGenerationActiveCount = summary.Active;
+                    item.BranchGenerationFailedCount = summary.Failed;
+                }
+            }
+        }
 
         return new AdminRepositoryListResponse
         {
@@ -99,6 +147,20 @@ public class AdminRepositoryService : IAdminRepositoryService
             GenerateSkill = repo.GenerateSkill,
             Status = (int)repo.Status,
             StatusText = GetStatusText(repo.Status),
+            ScanDepthMode = repo.ScanDepthMode.ToString(),
+            ScanPlan = ToScanPlanDto(_scanPlanResolver.Resolve(repo)),
+            BranchGenerationActiveCount = await _context.RepositoryBranches
+                .AsNoTracking()
+                .CountAsync(branch => branch.RepositoryId == repo.Id &&
+                                      !branch.IsDeleted &&
+                                      branch.GenerationStatus != null &&
+                                      (branch.GenerationStatus == BranchGenerationTaskStatus.Pending ||
+                                       branch.GenerationStatus == BranchGenerationTaskStatus.Processing)),
+            BranchGenerationFailedCount = await _context.RepositoryBranches
+                .AsNoTracking()
+                .CountAsync(branch => branch.RepositoryId == repo.Id &&
+                                      !branch.IsDeleted &&
+                                      branch.GenerationStatus == BranchGenerationTaskStatus.Failed),
             StarCount = repo.StarCount,
             ForkCount = repo.ForkCount,
             BookmarkCount = repo.BookmarkCount,
@@ -327,6 +389,25 @@ public class AdminRepositoryService : IAdminRepositoryService
         _ => "未知"
     };
 
+    private static AdminRepositoryScanPlanDto ToScanPlanDto(ResolvedRepositoryScanPlan plan)
+    {
+        return new AdminRepositoryScanPlanDto
+        {
+            Source = plan.Source,
+            Mode = plan.Mode.ToString(),
+            DirectoryTreeDepth = plan.DirectoryTreeDepth,
+            FileListDepth = plan.FileListDepth,
+            MaxTreeNodes = plan.MaxTreeNodes,
+            MaxFilesPerDirectory = plan.MaxFilesPerDirectory,
+            MaxTotalFiles = plan.MaxTotalFiles,
+            ExtraExcludedDirs = plan.ExtraExcludedDirs.ToList(),
+            ProfileHash = plan.ProfileHash,
+            Reason = plan.Reason,
+            Confidence = plan.Confidence,
+            UpdatedAt = plan.UpdatedAt
+        };
+    }
+
     public async Task<SyncStatsResult> SyncRepositoryStatsAsync(string id)
     {
         var repo = await _context.Repositories
@@ -527,6 +608,11 @@ public class AdminRepositoryService : IAdminRepositoryService
                 Name = branch.BranchName,
                 LastCommitId = branch.LastCommitId,
                 LastProcessedAt = branch.LastProcessedAt,
+                GenerationStatus = branch.GenerationStatus?.ToString(),
+                LastGenerationTaskId = branch.LastGenerationTaskId,
+                LastGenerationError = branch.LastGenerationError,
+                LastGenerationStartedAt = branch.LastGenerationStartedAt,
+                LastGenerationCompletedAt = branch.LastGenerationCompletedAt,
                 Languages = languageDtos
             };
         }).ToList();
@@ -556,6 +642,33 @@ public class AdminRepositoryService : IAdminRepositoryService
                 CompletedAt = task.CompletedAt
             }).ToList();
 
+        var branchGenerationTasks = await _context.BranchGenerationTasks
+            .AsNoTracking()
+            .Where(t => t.RepositoryId == id && !t.IsDeleted)
+            .OrderByDescending(t => t.CreatedAt)
+            .Take(20)
+            .ToListAsync();
+
+        var branchTaskDtos = branchGenerationTasks.Select(task =>
+            new AdminBranchGenerationTaskDto
+            {
+                TaskId = task.Id,
+                RepositoryId = task.RepositoryId,
+                BranchId = task.BranchId,
+                BranchName = branchNameMap.GetValueOrDefault(task.BranchId),
+                Status = task.Status.ToString(),
+                Mode = task.Mode.ToString(),
+                Priority = task.Priority,
+                IsManualTrigger = task.IsManualTrigger,
+                RetryCount = task.RetryCount,
+                ErrorMessage = task.ErrorMessage,
+                RequestedBy = task.RequestedBy,
+                TargetCommitId = task.TargetCommitId,
+                CreatedAt = task.CreatedAt,
+                StartedAt = task.StartedAt,
+                CompletedAt = task.CompletedAt
+            }).ToList();
+
         return new AdminRepositoryManagementDto
         {
             RepositoryId = repository.Id,
@@ -564,8 +677,136 @@ public class AdminRepositoryService : IAdminRepositoryService
             Status = (int)repository.Status,
             StatusText = GetStatusText(repository.Status),
             Branches = branchDtos,
-            RecentIncrementalTasks = taskDtos
+            RecentIncrementalTasks = taskDtos,
+            RecentBranchGenerationTasks = branchTaskDtos,
+            ScanPlan = ToScanPlanDto(_scanPlanResolver.Resolve(repository))
         };
+    }
+
+    public async Task<AdminRepositoryScanPlanDto?> GetScanPlanAsync(string id)
+    {
+        var repository = await _context.Repositories
+            .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
+        return repository == null ? null : ToScanPlanDto(_scanPlanResolver.Resolve(repository));
+    }
+
+    public async Task<AdminRepositoryScanPlanDto?> UpdateScanPlanAsync(string id, UpdateRepositoryScanPlanRequest request)
+    {
+        var repository = await _context.Repositories
+            .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
+        if (repository == null)
+        {
+            return null;
+        }
+
+        var previousMode = repository.ScanDepthMode;
+        var requestedMode = ParseScanDepthMode(request.Mode);
+        var hasExplicitPlanValues =
+            request.DirectoryTreeDepth.HasValue ||
+            request.FileListDepth.HasValue ||
+            request.MaxTreeNodes.HasValue ||
+            request.MaxFilesPerDirectory.HasValue ||
+            request.MaxTotalFiles.HasValue ||
+            request.ExtraExcludedDirs is { Count: > 0 };
+
+        repository.ScanDepthMode = requestedMode;
+        if (requestedMode == RepositoryScanDepthMode.Auto && !hasExplicitPlanValues)
+        {
+            if (previousMode == RepositoryScanDepthMode.Manual)
+            {
+                repository.DirectoryTreeDepthOverride = null;
+                repository.FileListDepthOverride = null;
+                repository.MaxTreeNodes = null;
+                repository.MaxFilesPerDirectory = null;
+                repository.MaxTotalFiles = null;
+                repository.ExtraExcludedDirsJson = null;
+                repository.ScanProfileHash = null;
+                repository.ScanProfileReason = null;
+                repository.ScanProfileConfidence = null;
+                repository.ScanProfileUpdatedAt = null;
+            }
+        }
+        else
+        {
+            repository.DirectoryTreeDepthOverride = request.DirectoryTreeDepth;
+            repository.FileListDepthOverride = request.FileListDepth;
+            repository.MaxTreeNodes = request.MaxTreeNodes;
+            repository.MaxFilesPerDirectory = request.MaxFilesPerDirectory;
+            repository.MaxTotalFiles = request.MaxTotalFiles;
+            repository.ExtraExcludedDirsJson = RepositoryScanPlanResolver.SerializeExcludedDirs(request.ExtraExcludedDirs);
+        }
+
+        if (repository.ScanDepthMode == RepositoryScanDepthMode.Manual)
+        {
+            repository.ScanProfileHash = null;
+            repository.ScanProfileReason = null;
+            repository.ScanProfileConfidence = null;
+            repository.ScanProfileUpdatedAt = null;
+        }
+        repository.UpdateTimestamp();
+
+        _context.Repositories.Update(repository);
+        await _context.SaveChangesAsync();
+
+        return ToScanPlanDto(_scanPlanResolver.Resolve(repository));
+    }
+
+    public async Task<AdminRepositoryScanPlanOperationResult?> ReevaluateScanPlanAsync(string id, CancellationToken cancellationToken = default)
+    {
+        var repository = await _context.Repositories
+            .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted, cancellationToken);
+        if (repository == null)
+        {
+            return null;
+        }
+
+        if (repository.Status is RepositoryStatus.Pending or RepositoryStatus.Processing)
+        {
+            return new AdminRepositoryScanPlanOperationResult
+            {
+                Success = false,
+                Message = "仓库正在处理中，无法重新评估扫描策略",
+                ScanPlan = ToScanPlanDto(_scanPlanResolver.Resolve(repository))
+            };
+        }
+
+        var branch = await _context.RepositoryBranches
+            .Where(b => b.RepositoryId == id && !b.IsDeleted)
+            .OrderByDescending(b => b.LastProcessedAt)
+            .ThenBy(b => b.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (branch == null)
+        {
+            return new AdminRepositoryScanPlanOperationResult
+            {
+                Success = false,
+                Message = "仓库没有可评估的分支",
+                ScanPlan = ToScanPlanDto(_scanPlanResolver.Resolve(repository))
+            };
+        }
+
+        var workspace = await _repositoryAnalyzer.PrepareWorkspaceAsync(repository, branch.BranchName, branch.LastCommitId, cancellationToken);
+        try
+        {
+            var plan = await _scanPlanResolver.ReevaluateAsync(_context, repository, workspace.WorkingDirectory, cancellationToken);
+            return new AdminRepositoryScanPlanOperationResult
+            {
+                Success = true,
+                Message = "扫描策略已重新评估",
+                ScanPlan = ToScanPlanDto(plan)
+            };
+        }
+        finally
+        {
+            await _repositoryAnalyzer.CleanupWorkspaceAsync(workspace, cancellationToken);
+        }
+    }
+
+    private static RepositoryScanDepthMode ParseScanDepthMode(string? mode)
+    {
+        return Enum.TryParse<RepositoryScanDepthMode>(mode, ignoreCase: true, out var parsed)
+            ? parsed
+            : RepositoryScanDepthMode.Auto;
     }
 
     public async Task<AdminRepositoryOperationResult> RegenerateRepositoryAsync(string id)
@@ -587,60 +828,64 @@ public class AdminRepositoryService : IAdminRepositoryService
             return new AdminRepositoryOperationResult
             {
                 Success = false,
-                Message = "仓库正在处理中，无法重复触发"
+                Message = "仓库正在处理中，无法重复触发",
+                StatusCode = StatusCodes.Status409Conflict
             };
         }
 
-        if (repository.Status == RepositoryStatus.Completed)
+        await using var transaction = await EfContextTransaction.BeginIfSupportedAsync(_context, CancellationToken.None);
+        var lockAcquired = await _generationLockService.TryAcquireAsync(
+            _context,
+            repository.Id,
+            RepositoryGenerationLockOwnerType.Repository,
+            repository.Id,
+            RepositoryGenerationLockScope.Repository);
+
+        if (!lockAcquired)
         {
-            // Full regeneration for completed repositories starts from a clean document set.
-            var branchLanguageIds = await _context.RepositoryBranches
-                .Where(b => b.RepositoryId == repository.Id && !b.IsDeleted)
-                .Join(
-                    _context.BranchLanguages.Where(l => !l.IsDeleted),
-                    b => b.Id,
-                    l => l.RepositoryBranchId,
-                    (b, l) => l.Id)
-                .ToListAsync();
-
-            var oldCatalogs = await _context.DocCatalogs
-                .Where(c => branchLanguageIds.Contains(c.BranchLanguageId) && !c.IsDeleted)
-                .ToListAsync();
-
-            var docFileIds = oldCatalogs
-                .Where(c => c.DocFileId != null)
-                .Select(c => c.DocFileId!)
-                .Distinct()
-                .ToList();
-
-            if (oldCatalogs.Count > 0)
+            if (transaction is not null)
             {
-                _context.DocCatalogs.RemoveRange(oldCatalogs);
+                await transaction.RollbackAsync();
             }
 
-            if (docFileIds.Count > 0)
+            return new AdminRepositoryOperationResult
             {
-                var oldDocFiles = await _context.DocFiles
-                    .Where(file => docFileIds.Contains(file.Id))
-                    .ToListAsync();
-                if (oldDocFiles.Count > 0)
-                {
-                    _context.DocFiles.RemoveRange(oldDocFiles);
-                }
+                Success = false,
+                Message = "仓库已有 branch 生成任务正在排队或处理中",
+                StatusCode = StatusCodes.Status409Conflict
+            };
+        }
+
+        try
+        {
+            await _fullRegenerationCleaner.CleanAsync(_context, repository);
+
+            repository.Status = RepositoryStatus.Pending;
+            repository.UpdateTimestamp();
+            await _context.SaveChangesAsync();
+            if (transaction is not null)
+            {
+                await transaction.CommitAsync();
             }
         }
-
-        var oldLogs = await _context.RepositoryProcessingLogs
-            .Where(log => log.RepositoryId == repository.Id)
-            .ToListAsync();
-        if (oldLogs.Count > 0)
+        catch
         {
-            _context.RepositoryProcessingLogs.RemoveRange(oldLogs);
-        }
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync();
+            }
+            else
+            {
+                await _generationLockService.ReleaseAsync(
+                    _context,
+                    repository.Id,
+                    RepositoryGenerationLockOwnerType.Repository,
+                    repository.Id,
+                    CancellationToken.None);
+            }
 
-        repository.Status = RepositoryStatus.Pending;
-        repository.UpdateTimestamp();
-        await _context.SaveChangesAsync();
+            throw;
+        }
 
         return new AdminRepositoryOperationResult
         {

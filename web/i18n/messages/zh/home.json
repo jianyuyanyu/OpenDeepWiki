@@ -143,6 +143,18 @@
     "submitError": "仓库提交失败",
     "listTitle": "我的仓库",
     "noRepositories": "暂无仓库",
+    "view": {
+      "tree": "树状",
+      "grid": "平铺"
+    },
+    "tree": {
+      "title": "仓库目录",
+      "all": "全部仓库",
+      "count": "{count} 个仓库",
+      "emptyFolder": "当前目录下暂无仓库",
+      "expandFolder": "展开目录",
+      "collapseFolder": "收起目录"
+    },
     "status": {
       "pending": "等待处理",
       "processing": "正在生成",

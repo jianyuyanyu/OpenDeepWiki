@@ -52,6 +52,8 @@ public class TestConfigDbContext : DbContext, IContext
     public DbSet<ChatLog> ChatLogs { get; set; } = null!;
     public DbSet<TranslationTask> TranslationTasks { get; set; } = null!;
     public DbSet<IncrementalUpdateTask> IncrementalUpdateTasks { get; set; } = null!;
+    public DbSet<BranchGenerationTask> BranchGenerationTasks { get; set; } = null!;
+    public DbSet<RepositoryGenerationLock> RepositoryGenerationLocks { get; set; } = null!;
     public DbSet<GraphifyArtifact> GraphifyArtifacts { get; set; } = null!;
     public DbSet<McpProvider> McpProviders { get; set; }
     public DbSet<McpUsageLog> McpUsageLogs { get; set; }

@@ -12,7 +12,12 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslations } from "@/hooks/use-translations";
-import { fetchRepositoryList, regenerateRepository } from "@/lib/repository-api";
+import {
+  fetchAllRepositoryList,
+  fetchRepositoryList,
+  regenerateRepository,
+} from "@/lib/repository-api";
+import { RepositoryExplorerView } from "@/components/repo/repository-explorer-view";
 import type {
   RepositoryItemResponse,
   RepositoryStatus,
@@ -26,6 +31,11 @@ import {
   ExternalLink,
   RefreshCw,
   GitBranch,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
+  ListTree,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { buildRepoBasePath } from "@/lib/repo-route";
@@ -36,6 +46,8 @@ interface RepositoryListProps {
   ownerId?: string;
   refreshTrigger?: number;
 }
+
+const PAGE_SIZE = 20;
 
 const STATUS_CONFIG: Record<RepositoryStatus, {
   icon: typeof Clock;
@@ -128,6 +140,22 @@ function RepositoryCard({
             <p className="mt-2 text-xs text-muted-foreground">
               {t("home.repository.createdAt")}: {createdDate}
             </p>
+            {((repo.branchGenerationActiveCount ?? 0) > 0 || (repo.branchGenerationFailedCount ?? 0) > 0) && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {(repo.branchGenerationActiveCount ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-1 text-xs text-blue-600">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    branch running {repo.branchGenerationActiveCount}
+                  </span>
+                )}
+                {(repo.branchGenerationFailedCount ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-1 text-xs text-red-600">
+                    <AlertTriangle className="h-3 w-3" />
+                    branch failed {repo.branchGenerationFailedCount}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             <StatusBadge status={repo.statusName} />
@@ -196,20 +224,34 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryingRepoId, setRetryingRepoId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"tree" | "list">("tree");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  const isTreeView = viewMode === "tree";
+  const totalPages = isTreeView ? 1 : Math.ceil(total / PAGE_SIZE);
 
   const loadRepositories = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetchRepositoryList({ ownerId });
+      const params = { ownerId };
+      const response = isTreeView
+        ? await fetchAllRepositoryList(params)
+        : await fetchRepositoryList({
+            ...params,
+            page,
+            pageSize: PAGE_SIZE,
+          });
       setRepositories(response.items);
+      setTotal(response.total);
     } catch (err) {
       setError("Failed to load repositories");
       console.error("Failed to fetch repositories:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [ownerId]);
+  }, [isTreeView, ownerId, page]);
 
   // 处理可见性变化，更新本地状态
   const handleVisibilityChange = useCallback((repoId: string, newIsPublic: boolean) => {
@@ -246,6 +288,10 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
   useEffect(() => {
     loadRepositories();
   }, [loadRepositories, refreshTrigger]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [ownerId, viewMode]);
 
   // Auto-refresh for pending/processing repositories
   useEffect(() => {
@@ -296,25 +342,77 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
     );
   }
 
+  const pagination =
+    totalPages > 1 ? (
+      <div className="flex items-center justify-center gap-4 pt-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((current) => Math.max(1, current - 1))}
+          disabled={page === 1 || isLoading}
+        >
+          <ChevronLeft className="mr-1 h-4 w-4" />
+          {t("home.bookmarks.previous")}
+        </Button>
+        <span className="text-sm text-muted-foreground">
+          {t("home.bookmarks.pageInfo")
+            .replace("{current}", page.toString())
+            .replace("{total}", totalPages.toString())}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+          disabled={page === totalPages || isLoading}
+        >
+          {t("home.bookmarks.next")}
+          <ChevronRight className="ml-1 h-4 w-4" />
+        </Button>
+      </div>
+    ) : null;
+
   return (
     <Card className="w-full">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>{t("home.repository.listTitle")}</CardTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={loadRepositories}
-            disabled={isLoading}
-          >
-            <RefreshCw
-              className={cn("h-4 w-4", isLoading && "animate-spin")}
-            />
-          </Button>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="grid flex-1 grid-cols-2 rounded-lg border bg-muted/30 p-1 sm:flex sm:flex-none">
+              <Button
+                variant={viewMode === "tree" ? "secondary" : "ghost"}
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setViewMode("tree")}
+              >
+                <ListTree className="h-4 w-4" />
+                {t("home.repository.view.tree")}
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setViewMode("list")}
+              >
+                <LayoutGrid className="h-4 w-4" />
+                {t("home.repository.view.grid")}
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={loadRepositories}
+              disabled={isLoading}
+            >
+              <RefreshCw
+                className={cn("h-4 w-4", isLoading && "animate-spin")}
+              />
+            </Button>
+          </div>
         </div>
         {repositories.length > 0 && (
           <CardDescription>
-            {repositories.length} {repositories.length === 1 ? "repository" : "repositories"}
+            {total} {total === 1 ? "repository" : "repositories"}
           </CardDescription>
         )}
       </CardHeader>
@@ -328,15 +426,41 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
           </div>
         ) : (
           <div className="space-y-4">
-            {repositories.map((repo) => (
-              <RepositoryCard 
-                key={repo.id} 
-                repo={repo} 
-                onVisibilityChange={handleVisibilityChange}
-                onRetry={handleRetry}
-                isRetrying={retryingRepoId === repo.id}
+            {viewMode === "tree" ? (
+              <RepositoryExplorerView
+                repositories={repositories}
+                emptyMessage={t("home.repository.noRepositories")}
+                contentClassName="lg:grid-cols-1 xl:grid-cols-2"
+                labels={{
+                  treeTitle: t("home.repository.tree.title"),
+                  allRepositories: t("home.repository.tree.all"),
+                  repositoryCount: (count) =>
+                    t("home.repository.tree.count").replace("{count}", count.toString()),
+                  emptyFolder: t("home.repository.tree.emptyFolder"),
+                  expandFolder: t("home.repository.tree.expandFolder"),
+                  collapseFolder: t("home.repository.tree.collapseFolder"),
+                }}
+                renderRepository={(repo) => (
+                  <RepositoryCard
+                    repo={repo}
+                    onVisibilityChange={handleVisibilityChange}
+                    onRetry={handleRetry}
+                    isRetrying={retryingRepoId === repo.id}
+                  />
+                )}
               />
-            ))}
+            ) : (
+              repositories.map((repo) => (
+                <RepositoryCard
+                  key={repo.id}
+                  repo={repo}
+                  onVisibilityChange={handleVisibilityChange}
+                  onRetry={handleRetry}
+                  isRetrying={retryingRepoId === repo.id}
+                />
+              ))
+            )}
+            {pagination}
           </div>
         )}
       </CardContent>
