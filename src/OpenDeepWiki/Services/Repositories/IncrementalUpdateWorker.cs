@@ -292,7 +292,7 @@ public class IncrementalUpdateWorker : BackgroundService
                 .Where(b => b.RepositoryId == repository.Id && !b.IsDeleted)
                 .ToListAsync(stoppingToken);
 
-            var isGitRepository = RepositorySource.IsGit(repository.GitUrl);
+            var sourceInfo = RepositorySource.Parse(repository.GitUrl);
             var saveChanges = false;
 
             foreach (var branch in branches)
@@ -329,13 +329,6 @@ public class IncrementalUpdateWorker : BackgroundService
                     continue;
                 }
 
-                if (!isGitRepository)
-                {
-                    CreateScheduledTask(context, repository, branch, branch.LastCommitId, null);
-                    saveChanges = true;
-                    continue;
-                }
-
                 string? remoteCommitId;
                 try
                 {
@@ -357,11 +350,18 @@ public class IncrementalUpdateWorker : BackgroundService
 
                 if (string.IsNullOrWhiteSpace(remoteCommitId))
                 {
-                    _logger.LogWarning(
-                        "Remote HEAD was not found. Repository: {Org}/{Repo}, Branch: {Branch}",
-                        repository.OrgName,
-                        repository.RepoName,
-                        branch.BranchName);
+                    if (sourceInfo.SourceType == RepositorySourceType.Git)
+                    {
+                        _logger.LogWarning(
+                            "Remote HEAD was not found. Repository: {Org}/{Repo}, Branch: {Branch}",
+                            repository.OrgName,
+                            repository.RepoName,
+                            branch.BranchName);
+                        continue;
+                    }
+
+                    CreateScheduledTask(context, repository, branch, branch.LastCommitId, null);
+                    saveChanges = true;
                     continue;
                 }
 
@@ -373,6 +373,13 @@ public class IncrementalUpdateWorker : BackgroundService
                         repository.RepoName,
                         branch.BranchName,
                         remoteCommitId);
+                    continue;
+                }
+
+                if (ShouldNormalizeSnapshotBaseline(sourceInfo, branch.LastCommitId, remoteCommitId))
+                {
+                    NormalizeSnapshotBaseline(repository, branch, remoteCommitId);
+                    saveChanges = true;
                     continue;
                 }
 
@@ -395,6 +402,46 @@ public class IncrementalUpdateWorker : BackgroundService
                 "Failed to create scheduled update tasks. Repository: {Org}/{Repo}",
                 repository.OrgName, repository.RepoName);
         }
+    }
+
+    private void NormalizeSnapshotBaseline(
+        Repository repository,
+        RepositoryBranch branch,
+        string remoteCommitId)
+    {
+        var previousCommitId = branch.LastCommitId;
+        branch.LastCommitId = remoteCommitId;
+        branch.UpdatedAt = DateTime.UtcNow;
+
+        _logger.LogInformation(
+            "Normalized scheduled incremental baseline without creating a task. Repository: {Org}/{Repo}, Branch: {Branch}, PreviousCommit: {PreviousCommit}, CurrentCommit: {CurrentCommit}",
+            repository.OrgName,
+            repository.RepoName,
+            branch.BranchName,
+            previousCommitId,
+            remoteCommitId);
+    }
+
+    private static bool ShouldNormalizeSnapshotBaseline(
+        RepositorySourceInfo sourceInfo,
+        string? previousCommitId,
+        string remoteCommitId)
+    {
+        return sourceInfo.SourceType == RepositorySourceType.LocalDirectory &&
+               IsGitCommitId(remoteCommitId) &&
+               IsDirectorySnapshotId(previousCommitId);
+    }
+
+    private static bool IsGitCommitId(string? commitId)
+    {
+        return commitId is { Length: 40 } &&
+               commitId.All(Uri.IsHexDigit);
+    }
+
+    private static bool IsDirectorySnapshotId(string? commitId)
+    {
+        return commitId is { Length: 64 } &&
+               commitId.All(Uri.IsHexDigit);
     }
 
     private void CreateScheduledTask(

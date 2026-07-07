@@ -1,9 +1,11 @@
 using System.IO.Compression;
+using System.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Services.Repositories;
 using Xunit;
+using GitCloneOptions = LibGit2Sharp.CloneOptions;
 using GitCommitOptions = LibGit2Sharp.CommitOptions;
 using GitCommands = LibGit2Sharp.Commands;
 using GitRepository = LibGit2Sharp.Repository;
@@ -169,6 +171,375 @@ public class RepositoryAnalyzerSourceTests
         Assert.NotEqual(aWorkspace.WorkingDirectory, bWorkspace.WorkingDirectory);
     }
 
+    [Fact]
+    public async Task PrepareWorkspaceAsync_WhenLocalDirectorySourceIsGitRepository_UsesTargetBranchHead()
+    {
+        var repositoriesRoot = CreateTempDirectory();
+        var sourceRoot = CreateTempDirectory();
+        var (aCommit, bCommit) = CreateGitRepositoryWithBranches(
+            sourceRoot,
+            "release/stable",
+            "feature/docs-refresh");
+        var analyzer = CreateAnalyzer(
+            repositoriesRoot,
+            new RepositoryAnalyzerOptions
+            {
+                RepositoriesDirectory = repositoriesRoot,
+                AllowedLocalPathRoots = [Path.GetDirectoryName(sourceRoot)!]
+            });
+        var repository = new Repository
+        {
+            Id = Guid.NewGuid().ToString(),
+            OwnerUserId = Guid.NewGuid().ToString(),
+            OrgName = "example-org",
+            RepoName = "sample-repo",
+            GitUrl = RepositorySource.EncodeLocalDirectoryPath(sourceRoot)
+        };
+
+        var aWorkspace = await analyzer.PrepareWorkspaceAsync(repository, "release/stable");
+        var bWorkspace = await analyzer.PrepareWorkspaceAsync(repository, "feature/docs-refresh");
+        var bRemoteHead = await analyzer.GetRemoteBranchHeadCommitAsync(repository, "feature/docs-refresh");
+
+        Assert.Equal(RepositorySourceType.LocalDirectory, bWorkspace.SourceType);
+        Assert.True(bWorkspace.SupportsIncrementalUpdates);
+        Assert.Equal(aCommit, aWorkspace.CommitId);
+        Assert.Equal("A branch", File.ReadAllText(Path.Combine(aWorkspace.WorkingDirectory, "branch.txt")));
+        Assert.Equal(bCommit, bWorkspace.CommitId);
+        Assert.Equal(bCommit, bRemoteHead);
+        Assert.Equal("B branch", File.ReadAllText(Path.Combine(bWorkspace.WorkingDirectory, "branch.txt")));
+        Assert.NotEqual(aWorkspace.WorkingDirectory, bWorkspace.WorkingDirectory);
+    }
+
+    [Fact]
+    public async Task PrepareWorkspaceAsync_WhenLibGit2SourceHasOnlyMatchingRemoteRef_UsesTargetBranchHead()
+    {
+        var repositoriesRoot = CreateTempDirectory();
+        var sourceRoot = CreateTempDirectory();
+        var (aCommit, bCommit) = CreateGitRepositoryWithBranches(
+            sourceRoot,
+            "release/stable",
+            "feature/docs-refresh");
+        using (var sourceRepository = new GitRepository(sourceRoot))
+        {
+            sourceRepository.Refs.Add(
+                "refs/remotes/feature/docs-refresh",
+                bCommit,
+                true);
+            GitCommands.Checkout(sourceRepository, (LibGit2Sharp.Commit)sourceRepository.Lookup(aCommit));
+            sourceRepository.Branches.Remove("feature/docs-refresh");
+        }
+
+        var analyzer = CreateAnalyzer(
+            repositoriesRoot,
+            new RepositoryAnalyzerOptions
+            {
+                RepositoriesDirectory = repositoriesRoot,
+                AllowedLocalPathRoots = [Path.GetDirectoryName(sourceRoot)!]
+            });
+        var repository = CreateLocalSourceRepository(sourceRoot);
+
+        var workspace = await analyzer.PrepareWorkspaceAsync(repository, "feature/docs-refresh");
+        var remoteHead = await analyzer.GetRemoteBranchHeadCommitAsync(repository, "feature/docs-refresh");
+
+        Assert.Equal(bCommit, workspace.CommitId);
+        Assert.Equal(bCommit, remoteHead);
+        Assert.Equal("B branch", File.ReadAllText(Path.Combine(workspace.WorkingDirectory, "branch.txt")));
+        using var workspaceRepository = new GitRepository(workspace.WorkingDirectory);
+        Assert.NotNull(workspaceRepository.Branches["origin/feature/docs-refresh"]);
+        Assert.Equal(bCommit, workspaceRepository.Branches["origin/feature/docs-refresh"].Tip.Sha);
+    }
+
+    [Fact]
+    public async Task PrepareWorkspaceAsync_WhenWorkspaceIsPlainDirectoryInsideParentGitRepo_ReclonesTargetBranch()
+    {
+        var parentRoot = CreateTempDirectory();
+        GitRepository.Init(parentRoot);
+        var repositoriesRoot = Path.Combine(parentRoot, "data");
+        var sourceRoot = CreateTempDirectory();
+        var (_, bCommit) = CreateGitRepositoryWithBranches(
+            sourceRoot,
+            "release/stable",
+            "feature/docs-refresh");
+        var pollutedWorkspace = GetExpectedWorkspacePath(
+            repositoriesRoot,
+            "example-org",
+            "sample-repo",
+            "feature/docs-refresh");
+        Directory.CreateDirectory(pollutedWorkspace);
+        File.WriteAllText(Path.Combine(pollutedWorkspace, "branch.txt"), "polluted parent repository content");
+
+        var analyzer = CreateAnalyzer(
+            repositoriesRoot,
+            new RepositoryAnalyzerOptions
+            {
+                RepositoriesDirectory = repositoriesRoot,
+                AllowedLocalPathRoots = [Path.GetDirectoryName(sourceRoot)!]
+            });
+        var repository = CreateLocalSourceRepository(sourceRoot);
+
+        var workspace = await analyzer.PrepareWorkspaceAsync(repository, "feature/docs-refresh");
+
+        Assert.Equal(bCommit, workspace.CommitId);
+        Assert.Equal("B branch", File.ReadAllText(Path.Combine(workspace.WorkingDirectory, "branch.txt")));
+        using var workspaceRepository = new GitRepository(workspace.WorkingDirectory);
+        Assert.Equal(NormalizePath(workspace.WorkingDirectory), NormalizePath(workspaceRepository.Info.WorkingDirectory));
+    }
+
+    [Fact]
+    public async Task PrepareWorkspaceAsync_WhenWorkspaceHasInvalidGitDirectory_Reclones()
+    {
+        var repositoriesRoot = CreateTempDirectory();
+        var sourceRoot = CreateTempDirectory();
+        var (_, bCommit) = CreateGitRepositoryWithBranches(
+            sourceRoot,
+            "release/stable",
+            "feature/docs-refresh");
+        var invalidWorkspace = GetExpectedWorkspacePath(
+            repositoriesRoot,
+            "example-org",
+            "sample-repo",
+            "feature/docs-refresh");
+        Directory.CreateDirectory(Path.Combine(invalidWorkspace, ".git"));
+
+        var analyzer = CreateAnalyzer(
+            repositoriesRoot,
+            new RepositoryAnalyzerOptions
+            {
+                RepositoriesDirectory = repositoriesRoot,
+                AllowedLocalPathRoots = [Path.GetDirectoryName(sourceRoot)!]
+            });
+        var repository = CreateLocalSourceRepository(sourceRoot);
+
+        var workspace = await analyzer.PrepareWorkspaceAsync(repository, "feature/docs-refresh");
+
+        Assert.Equal(bCommit, workspace.CommitId);
+        Assert.Equal("B branch", File.ReadAllText(Path.Combine(workspace.WorkingDirectory, "branch.txt")));
+    }
+
+    [Fact]
+    public async Task PrepareWorkspaceAsync_WhenWorkspaceOriginPointsAtDifferentSource_Reclones()
+    {
+        var repositoriesRoot = CreateTempDirectory();
+        var rightSourceRoot = CreateTempDirectory();
+        var wrongSourceRoot = CreateTempDirectory();
+        var (_, rightBCommit) = CreateGitRepositoryWithBranches(
+            rightSourceRoot,
+            "release/stable",
+            "feature/docs-refresh",
+            bContent: "right B branch");
+        CreateGitRepositoryWithBranches(
+            wrongSourceRoot,
+            "release/stable",
+            "feature/docs-refresh",
+            bContent: "wrong B branch");
+        var workspacePath = GetExpectedWorkspacePath(
+            repositoriesRoot,
+            "example-org",
+            "sample-repo",
+            "feature/docs-refresh");
+        GitRepository.Clone(
+            wrongSourceRoot,
+            workspacePath,
+            new GitCloneOptions { BranchName = "feature/docs-refresh" });
+
+        var analyzer = CreateAnalyzer(
+            repositoriesRoot,
+            new RepositoryAnalyzerOptions
+            {
+                RepositoriesDirectory = repositoriesRoot,
+                AllowedLocalPathRoots = [Path.GetDirectoryName(rightSourceRoot)!]
+            });
+        var repository = CreateLocalSourceRepository(rightSourceRoot);
+
+        var workspace = await analyzer.PrepareWorkspaceAsync(repository, "feature/docs-refresh");
+
+        Assert.Equal(rightBCommit, workspace.CommitId);
+        Assert.Equal("right B branch", File.ReadAllText(Path.Combine(workspace.WorkingDirectory, "branch.txt")));
+        using var workspaceRepository = new GitRepository(workspace.WorkingDirectory);
+        Assert.Equal(NormalizePath(rightSourceRoot), NormalizePath(workspaceRepository.Network.Remotes["origin"].Url));
+    }
+
+    [Fact]
+    public async Task PrepareWorkspaceAsync_WhenLocalDirectorySourceIsGitRepoSubdirectory_DoesNotUseParentGitRepository()
+    {
+        var repositoriesRoot = CreateTempDirectory();
+        var parentRoot = CreateTempDirectory();
+        GitRepository.Init(parentRoot);
+        using (var parentRepository = new GitRepository(parentRoot))
+        {
+            var signature = new GitSignature("OpenDeepWiki Tests", "tests@opendeepwiki.local", DateTimeOffset.UtcNow);
+            Directory.CreateDirectory(Path.Combine(parentRoot, "nested-source"));
+            File.WriteAllText(Path.Combine(parentRoot, "nested-source", "branch.txt"), "plain nested source");
+            GitCommands.Stage(parentRepository, "nested-source/branch.txt");
+            parentRepository.Commit("Parent commit", signature, signature, new GitCommitOptions());
+        }
+
+        var sourceSubdirectory = Path.Combine(parentRoot, "nested-source");
+        var analyzer = CreateAnalyzer(
+            repositoriesRoot,
+            new RepositoryAnalyzerOptions
+            {
+                RepositoriesDirectory = repositoriesRoot,
+                AllowedLocalPathRoots = [parentRoot]
+            });
+        var repository = CreateLocalSourceRepository(sourceSubdirectory);
+
+        var workspace = await analyzer.PrepareWorkspaceAsync(repository, "feature/docs-refresh");
+
+        Assert.False(workspace.SupportsIncrementalUpdates);
+        Assert.Equal(64, workspace.CommitId.Length);
+        Assert.Equal("plain nested source", File.ReadAllText(Path.Combine(workspace.WorkingDirectory, "branch.txt")));
+        Assert.False(Directory.Exists(Path.Combine(workspace.WorkingDirectory, ".git")));
+    }
+
+    [Fact]
+    public async Task PrepareWorkspaceAsync_WhenLocalDirectorySourceIsGitWorktree_UsesTargetBranchHead()
+    {
+        var repositoriesRoot = CreateTempDirectory();
+        var sourceRoot = CreateTempDirectory();
+        var worktreeRoot = CreateTempDirectory();
+        Directory.Delete(worktreeRoot);
+        var (_, bCommit) = CreateGitRepositoryWithBranches(
+            sourceRoot,
+            "release/stable",
+            "feature/docs-refresh");
+        using (var sourceRepository = new GitRepository(sourceRoot))
+        {
+            sourceRepository.Worktrees.Add(
+                "release/stable",
+                "source-worktree",
+                worktreeRoot,
+                isLocked: false);
+        }
+
+        var analyzer = CreateAnalyzer(
+            repositoriesRoot,
+            new RepositoryAnalyzerOptions
+            {
+                RepositoriesDirectory = repositoriesRoot,
+                AllowedLocalPathRoots = [Path.GetDirectoryName(worktreeRoot)!]
+            });
+        var repository = CreateLocalSourceRepository(worktreeRoot);
+
+        var workspace = await analyzer.PrepareWorkspaceAsync(repository, "feature/docs-refresh");
+
+        Assert.True(File.Exists(Path.Combine(worktreeRoot, ".git")));
+        Assert.Equal(bCommit, workspace.CommitId);
+        Assert.Equal("B branch", File.ReadAllText(Path.Combine(workspace.WorkingDirectory, "branch.txt")));
+    }
+
+    [Fact]
+    public void BuildGitCliSafeDirectories_WhenSourceIsGitWorktree_IncludesWorktreeGitFileAndCommonGitDir()
+    {
+        var sourceRoot = CreateTempDirectory();
+        var worktreeRoot = CreateTempDirectory();
+        Directory.Delete(worktreeRoot);
+        CreateGitRepositoryWithBranches(
+            sourceRoot,
+            "release/stable",
+            "feature/docs-refresh");
+        using (var sourceRepository = new GitRepository(sourceRoot))
+        {
+            sourceRepository.Worktrees.Add(
+                "release/stable",
+                "source-worktree",
+                worktreeRoot,
+                isLocked: false);
+        }
+
+        var gitFile = Path.Combine(worktreeRoot, ".git");
+        var gitDir = ResolveGitDirPointerForTest(gitFile, worktreeRoot);
+        var commonGitDir = ResolveCommonGitDirForTest(gitDir);
+        var safeDirectories = InvokeBuildGitCliSafeDirectories(worktreeRoot)
+            .Select(NormalizePath)
+            .ToArray();
+
+        Assert.Contains(NormalizePath(worktreeRoot), safeDirectories);
+        Assert.Contains(NormalizePath(gitFile), safeDirectories);
+        Assert.Contains(NormalizePath(gitDir), safeDirectories);
+        Assert.Contains(NormalizePath(commonGitDir), safeDirectories);
+    }
+
+    [Fact]
+    public void BuildGitCliUploadPackArgument_IncludesSafeDirectoriesBeforeUploadPack()
+    {
+        var sourceRoot = NormalizePath(Path.Combine(CreateTempDirectory(), "source with space"));
+        var gitDir = NormalizePath(Path.Combine(sourceRoot, ".git"));
+        var argument = InvokeBuildGitCliUploadPackArgument([sourceRoot, gitDir]);
+        var processArguments = InvokeBuildGitCliProcessArguments(
+            ["clone", "--no-local", argument, "--no-checkout", sourceRoot, "/tmp/target"],
+            [sourceRoot, gitDir]);
+
+        Assert.Contains($"-c 'safe.directory={sourceRoot}'", argument);
+        Assert.Contains($"-c 'safe.directory={gitDir}'", argument);
+        Assert.EndsWith(" upload-pack", argument);
+        Assert.Equal("-c", processArguments[0]);
+        Assert.Equal($"safe.directory={sourceRoot}", processArguments[1]);
+        Assert.Equal("-c", processArguments[2]);
+        Assert.Equal($"safe.directory={gitDir}", processArguments[3]);
+        Assert.Equal("clone", processArguments[4]);
+        Assert.Equal("--no-local", processArguments[5]);
+        Assert.Equal(argument, processArguments[6]);
+    }
+
+    [Fact]
+    public async Task GetGitCliBranchHeadCommitAsync_WhenLocalBranchExists_ReturnsExplicitFetchRefSpec()
+    {
+        var repositoriesRoot = CreateTempDirectory();
+        var sourceRoot = CreateTempDirectory();
+        var (_, bCommit) = CreateGitRepositoryWithBranches(
+            sourceRoot,
+            "release/stable",
+            "feature/docs-refresh");
+        var analyzer = CreateAnalyzer(repositoriesRoot);
+
+        var result = await InvokeGetGitCliBranchHeadCommitAsync(
+            analyzer,
+            sourceRoot,
+            "feature/docs-refresh");
+
+        Assert.NotNull(result);
+        Assert.Equal(bCommit, GetReflectedStringProperty(result, "CommitId"));
+        Assert.Equal("refs/heads/feature/docs-refresh", GetReflectedStringProperty(result, "SourceRef"));
+        Assert.Equal(
+            "+refs/heads/feature/docs-refresh:refs/remotes/origin/feature/docs-refresh",
+            GetReflectedStringProperty(result, "FetchRefSpec"));
+    }
+
+    [Fact]
+    public async Task GetGitCliBranchHeadCommitAsync_WhenMatchingRemoteRefExists_ReturnsRemoteFetchRefSpec()
+    {
+        var repositoriesRoot = CreateTempDirectory();
+        var sourceRoot = CreateTempDirectory();
+        var (aCommit, bCommit) = CreateGitRepositoryWithBranches(
+            sourceRoot,
+            "release/stable",
+            "feature/docs-refresh");
+        using (var sourceRepository = new GitRepository(sourceRoot))
+        {
+            sourceRepository.Refs.Add(
+                "refs/remotes/feature/docs-refresh",
+                bCommit,
+                true);
+            GitCommands.Checkout(sourceRepository, (LibGit2Sharp.Commit)sourceRepository.Lookup(aCommit));
+            sourceRepository.Branches.Remove("feature/docs-refresh");
+        }
+
+        var analyzer = CreateAnalyzer(repositoriesRoot);
+
+        var result = await InvokeGetGitCliBranchHeadCommitAsync(
+            analyzer,
+            sourceRoot,
+            "feature/docs-refresh");
+
+        Assert.NotNull(result);
+        Assert.Equal(bCommit, GetReflectedStringProperty(result, "CommitId"));
+        Assert.Equal("refs/remotes/feature/docs-refresh", GetReflectedStringProperty(result, "SourceRef"));
+        Assert.Equal(
+            "+refs/remotes/feature/docs-refresh:refs/remotes/origin/feature/docs-refresh",
+            GetReflectedStringProperty(result, "FetchRefSpec"));
+    }
+
     private static RepositoryAnalyzer CreateAnalyzer(string repositoriesRoot, RepositoryAnalyzerOptions? options = null)
     {
         return new RepositoryAnalyzer(
@@ -178,6 +549,76 @@ public class RepositoryAnalyzerSourceTests
                 AllowedLocalPathRoots = []
             }),
             NullLogger<RepositoryAnalyzer>.Instance);
+    }
+
+    private static IReadOnlyList<string> InvokeBuildGitCliSafeDirectories(params string[] paths)
+    {
+        var method = typeof(RepositoryAnalyzer).GetMethod(
+            "BuildGitCliSafeDirectories",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return Assert.IsAssignableFrom<IReadOnlyList<string>>(method.Invoke(null, [paths]));
+    }
+
+    private static string InvokeBuildGitCliUploadPackArgument(IReadOnlyList<string> safeDirectories)
+    {
+        var method = typeof(RepositoryAnalyzer).GetMethod(
+            "BuildGitCliUploadPackArgument",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return Assert.IsType<string>(method.Invoke(null, [safeDirectories]));
+    }
+
+    private static string[] InvokeBuildGitCliProcessArguments(
+        IReadOnlyList<string> arguments,
+        IReadOnlyList<string> safeDirectories)
+    {
+        var method = typeof(RepositoryAnalyzer).GetMethod(
+            "BuildGitCliProcessArguments",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var result = Assert.IsAssignableFrom<IEnumerable<string>>(
+            method.Invoke(null, [arguments, safeDirectories]));
+        return result.ToArray();
+    }
+
+    private static async Task<object?> InvokeGetGitCliBranchHeadCommitAsync(
+        RepositoryAnalyzer analyzer,
+        string sourcePath,
+        string branchName)
+    {
+        var method = typeof(RepositoryAnalyzer).GetMethod(
+            "GetGitCliBranchHeadCommitAsync",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(method);
+        var task = Assert.IsAssignableFrom<Task>(method.Invoke(
+            analyzer,
+            [sourcePath, branchName, CancellationToken.None, null]));
+        await task;
+        return task.GetType().GetProperty("Result")?.GetValue(task);
+    }
+
+    private static string GetReflectedStringProperty(object value, string propertyName)
+    {
+        return Assert.IsType<string>(value.GetType().GetProperty(propertyName)?.GetValue(value));
+    }
+
+    private static string ResolveGitDirPointerForTest(string gitFile, string worktreePath)
+    {
+        var firstLine = File.ReadLines(gitFile).First();
+        Assert.StartsWith("gitdir:", firstLine, StringComparison.OrdinalIgnoreCase);
+        var gitDir = firstLine["gitdir:".Length..].Trim();
+        return Path.IsPathRooted(gitDir)
+            ? NormalizePath(gitDir)
+            : NormalizePath(Path.Combine(worktreePath, gitDir));
+    }
+
+    private static string ResolveCommonGitDirForTest(string gitDir)
+    {
+        var commonDir = File.ReadLines(Path.Combine(gitDir, "commondir")).First().Trim();
+        return Path.IsPathRooted(commonDir)
+            ? NormalizePath(commonDir)
+            : NormalizePath(Path.Combine(gitDir, commonDir));
     }
 
     private static string CreateTempDirectory()
@@ -202,16 +643,65 @@ public class RepositoryAnalyzerSourceTests
         }
     }
 
+    private static Repository CreateLocalSourceRepository(string sourceRoot)
+    {
+        return new Repository
+        {
+            Id = Guid.NewGuid().ToString(),
+            OwnerUserId = Guid.NewGuid().ToString(),
+            OrgName = "example-org",
+            RepoName = "sample-repo",
+            GitUrl = RepositorySource.EncodeLocalDirectoryPath(sourceRoot)
+        };
+    }
+
+    private static string GetExpectedWorkspacePath(
+        string repositoriesRoot,
+        string orgName,
+        string repositoryName,
+        string branchName)
+    {
+        return Path.Combine(
+            repositoriesRoot,
+            SanitizePathComponent(orgName),
+            SanitizePathComponent(repositoryName),
+            "branches",
+            SanitizePathComponent(branchName),
+            "tree");
+    }
+
+    private static string SanitizePathComponent(string component)
+    {
+        return component
+            .Replace('/', '_')
+            .Replace('\\', '_')
+            .Replace("..", "_")
+            .Trim();
+    }
+
+    private static string NormalizePath(string path)
+    {
+        if (Uri.TryCreate(path, UriKind.Absolute, out var uri) && uri.IsFile)
+        {
+            path = uri.LocalPath;
+        }
+
+        return Path.GetFullPath(path)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
     private static (string ACommit, string BCommit) CreateGitRepositoryWithBranches(
         string repositoryPath,
         string branchA,
-        string branchB)
+        string branchB,
+        string aContent = "A branch",
+        string bContent = "B branch")
     {
         GitRepository.Init(repositoryPath);
         using var repository = new GitRepository(repositoryPath);
         var signature = new GitSignature("OpenDeepWiki Tests", "tests@opendeepwiki.local", DateTimeOffset.UtcNow);
 
-        File.WriteAllText(Path.Combine(repositoryPath, "branch.txt"), "A branch");
+        File.WriteAllText(Path.Combine(repositoryPath, "branch.txt"), aContent);
         GitCommands.Stage(repository, "branch.txt");
         var commitOptions = new GitCommitOptions();
         var aCommit = repository.Commit("A branch", signature, signature, commitOptions);
@@ -219,7 +709,7 @@ public class RepositoryAnalyzerSourceTests
 
         var bBranch = repository.Branches.Add(branchB, aCommit);
         GitCommands.Checkout(repository, bBranch);
-        File.WriteAllText(Path.Combine(repositoryPath, "branch.txt"), "B branch");
+        File.WriteAllText(Path.Combine(repositoryPath, "branch.txt"), bContent);
         GitCommands.Stage(repository, "branch.txt");
         var bCommit = repository.Commit("B branch", signature, signature, commitOptions);
 
