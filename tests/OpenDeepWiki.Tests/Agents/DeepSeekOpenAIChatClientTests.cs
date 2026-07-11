@@ -128,6 +128,35 @@ public class DeepSeekOpenAIChatClientTests
     }
 
     [Fact]
+    public async Task GetResponseAsync_UsesSpecificToolChoice()
+    {
+        var handler = new StubHttpMessageHandler(_ => JsonResponse("""
+            {"id":"chatcmpl-test","model":"deepseek-v4-flash","choices":[{"message":{"role":"assistant","content":"saved"},"finish_reason":"stop"}]}
+            """));
+        var client = CreateClient(handler);
+        var writeDoc = AIFunctionFactory.Create(
+            (string content) => $"saved:{content}",
+            new AIFunctionFactoryOptions
+            {
+                Name = "WriteDoc",
+                Description = "Persist a Markdown document"
+            });
+
+        await client.GetResponseAsync(
+            [new ChatMessage(ChatRole.User, "save")],
+            new ChatOptions
+            {
+                Tools = [writeDoc],
+                ToolMode = ChatToolMode.RequireSpecific("WriteDoc")
+            });
+
+        using var document = JsonDocument.Parse(handler.RequestBodies.Single());
+        var choice = document.RootElement.GetProperty("tool_choice");
+        Assert.Equal("function", choice.GetProperty("type").GetString());
+        Assert.Equal("WriteDoc", choice.GetProperty("function").GetProperty("name").GetString());
+    }
+
+    [Fact]
     public async Task GetResponseAsync_PrependsInstructionsAsSystemMessage()
     {
         var handler = new StubHttpMessageHandler(_ => JsonResponse("""
