@@ -59,6 +59,7 @@ public class TokenUsageStats
 /// </summary>
 public class WikiGenerator : IWikiGenerator
 {
+    private sealed record AgentExecutionResult(string AssistantText, int ToolCallCount);
     // Compiled regex for better performance when removing <think> tags
     private static readonly Regex ThinkTagRegex = new(
         @"<think>[\s\S]*?</think>",
@@ -908,10 +909,6 @@ Please start executing the task.";
 Please start executing the task.";
 
             var contentAi = await ResolveContentModelAsync(cancellationToken);
-            var persistenceAttempts = Math.Max(1, _options.MaxRetryAttempts);
-            Exception? lastPersistenceFailure = null;
-
-            for (var attempt = 1; attempt <= persistenceAttempts; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -932,8 +929,8 @@ Please start executing the task.";
 
                 _logger.LogInformation(
                     "Starting document persistence attempt {Attempt}/{MaxAttempts}. Path: {Path}, Title: {Title}, SourceToolBudget: {SourceToolBudget}, AppendBudget: {AppendBudget}, MaxToolCalls: {MaxToolCalls}",
-                    attempt,
-                    persistenceAttempts,
+                    1,
+                    1,
                     catalogPath,
                     catalogTitle,
                     _options.MaxDocumentSourceToolCalls,
@@ -941,7 +938,7 @@ Please start executing the task.";
                     _options.MaxDocumentToolCalls);
 
                 var attemptStartedAt = DateTime.UtcNow.AddSeconds(-1);
-                await ExecuteAgentWithRetryAsync(
+                var exploration = await ExecuteAgentWithRetryAsync(
                     contentAi,
                     prompt,
                     userMessage,
@@ -965,13 +962,6 @@ Please start executing the task.";
 
                 if (await HasPersistedDocumentContentAsync(branchLanguage.Id, catalogPath, attemptStartedAt, cancellationToken))
                 {
-                    if (attempt > 1)
-                    {
-                        _logger.LogInformation(
-                            "Document persisted after retry. Path: {Path}, Title: {Title}, Attempt: {Attempt}/{MaxAttempts}",
-                            catalogPath, catalogTitle, attempt, persistenceAttempts);
-                    }
-
                     stopwatch.Stop();
                     _logger.LogInformation(
                         "Document content generation completed. Path: {Path}, Title: {Title}, Duration: {Duration}ms",
@@ -979,23 +969,98 @@ Please start executing the task.";
                     return;
                 }
 
-                lastPersistenceFailure = new InvalidOperationException(
-                    $"AI agent completed but WriteDoc did not persist content for catalog path '{catalogPath}'.");
-
-                _logger.LogWarning(
-                    lastPersistenceFailure,
-                    "Document generation completed without persisted content. Path: {Path}, Title: {Title}, Attempt: {Attempt}/{MaxAttempts}",
-                    catalogPath, catalogTitle, attempt, persistenceAttempts);
-
-                if (attempt < persistenceAttempts)
+                var groundingText = string.Empty;
+                if (gitTool.GetReadFiles().Count == 0)
                 {
-                    await Task.Delay(CalculateRetryDelayMs(attempt), cancellationToken);
-                }
-            }
+                    var readFileTool = gitTool.GetTools()
+                        .Single(tool => string.Equals(tool.Name, "ReadFile", StringComparison.Ordinal));
+                    var grounding = await ExecuteAgentWithRetryAsync(
+                        contentAi,
+                        prompt,
+                        $"Select the source file most relevant to '{catalogTitle}' and call ReadFile exactly once.",
+                        [readFileTool],
+                        $"DocumentContent:{catalogPath}:forced-read",
+                        ProcessingStep.Content,
+                        CreateWikiAiContext(
+                            "wiki_document_generation",
+                            "仓库文档生成",
+                            workspace,
+                            branchLanguage,
+                            catalogPath,
+                            contentAi.ModelId),
+                        cancellationToken,
+                        toolMode: ChatToolMode.RequireSpecific("ReadFile"));
+                    groundingText = grounding.AssistantText;
 
-            throw new InvalidOperationException(
-                $"Document content generation failed to persist content for path '{catalogPath}' after {persistenceAttempts} attempts.",
-                lastPersistenceFailure);
+                    if (gitTool.GetReadFiles().Count == 0)
+                    {
+                        var fallbackPath = SelectSourceGroundingFile(
+                            workspace.WorkingDirectory,
+                            catalogPath,
+                            catalogTitle);
+                        if (fallbackPath is null)
+                        {
+                            throw new InvalidOperationException(
+                                $"required_source_tool_not_called: No readable source was available for '{catalogPath}'.");
+                        }
+
+                        _logger.LogWarning(
+                            "Provider ignored required ReadFile tool choice. Reading deterministic fallback source. Path: {Path}, SourceFile: {SourceFile}",
+                            catalogPath,
+                            fallbackPath);
+                        groundingText = await gitTool.ReadAsync(
+                            fallbackPath,
+                            limit: 2000,
+                            cancellationToken: cancellationToken);
+                    }
+                }
+
+                using var forcedContext = _contextFactory.CreateContext();
+                var writeTool = new DocTool(
+                        forcedContext,
+                        branchLanguage.Id,
+                        catalogPath,
+                        gitTool,
+                        _options.MaxDocumentAppendOperations)
+                    .GetTools()
+                    .Single(tool => string.Equals(tool.Name, "WriteDoc", StringComparison.Ordinal));
+                var forcedWrite = await ExecuteAgentWithRetryAsync(
+                    contentAi,
+                    prompt,
+                    $@"Call WriteDoc exactly once with the complete Markdown document for '{catalogPath}'.
+
+Previous draft:
+{exploration.AssistantText}
+
+Source grounding:
+{groundingText}",
+                    [writeTool],
+                    $"DocumentContent:{catalogPath}:forced-write",
+                    ProcessingStep.Content,
+                    CreateWikiAiContext(
+                        "wiki_document_generation",
+                        "仓库文档生成",
+                        workspace,
+                        branchLanguage,
+                        catalogPath,
+                        contentAi.ModelId),
+                    cancellationToken,
+                    toolMode: ChatToolMode.RequireSpecific("WriteDoc"));
+
+                if (await HasPersistedDocumentContentAsync(branchLanguage.Id, catalogPath, attemptStartedAt, cancellationToken))
+                {
+                    stopwatch.Stop();
+                    _logger.LogInformation(
+                        "Document content generation completed after mandatory WriteDoc pass. Path: {Path}, ToolCalls: {ToolCalls}, Duration: {Duration}ms",
+                        catalogPath,
+                        forcedWrite.ToolCallCount,
+                        stopwatch.ElapsedMilliseconds);
+                    return;
+                }
+
+                throw new InvalidOperationException(
+                    $"required_tool_not_called: WriteDoc did not persist content for catalog path '{catalogPath}'.");
+            }
         }
         catch (Exception ex)
         {
@@ -1005,6 +1070,56 @@ Please start executing the task.";
                 catalogPath, catalogTitle, stopwatch.ElapsedMilliseconds);
             throw;
         }
+    }
+
+    private static string? SelectSourceGroundingFile(
+        string workingDirectory,
+        string catalogPath,
+        string catalogTitle)
+    {
+        var stopWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "and", "the", "for", "with", "from", "into", "using", "overview"
+        };
+        var terms = Regex.Split($"{catalogPath} {catalogTitle}".ToLowerInvariant(), @"[^\p{L}\p{N}]+")
+            .Where(term => term.Length >= 3 && !stopWords.Contains(term))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var extensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".md", ".txt", ".cs", ".fs", ".vb", ".py", ".js", ".mjs", ".cjs",
+            ".ts", ".tsx", ".jsx", ".java", ".kt", ".go", ".rs", ".rb", ".php",
+            ".sh", ".ps1", ".json", ".yaml", ".yml", ".toml", ".xml", ".sql"
+        };
+
+        return Directory.EnumerateFiles(workingDirectory, "*", SearchOption.AllDirectories)
+            .Select(path => new
+            {
+                FullPath = path,
+                RelativePath = Path.GetRelativePath(workingDirectory, path).Replace('\\', '/')
+            })
+            .Where(file => !file.RelativePath.StartsWith(".git/", StringComparison.OrdinalIgnoreCase))
+            .Where(file => extensions.Contains(Path.GetExtension(file.RelativePath)))
+            .Where(file => new FileInfo(file.FullPath).Length <= 1_000_000)
+            .Select(file =>
+            {
+                var pathTerms = Regex.Split(
+                        Path.ChangeExtension(file.RelativePath, null).ToLowerInvariant(),
+                        @"[^\p{L}\p{N}]+")
+                    .Where(term => term.Length > 0)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                return new
+                {
+                    file.RelativePath,
+                    Score = terms.Count(pathTerms.Contains) * 10
+                        + (Path.GetFileName(file.RelativePath).StartsWith("README", StringComparison.OrdinalIgnoreCase) ? 5 : 0)
+                        - file.RelativePath.Count(ch => ch == '/')
+                };
+            })
+            .OrderByDescending(file => file.Score)
+            .ThenBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .Select(file => file.RelativePath)
+            .FirstOrDefault();
     }
 
     private async Task<bool> HasPersistedDocumentContentAsync(
@@ -1154,7 +1269,7 @@ Please start executing the task.";
     /// <summary>
     /// Executes an AI agent with retry logic using exponential backoff.
     /// </summary>
-    private async Task ExecuteAgentWithRetryAsync(
+    private async Task<AgentExecutionResult> ExecuteAgentWithRetryAsync(
         ResolvedAiModel ai,
         string systemPrompt,
         string userMessage,
@@ -1164,7 +1279,8 @@ Please start executing the task.";
         AiExecutionContext executionContext,
         CancellationToken cancellationToken,
         int? maxToolCallsBeforeEarlyCompletion = null,
-        Func<CancellationToken, Task<bool>>? earlyCompletionCheck = null)
+        Func<CancellationToken, Task<bool>>? earlyCompletionCheck = null,
+        ChatToolMode? toolMode = null)
     {
         var model = ai.ModelId;
         var requestOptions = ai.ToRequestOptions();
@@ -1195,7 +1311,7 @@ Please start executing the task.";
                 {
                     ChatOptions = new ChatOptions()
                     {
-                        ToolMode = ChatToolMode.Auto,
+                        ToolMode = toolMode ?? ChatToolMode.Auto,
                         MaxOutputTokens = _options.MaxOutputTokens,
                         Instructions = systemPrompt,
                         Tools = tools,
@@ -1211,7 +1327,8 @@ Please start executing the task.";
                     model,
                     tools,
                     chatOptions,
-                    requestOptions);
+                    requestOptions,
+                    toolMode);
 
                 // Build the conversation with system prompt and user message
                 var messages = new List<ChatMessage>
@@ -1339,7 +1456,7 @@ Please start executing the task.";
                     "Streaming response completed. Operation: {Operation}, ContentLength: {Length}",
                     operationName, contentBuilder.Length);
 
-                return;
+                return new AgentExecutionResult(contentBuilder.ToString(), toolCallCount);
             }
             catch (Exception ex) when (ex is not OperationCanceledException && IsTransientException(ex))
             {

@@ -245,14 +245,16 @@ namespace OpenDeepWiki.Agents
             string model,
             AITool[] tools,
             ChatClientAgentOptions clientAgentOptions,
-            AiRequestOptions? requestOptions = null)
+            AiRequestOptions? requestOptions = null,
+            ChatToolMode? toolMode = null)
         {
             var option = ResolveOptions(requestOptions ?? _options, true);
 
             // Ensure tools are set in chat options
             clientAgentOptions.ChatOptions ??= new ChatOptions();
             clientAgentOptions.ChatOptions.Tools = tools;
-            clientAgentOptions.ChatOptions.ToolMode = ChatToolMode.Auto;
+            clientAgentOptions.ChatOptions.ToolMode =
+                toolMode ?? clientAgentOptions.ChatOptions.ToolMode ?? ChatToolMode.Auto;
             var agent = CreateAgentInternal(model, clientAgentOptions, option);
 
 

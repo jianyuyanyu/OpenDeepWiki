@@ -4,6 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libkrb5-3 curl python3 python3-pip \
     && pip3 install --break-system-packages --no-cache-dir "graphifyy[openai,gemini,kimi,ollama]" anthropic \
     && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /app/logs && chown -R $APP_UID:$APP_UID /app/logs
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
