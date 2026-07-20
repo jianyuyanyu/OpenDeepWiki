@@ -1,0 +1,20 @@
+{
+  "title": "Abonnements",
+  "description": "Les dépôts que tu suis pour les mises à jour",
+  "loginRequired": "Connecte-toi pour voir tes abonnements",
+  "loginPrompt": "Connecte-toi pour gérer tes abonnements aux dépôts",
+  "noSubscriptions": "Aucun abonnement pour le moment",
+  "noSubscriptionsPrompt": "Commence à t'abonner à des dépôts pour les voir ici",
+  "unwatch": "Ne plus suivre",
+  "noDescription": "Aucune description",
+  "today": "Aujourd'hui",
+  "yesterday": "Hier",
+  "daysAgo": "Il y a {{count}} jours",
+  "weeksAgo": "Il y a {{count}} semaines",
+  "monthsAgo": "Il y a {{count}} mois",
+  "pageOf": "Page {{current}} sur {{total}}",
+  "previous": "Précédent",
+  "next": "Suivant",
+  "failedToLoad": "Échec du chargement des abonnements",
+  "failedToUnsubscribe": "Échec du désabonnement"
+}

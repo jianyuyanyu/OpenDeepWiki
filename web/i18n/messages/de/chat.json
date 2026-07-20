@@ -1,0 +1,95 @@
+{
+  "assistant": {
+    "title": "OpenDeepWiki Agent",
+    "greeting": "👋 Hallo! Ich bin der OpenDeepWiki Agent",
+    "greetingSubtitle": "Stell mir gerne Fragen zur Dokumentation",
+    "disabled": "Agent ist deaktiviert",
+    "noModels": "Keine verfügbaren Modelle. Bitte wende dich an den Administrator, um Modelle zu konfigurieren",
+    "thinking": "Denke nach...",
+    "selectModel": "Bitte wähle zuerst ein Modell",
+    "loadConfigFailed": "Konfiguration konnte nicht geladen werden. Bitte aktualisiere die Seite und versuche es erneut"
+  },
+  "panel": {
+    "clearHistory": "Verlauf löschen",
+    "close": "Schließen",
+    "inputPlaceholder": "Nachricht eingeben, Enter zum Senden drücken...",
+    "uploadImage": "Bild hochladen",
+    "send": "Senden",
+    "retry": "Erneut versuchen",
+    "closeError": "Schließen",
+    "shareConversation": "Aktuelle Konversation teilen",
+    "shareNoMessages": "Keine Konversation zum Teilen verfügbar",
+    "shareSelectModel": "Wähle zuerst ein Modell",
+    "shareFailed": "Konversation konnte nicht geteilt werden. Bitte versuche es erneut.",
+    "shareDialogTitle": "Aktuelle Konversation teilen",
+    "shareDialogDescription": "Generiere einen schreibgeschützten Link, um eine Momentaufnahme dieser Konversation zu teilen.",
+    "shareLink": "Teilen-Link",
+    "shareId": "Teilen-ID",
+    "copied": "Kopiert",
+    "copyLink": "Link kopieren",
+    "openSharePage": "Teilen-Seite öffnen",
+    "shareTitle": "Teilen-Titel",
+    "shareTitlePlaceholder": "Gib dieser Freigabe einen Titel",
+    "shareDescription": "Beschreibung (optional)",
+    "shareDescriptionPlaceholder": "Füge Kontext für Betrachter hinzu",
+    "shareExpiration": "Ablauf (Minuten)",
+    "shareExpirationHint": "Standard ist 7 Tage, maximal 30 Tage.",
+    "generateShareLink": "Teilen-Link generieren",
+    "generating": "Wird generiert..."
+  },
+  "message": {
+    "thinking": "Denkprozess",
+    "toolCall": "Werkzeugaufruf",
+    "toolResult": "Werkzeugergebnis",
+    "toolError": "Werkzeugausführung fehlgeschlagen",
+    "uploadedImage": "Hochgeladenes Bild",
+    "quotedFrom": "Zitiert aus:",
+    "currentPage": "Aktuelle Seite",
+    "tokens": "Tokens",
+    "inputTokens": "Eingabe",
+    "outputTokens": "Ausgabe"
+  },
+  "image": {
+    "upload": "Bild hochladen",
+    "supportedFormats": "Unterstützt PNG, JPG, GIF, WebP. Maximal 10 MB pro Bild, bis zu {maxImages} Bilder",
+    "unsupportedFormat": "Es werden nur PNG-, JPG-, GIF- und WebP-Formate unterstützt",
+    "sizeTooLarge": "Bildgröße darf 10 MB nicht überschreiten",
+    "preview": "Vorschau {index}",
+    "remove": "Bild {index} entfernen",
+    "invalidFormat": "Ungültiges Base64-Bildformat",
+    "readFailed": "Datei konnte nicht gelesen werden"
+  },
+  "error": {
+    "chatFailed": "Chat fehlgeschlagen. Bitte versuche es erneut",
+    "configMissing": "Konfiguration fehlt",
+    "modelUnavailable": "Modell nicht verfügbar",
+    "requestTimeout": "Zeitüberschreitung der Anfrage. Bitte versuche es erneut",
+    "connectionFailed": "Verbindung fehlgeschlagen. Bitte überprüfe dein Netzwerk",
+    "sendFailed": "Senden fehlgeschlagen. Bitte versuche es erneut",
+    "loadConfigFailed": "Konfiguration konnte nicht geladen werden",
+    "noResponse": "Antwort konnte nicht gelesen werden"
+  },
+  "embed": {
+    "title": "Chat-Assistent",
+    "greeting": "👋 Hallo!",
+    "greetingSubtitle": "Wie kann ich dir helfen?",
+    "inputPlaceholder": "Nachricht eingeben...",
+    "configInvalid": "Konfigurationsvalidierung fehlgeschlagen",
+    "loadConfigFailed": "Konfiguration konnte nicht geladen werden"
+  },
+  "model": {
+    "selector": "Modell auswählen",
+    "noModels": "Keine verfügbaren Modelle",
+    "provider": "Anbieter"
+  },
+  "quote": {
+    "icon": "📎",
+    "label": "Zitiert aus:",
+    "remove": "Zitat entfernen"
+  },
+  "share": {
+    "title": "Chat teilen",
+    "messageCount": "{count} Chat-Nachrichten",
+    "empty": "Diese geteilte Konversation hat noch keine Nachrichten."
+  }
+}

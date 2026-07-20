@@ -1,0 +1,95 @@
+{
+  "assistant": {
+    "title": "Agente de OpenDeepWiki",
+    "greeting": "👋 ¡Hola! Soy el Agente de OpenDeepWiki",
+    "greetingSubtitle": "No dudes en preguntarme cualquier cosa sobre la documentación",
+    "disabled": "El agente está desactivado",
+    "noModels": "No hay modelos disponibles. Contacta con el administrador para configurar los modelos",
+    "thinking": "Pensando...",
+    "selectModel": "Por favor, selecciona primero un modelo",
+    "loadConfigFailed": "Error al cargar la configuración. Actualiza e inténtalo de nuevo"
+  },
+  "panel": {
+    "clearHistory": "Borrar historial",
+    "close": "Cerrar",
+    "inputPlaceholder": "Escribe un mensaje, pulsa Enter para enviar...",
+    "uploadImage": "Subir imagen",
+    "send": "Enviar",
+    "retry": "Reintentar",
+    "closeError": "Cerrar",
+    "shareConversation": "Compartir conversación actual",
+    "shareNoMessages": "No hay conversación disponible para compartir",
+    "shareSelectModel": "Selecciona primero un modelo",
+    "shareFailed": "Error al compartir la conversación. Inténtalo de nuevo.",
+    "shareDialogTitle": "Compartir conversación actual",
+    "shareDialogDescription": "Genera un enlace de solo lectura para compartir una instantánea de esta conversación.",
+    "shareLink": "Enlace de compartir",
+    "shareId": "ID de compartir",
+    "copied": "Copiado",
+    "copyLink": "Copiar enlace",
+    "openSharePage": "Abrir página de compartir",
+    "shareTitle": "Título del enlace",
+    "shareTitlePlaceholder": "Dale un título a este enlace",
+    "shareDescription": "Descripción (opcional)",
+    "shareDescriptionPlaceholder": "Añade contexto para los espectadores",
+    "shareExpiration": "Caducidad (minutos)",
+    "shareExpirationHint": "El valor predeterminado es 7 días, el máximo es 30 días.",
+    "generateShareLink": "Generar enlace de compartir",
+    "generating": "Generando..."
+  },
+  "message": {
+    "thinking": "Proceso de pensamiento",
+    "toolCall": "Llamada a herramienta",
+    "toolResult": "Resultado de la herramienta",
+    "toolError": "Error en la ejecución de la herramienta",
+    "uploadedImage": "Imagen subida",
+    "quotedFrom": "Cita de:",
+    "currentPage": "Página actual",
+    "tokens": "tokens",
+    "inputTokens": "entrada",
+    "outputTokens": "salida"
+  },
+  "image": {
+    "upload": "Subir imagen",
+    "supportedFormats": "Admite PNG, JPG, GIF, WebP. Máximo 10MB por imagen, hasta {maxImages} imágenes",
+    "unsupportedFormat": "Solo se admiten los formatos PNG, JPG, GIF, WebP",
+    "sizeTooLarge": "El tamaño de la imagen no puede superar los 10MB",
+    "preview": "Vista previa {index}",
+    "remove": "Eliminar imagen {index}",
+    "invalidFormat": "Formato de imagen Base64 no válido",
+    "readFailed": "Error al leer el archivo"
+  },
+  "error": {
+    "chatFailed": "Error en el chat. Inténtalo de nuevo",
+    "configMissing": "Falta la configuración",
+    "modelUnavailable": "Modelo no disponible",
+    "requestTimeout": "Tiempo de espera agotado. Inténtalo de nuevo",
+    "connectionFailed": "Error de conexión. Comprueba tu red",
+    "sendFailed": "Error al enviar. Inténtalo de nuevo",
+    "loadConfigFailed": "Error al cargar la configuración",
+    "noResponse": "No se pudo leer la respuesta"
+  },
+  "embed": {
+    "title": "Asistente de chat",
+    "greeting": "👋 ¡Hola!",
+    "greetingSubtitle": "¿En qué puedo ayudarte?",
+    "inputPlaceholder": "Escribe un mensaje...",
+    "configInvalid": "Error en la validación de la configuración",
+    "loadConfigFailed": "Error al cargar la configuración"
+  },
+  "model": {
+    "selector": "Seleccionar modelo",
+    "noModels": "No hay modelos disponibles",
+    "provider": "Proveedor"
+  },
+  "quote": {
+    "icon": "📎",
+    "label": "Cita de:",
+    "remove": "Eliminar cita"
+  },
+  "share": {
+    "title": "Compartir chat",
+    "messageCount": "{count} mensajes de chat",
+    "empty": "Esta conversación compartida aún no tiene mensajes."
+  }
+}

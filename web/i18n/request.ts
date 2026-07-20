@@ -1,15 +1,11 @@
-import { getRequestConfig } from 'next-intl/server';
+﻿import { getRequestConfig } from 'next-intl/server';
+import { uiLocales, defaultUiLocale, uiLocaleNames, type UiLocale } from './config';
 
-export const locales = ['zh', 'en', 'ko', 'ja'] as const;
-export type Locale = (typeof locales)[number];
-const defaultLocale: Locale = 'en';
-
-export const localeNames: Record<Locale, string> = {
-  zh: '简体中文',
-  en: 'English',
-  ko: '한국어',
-  ja: '日本語',
-};
+// Re-export for backward compatibility with existing imports
+export const locales = uiLocales;
+export type Locale = UiLocale;
+const defaultLocale = defaultUiLocale;
+export const localeNames = uiLocaleNames;
 
 // 动态加载所有翻译文件
 async function loadMessages(locale: Locale) {

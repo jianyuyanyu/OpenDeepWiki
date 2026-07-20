@@ -1,0 +1,32 @@
+{
+  "title": "Recommandations",
+  "subtitle": "Découvre les dépôts tendance et recommandés",
+  "subtitleWithCount": "Sélectionnés parmi {count} dépôts pour toi",
+  "refresh": "Actualiser",
+  "allLanguages": "Toutes les langues",
+  "strategies": {
+    "default": "Pour toi",
+    "popular": "Tendance",
+    "personalized": "Personnalisé",
+    "explore": "Explorer"
+  },
+  "reasons": {
+    "popular": "Projet populaire",
+    "highSubscription": "Abonnements élevés",
+    "recentlyActive": "Actif récemment",
+    "matchPreference": "Correspond à tes préférences",
+    "matchTechStack": "Correspond à ta stack technique",
+    "similarUsers": "Recommandé par des utilisateurs similaires",
+    "comprehensive": "Recommandé"
+  },
+  "actions": {
+    "notInterested": "Pas intéressé"
+  },
+  "empty": {
+    "title": "Aucune recommandation pour le moment",
+    "description": "Ajoute d'autres dépôts pour obtenir des recommandations personnalisées"
+  },
+  "score": {
+    "label": "Score de recommandation"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "title": "Recomendações",
+  "subtitle": "Descubra repositórios em alta e recomendados",
+  "subtitleWithCount": "Selecionados de {count} repositórios para você",
+  "refresh": "Atualizar",
+  "allLanguages": "Todos os Idiomas",
+  "strategies": {
+    "default": "Para Você",
+    "popular": "Em Alta",
+    "personalized": "Personalizado",
+    "explore": "Explorar"
+  },
+  "reasons": {
+    "popular": "Projeto popular",
+    "highSubscription": "Muitas inscrições",
+    "recentlyActive": "Ativo recentemente",
+    "matchPreference": "Corresponde à sua preferência",
+    "matchTechStack": "Corresponde à sua stack tecnológica",
+    "similarUsers": "Usuários similares recomendam",
+    "comprehensive": "Recomendado"
+  },
+  "actions": {
+    "notInterested": "Não interessado"
+  },
+  "empty": {
+    "title": "Nenhuma recomendação ainda",
+    "description": "Adicione mais repositórios para obter recomendações personalizadas"
+  },
+  "score": {
+    "label": "Pontuação de Recomendação"
+  }
+}

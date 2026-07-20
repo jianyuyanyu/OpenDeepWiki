@@ -1,0 +1,13 @@
+{
+  "explore": "Explorar",
+  "recommend": "Recomendados",
+  "private": "Repos privados",
+  "subscribe": "Suscripciones",
+  "bookmarks": "Marcadores",
+  "organizations": "Organizaciones",
+  "apps": "Mis apps",
+  "mcp": "Servicios MCP",
+  "github": "GitHub",
+  "feishu": "Feishu",
+  "scanQrCode": "Escanea para seguir Feishu"
+}

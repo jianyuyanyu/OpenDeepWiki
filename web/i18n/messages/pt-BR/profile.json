@@ -1,0 +1,22 @@
+{
+  "title": "Perfil",
+  "description": "Gerencie suas informações pessoais",
+  "name": "Nome de Usuário",
+  "email": "E-mail",
+  "phone": "Telefone",
+  "phonePlaceholder": "Opcional",
+  "avatarUrl": "URL do Avatar",
+  "updateSuccess": "Perfil atualizado com sucesso",
+  "updateFailed": "Falha na atualização",
+  "nameRequired": "O nome de usuário é obrigatório",
+  "changePassword": "Alterar Senha",
+  "passwordDescription": "Altere sua senha regularmente para manter sua conta segura",
+  "currentPassword": "Senha Atual",
+  "newPassword": "Nova Senha",
+  "confirmPassword": "Confirmar Nova Senha",
+  "passwordPlaceholder": "Pelo menos 6 caracteres",
+  "passwordChanged": "Senha alterada com sucesso",
+  "passwordChangeFailed": "Falha ao alterar a senha",
+  "passwordMismatch": "As senhas não coincidem",
+  "passwordTooShort": "A senha deve ter pelo menos 6 caracteres"
+}

@@ -1,0 +1,25 @@
+{
+  "title": "Projektarchitektur",
+  "description": "Mindmap zeigt die Kernmodule und Dateistruktur von {owner}/{repo}",
+  "loading": "Projektarchitektur-Mindmap wird erstellt",
+  "loadingDescription": "KI analysiert die Projektstruktur, bitte warte...",
+  "failed": "Mindmap-Erstellung fehlgeschlagen",
+  "failedDescription": "Bitte versuche, die Repository-Dokumentation neu zu generieren",
+  "empty": "Keine Mindmap verfügbar",
+  "emptyDescription": "Für dieses Repository wurde noch keine Projektarchitektur-Mindmap erstellt",
+  "emptyContent": "Mindmap-Inhalt ist leer",
+  "error": "Mindmap konnte nicht geladen werden",
+  "errorDescription": "Bitte versuche es später erneut oder überprüfe, ob das Repository existiert",
+  "toolbar": {
+    "mindmap": "Mindmap",
+    "list": "Listenansicht",
+    "zoomIn": "Vergrößern",
+    "zoomOut": "Verkleinern",
+    "reset": "Zurücksetzen"
+  },
+  "tips": {
+    "expand": "Klicke auf einen Knoten zum Auf-/Zuklappen",
+    "link": "Klicke auf einen Dateipfad, um zum Quellcode zu springen",
+    "scroll": "Scrollen zum Zoomen"
+  }
+}

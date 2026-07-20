@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "@/hooks/use-translations";
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { wikiLanguageCodes } from "@/i18n/config";
 import {
   ExternalLink,
   GitBranch,
@@ -376,10 +377,11 @@ export function GitHubRepoBrowser({
                 <SelectValue />
               </SelectTrigger>
             <SelectContent>
-              <SelectItem value="en">{t("common.languageNames.en")}</SelectItem>
-              <SelectItem value="zh">{t("common.languageNames.zh")}</SelectItem>
-              <SelectItem value="ko">{t("common.languageNames.ko")}</SelectItem>
-              <SelectItem value="ja">{t("common.languageNames.ja")}</SelectItem>
+              {wikiLanguageCodes.map((lang) => (
+                <SelectItem key={lang} value={lang}>
+                  {t(`common.languageNames.${lang}`)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

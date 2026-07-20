@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
+import { uiLocales, defaultUiLocale } from './i18n/config';
 
-const supportedLocales = ['zh', 'en', 'ko', 'ja'];
-const defaultLocale = 'en';
+const supportedLocales = uiLocales as readonly string[];
+const defaultLocale = defaultUiLocale;
 
 export function middleware(request: NextRequest) {
   // 优先从 URL 查询参数获取语言设置（用于仓库文档页面）
@@ -11,7 +12,7 @@ export function middleware(request: NextRequest) {
   const cookieLocale = request.cookies.get('NEXT_LOCALE')?.value;
   
   // Priority: URL `lang` > cookie > default `en`
-  let locale = defaultLocale;
+  let locale: string = defaultLocale;
   if (urlLang && supportedLocales.includes(urlLang)) {
     locale = urlLang;
   } else if (cookieLocale && supportedLocales.includes(cookieLocale)) {

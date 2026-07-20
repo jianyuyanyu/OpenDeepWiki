@@ -1,0 +1,20 @@
+{
+  "title": "Acompanhar",
+  "description": "Repositórios que você está acompanhando para atualizações",
+  "loginRequired": "Faça login para visualizar suas inscrições",
+  "loginPrompt": "Entre para gerenciar suas inscrições de repositórios",
+  "noSubscriptions": "Nenhuma inscrição ainda",
+  "noSubscriptionsPrompt": "Comece a acompanhar repositórios para vê-los aqui",
+  "unwatch": "Parar de Acompanhar",
+  "noDescription": "Sem descrição",
+  "today": "Hoje",
+  "yesterday": "Ontem",
+  "daysAgo": "{{count}} dias atrás",
+  "weeksAgo": "{{count}} semanas atrás",
+  "monthsAgo": "{{count}} meses atrás",
+  "pageOf": "Página {{current}} de {{total}}",
+  "previous": "Anterior",
+  "next": "Próximo",
+  "failedToLoad": "Falha ao carregar inscrições",
+  "failedToUnsubscribe": "Falha ao cancelar inscrição"
+}

@@ -1,0 +1,25 @@
+{
+  "title": "Architecture du projet",
+  "description": "Carte mentale montrant les modules principaux et la structure des fichiers de {owner}/{repo}",
+  "loading": "Génération de la carte mentale de l'architecture du projet",
+  "loadingDescription": "L'IA analyse la structure du projet, patiente...",
+  "failed": "Échec de la génération de la carte mentale",
+  "failedDescription": "Essaie de régénérer la documentation du dépôt",
+  "empty": "Aucune carte mentale disponible",
+  "emptyDescription": "Ce dépôt n'a pas encore généré de carte mentale de l'architecture du projet",
+  "emptyContent": "Le contenu de la carte mentale est vide",
+  "error": "Impossible de charger la carte mentale",
+  "errorDescription": "Réessaie plus tard ou vérifie si le dépôt existe",
+  "toolbar": {
+    "mindmap": "Carte mentale",
+    "list": "Vue en liste",
+    "zoomIn": "Zoomer",
+    "zoomOut": "Dézoomer",
+    "reset": "Réinitialiser"
+  },
+  "tips": {
+    "expand": "Clique sur un nœud pour développer/réduire",
+    "link": "Clique sur le chemin du fichier pour accéder au code source",
+    "scroll": "Faire défiler pour zoomer"
+  }
+}

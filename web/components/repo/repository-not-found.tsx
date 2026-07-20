@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { submitRepository } from "@/lib/repository-api";
 import { useAuth } from "@/contexts/auth-context";
 import { useTranslations } from "@/hooks/use-translations";
+import { resolveWikiLanguageFromUiLocale } from "@/i18n/config";
 import type { GitRepoCheckResponse } from "@/types/repository";
 
 interface RepositoryNotFoundProps {
@@ -45,7 +46,7 @@ export function RepositoryNotFound({ owner, repo, gitHubInfo }: RepositoryNotFou
         repoName: repo,
         orgName: owner,
         branchName: gitHubInfo.defaultBranch,
-        languageCode: locale,
+        languageCode: resolveWikiLanguageFromUiLocale(locale),
         isPublic: true,
         generateSkill: true,
       });

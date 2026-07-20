@@ -1,0 +1,20 @@
+{
+  "title": "Abonnements",
+  "description": "Repositories, die du auf Updates beobachtest",
+  "loginRequired": "Bitte melde dich an, um deine Abonnements zu sehen",
+  "loginPrompt": "Melde dich an, um deine Repository-Abonnements zu verwalten",
+  "noSubscriptions": "Noch keine Abonnements",
+  "noSubscriptionsPrompt": "Beginne, Repositories zu abonnieren, um sie hier zu sehen",
+  "unwatch": "Nicht mehr beobachten",
+  "noDescription": "Keine Beschreibung",
+  "today": "Heute",
+  "yesterday": "Gestern",
+  "daysAgo": "vor {{count}} Tagen",
+  "weeksAgo": "vor {{count}} Wochen",
+  "monthsAgo": "vor {{count}} Monaten",
+  "pageOf": "Seite {{current}} von {{total}}",
+  "previous": "Zurück",
+  "next": "Weiter",
+  "failedToLoad": "Abonnements konnten nicht geladen werden",
+  "failedToUnsubscribe": "Abonnement konnte nicht gekündigt werden"
+}

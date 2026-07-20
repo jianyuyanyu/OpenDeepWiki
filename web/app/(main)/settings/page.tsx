@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -12,6 +12,7 @@ import { useTranslations } from "@/hooks/use-translations";
 import { useAuth } from "@/contexts/auth-context";
 import { getUserSettings, updateUserSettings, UserSettings, getSystemVersion, SystemVersion, getUserApiKeys, createUserApiKey, revokeUserApiKey, UserApiKeyListItem, UserApiKeyCreateResult } from "@/lib/profile-api";
 import { Loader2, Settings, Bell, Globe, Palette, ArrowLeft, Key, Plus, Trash2, Copy, Check, AlertTriangle } from "lucide-react";
+import { uiLocales } from "@/i18n/config";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -243,10 +244,11 @@ export default function SettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="zh">{t("common.languageNames.zh")}</SelectItem>
-                    <SelectItem value="en">{t("common.languageNames.en")}</SelectItem>
-                    <SelectItem value="ja">{t("common.languageNames.ja")}</SelectItem>
-                    <SelectItem value="ko">{t("common.languageNames.ko")}</SelectItem>
+                    {uiLocales.map((loc) => (
+                      <SelectItem key={loc} value={loc}>
+                        {t(`common.languageNames.${loc}`)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

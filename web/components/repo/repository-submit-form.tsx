@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api-client";
+import { wikiLanguageCodes } from "@/i18n/config";
 
 interface RepositorySubmitFormProps {
   onSuccess?: () => void;
@@ -48,13 +49,10 @@ interface RepositorySubmitFormProps {
 
 const GIT_URL_REGEX = /^(https?:\/\/|git@)[\w.-]+[/:].+?(\.git)?$/i;
 
-const SUPPORTED_LANGUAGES = [
-  { code: "en", label: "languages.en" },
-  { code: "pl", label: "languages.pl" },
-  { code: "zh", label: "languages.zh" },
-  { code: "ja", label: "languages.ja" },
-  { code: "ko", label: "languages.ko" },
-];
+const SUPPORTED_LANGUAGES = wikiLanguageCodes.map((code) => ({
+  code,
+  label: `languages.${code}` as const,
+}));
 
 const SOURCE_OPTIONS: Array<{
   value: RepositorySourceType;

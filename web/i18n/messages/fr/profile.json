@@ -1,0 +1,22 @@
+{
+  "title": "Profil",
+  "description": "Gère tes informations personnelles",
+  "name": "Nom d'utilisateur",
+  "email": "Email",
+  "phone": "Téléphone",
+  "phonePlaceholder": "Facultatif",
+  "avatarUrl": "URL de l'avatar",
+  "updateSuccess": "Profil mis à jour avec succès",
+  "updateFailed": "Échec de la mise à jour",
+  "nameRequired": "Le nom d'utilisateur est requis",
+  "changePassword": "Changer le mot de passe",
+  "passwordDescription": "Change ton mot de passe régulièrement pour garder ton compte sécurisé",
+  "currentPassword": "Mot de passe actuel",
+  "newPassword": "Nouveau mot de passe",
+  "confirmPassword": "Confirmer le nouveau mot de passe",
+  "passwordPlaceholder": "Au moins 6 caractères",
+  "passwordChanged": "Mot de passe changé avec succès",
+  "passwordChangeFailed": "Échec du changement de mot de passe",
+  "passwordMismatch": "Les mots de passe ne correspondent pas",
+  "passwordTooShort": "Le mot de passe doit comporter au moins 6 caractères"
+}

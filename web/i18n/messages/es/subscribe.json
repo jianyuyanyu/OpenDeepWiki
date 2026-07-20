@@ -1,0 +1,20 @@
+{
+  "title": "Suscripciones",
+  "description": "Repositorios que estás siguiendo para recibir actualizaciones",
+  "loginRequired": "Por favor, inicia sesión para ver tus suscripciones",
+  "loginPrompt": "Inicia sesión para gestionar tus suscripciones a repositorios",
+  "noSubscriptions": "Aún no hay suscripciones",
+  "noSubscriptionsPrompt": "Empieza a suscribirte a repositorios para verlos aquí",
+  "unwatch": "Dejar de seguir",
+  "noDescription": "Sin descripción",
+  "today": "Hoy",
+  "yesterday": "Ayer",
+  "daysAgo": "hace {{count}} días",
+  "weeksAgo": "hace {{count}} semanas",
+  "monthsAgo": "hace {{count}} meses",
+  "pageOf": "Página {{current}} de {{total}}",
+  "previous": "Anterior",
+  "next": "Siguiente",
+  "failedToLoad": "Error al cargar las suscripciones",
+  "failedToUnsubscribe": "Error al cancelar la suscripción"
+}

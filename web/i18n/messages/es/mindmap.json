@@ -1,0 +1,25 @@
+{
+  "title": "Arquitectura del proyecto",
+  "description": "Mapa mental que muestra los módulos principales y la estructura de archivos de {owner}/{repo}",
+  "loading": "Generando mapa mental de la arquitectura del proyecto",
+  "loadingDescription": "La IA está analizando la estructura del proyecto, espera...",
+  "failed": "Error al generar el mapa mental",
+  "failedDescription": "Prueba a regenerar la documentación del repositorio",
+  "empty": "No hay mapa mental disponible",
+  "emptyDescription": "Este repositorio aún no ha generado un mapa mental de la arquitectura del proyecto",
+  "emptyContent": "El contenido del mapa mental está vacío",
+  "error": "No se pudo cargar el mapa mental",
+  "errorDescription": "Inténtalo de nuevo más tarde o comprueba si el repositorio existe",
+  "toolbar": {
+    "mindmap": "Mapa mental",
+    "list": "Vista de lista",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "reset": "Restablecer"
+  },
+  "tips": {
+    "expand": "Haz clic en un nodo para expandir/contraer",
+    "link": "Haz clic en la ruta del archivo para ir al código fuente",
+    "scroll": "Usa la rueda para acercar/alejar"
+  }
+}
