@@ -49,9 +49,11 @@ import {
   RepositoryListResponse,
 } from "@/lib/admin-api";
 import { getRepositorySourceTypeLabelKey, isGitRepositorySource } from "@/lib/repository-source";
+import { RepositorySubmitForm } from "@/components/repo/repository-submit-form";
 import {
   Loader2,
   Search,
+  Plus,
   Trash2,
   Eye,
   RefreshCw,
@@ -88,6 +90,7 @@ export default function AdminRepositoriesPage() {
   const router = useRouter();
   const [data, setData] = useState<RepositoryListResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
@@ -138,6 +141,11 @@ export default function AdminRepositoriesPage() {
       setLoading(false);
     }
   }, [page, search, status, t]);
+
+  const handleSubmitSuccess = useCallback(() => {
+    setIsSubmitDialogOpen(false);
+    fetchData();
+  }, [fetchData]);
 
   useEffect(() => {
     fetchData();
@@ -299,12 +307,18 @@ export default function AdminRepositoriesPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in-0 duration-500">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">{t('admin.repositories.title')}</h1>
-        <Button variant="outline" onClick={fetchData} disabled={loading} className="transition-all duration-200 hover:-translate-y-0.5">
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          {t('admin.common.refresh')}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setIsSubmitDialogOpen(true)} className="transition-all duration-200 hover:-translate-y-0.5">
+            <Plus className="mr-2 h-4 w-4" />
+            {t('home.repository.submitTitle')}
+          </Button>
+          <Button variant="outline" onClick={fetchData} disabled={loading} className="transition-all duration-200 hover:-translate-y-0.5">
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            {t('admin.common.refresh')}
+          </Button>
+        </div>
       </div>
 
       {/* 搜索和筛选 */}
@@ -676,6 +690,12 @@ export default function AdminRepositoriesPage() {
           </>
         )}
       </Card>
+
+      <Dialog open={isSubmitDialogOpen} onOpenChange={setIsSubmitDialogOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <RepositorySubmitForm onSuccess={handleSubmitSuccess} />
+        </DialogContent>
+      </Dialog>
 
       {/* 详情对话框 */}
       <Dialog open={!!selectedRepo} onOpenChange={() => setSelectedRepo(null)}>
