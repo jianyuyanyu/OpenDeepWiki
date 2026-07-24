@@ -356,32 +356,36 @@ export default function AdminRepositoriesPage() {
         <div className="grid gap-3 md:grid-cols-3">
           <Card className="p-3">
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span>当前页完成率</span>
+              <span>{t("admin.repositories.pageCompletionRate")}</span>
               <span>{overview.completedRate}%</span>
             </div>
             <Progress value={overview.completedRate} className="h-2.5" />
             <p className="mt-2 text-xs text-muted-foreground">
-              完成 {overview.completedCount} / {overview.pageCount}，处理中 {overview.processingCount}
+              {t("admin.repositories.completedOfTotal", {
+                completed: overview.completedCount,
+                total: overview.pageCount,
+                processing: overview.processingCount,
+              })}
             </p>
           </Card>
           <Card className="p-3">
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span>公开仓库占比</span>
+              <span>{t("admin.repositories.publicRepoRatio")}</span>
               <span>{overview.publicRate}%</span>
             </div>
             <Progress value={overview.publicRate} className="h-2.5" />
             <p className="mt-2 text-xs text-muted-foreground">
-              失败仓库 {overview.failedCount}，建议优先排查
+              {t("admin.repositories.failedPrioritize", { count: overview.failedCount })}
             </p>
           </Card>
           <Card className="p-3">
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span>当前页选中占比</span>
+              <span>{t("admin.repositories.pageSelectionRatio")}</span>
               <span>{overview.selectedRate}%</span>
             </div>
             <Progress value={overview.selectedRate} className="h-2.5" />
             <p className="mt-2 text-xs text-muted-foreground">
-              已选择 {selectedIds.size} 项用于批量操作
+              {t("admin.repositories.selectedForBatch", { count: selectedIds.size })}
             </p>
           </Card>
         </div>
@@ -390,8 +394,8 @@ export default function AdminRepositoriesPage() {
       <Card className="p-4 transition-all duration-300 hover:shadow-sm">
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold">当前页状态分布</p>
-            <Badge variant="outline">共 {overview.pageCount} 条</Badge>
+            <p className="text-sm font-semibold">{t("admin.repositories.statusDistribution")}</p>
+            <Badge variant="outline">{t("admin.repositories.totalItems", { count: overview.pageCount })}</Badge>
           </div>
           <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
             <div className="flex h-full w-full">
@@ -509,7 +513,7 @@ export default function AdminRepositoriesPage() {
                               type="button"
                               className="font-medium text-left transition-all duration-200 hover:text-primary hover:underline underline-offset-4"
                               onClick={() => router.push(`/${repo.id}`)}
-                              title="管理仓库"
+                              title={t("admin.repositories.manageRepo")}
                             >
                               {repo.orgName}/{repo.repoName}
                             </button>
@@ -648,7 +652,7 @@ export default function AdminRepositoriesPage() {
                   ) : (
                     <tr>
                       <td colSpan={7} className="px-4 py-16 text-center text-sm text-muted-foreground animate-in fade-in-0 duration-200">
-                        当前筛选条件下暂无仓库数据
+                        {t("admin.repositories.noReposForFilter")}
                       </td>
                     </tr>
                   )}
