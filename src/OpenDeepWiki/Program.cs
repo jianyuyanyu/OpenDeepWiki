@@ -472,7 +472,7 @@ static void LoadEnvFile(IConfigurationBuilder configuration)
                 value = value[1..^1];
             }
             
-            envVars[key] = value;
+            envVars[NormalizeEnvKey(key)] = value;
             
             // 同时设置到环境变量，以便其他地方使用
             Environment.SetEnvironmentVariable(key, value);
@@ -485,4 +485,19 @@ static void LoadEnvFile(IConfigurationBuilder configuration)
     }
     
     Log.Information("No .env file found, using system environment variables only");
+}
+
+/// <summary>
+/// 将 .env 文件中的变量名转换为 .NET 配置键：
+/// - "__" 转换为 ":"（与标准环境变量命名一致，使嵌套/数组配置可被绑定）
+/// - LOCAL_IMPORT_ROOT 映射为 RepositoryAnalyzer:AllowedLocalPathRoots:0
+/// </summary>
+static string NormalizeEnvKey(string key)
+{
+    if (key.Equals("LOCAL_IMPORT_ROOT", StringComparison.OrdinalIgnoreCase))
+    {
+        return "RepositoryAnalyzer:AllowedLocalPathRoots:0";
+    }
+
+    return key.Replace("__", ":");
 }

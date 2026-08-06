@@ -250,6 +250,79 @@ public class AiProviderPresetSeederTests
         Assert.DoesNotContain(oldProviders.Select(p => p.Id).Skip(1), id => id == targetProviderId);
     }
 
+    [Fact]
+    public async Task MigrateAsync_RepairsStaleModelBindingsButKeepsValidOnes()
+    {
+        await using var context = CreateContext();
+        var endpoint = "https://proxy.example.com/v1";
+        var apiKey = "shared-secret";
+
+        var provider = new AiProviderConfig
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = "legacy-openai-proxy",
+            DisplayName = "Migrated OpenAI (proxy.example.com)",
+            ProviderType = "OpenAI",
+            BaseUrl = endpoint,
+            ApiKey = apiKey,
+            AuthType = "ApiKey",
+            IsActive = true,
+            SupportsModelDiscovery = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        context.AiProviderConfigs.Add(provider);
+
+        context.AiModelConfigs.Add(new AiModelConfig
+        {
+            Id = Guid.NewGuid().ToString(),
+            ProviderId = provider.Id,
+            ModelId = "valid-model",
+            Name = "Valid Model",
+            ModelType = "chat",
+            ProviderType = "OpenAI",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        context.SystemSettings.AddRange(
+            CreateSetting(SystemSettingDefaults.WikiCatalogProviderId, provider.Id),
+            CreateSetting(SystemSettingDefaults.WikiCatalogModelId, "stale-model"),
+            CreateSetting(SystemSettingDefaults.WikiContentProviderId, provider.Id),
+            CreateSetting(SystemSettingDefaults.WikiContentModelId, "valid-model"));
+        await context.SaveChangesAsync();
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["AI:Endpoint"] = endpoint,
+                ["AI:ApiKey"] = apiKey,
+                ["AI:RequestType"] = "OpenAI",
+                ["WIKI_CATALOG_MODEL"] = "deepseek-v4-flash",
+                ["WIKI_CONTENT_MODEL"] = "deepseek-v4-flash"
+            })
+            .Build();
+        var migration = new AiConfigurationMigrationService(
+            context,
+            configuration,
+            CreateSeeder(context),
+            NullLogger<AiConfigurationMigrationService>.Instance);
+
+        await migration.MigrateAsync();
+
+        var catalogModelSetting = await context.SystemSettings
+            .SingleAsync(s => s.Key == SystemSettingDefaults.WikiCatalogModelId);
+        var contentModelSetting = await context.SystemSettings
+            .SingleAsync(s => s.Key == SystemSettingDefaults.WikiContentModelId);
+
+        Assert.Equal("deepseek-v4-flash", catalogModelSetting.Value);
+        Assert.Equal("valid-model", contentModelSetting.Value);
+        Assert.NotNull(await context.AiModelConfigs.SingleOrDefaultAsync(m =>
+            m.ProviderId == provider.Id &&
+            m.ModelId == "deepseek-v4-flash" &&
+            m.IsActive &&
+            !m.IsDeleted));
+    }
+
     private static AiProviderPresetSeeder CreateSeeder(IContext context)
     {
         return new AiProviderPresetSeeder(
