@@ -120,12 +120,13 @@ public class AiConfigurationMigrationService : IAiConfigurationMigrationService
     {
         var effective = legacy.WithFallback();
         modelId = string.IsNullOrWhiteSpace(modelId) ? effective.ModelId : modelId;
-        if (string.IsNullOrWhiteSpace(modelId))
-        {
-            modelId = "gpt-4o-mini";
-        }
 
         var provider = await GetOrCreateProviderAsync(displayName, effective, cancellationToken);
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            modelId = provider.DefaultModelId ?? "gpt-4o-mini";
+        }
+
         var model = await GetOrCreateModelAsync(provider, modelId, displayName, cancellationToken);
 
         provider.DefaultModelId ??= model.ModelId;
@@ -371,6 +372,13 @@ public class AiConfigurationMigrationService : IAiConfigurationMigrationService
             setting.Value = value;
             setting.UpdatedAt = DateTime.UtcNow;
         }
+        else if (IsModelBindingSettingKey(key) &&
+                 !string.Equals(setting.Value, value, StringComparison.Ordinal) &&
+                 await ShouldRepairModelBindingAsync(key, setting.Value, cancellationToken))
+        {
+            setting.Value = value;
+            setting.UpdatedAt = DateTime.UtcNow;
+        }
     }
 
     private async Task ConsolidateTaskScopedLegacyProvidersAsync(CancellationToken cancellationToken)
@@ -483,6 +491,55 @@ public class AiConfigurationMigrationService : IAiConfigurationMigrationService
         return provider == null || provider.IsDeleted || IsTaskScopedLegacyProvider(provider);
     }
 
+    private async Task<bool> ShouldRepairModelBindingAsync(
+        string modelSettingKey,
+        string? modelId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(modelId))
+        {
+            return true;
+        }
+
+        var providerSettingKey = modelSettingKey switch
+        {
+            SystemSettingDefaults.WikiCatalogModelId => SystemSettingDefaults.WikiCatalogProviderId,
+            SystemSettingDefaults.WikiContentModelId => SystemSettingDefaults.WikiContentProviderId,
+            SystemSettingDefaults.WikiTranslationModelId => SystemSettingDefaults.WikiTranslationProviderId,
+            SystemSettingDefaults.GraphifyModelId => SystemSettingDefaults.GraphifyProviderId,
+            _ => null
+        };
+
+        if (providerSettingKey == null)
+        {
+            return false;
+        }
+
+        var providerSetting = await _context.SystemSettings
+            .FirstOrDefaultAsync(s => s.Key == providerSettingKey && !s.IsDeleted, cancellationToken);
+        if (providerSetting == null || string.IsNullOrWhiteSpace(providerSetting.Value))
+        {
+            return true;
+        }
+
+        var provider = await _context.AiProviderConfigs
+            .FirstOrDefaultAsync(p => p.Id == providerSetting.Value, cancellationToken);
+        if (provider == null || provider.IsDeleted)
+        {
+            return true;
+        }
+
+        var model = await _context.AiModelConfigs
+            .FirstOrDefaultAsync(m =>
+                m.ProviderId == provider.Id &&
+                m.ModelId == modelId &&
+                m.IsActive &&
+                !m.IsDeleted,
+                cancellationToken);
+
+        return model == null;
+    }
+
     private AiProviderConfig? FindLocalProviderByName(string name)
     {
         return _context.AiProviderConfigs.Local.FirstOrDefault(p =>
@@ -582,6 +639,14 @@ public class AiConfigurationMigrationService : IAiConfigurationMigrationService
             or SystemSettingDefaults.WikiContentProviderId
             or SystemSettingDefaults.WikiTranslationProviderId
             or SystemSettingDefaults.GraphifyProviderId;
+    }
+
+    private static bool IsModelBindingSettingKey(string key)
+    {
+        return key is SystemSettingDefaults.WikiCatalogModelId
+            or SystemSettingDefaults.WikiContentModelId
+            or SystemSettingDefaults.WikiTranslationModelId
+            or SystemSettingDefaults.GraphifyModelId;
     }
 
     private static bool IsTaskScopedLegacyProvider(AiProviderConfig provider)
