@@ -35,6 +35,21 @@ function buildVariantQuery(branch: string, lang: string): string {
   return `?${params.toString()}`;
 }
 
+function escapeXml(value: string): string {
+  return value.replace(/[&<>]/g, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      default:
+        return character;
+    }
+  });
+}
+
 function addSitemapUrl(
   urls: MetadataRoute.Sitemap,
   knownUrls: Set<string>,
@@ -51,7 +66,7 @@ function addSitemapUrl(
   }
 
   knownUrls.add(url);
-  urls.push({ url, ...entry });
+  urls.push({ url: escapeXml(url), ...entry });
 }
 
 function addTreeUrls(
