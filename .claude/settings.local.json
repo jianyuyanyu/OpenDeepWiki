@@ -25,7 +25,8 @@
       "Bash(cd:*)",
       "Bash(dotnet build:*)",
       "Bash(npx next:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(gh issue *)"
     ],
     "deny": [],
     "ask": []

@@ -1,7 +1,7 @@
-import type { MetadataRoute } from "next";
-import { fetchRepoTree, fetchRepositoryList } from "@/lib/repository-api";
+﻿import type { MetadataRoute } from "next";
+import { fetchRepoBranches, fetchRepoTree, fetchRepositoryList } from "@/lib/repository-api";
 import type { RepoTreeNode } from "@/types/repository";
-import { buildRepoDocPath } from "@/lib/repo-route";
+import { buildRepoBasePath, buildRepoDocPath } from "@/lib/repo-route";
 import { absoluteUrl } from "@/lib/repo-seo";
 
 export const dynamic = "force-dynamic";
@@ -28,14 +28,62 @@ function collectLeafSlugs(nodes: RepoTreeNode[]): string[] {
   return slugs;
 }
 
+function buildVariantQuery(branch: string, lang: string): string {
+  const params = new URLSearchParams();
+  params.set("branch", branch);
+  params.set("lang", lang);
+  return `?${params.toString()}`;
+}
+
+function addSitemapUrl(
+  urls: MetadataRoute.Sitemap,
+  knownUrls: Set<string>,
+  path: string,
+  entry: Omit<MetadataRoute.Sitemap[number], "url">,
+) {
+  if (urls.length >= MAX_URLS) {
+    return;
+  }
+
+  const url = absoluteUrl(path);
+  if (knownUrls.has(url)) {
+    return;
+  }
+
+  knownUrls.add(url);
+  urls.push({ url, ...entry });
+}
+
+function addTreeUrls(
+  urls: MetadataRoute.Sitemap,
+  knownUrls: Set<string>,
+  owner: string,
+  repo: string,
+  nodes: RepoTreeNode[],
+  lastModified: Date,
+  query = "",
+) {
+  for (const slug of collectLeafSlugs(nodes)) {
+    if (urls.length >= MAX_URLS) {
+      return;
+    }
+
+    addSitemapUrl(urls, knownUrls, `${buildRepoDocPath(owner, repo, slug)}${query}`, {
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.6,
+    });
+  }
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const urls: MetadataRoute.Sitemap = [
-    {
-      url: absoluteUrl("/"),
-      changeFrequency: "daily",
-      priority: 1,
-    },
-  ];
+  const urls: MetadataRoute.Sitemap = [];
+  const knownUrls = new Set<string>();
+
+  addSitemapUrl(urls, knownUrls, "/", {
+    changeFrequency: "daily",
+    priority: 1,
+  });
 
   try {
     let page = 1;
@@ -62,6 +110,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         }
 
         processedRepositories += 1;
+        const lastModified = new Date(repo.updatedAt ?? repo.createdAt);
 
         try {
           const tree = await fetchRepoTree(repo.orgName, repo.repoName);
@@ -69,24 +118,54 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             continue;
           }
 
-          urls.push({
-            url: absoluteUrl(`/${encodeURIComponent(repo.orgName)}/${encodeURIComponent(repo.repoName)}`),
-            lastModified: repo.updatedAt ? new Date(repo.updatedAt) : new Date(repo.createdAt),
+          addSitemapUrl(urls, knownUrls, buildRepoBasePath(repo.orgName, repo.repoName), {
+            lastModified,
             changeFrequency: "weekly",
             priority: 0.7,
           });
+          addTreeUrls(urls, knownUrls, repo.orgName, repo.repoName, tree.nodes, lastModified);
 
-          for (const slug of collectLeafSlugs(tree.nodes)) {
+          if (urls.length >= MAX_URLS) {
+            break;
+          }
+
+          const branches = await fetchRepoBranches(repo.orgName, repo.repoName);
+          const defaultBranch = tree.currentBranch || branches.defaultBranch;
+          const defaultLanguage = tree.currentLanguage || branches.defaultLanguage;
+
+          for (const branch of branches.branches) {
+            for (const lang of branch.languages) {
+              if (urls.length >= MAX_URLS) {
+                break;
+              }
+
+              if (branch.name === defaultBranch && lang === defaultLanguage) {
+                continue;
+              }
+
+              try {
+                const variantTree = await fetchRepoTree(repo.orgName, repo.repoName, branch.name, lang);
+                if (!variantTree.exists || variantTree.statusName !== "Completed" || variantTree.nodes.length === 0) {
+                  continue;
+                }
+
+                addTreeUrls(
+                  urls,
+                  knownUrls,
+                  repo.orgName,
+                  repo.repoName,
+                  variantTree.nodes,
+                  lastModified,
+                  buildVariantQuery(branch.name, lang),
+                );
+              } catch {
+                continue;
+              }
+            }
+
             if (urls.length >= MAX_URLS) {
               break;
             }
-
-            urls.push({
-              url: absoluteUrl(buildRepoDocPath(repo.orgName, repo.repoName, slug)),
-              lastModified: repo.updatedAt ? new Date(repo.updatedAt) : new Date(repo.createdAt),
-              changeFrequency: "weekly",
-              priority: 0.6,
-            });
           }
         } catch {
           continue;
