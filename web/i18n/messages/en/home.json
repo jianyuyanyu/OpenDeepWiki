@@ -154,7 +154,9 @@
       "count": "{count} repositories",
       "emptyFolder": "No repositories in this folder",
       "expandFolder": "Expand folder",
-      "collapseFolder": "Collapse folder"
+      "collapseFolder": "Collapse folder",
+      "filterPlaceholder": "Filter orgs or folders…",
+      "noMatch": "No matching organizations"
     },
     "status": {
       "pending": "Pending",

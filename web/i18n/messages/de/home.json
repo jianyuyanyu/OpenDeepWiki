@@ -154,7 +154,9 @@
       "count": "{count} Repositories",
       "emptyFolder": "Keine Repositories in diesem Ordner",
       "expandFolder": "Ordner aufklappen",
-      "collapseFolder": "Ordner einklappen"
+      "collapseFolder": "Ordner einklappen",
+      "filterPlaceholder": "Orgs oder Ordner filtern…",
+      "noMatch": "Keine passenden Organisationen"
     },
     "status": {
       "pending": "Ausstehend",

@@ -154,7 +154,9 @@
       "count": "{count} repositórios",
       "emptyFolder": "Nenhum repositório nesta pasta",
       "expandFolder": "Expandir pasta",
-      "collapseFolder": "Recolher pasta"
+      "collapseFolder": "Recolher pasta",
+      "filterPlaceholder": "Filtrar orgs ou pastas…",
+      "noMatch": "Nenhuma organização correspondente"
     },
     "status": {
       "pending": "Pendente",

@@ -154,7 +154,9 @@
       "count": "{count} 个仓库",
       "emptyFolder": "当前目录下暂无仓库",
       "expandFolder": "展开目录",
-      "collapseFolder": "收起目录"
+      "collapseFolder": "收起目录",
+      "filterPlaceholder": "筛选组织或目录…",
+      "noMatch": "没有匹配的组织"
     },
     "status": {
       "pending": "等待处理",

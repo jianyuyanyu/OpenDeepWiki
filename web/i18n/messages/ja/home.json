@@ -199,7 +199,9 @@
       "count": "{count} 件のリポジトリ",
       "emptyFolder": "このフォルダーにリポジトリはありません",
       "expandFolder": "フォルダーを展開",
-      "collapseFolder": "フォルダーを折りたたむ"
+      "collapseFolder": "フォルダーを折りたたむ",
+      "filterPlaceholder": "組織またはフォルダーを絞り込み…",
+      "noMatch": "一致する組織がありません"
     }
   },
   "mcpIntegrationShort": "MCP 連携"

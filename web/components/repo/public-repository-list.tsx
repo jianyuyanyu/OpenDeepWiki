@@ -257,6 +257,8 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
                 emptyFolder: t("home.repository.tree.emptyFolder"),
                 expandFolder: t("home.repository.tree.expandFolder"),
                 collapseFolder: t("home.repository.tree.collapseFolder"),
+                filterPlaceholder: t("home.repository.tree.filterPlaceholder"),
+                noMatch: t("home.repository.tree.noMatch"),
               }}
               renderRepository={(repo) => (
                 <PublicRepositoryCard repository={repo} variant="tree" />

@@ -431,15 +431,17 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
                 repositories={repositories}
                 emptyMessage={t("home.repository.noRepositories")}
                 contentClassName="lg:grid-cols-1 xl:grid-cols-2"
-                labels={{
-                  treeTitle: t("home.repository.tree.title"),
-                  allRepositories: t("home.repository.tree.all"),
-                  repositoryCount: (count) =>
-                    t("home.repository.tree.count").replace("{count}", count.toString()),
-                  emptyFolder: t("home.repository.tree.emptyFolder"),
-                  expandFolder: t("home.repository.tree.expandFolder"),
-                  collapseFolder: t("home.repository.tree.collapseFolder"),
-                }}
+                  labels={{
+                    treeTitle: t("home.repository.tree.title"),
+                    allRepositories: t("home.repository.tree.all"),
+                    repositoryCount: (count) =>
+                      t("home.repository.tree.count").replace("{count}", count.toString()),
+                    emptyFolder: t("home.repository.tree.emptyFolder"),
+                    expandFolder: t("home.repository.tree.expandFolder"),
+                    collapseFolder: t("home.repository.tree.collapseFolder"),
+                    filterPlaceholder: t("home.repository.tree.filterPlaceholder"),
+                    noMatch: t("home.repository.tree.noMatch"),
+                  }}
                 renderRepository={(repo) => (
                   <RepositoryCard
                     repo={repo}

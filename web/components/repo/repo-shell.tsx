@@ -9,6 +9,7 @@ import type { RepoBranchesResponse, RepoTreeNode } from "@/types/repository";
 import { BranchLanguageSelector } from "./branch-language-selector";
 import { fetchRepoBranches, fetchRepoTree } from "@/lib/repository-api";
 import { ChatAssistant, buildCatalogMenu } from "@/components/chat";
+import { WithAnnouncement } from "@/components/with-announcement";
 import { buildRepoBasePath, buildRepoDocPath, buildRepoGraphifyPath, buildRepoMindMapPath } from "@/lib/repo-route";
 import { cn } from "@/lib/utils";
 
@@ -440,7 +441,7 @@ export function RepoShell({
   );
 
   return (
-    <div className="flex h-svh flex-col overflow-hidden bg-background">
+    <WithAnnouncement className="h-svh min-h-0 overflow-hidden bg-background">
       <div className="shrink-0 border-b border-border/70 bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3 lg:px-6">
           <div className="min-w-0">
@@ -500,6 +501,6 @@ export function RepoShell({
           catalogMenu: buildCatalogMenu(nodes),
         }}
       />
-    </div>
+    </WithAnnouncement>
   );
 }

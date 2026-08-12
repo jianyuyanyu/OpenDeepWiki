@@ -2,15 +2,16 @@
 
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Card } from "@/components/ui/card";
 import type { RepositoryItemResponse } from "@/types/repository";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ChevronDown,
   ChevronRight,
-  Folder,
   FolderOpen,
   GitBranch,
+  Search,
 } from "lucide-react";
 
 type TreeNode = {
@@ -31,12 +32,25 @@ interface RepositoryExplorerViewProps {
     emptyFolder: string;
     expandFolder: string;
     collapseFolder: string;
+    filterPlaceholder: string;
+    noMatch: string;
   };
   className?: string;
   contentClassName?: string;
 }
 
 const ROOT_PATH = "";
+
+const AVATAR_TONES = [
+  "bg-teal-500/15 text-teal-600 dark:text-teal-400",
+  "bg-sky-500/15 text-sky-600 dark:text-sky-400",
+  "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+  "bg-rose-500/15 text-rose-600 dark:text-rose-400",
+  "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+  "bg-orange-500/15 text-orange-600 dark:text-orange-400",
+  "bg-cyan-500/15 text-cyan-700 dark:text-cyan-400",
+] as const;
 
 function splitRepositoryPath(repository: RepositoryItemResponse) {
   return [
@@ -91,7 +105,86 @@ function buildTree(repositories: RepositoryItemResponse[]) {
 }
 
 function sortNodes(nodes: Iterable<TreeNode>) {
-  return Array.from(nodes).sort((a, b) => a.name.localeCompare(b.name));
+  return Array.from(nodes).sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
+}
+
+function getInitials(name: string) {
+  const cleaned = name.replace(/[-_]/g, " ").trim();
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0]![0]}${parts[1]![0]}`.toUpperCase();
+  }
+  return cleaned.slice(0, 2).toUpperCase() || "?";
+}
+
+function getAvatarTone(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i += 1) {
+    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  return AVATAR_TONES[hash % AVATAR_TONES.length];
+}
+
+function getLetterGroup(name: string) {
+  const first = name.trim().charAt(0).toUpperCase();
+  return /[A-Z0-9]/.test(first) ? first : "#";
+}
+
+function filterTree(node: TreeNode, query: string): TreeNode | null {
+  if (!query) return node;
+
+  const filteredChildren = new Map<string, TreeNode>();
+  for (const [key, child] of node.children) {
+    const next = filterTree(child, query);
+    if (next) filteredChildren.set(key, next);
+  }
+
+  if (node.name.toLowerCase().includes(query) || filteredChildren.size > 0) {
+    return {
+      ...node,
+      children: filteredChildren,
+    };
+  }
+
+  return null;
+}
+
+function CountBadge({
+  count,
+  active = false,
+}: {
+  count: number;
+  active?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "ml-auto shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[11px] tabular-nums tracking-tight",
+        active
+          ? "bg-teal-500/15 text-teal-700 dark:text-teal-300"
+          : "bg-muted text-muted-foreground"
+      )}
+    >
+      {count}
+    </span>
+  );
+}
+
+function OrgAvatar({ name, active }: { name: string; active?: boolean }) {
+  return (
+    <span
+      className={cn(
+        "flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[10px] font-semibold tracking-wide transition-colors",
+        active
+          ? "bg-teal-500/20 text-teal-700 dark:text-teal-300"
+          : getAvatarTone(name)
+      )}
+    >
+      {getInitials(name)}
+    </span>
+  );
 }
 
 function TreeRow({
@@ -100,6 +193,7 @@ function TreeRow({
   selectedPath,
   expandedPaths,
   labels,
+  forceExpand,
   onSelect,
   onToggle,
 }: {
@@ -108,61 +202,86 @@ function TreeRow({
   selectedPath: string;
   expandedPaths: Set<string>;
   labels: RepositoryExplorerViewProps["labels"];
+  forceExpand: boolean;
   onSelect: (path: string) => void;
   onToggle: (path: string) => void;
 }) {
   const hasChildren = node.children.size > 0;
-  const isExpanded = expandedPaths.has(node.path);
+  const isExpanded = forceExpand || expandedPaths.has(node.path);
   const isSelected = selectedPath === node.path;
-  const FolderIcon = isExpanded ? FolderOpen : Folder;
+  const childNodes = sortNodes(node.children.values());
 
   return (
     <div>
       <div
         className={cn(
-          "flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+          "group relative flex min-w-0 items-center gap-1 rounded-lg transition-colors",
           isSelected
-            ? "bg-primary/10 text-primary"
-            : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+            ? "bg-teal-500/10 text-foreground"
+            : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
         )}
-        style={{ paddingLeft: `${8 + depth * 18}px` }}
+        style={{ paddingLeft: `${4 + depth * 14}px` }}
       >
-        <button
-          type="button"
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm hover:bg-background/80"
-          onClick={() => onToggle(node.path)}
-          aria-label={isExpanded ? labels.collapseFolder : labels.expandFolder}
-        >
-          {hasChildren ? (
-            isExpanded ? (
-              <ChevronDown className="h-4 w-4" />
+        {isSelected && (
+          <span
+            aria-hidden
+            className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-teal-500"
+          />
+        )}
+
+        {hasChildren ? (
+          <button
+            type="button"
+            className="flex h-7 w-5 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 opacity-70 transition-opacity hover:bg-background/60 hover:opacity-100 group-hover:opacity-100"
+            onClick={() => onToggle(node.path)}
+            aria-label={
+              isExpanded ? labels.collapseFolder : labels.expandFolder
+            }
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3.5 w-3.5" />
             ) : (
-              <ChevronRight className="h-4 w-4" />
-            )
-          ) : (
-            <span className="h-4 w-4" />
-          )}
-        </button>
+              <ChevronRight className="h-3.5 w-3.5" />
+            )}
+          </button>
+        ) : (
+          <span className="h-7 w-5 shrink-0" />
+        )}
+
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          className="flex min-w-0 flex-1 items-center gap-2.5 py-1.5 pr-2 text-left"
           onClick={() => onSelect(node.path)}
         >
-          <FolderIcon
+          {depth === 0 ? (
+            <OrgAvatar name={node.name} active={isSelected} />
+          ) : (
+            <span
+              className={cn(
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px]",
+                isSelected
+                  ? "bg-teal-500/15 text-teal-600 dark:text-teal-300"
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              <FolderOpen className="h-3 w-3" />
+            </span>
+          )}
+          <span
             className={cn(
-              "h-4 w-4 shrink-0",
-              isSelected ? "text-primary" : "text-muted-foreground"
+              "min-w-0 flex-1 truncate text-[13px]",
+              isSelected ? "font-medium text-foreground" : "font-normal"
             )}
-          />
-          <span className="truncate font-medium">{node.name}</span>
-          <span className="ml-auto shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[11px] text-muted-foreground">
-            {node.repositoryCount}
+          >
+            {node.name}
           </span>
+          <CountBadge count={node.repositoryCount} active={isSelected} />
         </button>
       </div>
+
       {hasChildren && isExpanded && (
-        <div className="mt-1 space-y-1">
-          {sortNodes(node.children.values()).map((child) => (
+        <div className="mt-0.5 space-y-0.5">
+          {childNodes.map((child) => (
             <TreeRow
               key={child.path}
               node={child}
@@ -170,6 +289,7 @@ function TreeRow({
               selectedPath={selectedPath}
               expandedPaths={expandedPaths}
               labels={labels}
+              forceExpand={forceExpand}
               onSelect={onSelect}
               onToggle={onToggle}
             />
@@ -196,6 +316,9 @@ export function RepositoryExplorerView({
   const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(
     () => new Set()
   );
+  const [filter, setFilter] = useState("");
+  const query = filter.trim().toLowerCase();
+
   const effectiveSelectedPath =
     selectedPath === ROOT_PATH || folderPaths.includes(selectedPath)
       ? selectedPath
@@ -204,6 +327,27 @@ export function RepositoryExplorerView({
     () => new Set(folderPaths.filter((path) => !collapsedPaths.has(path))),
     [collapsedPaths, folderPaths]
   );
+
+  const filteredRoot = useMemo(() => {
+    if (!query) return root;
+    return filterTree(root, query) ?? createNode(root.name, root.path);
+  }, [query, root]);
+
+  const rootChildren = useMemo(
+    () => sortNodes(filteredRoot.children.values()),
+    [filteredRoot]
+  );
+
+  const letterGroups = useMemo(() => {
+    const groups = new Map<string, TreeNode[]>();
+    for (const node of rootChildren) {
+      const letter = getLetterGroup(node.name);
+      const list = groups.get(letter) ?? [];
+      list.push(node);
+      groups.set(letter, list);
+    }
+    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [rootChildren]);
 
   const selectedRepositories = useMemo(() => {
     if (effectiveSelectedPath === ROOT_PATH) {
@@ -245,54 +389,108 @@ export function RepositoryExplorerView({
   }
 
   return (
-    <Card
+    <div
       className={cn(
-        "grid overflow-hidden rounded-lg border bg-background shadow-sm md:grid-cols-[280px_minmax(0,1fr)]",
+        "grid overflow-hidden rounded-xl border border-border/70 bg-background md:grid-cols-[300px_minmax(0,1fr)]",
         className
       )}
     >
-      <aside className="border-b bg-muted/20 p-3 md:border-b-0 md:border-r">
-        <div className="mb-3 flex items-center justify-between gap-3 px-1">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {labels.treeTitle}
+      <aside className="flex min-h-0 flex-col border-b border-border/70 bg-muted/20 md:border-b-0 md:border-r">
+        <div className="shrink-0 space-y-3 border-b border-border/60 px-3.5 py-3.5">
+          <div className="flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                {labels.treeTitle}
+              </p>
+              <p className="mt-1 text-sm font-medium text-foreground">
+                {labels.repositoryCount(repositories.length)}
+              </p>
+            </div>
           </div>
-          <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
-            {repositories.length}
-          </span>
-        </div>
-        <div className="max-h-72 space-y-1 overflow-y-auto pr-1 md:max-h-[640px]">
-          <button
-            type="button"
-            className={cn(
-              "mb-1 flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
-              effectiveSelectedPath === ROOT_PATH
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
-            )}
-            onClick={() => setSelectedPath(ROOT_PATH)}
-          >
-            <GitBranch className="h-4 w-4 shrink-0" />
-            <span className="truncate font-medium">{labels.allRepositories}</span>
-            <span className="ml-auto shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[11px] text-muted-foreground">
-              {repositories.length}
-            </span>
-          </button>
-          {sortNodes(root.children.values()).map((node) => (
-            <TreeRow
-              key={node.path}
-              node={node}
-              depth={0}
-              selectedPath={effectiveSelectedPath}
-              expandedPaths={expandedPaths}
-              labels={labels}
-              onSelect={setSelectedPath}
-              onToggle={handleToggle}
+
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+              placeholder={labels.filterPlaceholder}
+              className="h-8 rounded-lg border-border/60 bg-background/80 pl-8 text-xs shadow-none focus-visible:border-teal-500/40 focus-visible:ring-teal-500/15"
             />
-          ))}
+          </div>
         </div>
+
+        <ScrollArea className="h-72 md:h-[640px]">
+          <div className="space-y-0.5 p-2 pr-3">
+            <button
+              type="button"
+              className={cn(
+                "relative mb-1 flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] transition-colors",
+                effectiveSelectedPath === ROOT_PATH
+                  ? "bg-teal-500/10 text-foreground"
+                  : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+              )}
+              onClick={() => setSelectedPath(ROOT_PATH)}
+            >
+              {effectiveSelectedPath === ROOT_PATH && (
+                <span
+                  aria-hidden
+                  className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-teal-500"
+                />
+              )}
+              <span
+                className={cn(
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                  effectiveSelectedPath === ROOT_PATH
+                    ? "bg-teal-500/20 text-teal-700 dark:text-teal-300"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                <GitBranch className="h-3.5 w-3.5" />
+              </span>
+              <span className="min-w-0 flex-1 truncate font-medium">
+                {labels.allRepositories}
+              </span>
+              <CountBadge
+                count={repositories.length}
+                active={effectiveSelectedPath === ROOT_PATH}
+              />
+            </button>
+
+            {rootChildren.length === 0 ? (
+              <div className="px-2 py-8 text-center text-xs text-muted-foreground">
+                {labels.noMatch}
+              </div>
+            ) : (
+              letterGroups.map(([letter, nodes]) => (
+                <div key={letter} className="pt-1">
+                  <div className="sticky top-0 z-[1] bg-muted/20 px-2 py-1 backdrop-blur-sm">
+                    <span className="text-[10px] font-semibold tracking-[0.16em] text-muted-foreground/80">
+                      {letter}
+                    </span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {nodes.map((node) => (
+                      <TreeRow
+                        key={node.path}
+                        node={node}
+                        depth={0}
+                        selectedPath={effectiveSelectedPath}
+                        expandedPaths={expandedPaths}
+                        labels={labels}
+                        forceExpand={Boolean(query)}
+                        onSelect={setSelectedPath}
+                        onToggle={handleToggle}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </ScrollArea>
       </aside>
 
-      <section className="min-w-0 bg-muted/5 p-4 md:p-5">
+      <section className="min-w-0 bg-background p-4 md:p-5">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
@@ -330,11 +528,9 @@ export function RepositoryExplorerView({
         </div>
 
         {selectedRepositories.length === 0 ? (
-          <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border border-dashed bg-background/60 p-8 text-center">
+          <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 p-8 text-center">
             <FolderOpen className="mb-3 h-10 w-10 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              {labels.emptyFolder}
-            </p>
+            <p className="text-sm text-muted-foreground">{labels.emptyFolder}</p>
           </div>
         ) : (
           <div
@@ -351,6 +547,6 @@ export function RepositoryExplorerView({
           </div>
         )}
       </section>
-    </Card>
+    </div>
   );
 }

@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.0.5 - 2026-08-12
+
+### Added
+- Added organization/folder filter search in the repository explorer sidebar.
+- Added shared `WithAnnouncement` layout wrapper so the top announcement banner appears across main and repository pages.
+
+### Changed
+- Redesigned the repository explorer left panel with initials avatars, A–Z sticky grouping, teal selected-state accent, and denser Linear-style scanning.
+- Localized explorer filter/empty-state copy across supported languages.
+
 ## v2.0.4 - 2026-08-12
 
 ### Added

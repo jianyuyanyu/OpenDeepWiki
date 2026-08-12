@@ -154,7 +154,9 @@
       "count": "{count} repositorios",
       "emptyFolder": "No hay repositorios en esta carpeta",
       "expandFolder": "Expandir carpeta",
-      "collapseFolder": "Contraer carpeta"
+      "collapseFolder": "Contraer carpeta",
+      "filterPlaceholder": "Filtrar orgs o carpetas…",
+      "noMatch": "No hay organizaciones coincidentes"
     },
     "status": {
       "pending": "Pendiente",

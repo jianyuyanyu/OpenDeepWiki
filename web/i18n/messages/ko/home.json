@@ -199,7 +199,9 @@
       "count": "저장소 {count}개",
       "emptyFolder": "이 폴더에는 저장소가 없습니다",
       "expandFolder": "폴더 펼치기",
-      "collapseFolder": "폴더 접기"
+      "collapseFolder": "폴더 접기",
+      "filterPlaceholder": "조직 또는 폴더 필터…",
+      "noMatch": "일치하는 조직이 없습니다"
     }
   },
   "mcpIntegrationShort": "MCP 연동"

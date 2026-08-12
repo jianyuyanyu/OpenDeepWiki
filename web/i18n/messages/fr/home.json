@@ -154,7 +154,9 @@
       "count": "{count} dépôts",
       "emptyFolder": "Aucun dépôt dans ce dossier",
       "expandFolder": "Développer le dossier",
-      "collapseFolder": "Réduire le dossier"
+      "collapseFolder": "Réduire le dossier",
+      "filterPlaceholder": "Filtrer orgs ou dossiers…",
+      "noMatch": "Aucune organisation correspondante"
     },
     "status": {
       "pending": "En attente",

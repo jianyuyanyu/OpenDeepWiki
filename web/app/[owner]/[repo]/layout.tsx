@@ -4,6 +4,7 @@ import { fetchRepoTree, fetchRepoBranches, checkGitHubRepo, fetchProcessingLogs 
 import { RepoShell } from "@/components/repo/repo-shell";
 import { RepositoryProcessingStatus } from "@/components/repo/repository-processing-status";
 import { RepositoryNotFound } from "@/components/repo/repository-not-found";
+import { WithAnnouncement } from "@/components/with-announcement";
 import { decodeRouteSegment } from "@/lib/repo-route";
 import { indexableMetadata, noIndexMetadata, repoCanonicalPath, repoTitle, SITE_DESCRIPTION } from "@/lib/repo-seo";
 import RouteProviders from "@/app/route-providers";
@@ -145,7 +146,7 @@ export default async function RepoLayout({ children, params }: RepoLayoutProps) 
   // For non-ready states, wrap content in RouteProviders
   return (
     <RouteProviders>
-      {content}
+      <WithAnnouncement>{content}</WithAnnouncement>
     </RouteProviders>
   );
 }
