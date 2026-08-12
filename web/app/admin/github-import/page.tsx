@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "@/hooks/use-translations";
+import { PageHeader } from "@/components/admin/page-header";
 import { toast } from "sonner";
 import {
   getGitHubStatus,
@@ -227,20 +228,17 @@ export default function GitHubImportPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t("admin.githubImport.title")}</h1>
-          <p className="text-muted-foreground mt-1">
-            {t("admin.githubImport.description")}
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={fetchStatus}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          {t("admin.githubImport.refresh")}
-        </Button>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={t("admin.githubImport.title")}
+        description={t("admin.githubImport.description")}
+        actions={
+          <Button variant="outline" size="sm" onClick={fetchStatus}>
+            <RefreshCw className="mr-1.5 h-4 w-4" />
+            {t("admin.githubImport.refresh")}
+          </Button>
+        }
+      />
 
       {/* Status Card */}
       <Card>

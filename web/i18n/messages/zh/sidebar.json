@@ -9,5 +9,9 @@
   "mcp": "MCP 服务",
   "github": "GitHub",
   "feishu": "飞书",
-  "scanQrCode": "扫码关注飞书"
+  "scanQrCode": "扫码关注飞书",
+  "groupDiscover": "发现",
+  "groupWorkspace": "工作区",
+  "groupTools": "工具",
+  "brandTagline": "代码知识库"
 }

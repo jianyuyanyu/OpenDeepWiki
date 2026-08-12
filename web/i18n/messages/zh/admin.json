@@ -1285,5 +1285,18 @@
       "allModelsDisabled": "已全部禁用模型",
       "bulkModelUpdateFailed": "批量更新模型失败"
     }
+  },
+  "shared": {
+    "totalItems": "共 {count} 条",
+    "rowsPerPage": "每页",
+    "noData": "暂无数据",
+    "loading": "加载中..."
+  },
+  "nav": {
+    "overview": "概览",
+    "content": "内容管理",
+    "organization": "组织权限",
+    "aiConfig": "AI 配置",
+    "system": "系统"
   }
 }

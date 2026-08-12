@@ -11,6 +11,7 @@
     "actionError": "操作に失敗しました。もう一度お試しください"
   },
   "title": "何を知りたいですか？",
+  "subtitle": "公開リポジトリを閲覧し、リンク貼り付けやキーワードで素早く探せます。",
   "bookmarks": {
     "pageTitle": "ブックマーク",
     "pageDescription": "保存したリポジトリにすばやくアクセス",
@@ -200,5 +201,6 @@
       "expandFolder": "フォルダーを展開",
       "collapseFolder": "フォルダーを折りたたむ"
     }
-  }
+  },
+  "mcpIntegrationShort": "MCP 連携"
 }

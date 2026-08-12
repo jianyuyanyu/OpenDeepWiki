@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
+import { PageHeader } from "@/components/admin/page-header";
 
 const allValue = "all";
 const inheritProviderTypeValue = "inherit";
@@ -432,29 +433,22 @@ export default function AdminAiModelsPage() {
   return (
     <div className="space-y-5">
       <section className="space-y-4">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="min-w-0 space-y-3">
-            <Badge variant="outline" className="w-fit bg-muted/40 text-xs">
-              {t("admin.models.registryBadge")}
-            </Badge>
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">{t("admin.models.title")}</h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                {t("admin.models.subtitle")}
-              </p>
-            </div>
-          </div>
-          <div className="flex shrink-0 gap-2">
-            <Button variant="outline" onClick={fetchData}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              {t("admin.models.refresh")}
-            </Button>
-            <Button onClick={() => openModelDialog()}>
-              <Plus className="mr-2 h-4 w-4" />
-              {t("admin.models.create")}
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title={t("admin.models.title")}
+          description={t("admin.models.subtitle")}
+          actions={
+            <>
+              <Button variant="outline" onClick={fetchData}>
+                <RefreshCw className="mr-1.5 h-4 w-4" />
+                {t("admin.models.refresh")}
+              </Button>
+              <Button onClick={() => openModelDialog()}>
+                <Plus className="mr-1.5 h-4 w-4" />
+                {t("admin.models.create")}
+              </Button>
+            </>
+          }
+        />
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {statCards.map(({ label, value, detail, icon: Icon }) => (

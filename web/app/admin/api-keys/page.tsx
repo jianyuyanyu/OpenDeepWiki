@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
+import { PageHeader } from "@/components/admin/page-header";
 import { useLocale } from "next-intl";
 
 export default function AdminApiKeysPage() {
@@ -118,24 +119,23 @@ export default function AdminApiKeysPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t("admin.apiKeys.title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("admin.apiKeys.subtitle")}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchData}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            {t("admin.common.refresh")}
-          </Button>
-          <Button onClick={openCreateDialog}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t("admin.apiKeys.createKey")}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={t("admin.apiKeys.title")}
+        description={t("admin.apiKeys.subtitle")}
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchData}>
+              <RefreshCw className="mr-1.5 h-4 w-4" />
+              {t("admin.common.refresh")}
+            </Button>
+            <Button onClick={openCreateDialog}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              {t("admin.apiKeys.createKey")}
+            </Button>
+          </>
+        }
+      />
 
       {/* API Keys Table */}
       {loading ? (

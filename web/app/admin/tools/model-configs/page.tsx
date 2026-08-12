@@ -38,6 +38,7 @@ import {
   updateSettings,
 } from "@/lib/admin-api";
 import { useTranslations } from "@/hooks/use-translations";
+import { PageHeader } from "@/components/admin/page-header";
 import {
   AlertCircle,
   BookOpen,
@@ -469,72 +470,54 @@ export default function AdminModelConfigsPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="relative overflow-hidden rounded-[2rem] border bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.24),transparent_32%),linear-gradient(135deg,#111827,#312e81_52%,#0f172a)] p-6 text-white shadow-sm">
-        <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-amber-300/20 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-32 w-32 rounded-full bg-sky-300/10 blur-3xl" />
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-3">
-            <Badge className="border-white/15 bg-white/10 text-white hover:bg-white/15">
-              {t("admin.modelConfigs.heroBadge")}
-            </Badge>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">{t("admin.modelConfigs.title")}</h1>
-              <p className="mt-2 max-w-3xl text-sm text-slate-300">
-                {t("admin.modelConfigs.subtitle")}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3 text-center text-sm">
-            <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-              <p className="text-xl font-semibold">{configuredTaskCount}/4</p>
-              <p className="text-xs text-slate-300">{t("admin.modelConfigs.heroStats.systemTasks")}</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-              <p className="text-xl font-semibold">{activeProviderCount}</p>
-              <p className="text-xs text-slate-300">{t("admin.modelConfigs.heroStats.availableProviders")}</p>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3">
-              <p className="text-xl font-semibold">{models.length}</p>
-              <p className="text-xs text-slate-300">{t("admin.modelConfigs.heroStats.modelMetadata")}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={t("admin.modelConfigs.title")}
+        description={t("admin.modelConfigs.subtitle")}
+      />
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border bg-card/70 p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-sky-500/10 p-2 text-sky-600">
-              <ShieldCheck className="h-4 w-4" />
-            </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-border/70 bg-card/70 p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold">{t("admin.modelConfigs.featureCards.provider.title")}</p>
-              <p className="text-xs text-muted-foreground">{t("admin.modelConfigs.featureCards.provider.description")}</p>
+              <p className="text-xs text-muted-foreground">{t("admin.modelConfigs.heroStats.systemTasks")}</p>
+              <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{configuredTaskCount}/4</p>
             </div>
-          </div>
-        </div>
-        <div className="rounded-2xl border bg-card/70 p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-600">
-              <Boxes className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold">{t("admin.modelConfigs.featureCards.models.title")}</p>
-              <p className="text-xs text-muted-foreground">{t("admin.modelConfigs.featureCards.models.description")}</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-2xl border bg-card/70 p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-amber-500/10 p-2 text-amber-600">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
               <Sparkles className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold">{t("admin.modelConfigs.featureCards.binding.title")}</p>
-              <p className="text-xs text-muted-foreground">{t("admin.modelConfigs.featureCards.binding.description")}</p>
-            </div>
+            </span>
           </div>
+          <p className="mt-3 truncate text-xs text-muted-foreground">
+            {t("admin.modelConfigs.featureCards.binding.description")}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border/70 bg-card/70 p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground">{t("admin.modelConfigs.heroStats.availableProviders")}</p>
+              <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{activeProviderCount}</p>
+            </div>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <ShieldCheck className="h-4 w-4" />
+            </span>
+          </div>
+          <p className="mt-3 truncate text-xs text-muted-foreground">
+            {t("admin.modelConfigs.featureCards.provider.description")}
+          </p>
+        </div>
+        <div className="rounded-lg border border-border/70 bg-card/70 p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground">{t("admin.modelConfigs.heroStats.modelMetadata")}</p>
+              <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{models.length}</p>
+            </div>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <Boxes className="h-4 w-4" />
+            </span>
+          </div>
+          <p className="mt-3 truncate text-xs text-muted-foreground">
+            {t("admin.modelConfigs.featureCards.models.description")}
+          </p>
         </div>
       </div>
 

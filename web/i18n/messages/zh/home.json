@@ -1,5 +1,6 @@
 {
   "title": "你想知道什么?",
+  "subtitle": "浏览公开仓库，粘贴链接或用关键词快速定位。",
   "bookmarks": {
     "pageTitle": "我的收藏",
     "pageDescription": "快速访问您收藏的仓库",
@@ -200,5 +201,6 @@
       "ja": "日语",
       "ko": "韩语"
     }
-  }
+  },
+  "mcpIntegrationShort": "MCP 接入"
 }

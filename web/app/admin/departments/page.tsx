@@ -66,6 +66,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
+import { PageHeader } from "@/components/admin/page-header";
+import { StatusBadge } from "@/components/admin/status-badge";
 
 
 interface FormData {
@@ -131,13 +133,11 @@ function DepartmentTreeNode({
         )}
         <Building2 className="h-4 w-4 text-primary flex-shrink-0" />
         <span className="flex-1 font-medium text-sm truncate">{dept.name}</span>
-        <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
-          dept.isActive
-            ? "bg-green-500/20 text-green-400"
-            : "bg-muted text-muted-foreground"
-        }`}>
-          {dept.isActive ? t('admin.departments.enabled') : t('admin.departments.disabled')}
-        </span>
+        <StatusBadge
+          tone={dept.isActive ? "success" : "neutral"}
+          label={dept.isActive ? t('admin.departments.enabled') : t('admin.departments.disabled')}
+          className="flex-shrink-0"
+        />
         <div className="flex gap-0.5 flex-shrink-0">
           <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted-foreground/20" onClick={(e) => { e.stopPropagation(); onEdit(dept); }}>
             <Edit className="h-3.5 w-3.5" />
@@ -457,25 +457,27 @@ export default function AdminDepartmentsPage() {
 
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t('admin.departments.title')}</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchData}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            {t('admin.common.refresh')}
-          </Button>
-          <Button onClick={openCreateDialog}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('admin.departments.createDept')}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={t('admin.departments.title')}
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchData} disabled={loading}>
+              <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              {t('admin.common.refresh')}
+            </Button>
+            <Button onClick={openCreateDialog}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              {t('admin.departments.createDept')}
+            </Button>
+          </>
+        }
+      />
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3">
         {/* 部门树 */}
         <div className="lg:col-span-1">
-          <Card className="p-4">
+          <Card className="gap-0 rounded-lg p-4 shadow-none">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
               <FolderTree className="h-4 w-4" />
               {t('admin.departments.structure')}
@@ -513,16 +515,16 @@ export default function AdminDepartmentsPage() {
         {/* 部门详情 */}
         <div className="lg:col-span-2">
           {!selectedDept ? (
-            <Card className="flex h-64 flex-col items-center justify-center">
+            <Card className="flex h-64 flex-col items-center justify-center rounded-lg shadow-none">
               <FolderTree className="h-12 w-12 text-muted-foreground/50" />
               <p className="mt-4 text-muted-foreground">{t('admin.departments.selectToView')}</p>
             </Card>
           ) : detailLoading ? (
-            <Card className="flex h-64 items-center justify-center">
+            <Card className="flex h-64 items-center justify-center rounded-lg shadow-none">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </Card>
           ) : (
-            <Card className="p-6">
+            <Card className="gap-0 rounded-lg p-6 shadow-none">
               <div className="mb-4">
                 <h2 className="text-xl font-semibold">{selectedDept.name}</h2>
                 {selectedDept.description && (

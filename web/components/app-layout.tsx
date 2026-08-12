@@ -3,6 +3,7 @@
 import React from "react";
 import { AppSidebar } from "@/app/sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/animate-ui/components/radix/sidebar";
+import { AnnouncementBanner } from "@/components/announcement-banner";
 import { Header } from "@/components/header";
 import { useTranslations } from "@/hooks/use-translations";
 
@@ -23,7 +24,6 @@ export function AppLayout({ children, activeItem, onItemClick, searchBox }: AppL
   const t = useTranslations();
   const defaultActiveItem = activeItem || t("sidebar.explore");
 
-  // Get current weekday
   const now = new Date();
   const dayIndex = now.getDay();
   const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -31,16 +31,23 @@ export function AppLayout({ children, activeItem, onItemClick, searchBox }: AppL
   const currentWeekday = t(`common.weekdays.${weekdayKey}`);
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <AppSidebar activeItem={defaultActiveItem} onItemClick={onItemClick} className="!flex" />
-      <SidebarInset>
-        <Header
-          title={defaultActiveItem}
-          currentWeekday={currentWeekday}
-          searchBox={searchBox}
+    <div className="flex min-h-svh w-full flex-col">
+      <AnnouncementBanner />
+      <SidebarProvider defaultOpen={true} className="min-h-0 flex-1">
+        <AppSidebar
+          activeItem={defaultActiveItem}
+          onItemClick={onItemClick}
+          className="!flex border-r border-sidebar-border/80"
         />
-        {children}
-      </SidebarInset>
-    </SidebarProvider>
+        <SidebarInset className="bg-background">
+          <Header
+            title={defaultActiveItem}
+            currentWeekday={currentWeekday}
+            searchBox={searchBox}
+          />
+          <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        </SidebarInset>
+      </SidebarProvider>
+    </div>
   );
 }

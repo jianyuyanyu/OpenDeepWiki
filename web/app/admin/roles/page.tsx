@@ -1,16 +1,36 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  Edit,
+  Plus,
+  RefreshCw,
+  Shield,
+  ShieldCheck,
+  Trash2,
+  Users,
+} from "lucide-react";
+import { toast } from "sonner";
+import { useLocale } from "next-intl";
+
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -22,6 +42,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PageHeader } from "@/components/admin/page-header";
 import {
   getRoles,
   createRole,
@@ -29,18 +50,7 @@ import {
   deleteRole,
   AdminRole,
 } from "@/lib/admin-api";
-import {
-  Loader2,
-  Trash2,
-  Edit,
-  RefreshCw,
-  Plus,
-  Shield,
-  Users,
-} from "lucide-react";
-import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
-import { useLocale } from "next-intl";
 
 export default function AdminRolesPage() {
   const [roles, setRoles] = useState<AdminRole[]>([]);
@@ -51,6 +61,7 @@ export default function AdminRolesPage() {
   const [formData, setFormData] = useState({ name: "", description: "" });
   const t = useTranslations();
   const locale = useLocale();
+  const dateLocale = locale === "zh" ? "zh-CN" : locale;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -59,7 +70,7 @@ export default function AdminRolesPage() {
       setRoles(result);
     } catch (error) {
       console.error("Failed to fetch roles:", error);
-      toast.error(t('admin.toast.fetchRoleFailed'));
+      toast.error(t("admin.toast.fetchRoleFailed"));
     } finally {
       setLoading(false);
     }
@@ -83,21 +94,23 @@ export default function AdminRolesPage() {
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
-      toast.error(t('admin.toast.enterRoleName'));
+      toast.error(t("admin.toast.enterRoleName"));
       return;
     }
     try {
       if (editingRole) {
         await updateRole(editingRole.id, formData);
-        toast.success(t('admin.toast.updateSuccess'));
+        toast.success(t("admin.toast.updateSuccess"));
       } else {
         await createRole(formData);
-        toast.success(t('admin.toast.createSuccess'));
+        toast.success(t("admin.toast.createSuccess"));
       }
       setShowDialog(false);
       fetchData();
-    } catch (error) {
-      toast.error(editingRole ? t('admin.toast.updateFailed') : t('admin.toast.createFailed'));
+    } catch {
+      toast.error(
+        editingRole ? t("admin.toast.updateFailed") : t("admin.toast.createFailed")
+      );
     }
   };
 
@@ -105,56 +118,91 @@ export default function AdminRolesPage() {
     if (!deleteId) return;
     try {
       await deleteRole(deleteId);
-      toast.success(t('admin.toast.deleteSuccess'));
+      toast.success(t("admin.toast.deleteSuccess"));
       setDeleteId(null);
       fetchData();
-    } catch (error: any) {
-      toast.error(error.message || t('admin.toast.deleteFailed'));
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : t("admin.toast.deleteFailed")
+      );
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t('admin.roles.title')}</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchData}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            {t('admin.common.refresh')}
-          </Button>
-          <Button onClick={openCreateDialog}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('admin.roles.createRole')}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={t("admin.roles.title")}
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchData} disabled={loading}>
+              <RefreshCw
+                className={`mr-1.5 h-4 w-4 ${loading ? "animate-spin" : ""}`}
+              />
+              {t("admin.common.refresh")}
+            </Button>
+            <Button onClick={openCreateDialog}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              {t("admin.roles.createRole")}
+            </Button>
+          </>
+        }
+      />
 
-      {/* 角色列表 */}
       {loading ? (
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-[170px] rounded-lg" />
+          ))}
         </div>
+      ) : roles.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Shield className="h-5 w-5" />
+            </EmptyMedia>
+            <EmptyTitle>{t("admin.shared.noData")}</EmptyTitle>
+          </EmptyHeader>
+        </Empty>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {roles.map((role) => (
-            <Card key={role.id} className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-primary/10 p-2">
-                    <Shield className="h-5 w-5 text-primary" />
+            <Card
+              key={role.id}
+              className="gap-0 rounded-lg p-5 shadow-none transition-colors hover:border-foreground/20"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div
+                    className={`rounded-md p-2 ${
+                      role.isSystem
+                        ? "bg-violet-500/10 text-violet-600 dark:text-violet-400"
+                        : "bg-primary/10 text-primary"
+                    }`}
+                  >
+                    {role.isSystem ? (
+                      <ShieldCheck className="h-4 w-4" />
+                    ) : (
+                      <Shield className="h-4 w-4" />
+                    )}
                   </div>
-                  <div>
-                    <h3 className="font-semibold">{role.name}</h3>
+                  <div className="min-w-0">
+                    <h3 className="truncate font-semibold">{role.name}</h3>
                     {role.isSystem && (
-                      <span className="text-xs text-muted-foreground">{t('admin.roles.systemRole')}</span>
+                      <Badge
+                        variant="secondary"
+                        className="mt-0.5 text-[10px] font-normal"
+                      >
+                        {t("admin.roles.systemRole")}
+                      </Badge>
                     )}
                   </div>
                 </div>
                 {!role.isSystem && (
-                  <div className="flex gap-1">
+                  <div className="flex shrink-0 gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-8 w-8"
                       onClick={() => openEditDialog(role)}
                     >
                       <Edit className="h-4 w-4" />
@@ -162,6 +210,7 @@ export default function AdminRolesPage() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      className="h-8 w-8"
                       onClick={() => setDeleteId(role.id)}
                     >
                       <Trash2 className="h-4 w-4 text-red-500" />
@@ -169,18 +218,20 @@ export default function AdminRolesPage() {
                   </div>
                 )}
               </div>
-              {role.description && (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  {role.description}
-                </p>
-              )}
-              <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                <Users className="h-4 w-4" />
-                <span>{t('admin.roles.usersCount', { count: role.userCount })}</span>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {t('admin.roles.createdAt', { date: new Date(role.createdAt).toLocaleDateString(locale === 'zh' ? 'zh-CN' : locale) })}
+              <p className="mt-3 line-clamp-2 min-h-10 text-sm text-muted-foreground">
+                {role.description || "—"}
               </p>
+              <div className="mt-3 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" />
+                  {t("admin.roles.usersCount", { count: role.userCount })}
+                </span>
+                <span>
+                  {t("admin.roles.createdAt", {
+                    date: new Date(role.createdAt).toLocaleDateString(dateLocale),
+                  })}
+                </span>
+              </div>
             </Card>
           ))}
         </div>
@@ -190,34 +241,42 @@ export default function AdminRolesPage() {
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingRole ? t('admin.roles.editRole') : t('admin.roles.createRole')}</DialogTitle>
+            <DialogTitle>
+              {editingRole ? t("admin.roles.editRole") : t("admin.roles.createRole")}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">{t('admin.roles.roleName')} *</label>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">
+                {t("admin.roles.roleName")} *
+              </label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder={t('admin.roles.enterRoleName')}
+                placeholder={t("admin.roles.enterRoleName")}
                 disabled={editingRole?.isSystem}
               />
             </div>
-            <div>
-              <label className="text-sm font-medium">{t('admin.roles.description')}</label>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">
+                {t("admin.roles.description")}
+              </label>
               <Textarea
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder={t('admin.roles.enterRoleDesc')}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
+                placeholder={t("admin.roles.enterRoleDesc")}
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDialog(false)}>
-              {t('admin.common.cancel')}
+              {t("admin.common.cancel")}
             </Button>
             <Button onClick={handleSave}>
-              {editingRole ? t('admin.common.save') : t('admin.common.create')}
+              {editingRole ? t("admin.common.save") : t("admin.common.create")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -227,15 +286,18 @@ export default function AdminRolesPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('admin.common.confirmDelete')}</AlertDialogTitle>
+            <AlertDialogTitle>{t("admin.common.confirmDelete")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('admin.roles.deleteWarning')}
+              {t("admin.roles.deleteWarning")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('admin.common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              {t('admin.common.delete')}
+            <AlertDialogCancel>{t("admin.common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {t("admin.common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -64,6 +64,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { useTranslations } from "@/hooks/use-translations";
+import { PageHeader } from "@/components/admin/page-header";
 
 const GLOBAL_MCP_PATH = "/api/mcp";
 
@@ -189,17 +190,17 @@ export default function AdminMcpProvidersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t("admin.mcpProviders.title")}</h1>
-          <p className="text-muted-foreground">{t("admin.mcpProviders.description")}</p>
-        </div>
-        <Button onClick={openCreateDialog}>
-          <Plus className="h-4 w-4 mr-2" />
-          {t("admin.mcpProviders.create")}
-        </Button>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={t("admin.mcpProviders.title")}
+        description={t("admin.mcpProviders.description")}
+        actions={
+          <Button onClick={openCreateDialog}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            {t("admin.mcpProviders.create")}
+          </Button>
+        }
+      />
 
       <Tabs defaultValue="providers" onValueChange={(v) => v === "logs" && loadUsageLogs()}>
         <TabsList>

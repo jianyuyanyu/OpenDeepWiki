@@ -9,5 +9,9 @@
   "mcp": "MCPサービス",
   "github": "GitHub",
   "feishu": "Feishu",
-  "scanQrCode": "QRコードをスキャンしてフォロー"
+  "scanQrCode": "QRコードをスキャンしてフォロー",
+  "groupDiscover": "発見",
+  "groupWorkspace": "ワークスペース",
+  "groupTools": "ツール",
+  "brandTagline": "コード知識ベース"
 }

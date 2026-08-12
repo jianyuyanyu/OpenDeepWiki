@@ -67,71 +67,27 @@ import {
 import { getRepositorySourceTypeLabelKey, isGitRepositorySource } from "@/lib/repository-source";
 import { fetchProcessingLogs, fetchRepoDoc, fetchRepoTree } from "@/lib/repository-api";
 import type { ProcessingLogResponse, RepoDocResponse, RepoTreeNode } from "@/types/repository";
+import { AdminBreadcrumb } from "@/components/admin/admin-breadcrumb";
+import { StatusBadge, type StatusTone } from "@/components/admin/status-badge";
+import {
+  type DocOption,
+  flattenDocNodes,
+  findNodeTrail,
+  mapTaskStatusToAdminTask,
+  normalizeTaskStatus,
+} from "./_components/utils";
 
-interface DocOption {
-  title: string;
-  slug: string;
-}
+const TASK_STATUS_TONE: Record<string, StatusTone> = {
+  completed: "success",
+  processing: "info",
+  pending: "neutral",
+  failed: "danger",
+  cancelled: "warning",
+  other: "neutral",
+};
 
-function flattenDocNodes(nodes: RepoTreeNode[]): DocOption[] {
-  const docs: DocOption[] = [];
-  const walk = (list: RepoTreeNode[]) => {
-    list.forEach((node) => {
-      if (node.children && node.children.length > 0) {
-        walk(node.children);
-        return;
-      }
-      docs.push({ title: node.title, slug: node.slug });
-    });
-  };
-  walk(nodes);
-  return docs;
-}
-
-function findNodeTrail(nodes: RepoTreeNode[], targetSlug: string, trail: string[] = []): string[] | null {
-  for (const node of nodes) {
-    const nextTrail = [...trail, node.slug];
-    if (node.slug === targetSlug) {
-      return nextTrail;
-    }
-    if (node.children?.length) {
-      const result = findNodeTrail(node.children, targetSlug, nextTrail);
-      if (result) {
-        return result;
-      }
-    }
-  }
-  return null;
-}
-
-function statusBadgeClass(status: string) {
-  const value = status.toLowerCase();
-  if (value === "completed" || value === "已完成") return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-  if (value === "processing" || value === "处理中") return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-  if (value === "pending" || value === "待处理") return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200";
-  if (value === "failed" || value === "失败") return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-  if (value === "cancelled" || value === "已取消") return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
-  return "bg-muted text-muted-foreground";
-}
-
-function mapTaskStatusToAdminTask(
-  source: Awaited<ReturnType<typeof getIncrementalUpdateTask>>
-): AdminIncrementalTask {
-  return {
-    taskId: source.taskId,
-    branchId: source.branchId,
-    branchName: source.branchName,
-    status: source.status,
-    priority: source.priority,
-    isManualTrigger: source.isManualTrigger,
-    retryCount: source.retryCount,
-    previousCommitId: source.previousCommitId,
-    targetCommitId: source.targetCommitId,
-    errorMessage: source.errorMessage,
-    createdAt: source.createdAt,
-    startedAt: source.startedAt,
-    completedAt: source.completedAt,
-  };
+function taskStatusTone(status: string): StatusTone {
+  return TASK_STATUS_TONE[normalizeTaskStatus(status)] ?? "neutral";
 }
 
 function mapBranchGenerationTask(source: AdminBranchGenerationTask): AdminBranchGenerationTask {
@@ -139,16 +95,6 @@ function mapBranchGenerationTask(source: AdminBranchGenerationTask): AdminBranch
     ...source,
     branchName: source.branchName,
   };
-}
-
-function normalizeTaskStatus(status: string) {
-  const value = status.toLowerCase();
-  if (value.includes("completed") || value.includes("完成")) return "completed";
-  if (value.includes("processing") || value.includes("处理")) return "processing";
-  if (value.includes("pending") || value.includes("待")) return "pending";
-  if (value.includes("failed") || value.includes("失败")) return "failed";
-  if (value.includes("cancel") || value.includes("取消")) return "cancelled";
-  return "other";
 }
 
 export default function AdminRepositoryManagementPage() {
@@ -1252,62 +1198,77 @@ export default function AdminRepositoryManagementPage() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in-0 duration-500">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push("/admin/repositories")}
-            className="transition-all duration-200 hover:-translate-x-1"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            {t("admin.repositories.management.backToList")}
-          </Button>
-          <h1 className="text-2xl font-bold">{repository.orgName}/{repository.repoName}</h1>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-xs">
-              {t(`admin.repositories.${getRepositorySourceTypeLabelKey(repository.sourceType, repository.sourceTypeName)}`)}
-            </span>
-            <span className="break-all">{repository.sourceLocation || repository.gitUrl}</span>
+    <div className="space-y-5">
+      <AdminBreadcrumb currentLabel={`${repository.orgName}/${repository.repoName}`} />
+
+      <Card className="gap-0 rounded-lg p-5 shadow-none">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                onClick={() => router.push("/admin/repositories")}
+                title={t("admin.repositories.management.backToList")}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <h1 className="truncate text-xl font-semibold tracking-tight">
+                {repository.orgName}/{repository.repoName}
+              </h1>
+              <Badge variant="secondary" className="text-xs font-normal">
+                {t(`admin.repositories.${getRepositorySourceTypeLabelKey(repository.sourceType, repository.sourceTypeName)}`)}
+              </Badge>
+              <StatusBadge
+                tone={taskStatusTone(repository.statusText)}
+                label={getLocalizedTaskStatus(repository.statusText)}
+                pulse={normalizeTaskStatus(repository.statusText) === "processing"}
+              />
+            </div>
+            <p className="break-all pl-9 text-xs text-muted-foreground">
+              {repository.sourceLocation || repository.gitUrl}
+            </p>
+            <p className="inline-flex items-center gap-1.5 pl-9 text-xs text-muted-foreground">
+              <Sparkles className="h-3 w-3 text-primary" />
+              {t("admin.repositories.management.visualHint")}
+            </p>
           </div>
-          <p className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
-            {t("admin.repositories.management.visualHint")}
-          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={handleRefreshAll} disabled={refreshingAll}>
+              <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${refreshingAll ? "animate-spin" : ""}`} />
+              {t("admin.repositories.management.refresh")}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleSyncStats} disabled={syncingStats || !supportsGitOperations} title={supportsGitOperations ? t("admin.repositories.management.syncStats") : t("admin.repositories.syncStatsNotSupported")}>
+              {syncingStats ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="mr-1.5 h-3.5 w-3.5" />}
+              {t("admin.repositories.management.syncStats")}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleTriggerIncremental} disabled={triggeringIncremental || !selectedBranch || !supportsGitOperations} title={supportsGitOperations ? t("admin.repositories.management.triggerIncremental") : t("admin.repositories.management.incrementalNotSupported")}>
+              {triggeringIncremental ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Zap className="mr-1.5 h-3.5 w-3.5" />}
+              {t("admin.repositories.management.triggerIncremental")}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleGenerateGraphify} disabled={isGraphifyGenerating || !selectedBranch}>
+              {isGraphifyGenerating ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+              {t("admin.repositories.management.generateGraphify")}
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleRegenerateRepository} disabled={regeneratingRepo}>
+              {regeneratingRepo ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1.5 h-3.5 w-3.5" />}
+              {t("admin.repositories.management.regenerateAll")}
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleRefreshAll} disabled={refreshingAll}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshingAll ? "animate-spin" : ""}`} />
-            {t("admin.repositories.management.refresh")}
-          </Button>
-          <Button variant="outline" onClick={handleSyncStats} disabled={syncingStats || !supportsGitOperations} title={supportsGitOperations ? t("admin.repositories.management.syncStats") : t("admin.repositories.syncStatsNotSupported")}>
-            {syncingStats ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
-            {t("admin.repositories.management.syncStats")}
-          </Button>
-          <Button variant="outline" onClick={handleTriggerIncremental} disabled={triggeringIncremental || !selectedBranch || !supportsGitOperations} title={supportsGitOperations ? t("admin.repositories.management.triggerIncremental") : t("admin.repositories.management.incrementalNotSupported")}>
-            {triggeringIncremental ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
-            {t("admin.repositories.management.triggerIncremental")}
-          </Button>
-          <Button variant="outline" onClick={handleGenerateGraphify} disabled={isGraphifyGenerating || !selectedBranch}>
-            {isGraphifyGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-            {t("admin.repositories.management.generateGraphify")}
-          </Button>
-          <Button variant="destructive" onClick={handleRegenerateRepository} disabled={regeneratingRepo}>
-            {regeneratingRepo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            {t("admin.repositories.management.regenerateAll")}
-          </Button>
-        </div>
-      </div>
+      </Card>
 
       <Card className="p-4 transition-all duration-300 hover:shadow-sm">
         <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold">{t("admin.repositories.management.summaryTitle")}</p>
-              <span className={`inline-flex rounded px-2 py-1 text-xs ${statusBadgeClass(repository.statusText)}`}>
-                {getLocalizedTaskStatus(repository.statusText)}
-              </span>
+              <StatusBadge
+                tone={taskStatusTone(repository.statusText)}
+                label={getLocalizedTaskStatus(repository.statusText)}
+                pulse={normalizeTaskStatus(repository.statusText) === "processing"}
+              />
             </div>
             <div className="rounded-lg border bg-muted/30 p-3">
               <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
@@ -1741,9 +1702,11 @@ export default function AdminRepositoryManagementPage() {
                         <td className="px-4 py-2 text-xs font-mono max-w-[220px] truncate">{task.taskId}</td>
                         <td className="px-4 py-2 text-xs">{task.branchName || task.branchId}</td>
                         <td className="px-4 py-2 text-xs">
-                          <span className={`inline-flex rounded px-2 py-1 text-xs ${statusBadgeClass(task.status)}`}>
-                            {getLocalizedTaskStatus(task.status)}
-                          </span>
+                          <StatusBadge
+                            tone={taskStatusTone(task.status)}
+                            label={getLocalizedTaskStatus(task.status)}
+                            pulse={normalizeTaskStatus(task.status) === "processing"}
+                          />
                           {task.errorMessage && (
                             <p className="mt-1 max-w-[300px] truncate text-[11px] text-red-500">{task.errorMessage}</p>
                           )}
@@ -2214,9 +2177,11 @@ export default function AdminRepositoryManagementPage() {
                       <td className="px-4 py-2 text-xs font-mono max-w-[220px] truncate">{task.taskId}</td>
                       <td className="px-4 py-2 text-xs">{task.branchName || task.branchId}</td>
                       <td className="px-4 py-2 text-xs">
-                        <span className={`inline-flex rounded px-2 py-1 text-xs ${statusBadgeClass(task.status)}`}>
-                          {getLocalizedTaskStatus(task.status)}
-                        </span>
+                        <StatusBadge
+                          tone={taskStatusTone(task.status)}
+                          label={getLocalizedTaskStatus(task.status)}
+                          pulse={normalizeTaskStatus(task.status) === "processing"}
+                        />
                         {task.errorMessage && (
                           <p className="mt-1 max-w-[260px] truncate text-[11px] text-red-500">{task.errorMessage}</p>
                         )}

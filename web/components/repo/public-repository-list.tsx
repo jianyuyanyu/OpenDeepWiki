@@ -144,7 +144,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
   if (isLoading && repositories.length === 0) {
     return (
       <div className={cn("w-full", className)}>
-        <h2 className="text-xl font-semibold mb-4">
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">
           {t("home.publicRepository.title")}
         </h2>
         <div className="mb-6">
@@ -162,7 +162,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
   if (error) {
     return (
       <div className={cn("w-full", className)}>
-        <h2 className="text-xl font-semibold mb-4">
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">
           {t("home.publicRepository.title")}
         </h2>
         <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -180,15 +180,22 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
   return (
     <div className={cn("w-full", className)}>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold">
-          {t("home.publicRepository.title")}
-        </h2>
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight">
+            {t("home.publicRepository.title")}
+          </h2>
+          {total > 0 && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {t("home.repository.tree.count").replace("{count}", total.toString())}
+            </p>
+          )}
+        </div>
         <div className="flex w-full items-center gap-2 sm:w-auto">
-          <div className="grid flex-1 grid-cols-2 rounded-lg border bg-muted/30 p-1 sm:flex sm:flex-none">
+          <div className="grid flex-1 grid-cols-2 rounded-lg border border-border/70 bg-muted/20 p-1 sm:flex sm:flex-none">
             <Button
               variant={viewMode === "tree" ? "secondary" : "ghost"}
               size="sm"
-              className="gap-1.5"
+              className="h-8 gap-1.5 rounded-md"
               onClick={() => setViewMode("tree")}
             >
               <ListTree className="h-4 w-4" />
@@ -197,7 +204,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
             <Button
               variant={viewMode === "grid" ? "secondary" : "ghost"}
               size="sm"
-              className="gap-1.5"
+              className="h-8 gap-1.5 rounded-md"
               onClick={() => setViewMode("grid")}
             >
               <LayoutGrid className="h-4 w-4" />
@@ -207,7 +214,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
           <Button
             variant="ghost"
             size="icon"
-            className="shrink-0"
+            className="h-8 w-8 shrink-0 rounded-lg"
             onClick={loadRepositories}
             disabled={isLoading}
           >

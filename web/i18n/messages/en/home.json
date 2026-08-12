@@ -1,5 +1,6 @@
 {
   "title": "What do you want to know?",
+  "subtitle": "Browse public repositories, paste a link, or search by keyword.",
   "bookmarks": {
     "pageTitle": "Bookmarks",
     "pageDescription": "Your saved repositories for quick access",
@@ -200,5 +201,6 @@
       "ja": "Japanese",
       "ko": "Korean"
     }
-  }
+  },
+  "mcpIntegrationShort": "MCP setup"
 }

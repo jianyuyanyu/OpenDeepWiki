@@ -1285,5 +1285,18 @@
       "allModelsDisabled": "All models disabled",
       "bulkModelUpdateFailed": "Failed to batch update model status"
     }
+  },
+  "shared": {
+    "totalItems": "全 {count} 件",
+    "rowsPerPage": "1ページあたり",
+    "noData": "データなし",
+    "loading": "読み込み中..."
+  },
+  "nav": {
+    "overview": "概要",
+    "content": "コンテンツ",
+    "organization": "組織",
+    "aiConfig": "AI 設定",
+    "system": "システム"
   }
 }

@@ -1,48 +1,6 @@
 {
   "login": "Iniciar sesión",
   "logout": "Cerrar sesión",
-  "profile": "Perfil",
-  "settings": "Ajustes",
-  "theme": "Tema",
-  "language": "Idioma",
-  "save": "Guardar",
-  "cancel": "Cancelar",
-  "confirm": "Confirmar",
-  "delete": "Eliminar",
-  "edit": "Editar",
-  "search": "Buscar",
-  "previous": "Anterior",
-  "next": "Siguiente",
-  "loading": "Cargando...",
-  "error": "Error",
-  "success": "Éxito",
-  "user": "Usuario",
-  "backToHome": "Volver al inicio",
-  "openMenu": "Abrir menú",
-  "toggleSidebar": "Mostrar/ocultar barra lateral",
-  "close": "Cerrar",
-  "submitting": "Enviando...",
-  "submitFailed": "Error al enviar",
-  "pleaseLogin": "Por favor, inicia sesión primero",
-  "adminPanel": "Panel de administración",
-  "admin": {
-    "dashboard": "Panel",
-    "repositories": "Repositorios",
-    "tools": "Herramientas",
-    "mcps": "MCPs",
-    "skills": "Skills",
-    "models": "Modelos",
-    "roles": "Roles",
-    "users": "Usuarios",
-    "departments": "Departamentos",
-    "chatAssistant": "Asistente de chat",
-    "settings": "Ajustes",
-    "refresh": "Actualizar",
-    "create": "Crear",
-    "total": "{count} registros",
-    "confirmDelete": "Confirmar eliminación",
-    "deleteWarning": "Esta acción no se puede deshacer. ¿Estás seguro?"
-  },
   "profile": {
     "title": "Perfil",
     "description": "Gestiona tu información personal",
@@ -86,6 +44,53 @@
     "aboutDescription": "Plataforma de base de conocimiento de código potenciada por IA",
     "saveSuccess": "Ajustes guardados",
     "saveFailed": "Error al guardar los ajustes"
+  },
+  "theme": {
+    "toggle": "Cambiar tema",
+    "light": "Claro",
+    "dark": "Oscuro",
+    "system": "Sistema"
+  },
+  "language": {
+    "selectLanguage": "Seleccionar idioma"
+  },
+  "save": "Guardar",
+  "cancel": "Cancelar",
+  "confirm": "Confirmar",
+  "delete": "Eliminar",
+  "edit": "Editar",
+  "search": "Buscar",
+  "previous": "Anterior",
+  "next": "Siguiente",
+  "loading": "Cargando...",
+  "error": "Error",
+  "success": "Éxito",
+  "user": "Usuario",
+  "backToHome": "Volver al inicio",
+  "openMenu": "Abrir menú",
+  "toggleSidebar": "Mostrar/ocultar barra lateral",
+  "close": "Cerrar",
+  "submitting": "Enviando...",
+  "submitFailed": "Error al enviar",
+  "pleaseLogin": "Por favor, inicia sesión primero",
+  "adminPanel": "Panel de administración",
+  "admin": {
+    "dashboard": "Panel",
+    "repositories": "Repositorios",
+    "tools": "Herramientas",
+    "mcps": "MCPs",
+    "skills": "Skills",
+    "models": "Modelos",
+    "roles": "Roles",
+    "users": "Usuarios",
+    "departments": "Departamentos",
+    "chatAssistant": "Asistente de chat",
+    "settings": "Ajustes",
+    "refresh": "Actualizar",
+    "create": "Crear",
+    "total": "{count} registros",
+    "confirmDelete": "Confirmar eliminación",
+    "deleteWarning": "Esta acción no se puede deshacer. ¿Estás seguro?"
   },
   "privateRepos": {
     "title": "Repositorios privados",
@@ -134,12 +139,6 @@
       "description": "La página que solicitaste no existe o se ha movido."
     }
   },
-  "theme": {
-    "toggle": "Cambiar tema",
-    "light": "Claro",
-    "dark": "Oscuro",
-    "system": "Sistema"
-  },
   "branch": {
     "selectBranch": "Seleccionar rama"
   },
@@ -156,9 +155,6 @@
     "unknown": "Desconocido",
     "fetchFailed": "Error al obtener los datos de la organización",
     "viewDocs": "Ver documentación"
-  },
-  "language": {
-    "selectLanguage": "Seleccionar idioma"
   },
   "sidebar": {
     "title": "Barra lateral",
@@ -216,5 +212,12 @@
     "pt-BR": "Portugués (Brasil)",
     "ru": "Ruso",
     "ar": "Árabe"
+  },
+  "announcement": {
+    "label": "Anuncio de patrocinio",
+    "prefix": "Este proyecto de código abierto es patrocinado con modelos de IA por",
+    "linkText": "https://routin.ai/",
+    "suffix": ". RoutinAI ofrece DeepSeek, GPT y más a bajo precio.",
+    "dismiss": "Cerrar anuncio"
   }
 }

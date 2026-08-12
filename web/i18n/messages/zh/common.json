@@ -1,8 +1,15 @@
 {
   "login": "登录",
   "logout": "退出登录",
-  "theme": "主题",
-  "language": "语言",
+  "theme": {
+    "toggle": "切换主题",
+    "light": "浅色",
+    "dark": "深色",
+    "system": "跟随系统"
+  },
+  "language": {
+    "selectLanguage": "选择语言"
+  },
   "save": "保存",
   "cancel": "取消",
   "confirm": "确认",
@@ -132,12 +139,6 @@
       "description": "你访问的页面不存在或已被移动。"
     }
   },
-  "theme": {
-    "toggle": "切换主题",
-    "light": "浅色",
-    "dark": "深色",
-    "system": "跟随系统"
-  },
   "branch": {
     "selectBranch": "选择分支"
   },
@@ -154,9 +155,6 @@
     "unknown": "未知",
     "fetchFailed": "获取组织数据失败",
     "viewDocs": "查看文档"
-  },
-  "language": {
-    "selectLanguage": "选择语言"
   },
   "sidebar": {
     "title": "侧边栏",
@@ -214,5 +212,12 @@
     "pt-BR": "Português (Brasil)",
     "ru": "Русский",
     "ar": "العربية"
+  },
+  "announcement": {
+    "label": "赞助公告",
+    "prefix": "当前开源项目由",
+    "linkText": "https://routin.ai/",
+    "suffix": "赞助提供大模型，RoutinAI 提供了低价 DeepSeek、GPT 模型等",
+    "dismiss": "关闭公告"
   }
 }

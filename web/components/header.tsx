@@ -52,15 +52,17 @@ export function Header({ title, currentWeekday, searchBox }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex items-center gap-2">
-        <SidebarTrigger className="-ml-1" />
-        <Separator orientation="vertical" className="mr-2 h-4" />
-        <h2 className="text-sm font-semibold">{title}</h2>
+    <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/70 bg-background/85 px-4 backdrop-blur-md supports-[backdrop-filter]:bg-background/70">
+      <div className="flex min-w-0 items-center gap-2">
+        <SidebarTrigger className="-ml-1 rounded-lg" />
+        <Separator orientation="vertical" className="mr-1 hidden h-4 sm:block" />
+        <div className="min-w-0">
+          <h2 className="truncate text-sm font-semibold tracking-tight">{title}</h2>
+        </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <span className="text-sm text-muted-foreground hidden md:inline-block">
+      <div className="flex items-center gap-3">
+        <span className="hidden text-xs text-muted-foreground md:inline-block">
           {currentWeekday}
         </span>
 

@@ -1,17 +1,45 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import Link from "next/link";
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Eye,
+  ExternalLink,
+  GitFork,
+  Globe,
+  Loader2,
+  Lock,
+  MoreHorizontal,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
+  Star,
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
+import { useLocale } from "next-intl";
+
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -24,9 +52,9 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -39,6 +67,22 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { PageHeader } from "@/components/admin/page-header";
+import { DataTableShell } from "@/components/admin/data-table";
+import { TablePagination } from "@/components/admin/table-pagination";
+import {
+  RepoStatusBadge,
+  REPO_STATUS_TONE,
+  StatusBadge,
+} from "@/components/admin/status-badge";
+import {
   getRepositories,
   deleteRepository,
   updateRepositoryStatus,
@@ -48,53 +92,27 @@ import {
   AdminRepository,
   RepositoryListResponse,
 } from "@/lib/admin-api";
-import { getRepositorySourceTypeLabelKey, isGitRepositorySource } from "@/lib/repository-source";
-import { RepositorySubmitForm } from "@/components/repo/repository-submit-form";
 import {
-  Loader2,
-  Search,
-  Plus,
-  Trash2,
-  Eye,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight,
-  Globe,
-  Lock,
-  RotateCcw,
-  Star,
-  GitFork,
-  ChevronDown,
-  Check,
-  AlertTriangle,
-} from "lucide-react";
-import { toast } from "sonner";
+  getRepositorySourceTypeLabelKey,
+  isGitRepositorySource,
+} from "@/lib/repository-source";
+import { RepositorySubmitForm } from "@/components/repo/repository-submit-form";
 import { useTranslations } from "@/hooks/use-translations";
-import { useLocale } from "next-intl";
 
-const statusColors: Record<number, string> = {
-  0: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
-  1: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  2: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  3: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-};
-
-const statusBarColors: Record<number, string> = {
-  0: "bg-slate-400/90",
-  1: "bg-blue-500/90",
-  2: "bg-emerald-500/90",
-  3: "bg-red-500/90",
-};
+const SEARCH_DEBOUNCE_MS = 400;
 
 export default function AdminRepositoriesPage() {
-  const router = useRouter();
   const [data, setData] = useState<RepositoryListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
-  const [selectedRepo, setSelectedRepo] = useState<AdminRepository | null>(null);
+  const [selectedRepo, setSelectedRepo] = useState<AdminRepository | null>(
+    null
+  );
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [syncing, setSyncing] = useState<string | null>(null);
@@ -102,23 +120,25 @@ export default function AdminRepositoriesPage() {
   const [batchSyncing, setBatchSyncing] = useState(false);
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const t = useTranslations();
   const locale = useLocale();
+  const dateLocale = locale === "zh" ? "zh-CN" : locale;
 
   const statusOptions = [
-    { value: "all", label: t('admin.repositories.allStatus') },
-    { value: "0", label: t('admin.repositories.pending') },
-    { value: "1", label: t('admin.repositories.processing') },
-    { value: "2", label: t('admin.repositories.completed') },
-    { value: "3", label: t('admin.repositories.failed') },
+    { value: "all", label: t("admin.repositories.allStatus") },
+    { value: "0", label: t("admin.repositories.pending") },
+    { value: "1", label: t("admin.repositories.processing") },
+    { value: "2", label: t("admin.repositories.completed") },
+    { value: "3", label: t("admin.repositories.failed") },
   ];
 
   const statusLabels: Record<number, string> = useMemo(
     () => ({
-      0: t('admin.repositories.pending'),
-      1: t('admin.repositories.processing'),
-      2: t('admin.repositories.completed'),
-      3: t('admin.repositories.failed'),
+      0: t("admin.repositories.pending"),
+      1: t("admin.repositories.processing"),
+      2: t("admin.repositories.completed"),
+      3: t("admin.repositories.failed"),
     }),
     [t]
   );
@@ -128,7 +148,7 @@ export default function AdminRepositoriesPage() {
     try {
       const result = await getRepositories(
         page,
-        20,
+        pageSize,
         search || undefined,
         status === "all" ? undefined : parseInt(status)
       );
@@ -136,47 +156,56 @@ export default function AdminRepositoriesPage() {
       setSelectedIds(new Set());
     } catch (error) {
       console.error("Failed to fetch repositories:", error);
-      toast.error(t('admin.toast.fetchRepoFailed'));
+      toast.error(t("admin.toast.fetchRepoFailed"));
     } finally {
       setLoading(false);
     }
-  }, [page, search, status, t]);
+  }, [page, pageSize, search, status, t]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Debounced search: reset to page 1 when the keyword settles.
+  const handleSearchInput = (value: string) => {
+    setSearchInput(value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      setPage(1);
+      setSearch(value.trim());
+    }, SEARCH_DEBOUNCE_MS);
+  };
 
   const handleSubmitSuccess = useCallback(() => {
     setIsSubmitDialogOpen(false);
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const handleSearch = () => {
-    setPage(1);
-    fetchData();
-  };
-
   const handleDelete = async () => {
     if (!deleteId) return;
     try {
       await deleteRepository(deleteId);
-      toast.success(t('admin.toast.deleteSuccess'));
+      toast.success(t("admin.toast.deleteSuccess"));
       setDeleteId(null);
       fetchData();
     } catch {
-      toast.error(t('admin.toast.deleteFailed'));
+      toast.error(t("admin.toast.deleteFailed"));
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: number, currentStatus?: number) => {
+  const handleStatusChange = async (
+    id: string,
+    newStatus: number,
+    currentStatus?: number
+  ) => {
     if (currentStatus === newStatus) return;
     setStatusUpdatingId(id);
     try {
       await updateRepositoryStatus(id, newStatus);
-      toast.success(t('admin.toast.statusUpdateSuccess'));
+      toast.success(t("admin.toast.statusUpdateSuccess"));
       fetchData();
     } catch {
-      toast.error(t('admin.toast.statusUpdateFailed'));
+      toast.error(t("admin.toast.statusUpdateFailed"));
     } finally {
       setStatusUpdatingId((prev) => (prev === id ? null : prev));
     }
@@ -188,26 +217,37 @@ export default function AdminRepositoriesPage() {
       const result = await syncRepositoryStats(id);
       if (result.success) {
         toast.success(
-          `${t('admin.toast.syncSuccess')}: ${t('admin.repositories.star')} ${result.starCount}, ${t('admin.repositories.fork')} ${result.forkCount}`
+          `${t("admin.toast.syncSuccess")}: ${t("admin.repositories.star")} ${result.starCount}, ${t("admin.repositories.fork")} ${result.forkCount}`
         );
         fetchData();
       } else {
-        toast.error(result.message || t('admin.toast.syncFailed'));
+        toast.error(result.message || t("admin.toast.syncFailed"));
       }
     } catch {
-      toast.error(t('admin.toast.syncFailed'));
+      toast.error(t("admin.toast.syncFailed"));
     } finally {
       setSyncing(null);
     }
   };
 
+  const selectedGitRepoIds = useMemo(() => {
+    const items = data?.items ?? [];
+    return items
+      .filter(
+        (item) =>
+          selectedIds.has(item.id) &&
+          isGitRepositorySource(item.sourceType, item.sourceTypeName)
+      )
+      .map((item) => item.id);
+  }, [data, selectedIds]);
+
   const handleBatchSync = async () => {
     if (selectedIds.size === 0) {
-      toast.warning(t('admin.repositories.selectFirst'));
+      toast.warning(t("admin.repositories.selectFirst"));
       return;
     }
     if (selectedGitRepoIds.length === 0) {
-      toast.warning(t('admin.repositories.syncStatsNotSupported'));
+      toast.warning(t("admin.repositories.syncStatsNotSupported"));
       return;
     }
     setBatchSyncing(true);
@@ -215,15 +255,20 @@ export default function AdminRepositoriesPage() {
       const result = await batchSyncRepositoryStats(selectedGitRepoIds);
       if (selectedGitRepoIds.length < selectedIds.size) {
         toast.warning(
-          t('admin.repositories.batchSyncSkippedNonGit', {
+          t("admin.repositories.batchSyncSkippedNonGit", {
             count: selectedIds.size - selectedGitRepoIds.length,
           })
         );
       }
-      toast.success(t('admin.repositories.batchSyncResult', { success: result.successCount, failed: result.failedCount }));
+      toast.success(
+        t("admin.repositories.batchSyncResult", {
+          success: result.successCount,
+          failed: result.failedCount,
+        })
+      );
       fetchData();
     } catch {
-      toast.error(t('admin.toast.syncFailed'));
+      toast.error(t("admin.toast.syncFailed"));
     } finally {
       setBatchSyncing(false);
     }
@@ -233,11 +278,16 @@ export default function AdminRepositoriesPage() {
     setBatchDeleting(true);
     try {
       const result = await batchDeleteRepositories(Array.from(selectedIds));
-      toast.success(t('admin.repositories.batchDeleteResult', { success: result.successCount, failed: result.failedCount }));
+      toast.success(
+        t("admin.repositories.batchDeleteResult", {
+          success: result.successCount,
+          failed: result.failedCount,
+        })
+      );
       setShowBatchDeleteConfirm(false);
       fetchData();
     } catch {
-      toast.error(t('admin.toast.deleteFailed'));
+      toast.error(t("admin.toast.deleteFailed"));
     } finally {
       setBatchDeleting(false);
     }
@@ -262,438 +312,339 @@ export default function AdminRepositoriesPage() {
     setSelectedIds(newSet);
   };
 
-  const totalPages = data ? Math.ceil(data.total / data.pageSize) : 0;
-  const allSelected = data && data.items.length > 0 && selectedIds.size === data.items.length;
+  const allSelected =
+    data && data.items.length > 0 && selectedIds.size === data.items.length;
   const someSelected = selectedIds.size > 0 && !allSelected;
-  const selectedGitRepoIds = useMemo(() => {
-    const items = data?.items ?? [];
-    return items
-      .filter((item) => selectedIds.has(item.id) && isGitRepositorySource(item.sourceType, item.sourceTypeName))
-      .map((item) => item.id);
-  }, [data, selectedIds]);
-  const overview = useMemo(() => {
-    const items = data?.items ?? [];
-    const pageCount = items.length;
-    const completedCount = items.filter((item) => item.status === 2).length;
-    const processingCount = items.filter((item) => item.status === 1).length;
-    const failedCount = items.filter((item) => item.status === 3).length;
-    const publicCount = items.filter((item) => item.isPublic).length;
+  const isEmpty = !loading && (data?.items.length ?? 0) === 0;
 
-    return {
-      pageCount,
-      completedCount,
-      processingCount,
-      failedCount,
-      pendingCount: items.filter((item) => item.status === 0).length,
-      completedRate: pageCount > 0 ? Math.round((completedCount / pageCount) * 100) : 0,
-      publicRate: pageCount > 0 ? Math.round((publicCount / pageCount) * 100) : 0,
-      selectedRate: pageCount > 0 ? Math.round((selectedIds.size / pageCount) * 100) : 0,
-    };
-  }, [data, selectedIds.size]);
-
-  const statusSegments = useMemo(() => {
-    const total = overview.pageCount || 1;
-    const segments = [
-      { status: 0, label: statusLabels[0], count: overview.pendingCount },
-      { status: 1, label: statusLabels[1], count: overview.processingCount },
-      { status: 2, label: statusLabels[2], count: overview.completedCount },
-      { status: 3, label: statusLabels[3], count: overview.failedCount },
-    ];
-    return segments.map((segment) => ({
-      ...segment,
-      percent: Math.round((segment.count / total) * 100),
-    }));
-  }, [overview, statusLabels]);
-
-  return (
-    <div className="space-y-6 animate-in fade-in-0 duration-500">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">{t('admin.repositories.title')}</h1>
-        <div className="flex items-center gap-2">
-          <Button onClick={() => setIsSubmitDialogOpen(true)} className="transition-all duration-200 hover:-translate-y-0.5">
-            <Plus className="mr-2 h-4 w-4" />
-            {t('home.repository.submitTitle')}
-          </Button>
-          <Button variant="outline" onClick={fetchData} disabled={loading} className="transition-all duration-200 hover:-translate-y-0.5">
-            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            {t('admin.common.refresh')}
-          </Button>
-        </div>
+  const toolbar = (
+    <>
+      <div className="relative min-w-[220px] flex-1 sm:max-w-xs">
+        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder={t("admin.repositories.searchPlaceholder")}
+          value={searchInput}
+          onChange={(e) => handleSearchInput(e.target.value)}
+          className="h-9 pl-8"
+        />
       </div>
+      <Select
+        value={status}
+        onValueChange={(v) => {
+          setStatus(v);
+          setPage(1);
+        }}
+      >
+        <SelectTrigger size="sm" className="h-9 w-[150px]">
+          <SlidersHorizontal className="mr-1 h-3.5 w-3.5 text-muted-foreground" />
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {statusOptions.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-      {/* 搜索和筛选 */}
-      <Card className="p-4 transition-all duration-300 hover:shadow-sm">
-        <div className="flex flex-wrap gap-4">
-          <div className="flex flex-1 gap-2">
-            <Input
-              placeholder={t('admin.repositories.searchPlaceholder')}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="max-w-md"
-            />
-            <Button onClick={handleSearch} className="transition-all duration-200">
-              <Search className="mr-2 h-4 w-4" />
-              {t('admin.common.search')}
-            </Button>
-          </div>
-          <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </Card>
-
-      <Card className="p-4 transition-all duration-300 hover:shadow-sm">
-        <div className="grid gap-3 md:grid-cols-3">
-          <Card className="p-3">
-            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span>{t("admin.repositories.pageCompletionRate")}</span>
-              <span>{overview.completedRate}%</span>
-            </div>
-            <Progress value={overview.completedRate} className="h-2.5" />
-            <p className="mt-2 text-xs text-muted-foreground">
-              {t("admin.repositories.completedOfTotal", {
-                completed: overview.completedCount,
-                total: overview.pageCount,
-                processing: overview.processingCount,
-              })}
-            </p>
-          </Card>
-          <Card className="p-3">
-            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span>{t("admin.repositories.publicRepoRatio")}</span>
-              <span>{overview.publicRate}%</span>
-            </div>
-            <Progress value={overview.publicRate} className="h-2.5" />
-            <p className="mt-2 text-xs text-muted-foreground">
-              {t("admin.repositories.failedPrioritize", { count: overview.failedCount })}
-            </p>
-          </Card>
-          <Card className="p-3">
-            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span>{t("admin.repositories.pageSelectionRatio")}</span>
-              <span>{overview.selectedRate}%</span>
-            </div>
-            <Progress value={overview.selectedRate} className="h-2.5" />
-            <p className="mt-2 text-xs text-muted-foreground">
-              {t("admin.repositories.selectedForBatch", { count: selectedIds.size })}
-            </p>
-          </Card>
-        </div>
-      </Card>
-
-      <Card className="p-4 transition-all duration-300 hover:shadow-sm">
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-semibold">{t("admin.repositories.statusDistribution")}</p>
-            <Badge variant="outline">{t("admin.repositories.totalItems", { count: overview.pageCount })}</Badge>
-          </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-            <div className="flex h-full w-full">
-              {statusSegments.map((segment) => (
-                <div
-                  key={segment.status}
-                  className={`h-full transition-all duration-500 ${statusBarColors[segment.status]}`}
-                  style={{ width: `${segment.percent}%` }}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {statusSegments.map((segment) => (
-              <Badge key={segment.status} variant="secondary" className="gap-1">
-                <span className={`inline-block h-2 w-2 rounded-full ${statusBarColors[segment.status]}`} />
-                {segment.label} {segment.count}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      </Card>
-
-      {/* 批量操作栏 */}
       {selectedIds.size > 0 && (
-        <Card className="p-3 bg-muted/50 animate-in fade-in-0 slide-in-from-top-1 duration-200">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">
-              {t('admin.repositories.selectedCount', { count: selectedIds.size })}
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleBatchSync}
-                disabled={batchSyncing}
-                className="transition-all duration-200"
-              >
-                {batchSyncing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                )}
-                {t('admin.repositories.batchSync')}
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowBatchDeleteConfirm(true)}
-                className="transition-all duration-200"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {t('admin.repositories.batchDelete')}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedIds(new Set())}
-                className="transition-all duration-200"
-              >
-                {t('admin.repositories.cancelSelect')}
-              </Button>
-            </div>
-          </div>
-        </Card>
+        <div className="flex items-center gap-2 rounded-md border bg-background px-2.5 py-1.5">
+          <span className="text-xs text-muted-foreground">
+            {t("admin.repositories.selectedCount", { count: selectedIds.size })}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7"
+            onClick={handleBatchSync}
+            disabled={batchSyncing}
+          >
+            {batchSyncing ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RotateCcw className="mr-1 h-3.5 w-3.5" />
+            )}
+            {t("admin.repositories.batchSync")}
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="h-7"
+            onClick={() => setShowBatchDeleteConfirm(true)}
+          >
+            <Trash2 className="mr-1 h-3.5 w-3.5" />
+            {t("admin.repositories.batchDelete")}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            {t("admin.repositories.cancelSelect")}
+          </Button>
+        </div>
       )}
 
-      {/* 仓库列表 */}
-      <Card className="transition-all duration-300 hover:shadow-sm">
-        {loading ? (
-          <div className="flex h-64 items-center justify-center animate-in fade-in-0 duration-200">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-3 text-left">
-                      <Checkbox
-                        checked={allSelected ? true : someSelected ? "indeterminate" : false}
-                        onCheckedChange={toggleSelectAll}
-                        aria-label={t('admin.common.selectAll')}
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.repositories.repository')}</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.repositories.visibility')}</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.repositories.status')}</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.repositories.statistics')}</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium">{t('admin.repositories.createdAt')}</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium">{t('admin.repositories.operations')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {data?.items.length ? (
-                    data.items.map((repo, index) => (
-                      <tr
-                        key={repo.id}
-                        className={`animate-in fade-in-0 slide-in-from-bottom-1 transition-colors duration-200 hover:bg-muted/50 ${
-                          selectedIds.has(repo.id) ? "bg-muted/30" : ""
-                        }`}
-                        style={{ animationDelay: `${Math.min(index * 25, 220)}ms` }}
-                      >
-                        <td className="px-4 py-3">
-                          <Checkbox
-                            checked={selectedIds.has(repo.id)}
-                            onCheckedChange={() => toggleSelect(repo.id)}
-                            aria-label={`Select ${repo.repoName}`}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div>
-                            <button
-                              type="button"
-                              className="font-medium text-left transition-all duration-200 hover:text-primary hover:underline underline-offset-4"
-                              onClick={() => router.push(`/${repo.id}`)}
-                              title={t("admin.repositories.manageRepo")}
-                            >
-                              {repo.orgName}/{repo.repoName}
-                            </button>
-                            <p className="text-sm text-muted-foreground truncate max-w-xs">
-                              {repo.sourceLocation || repo.gitUrl}
-                            </p>
-                            <p className="mt-1">
-                              <span className="inline-flex rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">
-                                {t(`admin.repositories.${getRepositorySourceTypeLabelKey(repo.sourceType, repo.sourceTypeName)}`)}
-                              </span>
-                            </p>
-                            {(repo.branchGenerationActiveCount > 0 || repo.branchGenerationFailedCount > 0) && (
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {repo.branchGenerationActiveCount > 0 && (
-                                  <Badge variant="secondary" className="gap-1">
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                    branch running {repo.branchGenerationActiveCount}
-                                  </Badge>
-                                )}
-                                {repo.branchGenerationFailedCount > 0 && (
-                                  <Badge variant="destructive" className="gap-1">
-                                    <AlertTriangle className="h-3 w-3" />
-                                    branch failed {repo.branchGenerationFailedCount}
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {repo.isPublic ? (
-                            <span className="inline-flex items-center gap-1 text-green-600">
-                              <Globe className="h-4 w-4" /> {t('admin.repositories.public')}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-gray-500">
-                              <Lock className="h-4 w-4" /> {t('admin.repositories.private')}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={statusUpdatingId === repo.id}
-                                className="h-8 w-[124px] justify-between px-2 transition-all duration-200"
-                              >
-                                <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs ${statusColors[repo.status]}`}>
-                                  <span className="h-1.5 w-1.5 rounded-full bg-current/80" />
-                                  {statusLabels[repo.status]}
-                                </span>
-                                {statusUpdatingId === repo.id ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                                ) : (
-                                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                                )}
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-[160px]">
-                              {[0, 1, 2, 3].map((statusValue) => (
-                                <DropdownMenuItem
-                                  key={statusValue}
-                                  disabled={repo.status === statusValue}
-                                  onClick={() => handleStatusChange(repo.id, statusValue, repo.status)}
-                                  className="justify-between"
-                                >
-                                  <span className="inline-flex items-center gap-2">
-                                    <span className={`h-2 w-2 rounded-full ${statusBarColors[statusValue]}`} />
-                                    {statusLabels[statusValue]}
-                                  </span>
-                                  {repo.status === statusValue ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                            <span className="inline-flex items-center gap-1">
-                              <Star className="h-3.5 w-3.5" />
-                              {repo.starCount}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <GitFork className="h-3.5 w-3.5" />
-                              {repo.forkCount}
-                            </span>
-                            <span className="inline-flex items-center gap-1">
-                              <Eye className="h-3.5 w-3.5" />
-                              {repo.viewCount}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {new Date(repo.createdAt).toLocaleDateString(locale === 'zh' ? 'zh-CN' : locale)}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleSyncStats(repo.id)}
-                              disabled={syncing === repo.id || !isGitRepositorySource(repo.sourceType, repo.sourceTypeName)}
-                              title={isGitRepositorySource(repo.sourceType, repo.sourceTypeName) ? t('admin.repositories.syncStats') : t('admin.repositories.syncStatsNotSupported')}
-                              className="transition-all duration-200 hover:-translate-y-0.5"
-                            >
-                              {syncing === repo.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <RotateCcw className="h-4 w-4" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setSelectedRepo(repo)}
-                              title={t('admin.repositories.viewDetail')}
-                              className="transition-all duration-200 hover:-translate-y-0.5"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeleteId(repo.id)}
-                              title={t('admin.common.delete')}
-                              className="transition-all duration-200 hover:-translate-y-0.5"
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-16 text-center text-sm text-muted-foreground animate-in fade-in-0 duration-200">
-                        {t("admin.repositories.noReposForFilter")}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+      <div className="ml-auto">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={fetchData}
+          disabled={loading}
+          title={t("admin.common.refresh")}
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+        </Button>
+      </div>
+    </>
+  );
 
-            {/* 分页 */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t px-4 py-3">
-                <p className="text-sm text-muted-foreground">
-                  {t('admin.repositories.totalRecords', { count: data?.total })}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === 1}
-                    onClick={() => setPage(page - 1)}
-                    className="transition-all duration-200"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm">
-                    {page} / {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === totalPages}
-                    onClick={() => setPage(page + 1)}
-                    className="transition-all duration-200"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </Card>
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title={t("admin.repositories.title")}
+        actions={
+          <Button onClick={() => setIsSubmitDialogOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            {t("home.repository.submitTitle")}
+          </Button>
+        }
+      />
+
+      <DataTableShell
+        toolbar={toolbar}
+        loading={loading}
+        empty={isEmpty}
+        emptyTitle={t("admin.repositories.noReposForFilter")}
+        footer={
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            total={data?.total ?? 0}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        }
+      >
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="w-10 pl-4">
+                <Checkbox
+                  checked={
+                    allSelected ? true : someSelected ? "indeterminate" : false
+                  }
+                  onCheckedChange={toggleSelectAll}
+                  aria-label={t("admin.common.selectAll")}
+                />
+              </TableHead>
+              <TableHead>{t("admin.repositories.repository")}</TableHead>
+              <TableHead>{t("admin.repositories.visibility")}</TableHead>
+              <TableHead>{t("admin.repositories.status")}</TableHead>
+              <TableHead>{t("admin.repositories.statistics")}</TableHead>
+              <TableHead>{t("admin.repositories.createdAt")}</TableHead>
+              <TableHead className="pr-4 text-right">
+                {t("admin.repositories.operations")}
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {data?.items.map((repo) => (
+              <TableRow
+                key={repo.id}
+                data-state={selectedIds.has(repo.id) ? "selected" : undefined}
+              >
+                <TableCell className="pl-4">
+                  <Checkbox
+                    checked={selectedIds.has(repo.id)}
+                    onCheckedChange={() => toggleSelect(repo.id)}
+                    aria-label={`Select ${repo.repoName}`}
+                  />
+                </TableCell>
+                <TableCell>
+                  <div className="min-w-0 max-w-md">
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/admin/repositories/${repo.id}`}
+                        className="truncate font-medium underline-offset-4 hover:text-primary hover:underline"
+                        title={t("admin.repositories.manageRepo")}
+                      >
+                        {repo.orgName}/{repo.repoName}
+                      </Link>
+                      <Badge
+                        variant="secondary"
+                        className="shrink-0 px-1.5 py-0 text-[10px] font-normal text-muted-foreground"
+                      >
+                        {t(
+                          `admin.repositories.${getRepositorySourceTypeLabelKey(repo.sourceType, repo.sourceTypeName)}`
+                        )}
+                      </Badge>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {repo.sourceLocation || repo.gitUrl}
+                    </p>
+                    {(repo.branchGenerationActiveCount > 0 ||
+                      repo.branchGenerationFailedCount > 0) && (
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {repo.branchGenerationActiveCount > 0 && (
+                          <Badge variant="secondary" className="gap-1 text-[10px]">
+                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                            branch running {repo.branchGenerationActiveCount}
+                          </Badge>
+                        )}
+                        {repo.branchGenerationFailedCount > 0 && (
+                          <Badge variant="destructive" className="gap-1 text-[10px]">
+                            <AlertTriangle className="h-2.5 w-2.5" />
+                            branch failed {repo.branchGenerationFailedCount}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {repo.isPublic ? (
+                    <span className="inline-flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400">
+                      <Globe className="h-3.5 w-3.5" />
+                      {t("admin.repositories.public")}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                      <Lock className="h-3.5 w-3.5" />
+                      {t("admin.repositories.private")}
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={statusUpdatingId === repo.id}
+                        className="group inline-flex items-center gap-1 rounded-md outline-none disabled:opacity-60"
+                      >
+                        <RepoStatusBadge status={repo.status} />
+                        {statusUpdatingId === repo.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                        )}
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-[170px]">
+                      <DropdownMenuLabel className="text-xs text-muted-foreground">
+                        {t("admin.repositories.status")}
+                      </DropdownMenuLabel>
+                      {[0, 1, 2, 3].map((statusValue) => (
+                        <DropdownMenuItem
+                          key={statusValue}
+                          disabled={repo.status === statusValue}
+                          onClick={() =>
+                            handleStatusChange(repo.id, statusValue, repo.status)
+                          }
+                          className="justify-between"
+                        >
+                          <StatusBadge
+                            tone={REPO_STATUS_TONE[statusValue]}
+                            label={statusLabels[statusValue]}
+                            className="border-transparent bg-transparent px-0"
+                          />
+                          {repo.status === statusValue ? (
+                            <Check className="h-3.5 w-3.5 text-primary" />
+                          ) : null}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground tabular-nums">
+                    <span className="inline-flex items-center gap-1">
+                      <Star className="h-3.5 w-3.5" />
+                      {repo.starCount}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <GitFork className="h-3.5 w-3.5" />
+                      {repo.forkCount}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Eye className="h-3.5 w-3.5" />
+                      {repo.viewCount}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                  {new Date(repo.createdAt).toLocaleDateString(dateLocale)}
+                </TableCell>
+                <TableCell className="pr-4 text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                    >
+                      <Link
+                        href={`/admin/repositories/${repo.id}`}
+                        title={t("admin.repositories.manageRepo")}
+                      >
+                        <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                        {t("admin.repositories.manageRepo")}
+                      </Link>
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-[180px]">
+                        <DropdownMenuItem
+                          onClick={() => setSelectedRepo(repo)}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          {t("admin.repositories.viewDetail")}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={
+                            syncing === repo.id ||
+                            !isGitRepositorySource(
+                              repo.sourceType,
+                              repo.sourceTypeName
+                            )
+                          }
+                          onClick={() => handleSyncStats(repo.id)}
+                        >
+                          {syncing === repo.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                          )}
+                          {t("admin.repositories.syncStats")}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => setDeleteId(repo.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          {t("admin.common.delete")}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </DataTableShell>
 
       <Dialog open={isSubmitDialogOpen} onOpenChange={setIsSubmitDialogOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
@@ -701,63 +652,83 @@ export default function AdminRepositoriesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 详情对话框 */}
+      {/* 快速预览对话框 */}
       <Dialog open={!!selectedRepo} onOpenChange={() => setSelectedRepo(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('admin.repositories.repoDetail')}</DialogTitle>
+            <DialogTitle>{t("admin.repositories.repoDetail")}</DialogTitle>
           </DialogHeader>
           {selectedRepo && (
             <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">{t('admin.repositories.repoName')}</label>
-                <p>{selectedRepo.orgName}/{selectedRepo.repoName}</p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">
+                    {selectedRepo.orgName}/{selectedRepo.repoName}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {selectedRepo.sourceLocation || selectedRepo.gitUrl}
+                  </p>
+                </div>
+                <RepoStatusBadge status={selectedRepo.status} />
               </div>
-              <div>
-                <label className="text-sm font-medium">{t('admin.repositories.sourceType')}</label>
-                <p>{t(`admin.repositories.${getRepositorySourceTypeLabelKey(selectedRepo.sourceType, selectedRepo.sourceTypeName)}`)}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium">{t('admin.repositories.sourceLocation')}</label>
-                <p className="text-sm text-muted-foreground break-all">{selectedRepo.sourceLocation || selectedRepo.gitUrl}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium">{t('admin.repositories.status')}</label>
-                  <p>{statusLabels[selectedRepo.status]}</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-md border p-3">
+                  <p className="text-xs text-muted-foreground">
+                    {t("admin.repositories.sourceType")}
+                  </p>
+                  <p className="mt-1 font-medium">
+                    {t(
+                      `admin.repositories.${getRepositorySourceTypeLabelKey(selectedRepo.sourceType, selectedRepo.sourceTypeName)}`
+                    )}
+                  </p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium">{t('admin.repositories.visibility')}</label>
-                  <p>{selectedRepo.isPublic ? t('admin.repositories.public') : t('admin.repositories.private')}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-4 gap-4">
-                <div>
-                  <label className="text-sm font-medium">{t('admin.repositories.star')}</label>
-                  <p>{selectedRepo.starCount}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">{t('admin.repositories.fork')}</label>
-                  <p>{selectedRepo.forkCount}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">{t('admin.repositories.bookmark')}</label>
-                  <p>{selectedRepo.bookmarkCount}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium">{t('admin.repositories.view')}</label>
-                  <p>{selectedRepo.viewCount}</p>
+                <div className="rounded-md border p-3">
+                  <p className="text-xs text-muted-foreground">
+                    {t("admin.repositories.visibility")}
+                  </p>
+                  <p className="mt-1 font-medium">
+                    {selectedRepo.isPublic
+                      ? t("admin.repositories.public")
+                      : t("admin.repositories.private")}
+                  </p>
                 </div>
               </div>
-              <div>
-                <label className="text-sm font-medium">{t('admin.repositories.createdAt')}</label>
-                <p>{new Date(selectedRepo.createdAt).toLocaleString(locale === 'zh' ? 'zh-CN' : locale)}</p>
+              <div className="grid grid-cols-4 gap-3">
+                {(
+                  [
+                    ["star", selectedRepo.starCount],
+                    ["fork", selectedRepo.forkCount],
+                    ["bookmark", selectedRepo.bookmarkCount],
+                    ["view", selectedRepo.viewCount],
+                  ] as const
+                ).map(([key, count]) => (
+                  <div key={key} className="rounded-md border p-3 text-center">
+                    <p className="text-lg font-semibold tabular-nums">
+                      {count}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {t(`admin.repositories.${key}`)}
+                    </p>
+                  </div>
+                ))}
               </div>
+              <p className="text-xs text-muted-foreground">
+                {t("admin.repositories.createdAt")}:{" "}
+                {new Date(selectedRepo.createdAt).toLocaleString(dateLocale)}
+              </p>
             </div>
           )}
           <DialogFooter>
+            {selectedRepo && (
+              <Button asChild variant="default">
+                <Link href={`/admin/repositories/${selectedRepo.id}`}>
+                  <ExternalLink className="mr-1.5 h-4 w-4" />
+                  {t("admin.repositories.manageRepo")}
+                </Link>
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setSelectedRepo(null)}>
-              {t('admin.common.close')}
+              {t("admin.common.close")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -767,31 +738,45 @@ export default function AdminRepositoriesPage() {
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('admin.repositories.confirmDelete')}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("admin.repositories.confirmDelete")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {t('admin.repositories.deleteWarning')}
+              {t("admin.repositories.deleteWarning")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t('admin.common.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              {t('admin.common.delete')}
+            <AlertDialogCancel>{t("admin.common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {t("admin.common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* 批量删除确认对话框 */}
-      <AlertDialog open={showBatchDeleteConfirm} onOpenChange={setShowBatchDeleteConfirm}>
+      <AlertDialog
+        open={showBatchDeleteConfirm}
+        onOpenChange={setShowBatchDeleteConfirm}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('admin.repositories.confirmBatchDelete')}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("admin.repositories.confirmBatchDelete")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {t('admin.repositories.batchDeleteWarning', { count: selectedIds.size })}
+              {t("admin.repositories.batchDeleteWarning", {
+                count: selectedIds.size,
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={batchDeleting}>{t('admin.common.cancel')}</AlertDialogCancel>
+            <AlertDialogCancel disabled={batchDeleting}>
+              {t("admin.common.cancel")}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleBatchDelete}
               className="bg-red-600 hover:bg-red-700"
@@ -800,10 +785,10 @@ export default function AdminRepositoriesPage() {
               {batchDeleting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('admin.repositories.deleting')}
+                  {t("admin.repositories.deleting")}
                 </>
               ) : (
-                t('admin.common.confirm')
+                t("admin.common.confirm")
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

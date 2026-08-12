@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
+import { PageHeader } from "@/components/admin/page-header";
 
 const PLATFORM_OPTIONS = [
   { value: "feishu", labelKey: "admin.chatProviders.platformFeishu" },
@@ -371,23 +372,22 @@ export default function AdminChatProvidersPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <MessageSquare className="h-6 w-6" />
-          <h1 className="text-2xl font-bold">{t("admin.chatProviders.title")}</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchData}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            {t("admin.common.refresh")}
-          </Button>
-          <Button onClick={openCreateDialog}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t("admin.chatProviders.create")}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={t("admin.chatProviders.title")}
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchData}>
+              <RefreshCw className="mr-1.5 h-4 w-4" />
+              {t("admin.common.refresh")}
+            </Button>
+            <Button onClick={openCreateDialog}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              {t("admin.chatProviders.create")}
+            </Button>
+          </>
+        }
+      />
 
       {loading ? (
         <div className="flex h-64 items-center justify-center">

@@ -1285,5 +1285,18 @@
       "allModelsDisabled": "All models disabled",
       "bulkModelUpdateFailed": "Failed to batch update model status"
     }
+  },
+  "shared": {
+    "totalItems": "{count} items",
+    "rowsPerPage": "Per page",
+    "noData": "No data",
+    "loading": "Loading..."
+  },
+  "nav": {
+    "overview": "Overview",
+    "content": "Content",
+    "organization": "Organization",
+    "aiConfig": "AI Configuration",
+    "system": "System"
   }
 }

@@ -1,48 +1,6 @@
 {
   "login": "Anmelden",
   "logout": "Abmelden",
-  "profile": "Profil",
-  "settings": "Einstellungen",
-  "theme": "Theme",
-  "language": "Sprache",
-  "save": "Speichern",
-  "cancel": "Abbrechen",
-  "confirm": "Bestätigen",
-  "delete": "Löschen",
-  "edit": "Bearbeiten",
-  "search": "Suchen",
-  "previous": "Zurück",
-  "next": "Weiter",
-  "loading": "Wird geladen...",
-  "error": "Fehler",
-  "success": "Erfolg",
-  "user": "Benutzer",
-  "backToHome": "Zurück zur Startseite",
-  "openMenu": "Menü öffnen",
-  "toggleSidebar": "Seitenleiste umschalten",
-  "close": "Schließen",
-  "submitting": "Wird gesendet...",
-  "submitFailed": "Senden fehlgeschlagen",
-  "pleaseLogin": "Bitte melde dich zuerst an",
-  "adminPanel": "Admin-Panel",
-  "admin": {
-    "dashboard": "Dashboard",
-    "repositories": "Repositories",
-    "tools": "Werkzeuge",
-    "mcps": "MCPs",
-    "skills": "Skills",
-    "models": "Modelle",
-    "roles": "Rollen",
-    "users": "Benutzer",
-    "departments": "Abteilungen",
-    "chatAssistant": "Chat-Assistent",
-    "settings": "Einstellungen",
-    "refresh": "Aktualisieren",
-    "create": "Erstellen",
-    "total": "{count} Einträge",
-    "confirmDelete": "Löschen bestätigen",
-    "deleteWarning": "Diese Aktion kann nicht rückgängig gemacht werden. Bist du sicher?"
-  },
   "profile": {
     "title": "Profil",
     "description": "Verwalte deine persönlichen Informationen",
@@ -86,6 +44,53 @@
     "aboutDescription": "KI-gestützte Code-Wissensdatenbank-Plattform",
     "saveSuccess": "Einstellungen gespeichert",
     "saveFailed": "Einstellungen konnten nicht gespeichert werden"
+  },
+  "theme": {
+    "toggle": "Theme wechseln",
+    "light": "Hell",
+    "dark": "Dunkel",
+    "system": "System"
+  },
+  "language": {
+    "selectLanguage": "Sprache auswählen"
+  },
+  "save": "Speichern",
+  "cancel": "Abbrechen",
+  "confirm": "Bestätigen",
+  "delete": "Löschen",
+  "edit": "Bearbeiten",
+  "search": "Suchen",
+  "previous": "Zurück",
+  "next": "Weiter",
+  "loading": "Wird geladen...",
+  "error": "Fehler",
+  "success": "Erfolg",
+  "user": "Benutzer",
+  "backToHome": "Zurück zur Startseite",
+  "openMenu": "Menü öffnen",
+  "toggleSidebar": "Seitenleiste umschalten",
+  "close": "Schließen",
+  "submitting": "Wird gesendet...",
+  "submitFailed": "Senden fehlgeschlagen",
+  "pleaseLogin": "Bitte melde dich zuerst an",
+  "adminPanel": "Admin-Panel",
+  "admin": {
+    "dashboard": "Dashboard",
+    "repositories": "Repositories",
+    "tools": "Werkzeuge",
+    "mcps": "MCPs",
+    "skills": "Skills",
+    "models": "Modelle",
+    "roles": "Rollen",
+    "users": "Benutzer",
+    "departments": "Abteilungen",
+    "chatAssistant": "Chat-Assistent",
+    "settings": "Einstellungen",
+    "refresh": "Aktualisieren",
+    "create": "Erstellen",
+    "total": "{count} Einträge",
+    "confirmDelete": "Löschen bestätigen",
+    "deleteWarning": "Diese Aktion kann nicht rückgängig gemacht werden. Bist du sicher?"
   },
   "privateRepos": {
     "title": "Private Repositories",
@@ -134,12 +139,6 @@
       "description": "Die angeforderte Seite existiert nicht oder wurde verschoben."
     }
   },
-  "theme": {
-    "toggle": "Theme wechseln",
-    "light": "Hell",
-    "dark": "Dunkel",
-    "system": "System"
-  },
   "branch": {
     "selectBranch": "Branch auswählen"
   },
@@ -156,9 +155,6 @@
     "unknown": "Unbekannt",
     "fetchFailed": "Organisationsdaten konnten nicht abgerufen werden",
     "viewDocs": "Dokumente ansehen"
-  },
-  "language": {
-    "selectLanguage": "Sprache auswählen"
   },
   "sidebar": {
     "title": "Seitenleiste",
@@ -216,5 +212,12 @@
     "pt-BR": "Portugiesisch (Brasilien)",
     "ru": "Russisch",
     "ar": "Arabisch"
+  },
+  "announcement": {
+    "label": "Sponsor-Hinweis",
+    "prefix": "Dieses Open-Source-Projekt wird mit großen Modellen von",
+    "linkText": "https://routin.ai/",
+    "suffix": " gesponsert. RoutinAI bietet günstige DeepSeek-, GPT-Modelle und mehr.",
+    "dismiss": "Hinweis schließen"
   }
 }

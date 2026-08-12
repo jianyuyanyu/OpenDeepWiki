@@ -1,5 +1,6 @@
 {
   "title": "Que veux-tu savoir ?",
+  "subtitle": "Parcourez les dépôts publics, collez un lien ou recherchez par mot-clé.",
   "bookmarks": {
     "pageTitle": "Favoris",
     "pageDescription": "Tes dépôts enregistrés pour un accès rapide",
@@ -200,5 +201,6 @@
       "ja": "Japonais",
       "ko": "Coréen"
     }
-  }
+  },
+  "mcpIntegrationShort": "MCP"
 }

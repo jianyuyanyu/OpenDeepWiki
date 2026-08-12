@@ -176,7 +176,7 @@ export function PublicRepositoryCard({
 
   return (
     <Link href={wikiUrl} className="block h-full">
-      <Card className="h-full min-h-[176px] cursor-pointer overflow-hidden transition-all hover:border-primary/50 hover:shadow-md">
+      <Card className="h-full min-h-[168px] cursor-pointer overflow-hidden border-border/70 bg-card/60 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-500/30 hover:bg-card hover:shadow-[0_10px_30px_-18px_rgba(0,0,0,0.55)]">
         <CardContent className="flex h-full p-4">
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             <div

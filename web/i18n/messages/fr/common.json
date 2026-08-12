@@ -1,48 +1,6 @@
 {
   "login": "Connexion",
   "logout": "Déconnexion",
-  "profile": "Profil",
-  "settings": "Paramètres",
-  "theme": "Thème",
-  "language": "Langue",
-  "save": "Enregistrer",
-  "cancel": "Annuler",
-  "confirm": "Confirmer",
-  "delete": "Supprimer",
-  "edit": "Modifier",
-  "search": "Rechercher",
-  "previous": "Précédent",
-  "next": "Suivant",
-  "loading": "Chargement...",
-  "error": "Erreur",
-  "success": "Succès",
-  "user": "Utilisateur",
-  "backToHome": "Retour à l'accueil",
-  "openMenu": "Ouvrir le menu",
-  "toggleSidebar": "Basculer la barre latérale",
-  "close": "Fermer",
-  "submitting": "Envoi en cours...",
-  "submitFailed": "Échec de l'envoi",
-  "pleaseLogin": "Connecte-toi d'abord",
-  "adminPanel": "Panneau d'administration",
-  "admin": {
-    "dashboard": "Tableau de bord",
-    "repositories": "Dépôts",
-    "tools": "Outils",
-    "mcps": "MCP",
-    "skills": "Compétences",
-    "models": "Modèles",
-    "roles": "Rôles",
-    "users": "Utilisateurs",
-    "departments": "Départements",
-    "chatAssistant": "Assistant de chat",
-    "settings": "Paramètres",
-    "refresh": "Actualiser",
-    "create": "Créer",
-    "total": "{count} enregistrements",
-    "confirmDelete": "Confirmer la suppression",
-    "deleteWarning": "Cette action est irréversible. Es-tu sûr ?"
-  },
   "profile": {
     "title": "Profil",
     "description": "Gère tes informations personnelles",
@@ -86,6 +44,53 @@
     "aboutDescription": "Plateforme de base de connaissances de code propulsée par l'IA",
     "saveSuccess": "Paramètres enregistrés",
     "saveFailed": "Échec de l'enregistrement des paramètres"
+  },
+  "theme": {
+    "toggle": "Changer de thème",
+    "light": "Clair",
+    "dark": "Sombre",
+    "system": "Système"
+  },
+  "language": {
+    "selectLanguage": "Sélectionner la langue"
+  },
+  "save": "Enregistrer",
+  "cancel": "Annuler",
+  "confirm": "Confirmer",
+  "delete": "Supprimer",
+  "edit": "Modifier",
+  "search": "Rechercher",
+  "previous": "Précédent",
+  "next": "Suivant",
+  "loading": "Chargement...",
+  "error": "Erreur",
+  "success": "Succès",
+  "user": "Utilisateur",
+  "backToHome": "Retour à l'accueil",
+  "openMenu": "Ouvrir le menu",
+  "toggleSidebar": "Basculer la barre latérale",
+  "close": "Fermer",
+  "submitting": "Envoi en cours...",
+  "submitFailed": "Échec de l'envoi",
+  "pleaseLogin": "Connecte-toi d'abord",
+  "adminPanel": "Panneau d'administration",
+  "admin": {
+    "dashboard": "Tableau de bord",
+    "repositories": "Dépôts",
+    "tools": "Outils",
+    "mcps": "MCP",
+    "skills": "Compétences",
+    "models": "Modèles",
+    "roles": "Rôles",
+    "users": "Utilisateurs",
+    "departments": "Départements",
+    "chatAssistant": "Assistant de chat",
+    "settings": "Paramètres",
+    "refresh": "Actualiser",
+    "create": "Créer",
+    "total": "{count} enregistrements",
+    "confirmDelete": "Confirmer la suppression",
+    "deleteWarning": "Cette action est irréversible. Es-tu sûr ?"
   },
   "privateRepos": {
     "title": "Dépôts privés",
@@ -134,12 +139,6 @@
       "description": "La page que tu as demandée n'existe pas ou a été déplacée."
     }
   },
-  "theme": {
-    "toggle": "Changer de thème",
-    "light": "Clair",
-    "dark": "Sombre",
-    "system": "Système"
-  },
   "branch": {
     "selectBranch": "Sélectionner une branche"
   },
@@ -156,9 +155,6 @@
     "unknown": "Inconnu",
     "fetchFailed": "Échec de la récupération des données de l'organisation",
     "viewDocs": "Voir la documentation"
-  },
-  "language": {
-    "selectLanguage": "Sélectionner la langue"
   },
   "sidebar": {
     "title": "Barre latérale",
@@ -216,5 +212,12 @@
     "pt-BR": "Portugais (Brésil)",
     "ru": "Russe",
     "ar": "Arabe"
+  },
+  "announcement": {
+    "label": "Annonce de sponsoring",
+    "prefix": "Ce projet open source est sponsorisé en modèles IA par",
+    "linkText": "https://routin.ai/",
+    "suffix": ". RoutinAI propose des modèles DeepSeek, GPT et plus à bas prix.",
+    "dismiss": "Fermer l’annonce"
   }
 }

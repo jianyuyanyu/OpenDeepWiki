@@ -1285,5 +1285,18 @@
       "allModelsDisabled": "Tous les modèles désactivés",
       "bulkModelUpdateFailed": "Échec de la mise à jour en lot du statut des modèles"
     }
+  },
+  "shared": {
+    "totalItems": "{count} éléments",
+    "rowsPerPage": "Par page",
+    "noData": "Aucune donnée",
+    "loading": "Chargement..."
+  },
+  "nav": {
+    "overview": "Aperçu",
+    "content": "Contenu",
+    "organization": "Organisation",
+    "aiConfig": "Configuration IA",
+    "system": "Système"
   }
 }

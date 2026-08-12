@@ -1,5 +1,6 @@
 {
   "title": "O que você quer saber?",
+  "subtitle": "Navegue por repositórios públicos, cole um link ou busque por palavra-chave.",
   "bookmarks": {
     "pageTitle": "Favoritos",
     "pageDescription": "Seus repositórios salvos para acesso rápido",
@@ -200,5 +201,6 @@
       "ja": "Japonês",
       "ko": "Coreano"
     }
-  }
+  },
+  "mcpIntegrationShort": "MCP"
 }

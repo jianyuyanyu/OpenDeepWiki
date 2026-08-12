@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
+import { PageHeader } from "@/components/admin/page-header";
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -155,36 +156,37 @@ export default function AdminSkillsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">{t('admin.skills.title')}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t('admin.skills.subtitle')} <a href="https://agentskills.io" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Agent Skills</a>
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleRefresh}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            {t('admin.skills.refreshFromDisk')}
-          </Button>
-          <Button onClick={handleUploadClick} disabled={uploading}>
-            {uploading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Upload className="mr-2 h-4 w-4" />
-            )}
-            {t('admin.skills.uploadSkill')}
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".zip"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={t('admin.skills.title')}
+        actions={
+          <>
+            <Button variant="outline" onClick={handleRefresh}>
+              <RefreshCw className="mr-1.5 h-4 w-4" />
+              {t('admin.skills.refreshFromDisk')}
+            </Button>
+            <Button onClick={handleUploadClick} disabled={uploading}>
+              {uploading ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <Upload className="mr-1.5 h-4 w-4" />
+              )}
+              {t('admin.skills.uploadSkill')}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".zip"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </>
+        }
+      >
+        <p className="-mt-2 text-sm text-muted-foreground">
+          {t('admin.skills.subtitle')} <a href="https://agentskills.io" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Agent Skills</a>
+        </p>
+      </PageHeader>
 
       {/* 上传提示 */}
       <Card className="p-4 bg-muted/50">

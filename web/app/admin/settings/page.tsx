@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
+import { PageHeader } from "@/components/admin/page-header";
 
 type SettingGroupId = "default" | "aiContent" | "aiCatalog" | "aiTranslation" | "aiRuntime" | "aiOther";
 
@@ -493,28 +494,12 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-md border bg-card p-5">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0 space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={hasChanges ? "default" : "secondary"} className="gap-1.5">
-                {hasChanges ? <AlertCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                {hasChanges
-                  ? t("admin.settings.unsavedState", { count: pendingChangeCount })
-                  : t("admin.settings.savedState")}
-              </Badge>
-              <span className="text-xs text-muted-foreground">{t("admin.settings.saveHint")}</span>
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">{t("admin.settings.title")}</h1>
-              <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                {t("admin.settings.description")}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
+    <div className="space-y-5">
+      <PageHeader
+        title={t("admin.settings.title")}
+        description={t("admin.settings.description")}
+        actions={
+          <>
             <Button variant="outline" onClick={() => fetchData()}>
               <RefreshCw className="h-4 w-4" />
               {t("admin.common.refresh")}
@@ -527,24 +512,34 @@ export default function AdminSettingsPage() {
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {t("admin.settings.saveChanges")}
             </Button>
-          </div>
+          </>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={hasChanges ? "default" : "secondary"} className="gap-1.5">
+            {hasChanges ? <AlertCircle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+            {hasChanges
+              ? t("admin.settings.unsavedState", { count: pendingChangeCount })
+              : t("admin.settings.savedState")}
+          </Badge>
+          <span className="text-xs text-muted-foreground">{t("admin.settings.saveHint")}</span>
         </div>
+      </PageHeader>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-md border bg-background/70 p-3">
-            <p className="text-xs text-muted-foreground">{t("admin.settings.statCategories")}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{categories.length}</p>
-          </div>
-          <div className="rounded-md border bg-background/70 p-3">
-            <p className="text-xs text-muted-foreground">{t("admin.settings.statFields")}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{settings.length}</p>
-          </div>
-          <div className="rounded-md border bg-background/70 p-3">
-            <p className="text-xs text-muted-foreground">{t("admin.settings.changedFields")}</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{pendingChangeCount}</p>
-          </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-border/70 bg-card/70 p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground">{t("admin.settings.statCategories")}</p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{categories.length}</p>
         </div>
-      </section>
+        <div className="rounded-lg border border-border/70 bg-card/70 p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground">{t("admin.settings.statFields")}</p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{settings.length}</p>
+        </div>
+        <div className="rounded-lg border border-border/70 bg-card/70 p-4 shadow-sm">
+          <p className="text-xs text-muted-foreground">{t("admin.settings.changedFields")}</p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{pendingChangeCount}</p>
+        </div>
+      </div>
 
       {!hasSettings ? (
         <section className="flex min-h-[280px] items-center justify-center rounded-md border bg-card p-8">

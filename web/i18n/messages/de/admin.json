@@ -1285,5 +1285,18 @@
       "allModelsDisabled": "Alle Modelle deaktiviert",
       "bulkModelUpdateFailed": "Modellstatus konnte nicht stapelweise aktualisiert werden"
     }
+  },
+  "shared": {
+    "totalItems": "{count} Einträge",
+    "rowsPerPage": "Pro Seite",
+    "noData": "Keine Daten",
+    "loading": "Wird geladen..."
+  },
+  "nav": {
+    "overview": "Übersicht",
+    "content": "Inhalte",
+    "organization": "Organisation",
+    "aiConfig": "KI-Konfiguration",
+    "system": "System"
   }
 }

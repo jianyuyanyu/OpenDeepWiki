@@ -1,5 +1,6 @@
 {
   "title": "Was möchtest du wissen?",
+  "subtitle": "Öffentliche Repositories durchsuchen, Link einfügen oder nach Stichwort suchen.",
   "bookmarks": {
     "pageTitle": "Lesezeichen",
     "pageDescription": "Deine gespeicherten Repositories für schnellen Zugriff",
@@ -200,5 +201,6 @@
       "ja": "Japanisch",
       "ko": "Koreanisch"
     }
-  }
+  },
+  "mcpIntegrationShort": "MCP"
 }

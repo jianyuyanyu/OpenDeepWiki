@@ -42,7 +42,6 @@ import {
   Loader2,
   RefreshCw,
   Save,
-  MessageCircle,
   Bot,
   ChevronRight,
   Wrench,
@@ -51,6 +50,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
+import { PageHeader } from "@/components/admin/page-header";
 
 function getModelDisplayName(model: SelectableModelItem): string {
   return model.modelDisplayName || model.modelName || model.modelId || model.name;
@@ -386,27 +386,26 @@ export default function AdminChatAssistantPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <MessageCircle className="h-6 w-6" />
-          <h1 className="text-2xl font-bold">{t('admin.chatAssistant.title')}</h1>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchData}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            {t('admin.common.refresh')}
-          </Button>
-          <Button onClick={handleSave} disabled={saving || !hasChanges}>
-            {saving ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="mr-2 h-4 w-4" />
-            )}
-            {t('admin.chatAssistant.saveConfig')}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={t('admin.chatAssistant.title')}
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchData}>
+              <RefreshCw className="mr-1.5 h-4 w-4" />
+              {t('admin.common.refresh')}
+            </Button>
+            <Button onClick={handleSave} disabled={saving || !hasChanges}>
+              {saving ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-1.5 h-4 w-4" />
+              )}
+              {t('admin.chatAssistant.saveConfig')}
+            </Button>
+          </>
+        }
+      />
 
       {/* 启用开关 */}
       <Card className="p-6">

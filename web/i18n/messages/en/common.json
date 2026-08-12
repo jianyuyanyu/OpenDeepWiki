@@ -1,48 +1,6 @@
 {
   "login": "Login",
   "logout": "Logout",
-  "profile": "Profile",
-  "settings": "Settings",
-  "theme": "Theme",
-  "language": "Language",
-  "save": "Save",
-  "cancel": "Cancel",
-  "confirm": "Confirm",
-  "delete": "Delete",
-  "edit": "Edit",
-  "search": "Search",
-  "previous": "Previous",
-  "next": "Next",
-  "loading": "Loading...",
-  "error": "Error",
-  "success": "Success",
-  "user": "User",
-  "backToHome": "Back to Home",
-  "openMenu": "Open menu",
-  "toggleSidebar": "Toggle Sidebar",
-  "close": "Close",
-  "submitting": "Submitting...",
-  "submitFailed": "Submit failed",
-  "pleaseLogin": "Please login first",
-  "adminPanel": "Admin Panel",
-  "admin": {
-    "dashboard": "Dashboard",
-    "repositories": "Repositories",
-    "tools": "Tools",
-    "mcps": "MCPs",
-    "skills": "Skills",
-    "models": "Models",
-    "roles": "Roles",
-    "users": "Users",
-    "departments": "Departments",
-    "chatAssistant": "Chat Assistant",
-    "settings": "Settings",
-    "refresh": "Refresh",
-    "create": "Create",
-    "total": "{count} records",
-    "confirmDelete": "Confirm Delete",
-    "deleteWarning": "This action cannot be undone. Are you sure?"
-  },
   "profile": {
     "title": "Profile",
     "description": "Manage your personal information",
@@ -86,6 +44,53 @@
     "aboutDescription": "AI-powered code knowledge base platform",
     "saveSuccess": "Settings saved",
     "saveFailed": "Failed to save settings"
+  },
+  "theme": {
+    "toggle": "Toggle theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "language": {
+    "selectLanguage": "Select language"
+  },
+  "save": "Save",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "delete": "Delete",
+  "edit": "Edit",
+  "search": "Search",
+  "previous": "Previous",
+  "next": "Next",
+  "loading": "Loading...",
+  "error": "Error",
+  "success": "Success",
+  "user": "User",
+  "backToHome": "Back to Home",
+  "openMenu": "Open menu",
+  "toggleSidebar": "Toggle Sidebar",
+  "close": "Close",
+  "submitting": "Submitting...",
+  "submitFailed": "Submit failed",
+  "pleaseLogin": "Please login first",
+  "adminPanel": "Admin Panel",
+  "admin": {
+    "dashboard": "Dashboard",
+    "repositories": "Repositories",
+    "tools": "Tools",
+    "mcps": "MCPs",
+    "skills": "Skills",
+    "models": "Models",
+    "roles": "Roles",
+    "users": "Users",
+    "departments": "Departments",
+    "chatAssistant": "Chat Assistant",
+    "settings": "Settings",
+    "refresh": "Refresh",
+    "create": "Create",
+    "total": "{count} records",
+    "confirmDelete": "Confirm Delete",
+    "deleteWarning": "This action cannot be undone. Are you sure?"
   },
   "privateRepos": {
     "title": "Private Repositories",
@@ -134,12 +139,6 @@
       "description": "The page you requested does not exist or has moved."
     }
   },
-  "theme": {
-    "toggle": "Toggle theme",
-    "light": "Light",
-    "dark": "Dark",
-    "system": "System"
-  },
   "branch": {
     "selectBranch": "Select branch"
   },
@@ -156,9 +155,6 @@
     "unknown": "Unknown",
     "fetchFailed": "Failed to fetch organization data",
     "viewDocs": "View Docs"
-  },
-  "language": {
-    "selectLanguage": "Select language"
   },
   "sidebar": {
     "title": "Sidebar",
@@ -216,5 +212,12 @@
     "pt-BR": "Portuguese (Brazil)",
     "ru": "Russian",
     "ar": "Arabic"
+  },
+  "announcement": {
+    "label": "Sponsorship announcement",
+    "prefix": "This open-source project is sponsored with large models by",
+    "linkText": "https://routin.ai/",
+    "suffix": ". RoutinAI offers affordable DeepSeek, GPT models, and more.",
+    "dismiss": "Dismiss announcement"
   }
 }

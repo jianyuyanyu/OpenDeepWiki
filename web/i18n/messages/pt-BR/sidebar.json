@@ -9,5 +9,9 @@
   "mcp": "Serviços MCP",
   "github": "GitHub",
   "feishu": "Feishu",
-  "scanQrCode": "Escaneie para seguir no Feishu"
+  "scanQrCode": "Escaneie para seguir no Feishu",
+  "groupDiscover": "Descobrir",
+  "groupWorkspace": "Espaço de trabalho",
+  "groupTools": "Ferramentas",
+  "brandTagline": "Base de conhecimento"
 }

@@ -26,7 +26,7 @@ export default function Home() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isIntegrationsOpen, setIsIntegrationsOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
-  const { isScrolled } = useScrollPosition(100);
+  const { isScrolled } = useScrollPosition(80);
 
   const handleSubmitSuccess = useCallback(() => {
     setIsFormOpen(false);
@@ -50,78 +50,88 @@ export default function Home() {
         visible: isScrolled,
       }}
     >
-      <div className="flex flex-1 flex-col p-4">
-        {/* Hero Section with Main Search Box */}
-        <div className="flex flex-col items-center justify-center py-12">
-          <div className="w-full max-w-2xl space-y-8">
-            <h1 className="text-center text-4xl font-medium tracking-tight text-foreground">
-              {t("home.title")}
-            </h1>
-            {/* Main Search Box with fade animation */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <section className="relative overflow-hidden border-b border-border/70">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklab,var(--foreground)_6%,transparent),transparent_58%)]"
+          />
+          <div className="relative mx-auto flex w-full max-w-[1400px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="min-w-0 space-y-1.5">
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  {t("sidebar.explore")}
+                </p>
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-[1.75rem]">
+                  {t("home.title")}
+                </h1>
+                <p className="max-w-xl text-sm text-muted-foreground">
+                  {t("home.subtitle")}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+                  <Button
+                    className="h-9 gap-2 rounded-lg bg-teal-600 px-3.5 text-white hover:bg-teal-500"
+                    onClick={handleAddRepoClick}
+                  >
+                    <Plus className="h-4 w-4" />
+                    {t("home.addPrivateRepo")}
+                  </Button>
+                  <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+                    {user && (
+                      <RepositorySubmitForm onSuccess={handleSubmitSuccess} />
+                    )}
+                  </DialogContent>
+                </Dialog>
+                <Button
+                  variant="outline"
+                  className="h-9 gap-2 rounded-lg border-border/80 bg-background/60"
+                >
+                  <Flame className="h-4 w-4 text-orange-500" />
+                  {t("home.exploreTrending")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="h-9 gap-2 rounded-lg text-muted-foreground hover:text-foreground"
+                  onClick={() => setIsIntegrationsOpen(true)}
+                >
+                  <Puzzle className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t("home.mcpIntegrationShort")}</span>
+                  <span className="sm:hidden">MCP</span>
+                </Button>
+              </div>
+            </div>
+
             <div
               className={cn(
-                "relative transition-all duration-250 ease-in-out",
+                "relative max-w-3xl transition-all duration-250 ease-out",
                 isScrolled
-                  ? "opacity-0 -translate-y-2 pointer-events-none"
-                  : "opacity-100 translate-y-0 pointer-events-auto"
+                  ? "pointer-events-none -translate-y-1 opacity-0"
+                  : "translate-y-0 opacity-100"
               )}
             >
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
-                <Search className="h-5 w-5" />
-              </div>
+              <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 placeholder={t("home.searchPlaceholder")}
                 maxLength={100}
-                className="h-14 rounded-full pl-12 text-lg shadow-sm transition-all hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary/20 bg-secondary/50 border-transparent"
+                className="h-11 rounded-xl border-border/70 bg-background/80 pl-10 text-sm shadow-none transition-[border-color,box-shadow] focus-visible:border-teal-500/40 focus-visible:ring-teal-500/15"
               />
             </div>
-
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                <Button
-                  variant="secondary"
-                  className="gap-2 rounded-full h-10 px-6 bg-teal-500/10 text-teal-500 hover:bg-teal-500/20 hover:text-teal-400 border border-teal-500/20"
-                  onClick={handleAddRepoClick}
-                >
-                  <Plus className="h-4 w-4" />
-                  {t("home.addPrivateRepo")}
-                </Button>
-                <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
-                  {user && (
-                    <RepositorySubmitForm
-                      onSuccess={handleSubmitSuccess}
-                    />
-                  )}
-                </DialogContent>
-              </Dialog>
-              <Button variant="secondary" className="gap-2 rounded-full h-10 px-6 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 hover:text-blue-400 border border-blue-500/20">
-                <Flame className="h-4 w-4" />
-                {t("home.exploreTrending")}
-              </Button>
-            </div>
-            <div className="flex justify-center">
-              <Button
-                variant="ghost"
-                className="gap-2 text-muted-foreground hover:text-foreground"
-                onClick={() => setIsIntegrationsOpen(true)}
-              >
-                <Puzzle className="h-4 w-4" />
-                {t("home.mcpIntegration")}
-              </Button>
-            </div>
-            <IntegrationsDialog
-              open={isIntegrationsOpen}
-              onOpenChange={setIsIntegrationsOpen}
-            />
           </div>
-        </div>
 
-        {/* Public Repository List Section */}
-        <div className="w-full max-w-6xl mx-auto mt-8">
+          <IntegrationsDialog
+            open={isIntegrationsOpen}
+            onOpenChange={setIsIntegrationsOpen}
+          />
+        </section>
+
+        <section className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-5 sm:px-6 lg:px-8">
           <PublicRepositoryList keyword={keyword} />
-        </div>
+        </section>
       </div>
     </AppLayout>
   );

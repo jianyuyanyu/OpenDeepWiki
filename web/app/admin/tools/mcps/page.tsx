@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "@/hooks/use-translations";
+import { PageHeader } from "@/components/admin/page-header";
 
 export default function AdminMcpsPage() {
   const [configs, setConfigs] = useState<McpConfig[]>([]);
@@ -145,20 +146,22 @@ export default function AdminMcpsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t('admin.mcps.title')}</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchData}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            {t('admin.common.refresh')}
-          </Button>
-          <Button onClick={openCreateDialog}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('admin.mcps.createMcp')}
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        title={t('admin.mcps.title')}
+        actions={
+          <>
+            <Button variant="outline" onClick={fetchData}>
+              <RefreshCw className="mr-1.5 h-4 w-4" />
+              {t('admin.common.refresh')}
+            </Button>
+            <Button onClick={openCreateDialog}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              {t('admin.mcps.createMcp')}
+            </Button>
+          </>
+        }
+      />
 
       {/* 配置列表 */}
       {loading ? (

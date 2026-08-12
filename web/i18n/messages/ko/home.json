@@ -11,6 +11,7 @@
     "actionError": "작업에 실패했습니다. 다시 시도하세요"
   },
   "title": "무엇을 알고 싶으신가요?",
+  "subtitle": "공개 저장소를 탐색하고, 링크를 붙여넣거나 키워드로 빠르게 찾으세요.",
   "bookmarks": {
     "pageTitle": "북마크",
     "pageDescription": "저장한 저장소에 빠르게 접근",
@@ -200,5 +201,6 @@
       "expandFolder": "폴더 펼치기",
       "collapseFolder": "폴더 접기"
     }
-  }
+  },
+  "mcpIntegrationShort": "MCP 연동"
 }
