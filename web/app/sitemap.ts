@@ -9,6 +9,21 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 100;
 const MAX_REPOSITORIES = 1000;
 const MAX_URLS = 50000;
+const DEFAULT_SITEMAP_REVALIDATE_SECONDS = 3600;
+
+type SitemapCacheEntry = {
+  urls: MetadataRoute.Sitemap;
+  expiresAt: number;
+};
+
+let sitemapCache: SitemapCacheEntry | null = null;
+let sitemapRefresh: Promise<MetadataRoute.Sitemap> | null = null;
+
+function getSitemapRevalidateMs(): number {
+  const parsed = Number.parseInt(process.env.SITEMAP_REVALIDATE_SECONDS ?? "", 10);
+  const seconds = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_SITEMAP_REVALIDATE_SECONDS;
+  return seconds * 1000;
+}
 
 function collectLeafSlugs(nodes: RepoTreeNode[]): string[] {
   const slugs: string[] = [];
@@ -91,7 +106,7 @@ function addTreeUrls(
   }
 }
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+async function buildSitemapUrls(): Promise<{ urls: MetadataRoute.Sitemap; complete: boolean }> {
   const urls: MetadataRoute.Sitemap = [];
   const knownUrls = new Set<string>();
 
@@ -190,8 +205,50 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       page += 1;
     }
   } catch {
-    return urls;
+    return { urls, complete: false };
   }
 
-  return urls;
+  return { urls, complete: true };
+}
+
+async function refreshSitemap(): Promise<MetadataRoute.Sitemap> {
+  if (sitemapRefresh) {
+    return sitemapRefresh;
+  }
+
+  sitemapRefresh = buildSitemapUrls()
+    .then((result) => {
+      if (result.complete) {
+        sitemapCache = {
+          urls: result.urls,
+          expiresAt: Date.now() + getSitemapRevalidateMs(),
+        };
+      }
+
+      return sitemapCache?.urls ?? result.urls;
+    })
+    .catch(() => sitemapCache?.urls ?? [])
+    .finally(() => {
+      sitemapRefresh = null;
+    });
+
+  return sitemapRefresh;
+}
+
+async function getCachedSitemap(): Promise<MetadataRoute.Sitemap> {
+  const cached = sitemapCache;
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.urls;
+  }
+
+  if (cached) {
+    void refreshSitemap();
+    return cached.urls;
+  }
+
+  return refreshSitemap();
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  return getCachedSitemap();
 }
