@@ -1,8 +1,6 @@
-using System.ComponentModel;
-using System.Net.Http.Json;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
+using ModelContextProtocol.Client;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 
@@ -26,20 +24,23 @@ public interface IMcpToolConverter
 
 /// <summary>
 /// Converts MCP configurations to AI tools that can be used by the chat assistant.
+/// Connects to each configured MCP server as a real MCP client (Streamable HTTP) and
+/// exposes every tool the server advertises, rather than a single opaque wrapper tool.
 /// </summary>
-public class McpToolConverter : IMcpToolConverter
+public class McpToolConverter : IMcpToolConverter, IAsyncDisposable
 {
     private readonly IContext _context;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<McpToolConverter> _logger;
+    private readonly List<McpClient> _clients = new();
 
     public McpToolConverter(
         IContext context,
-        IHttpClientFactory httpClientFactory,
+        ILoggerFactory loggerFactory,
         ILogger<McpToolConverter> logger)
     {
         _context = context;
-        _httpClientFactory = httpClientFactory;
+        _loggerFactory = loggerFactory;
         _logger = logger;
     }
 
@@ -64,13 +65,13 @@ public class McpToolConverter : IMcpToolConverter
         {
             try
             {
-                var tool = CreateMcpTool(config);
-                tools.Add(tool);
-                _logger.LogInformation("Created MCP tool: {Name}", config.Name);
+                var mcpTools = await ConnectAndListToolsAsync(config, cancellationToken);
+                tools.AddRange(mcpTools);
+                _logger.LogInformation("Loaded {Count} tools from MCP server: {Name}", mcpTools.Count, config.Name);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to create MCP tool for config: {Name}", config.Name);
+                _logger.LogError(ex, "Failed to connect to MCP server: {Name}", config.Name);
             }
         }
 
@@ -78,86 +79,48 @@ public class McpToolConverter : IMcpToolConverter
     }
 
     /// <summary>
-    /// Creates an AI tool from an MCP configuration.
+    /// Connects to an MCP server over Streamable HTTP and lists the tools it exposes.
+    /// The connection is kept open for the lifetime of this converter (one chat request)
+    /// so the returned tools remain callable; it is closed in <see cref="DisposeAsync"/>.
     /// </summary>
-    private AITool CreateMcpTool(McpConfig config)
+    private async Task<List<AITool>> ConnectAndListToolsAsync(McpConfig config, CancellationToken cancellationToken)
     {
-        // Create a wrapper function that calls the MCP server
-        var callMcpAsync = async (string input, CancellationToken ct) =>
+        var transportOptions = new HttpClientTransportOptions
         {
-            return await CallMcpServerAsync(config, input, ct);
+            Endpoint = new Uri(config.ServerUrl),
+            Name = config.Name
         };
 
-        // Create the AI function with metadata from the MCP config
-        return AIFunctionFactory.Create(
-            callMcpAsync,
-            new AIFunctionFactoryOptions
+        if (!string.IsNullOrEmpty(config.ApiKey))
+        {
+            transportOptions.AdditionalHeaders = new Dictionary<string, string>
             {
-                Name = SanitizeToolName(config.Name),
-                Description = config.Description ?? $"Call MCP server: {config.Name}"
-            });
+                ["Authorization"] = $"Bearer {config.ApiKey}"
+            };
+        }
+
+        var transport = new HttpClientTransport(transportOptions, _loggerFactory);
+        var client = await McpClient.CreateAsync(transport, loggerFactory: _loggerFactory, cancellationToken: cancellationToken);
+        _clients.Add(client);
+
+        var mcpTools = await client.ListToolsAsync(cancellationToken: cancellationToken);
+        return mcpTools.Cast<AITool>().ToList();
     }
 
-    /// <summary>
-    /// Calls the MCP server with the given input.
-    /// </summary>
-    private async Task<string> CallMcpServerAsync(
-        McpConfig config,
-        string input,
-        CancellationToken cancellationToken)
+    public async ValueTask DisposeAsync()
     {
-        try
+        foreach (var client in _clients)
         {
-            var httpClient = _httpClientFactory.CreateClient();
-            
-            // Set up the request
-            var request = new HttpRequestMessage(HttpMethod.Post, config.ServerUrl);
-            
-            // Add API key if configured
-            if (!string.IsNullOrEmpty(config.ApiKey))
+            try
             {
-                request.Headers.Add("Authorization", $"Bearer {config.ApiKey}");
+                await client.DisposeAsync();
             }
-
-            // Set the request body
-            request.Content = JsonContent.Create(new { input });
-
-            // Send the request
-            var response = await httpClient.SendAsync(request, cancellationToken);
-            
-            if (!response.IsSuccessStatusCode)
+            catch (Exception ex)
             {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("MCP call failed: {StatusCode} - {Error}", response.StatusCode, errorContent);
-                return JsonSerializer.Serialize(new { error = true, message = $"MCP调用失败: {response.StatusCode}" });
+                _logger.LogWarning(ex, "Failed to dispose MCP client");
             }
-
-            var result = await response.Content.ReadAsStringAsync(cancellationToken);
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error calling MCP server: {Name}", config.Name);
-            return JsonSerializer.Serialize(new { error = true, message = $"MCP调用错误: {ex.Message}" });
-        }
-    }
-
-    /// <summary>
-    /// Sanitizes the tool name to be a valid identifier.
-    /// </summary>
-    private static string SanitizeToolName(string name)
-    {
-        // Replace spaces and special characters with underscores
-        var sanitized = new string(name
-            .Select(c => char.IsLetterOrDigit(c) ? c : '_')
-            .ToArray());
-
-        // Ensure it starts with a letter
-        if (sanitized.Length > 0 && !char.IsLetter(sanitized[0]))
-        {
-            sanitized = "Mcp_" + sanitized;
         }
 
-        return sanitized;
+        _clients.Clear();
     }
 }
