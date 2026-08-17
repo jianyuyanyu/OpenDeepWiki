@@ -40,6 +40,10 @@ export default function Home() {
     setIsFormOpen(true);
   }, [user, router]);
 
+  const handleExploreTrendingClick = useCallback(() => {
+    router.push("/recommend?strategy=popular&window=7");
+  }, [router]);
+
   return (
     <AppLayout
       activeItem={activeItem}
@@ -88,6 +92,7 @@ export default function Home() {
                 <Button
                   variant="outline"
                   className="h-9 gap-2 rounded-lg border-border/80 bg-background/60"
+                  onClick={handleExploreTrendingClick}
                 >
                   <Flame className="h-4 w-4 text-orange-500" />
                   {t("home.exploreTrending")}

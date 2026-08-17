@@ -30,6 +30,7 @@ export interface ScoreBreakdown {
   userPreference: number;
   privateRepoLanguage: number;
   collaborative: number;
+  trending: number;
 }
 
 /** 推荐响应 */
@@ -37,6 +38,10 @@ export interface RecommendationResponse {
   items: RecommendedRepository[];
   strategy: string;
   totalCandidates: number;
+  /** 实际生效的时间窗口天数，未启用时为 null */
+  timeWindowDays?: number | null;
+  /** 时间窗口内无数据，已回退到全量排序 */
+  timeWindowFallback?: boolean;
 }
 
 /** 推荐请求参数 */
@@ -45,6 +50,8 @@ export interface RecommendationParams {
   limit?: number;
   strategy?: "default" | "popular" | "personalized" | "explore";
   language?: string;
+  /** 时间窗口天数，例如 7 表示只看最近一周活跃或新增的仓库 */
+  windowDays?: number;
 }
 
 /** 记录活动请求 */
@@ -99,6 +106,7 @@ export async function getRecommendations(
   if (params.limit) searchParams.set("limit", params.limit.toString());
   if (params.strategy) searchParams.set("strategy", params.strategy);
   if (params.language) searchParams.set("language", params.language);
+  if (params.windowDays) searchParams.set("windowDays", params.windowDays.toString());
 
   const queryString = searchParams.toString();
   const path = `/api/v1/recommendations${queryString ? `?${queryString}` : ""}`;
@@ -111,11 +119,13 @@ export async function getRecommendations(
  */
 export async function getPopularRepos(
   limit: number = 20,
-  language?: string
+  language?: string,
+  windowDays?: number
 ): Promise<RecommendationResponse> {
   const searchParams = new URLSearchParams();
   searchParams.set("limit", limit.toString());
   if (language) searchParams.set("language", language);
+  if (windowDays) searchParams.set("windowDays", windowDays.toString());
 
   return api.get<RecommendationResponse>(
     `/api/v1/recommendations/popular?${searchParams.toString()}`

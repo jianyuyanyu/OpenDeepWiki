@@ -57,7 +57,7 @@ public class RecommendationService
         }
 
         var candidates = await candidateQuery.ToListAsync(cancellationToken);
-        var totalCandidates = candidates.Count;
+        var timeWindowDays = NormalizeTimeWindowDays(request.TimeWindowDays);
 
         if (candidates.Count == 0)
         {
@@ -65,18 +65,48 @@ public class RecommendationService
             {
                 Items = new List<RecommendedRepository>(),
                 Strategy = request.Strategy,
-                TotalCandidates = 0
+                TotalCandidates = 0,
+                TimeWindowDays = timeWindowDays
             };
         }
 
-        // 2. 获取用户相关数据（如果有用户ID）
+        // 2. 按时间窗口收敛候选池，并计算窗口内的趋势热度
+        var trendingScores = new Dictionary<string, double>();
+        var timeWindowFallback = false;
+
+        if (timeWindowDays.HasValue)
+        {
+            var since = DateTime.UtcNow.AddDays(-timeWindowDays.Value);
+            trendingScores = await CalculateTrendingScoresAsync(
+                since, candidates.Select(c => c.Id).ToList(), cancellationToken);
+
+            var windowed = candidates
+                .Where(r => trendingScores.ContainsKey(r.Id) || (r.UpdatedAt ?? r.CreatedAt) >= since)
+                .ToList();
+
+            if (windowed.Count > 0)
+            {
+                candidates = windowed;
+                config = ApplyTrendingWeight(config);
+            }
+            else
+            {
+                // 窗口内没有任何活跃或新增数据，回退到全量排序，避免返回空列表
+                trendingScores.Clear();
+                timeWindowFallback = true;
+            }
+        }
+
+        var totalCandidates = candidates.Count;
+
+        // 3. 获取用户相关数据（如果有用户ID）
         UserPreferenceData? userPreference = null;
         if (!string.IsNullOrEmpty(request.UserId))
         {
             userPreference = await GetUserPreferenceDataAsync(request.UserId, cancellationToken);
         }
 
-        // 3. 获取协同过滤数据
+        // 4. 获取协同过滤数据
         var collaborativeScores = new Dictionary<string, double>();
         if (!string.IsNullOrEmpty(request.UserId) && config.CollaborativeWeight > 0)
         {
@@ -84,10 +114,11 @@ public class RecommendationService
                 request.UserId, candidates.Select(c => c.Id).ToList(), cancellationToken);
         }
 
-        // 4. 计算每个仓库的综合得分
+        // 5. 计算每个仓库的综合得分
         var scoredRepos = candidates.Select(repo =>
         {
-            var breakdown = CalculateScoreBreakdown(repo, userPreference, collaborativeScores, config);
+            var breakdown = CalculateScoreBreakdown(
+                repo, userPreference, collaborativeScores, trendingScores);
             var finalScore = CalculateFinalScore(breakdown, config);
 
             return new RecommendedRepository
@@ -105,7 +136,8 @@ public class RecommendationService
                 UpdatedAt = repo.UpdatedAt,
                 Score = finalScore,
                 ScoreBreakdown = breakdown,
-                RecommendReason = GenerateRecommendReason(breakdown, userPreference)
+                RecommendReason = GenerateRecommendReason(
+                    breakdown, userPreference, timeWindowFallback ? null : timeWindowDays)
             };
         })
         .OrderByDescending(r => r.Score)
@@ -116,8 +148,105 @@ public class RecommendationService
         {
             Items = scoredRepos,
             Strategy = request.Strategy,
-            TotalCandidates = totalCandidates
+            TotalCandidates = totalCandidates,
+            TimeWindowDays = timeWindowDays,
+            TimeWindowFallback = timeWindowFallback
         };
+    }
+
+    /// <summary>
+    /// 归一化时间窗口天数，超出范围的输入视为不启用窗口
+    /// </summary>
+    private static int? NormalizeTimeWindowDays(int? days)
+    {
+        if (days is not > 0) return null;
+        return Math.Min(days.Value, 365);
+    }
+
+    /// <summary>
+    /// 启用时间窗口时重新分配权重，让窗口内的趋势热度占据主导
+    /// </summary>
+    private static RecommendationConfig ApplyTrendingWeight(RecommendationConfig config)
+    {
+        const double trendingWeight = 0.50;
+        var scale = 1.0 - trendingWeight;
+
+        return new RecommendationConfig
+        {
+            PopularityWeight = config.PopularityWeight * scale,
+            SubscriptionWeight = config.SubscriptionWeight * scale,
+            TimeDecayWeight = config.TimeDecayWeight * scale,
+            UserPreferenceWeight = config.UserPreferenceWeight * scale,
+            PrivateRepoLanguageWeight = config.PrivateRepoLanguageWeight * scale,
+            CollaborativeWeight = config.CollaborativeWeight * scale,
+            TrendingWeight = trendingWeight
+        };
+    }
+
+    /// <summary>
+    /// 统计时间窗口内的仓库热度
+    /// 数据来源为窗口内新增的用户活动、收藏和订阅，结果归一化到 0-1
+    /// </summary>
+    private async Task<Dictionary<string, double>> CalculateTrendingScoresAsync(
+        DateTime since,
+        List<string> candidateRepoIds,
+        CancellationToken cancellationToken)
+    {
+        const double bookmarkWeight = 3.0;
+        const double subscriptionWeight = 4.0;
+
+        var rawScores = new Dictionary<string, double>();
+
+        var activities = await _context.UserActivities
+            .AsNoTracking()
+            .Where(a => a.CreatedAt >= since
+                        && a.RepositoryId != null
+                        && candidateRepoIds.Contains(a.RepositoryId))
+            .GroupBy(a => a.RepositoryId!)
+            .Select(g => new { RepoId = g.Key, Weight = g.Sum(a => a.Weight) })
+            .ToListAsync(cancellationToken);
+
+        foreach (var item in activities)
+        {
+            rawScores[item.RepoId] = item.Weight;
+        }
+
+        var bookmarks = await _context.UserBookmarks
+            .AsNoTracking()
+            .Where(b => b.CreatedAt >= since && candidateRepoIds.Contains(b.RepositoryId))
+            .GroupBy(b => b.RepositoryId)
+            .Select(g => new { RepoId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        foreach (var item in bookmarks)
+        {
+            rawScores[item.RepoId] = rawScores.GetValueOrDefault(item.RepoId) + item.Count * bookmarkWeight;
+        }
+
+        var subscriptions = await _context.UserSubscriptions
+            .AsNoTracking()
+            .Where(s => s.CreatedAt >= since && candidateRepoIds.Contains(s.RepositoryId))
+            .GroupBy(s => s.RepositoryId)
+            .Select(g => new { RepoId = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        foreach (var item in subscriptions)
+        {
+            rawScores[item.RepoId] = rawScores.GetValueOrDefault(item.RepoId) + item.Count * subscriptionWeight;
+        }
+
+        if (rawScores.Count == 0)
+        {
+            return rawScores;
+        }
+
+        // 使用对数归一化，避免单个高热仓库压制其余结果
+        var normalized = rawScores.ToDictionary(kvp => kvp.Key, kvp => Math.Log10(kvp.Value + 1));
+        var maxScore = normalized.Values.Max();
+
+        return maxScore <= 0
+            ? rawScores.ToDictionary(kvp => kvp.Key, _ => 0.0)
+            : normalized.ToDictionary(kvp => kvp.Key, kvp => kvp.Value / maxScore);
     }
 
 
@@ -262,7 +391,7 @@ public class RecommendationService
         Repository repo,
         UserPreferenceData? userPref,
         Dictionary<string, double> collaborativeScores,
-        RecommendationConfig config)
+        Dictionary<string, double> trendingScores)
     {
         return new ScoreBreakdown
         {
@@ -271,7 +400,8 @@ public class RecommendationService
             TimeDecay = CalculateTimeDecayScore(repo),
             UserPreference = CalculateUserPreferenceScore(repo, userPref),
             PrivateRepoLanguage = CalculatePrivateRepoLanguageScore(repo, userPref),
-            Collaborative = collaborativeScores.GetValueOrDefault(repo.Id, 0.3)
+            Collaborative = collaborativeScores.GetValueOrDefault(repo.Id, 0.3),
+            Trending = trendingScores.GetValueOrDefault(repo.Id, 0.0)
         };
     }
 
@@ -285,16 +415,22 @@ public class RecommendationService
                breakdown.TimeDecay * config.TimeDecayWeight +
                breakdown.UserPreference * config.UserPreferenceWeight +
                breakdown.PrivateRepoLanguage * config.PrivateRepoLanguageWeight +
-               breakdown.Collaborative * config.CollaborativeWeight;
+               breakdown.Collaborative * config.CollaborativeWeight +
+               breakdown.Trending * config.TrendingWeight;
     }
 
     /// <summary>
     /// 生成推荐理由
     /// </summary>
-    private string GenerateRecommendReason(ScoreBreakdown breakdown, UserPreferenceData? userPref)
+    private string GenerateRecommendReason(
+        ScoreBreakdown breakdown,
+        UserPreferenceData? userPref,
+        int? timeWindowDays)
     {
         var reasons = new List<string>();
 
+        if (timeWindowDays.HasValue && breakdown.Trending > 0.5)
+            reasons.Add($"近{timeWindowDays.Value}天热门");
         if (breakdown.Popularity > 0.7)
             reasons.Add("热门项目");
         if (breakdown.Subscription > 0.6)

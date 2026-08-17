@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/app-layout";
 import { useTranslations } from "@/hooks/use-translations";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +35,9 @@ import {
   MoreVertical,
   ThumbsDown,
   Eye,
-  Code2
+  Code2,
+  CalendarRange,
+  Info
 } from "lucide-react";
 import { 
   getRecommendations,
@@ -49,7 +52,20 @@ import { useAuth } from "@/contexts/auth-context";
 import Link from "next/link";
 import { buildRepoBasePath } from "@/lib/repo-route";
 
-type Strategy = "default" | "popular" | "personalized" | "explore";
+const STRATEGIES = ["default", "popular", "personalized", "explore"] as const;
+type Strategy = (typeof STRATEGIES)[number];
+
+/** 时间窗口选项，值为天数，"all" 表示不限时间 */
+const TIME_WINDOWS = ["all", "7", "30", "90"] as const;
+type TimeWindow = (typeof TIME_WINDOWS)[number];
+
+function parseStrategy(value: string | null): Strategy {
+  return STRATEGIES.includes(value as Strategy) ? (value as Strategy) : "default";
+}
+
+function parseTimeWindow(value: string | null): TimeWindow {
+  return TIME_WINDOWS.includes(value as TimeWindow) ? (value as TimeWindow) : "all";
+}
 
 function RepoCardSkeleton() {
   return (
@@ -81,14 +97,39 @@ function RepoCardSkeleton() {
 export default function RecommendPage() {
   const t = useTranslations();
   const { user } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeItem, setActiveItem] = useState(t("sidebar.recommend"));
   const [repos, setRepos] = useState<RecommendedRepository[]>([]);
   const [loading, setLoading] = useState(true);
-  const [strategy, setStrategy] = useState<Strategy>("default");
+  const [strategy, setStrategy] = useState<Strategy>(() =>
+    parseStrategy(searchParams.get("strategy"))
+  );
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>(() =>
+    parseTimeWindow(searchParams.get("window"))
+  );
+  const [timeWindowFallback, setTimeWindowFallback] = useState(false);
   const [totalCandidates, setTotalCandidates] = useState(0);
   const [languages, setLanguages] = useState<LanguageInfo[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
   const [dislikingId, setDislikingId] = useState<string | null>(null);
+
+  // 个性化策略仅对已登录用户可见，未登录时回到默认策略
+  useEffect(() => {
+    if (!user && strategy === "personalized") {
+      setStrategy("default");
+    }
+  }, [user, strategy]);
+
+  // 把当前筛选同步到地址栏，保证链接可分享、可回退
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (strategy !== "default") params.set("strategy", strategy);
+    if (timeWindow !== "all") params.set("window", timeWindow);
+
+    const query = params.toString();
+    router.replace(query ? `/recommend?${query}` : "/recommend", { scroll: false });
+  }, [strategy, timeWindow, router]);
 
   // 获取可用语言列表
   useEffect(() => {
@@ -105,16 +146,18 @@ export default function RecommendPage() {
         limit: 20,
         strategy,
         language: selectedLanguage === "all" ? undefined : selectedLanguage,
+        windowDays: timeWindow === "all" ? undefined : Number(timeWindow),
       };
       const response = await getRecommendations(params);
       setRepos(response.items);
       setTotalCandidates(response.totalCandidates);
+      setTimeWindowFallback(Boolean(response.timeWindowFallback));
     } catch (error) {
       console.error("Failed to fetch recommendations:", error);
     } finally {
       setLoading(false);
     }
-  }, [user?.id, strategy, selectedLanguage]);
+  }, [user?.id, strategy, selectedLanguage, timeWindow]);
 
   useEffect(() => {
     fetchRecommendations();
@@ -188,7 +231,22 @@ export default function RecommendPage() {
                 : t("recommend.subtitle")}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={timeWindow}
+              onValueChange={(v) => setTimeWindow(v as TimeWindow)}
+            >
+              <SelectTrigger className="w-[150px]">
+                <CalendarRange className="h-4 w-4 mr-2" />
+                <SelectValue placeholder={t("recommend.timeWindow.all")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("recommend.timeWindow.all")}</SelectItem>
+                <SelectItem value="7">{t("recommend.timeWindow.week")}</SelectItem>
+                <SelectItem value="30">{t("recommend.timeWindow.month")}</SelectItem>
+                <SelectItem value="90">{t("recommend.timeWindow.quarter")}</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
               <SelectTrigger className="w-[140px]">
                 <Code2 className="h-4 w-4 mr-2" />
@@ -237,6 +295,13 @@ export default function RecommendPage() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        {timeWindow !== "all" && timeWindowFallback && !loading && (
+          <div className="flex items-start gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{t("recommend.timeWindow.fallback")}</span>
+          </div>
+        )}
 
         {loading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

@@ -19,6 +19,13 @@
     "similarUsers": "相似用户推荐",
     "comprehensive": "综合推荐"
   },
+  "timeWindow": {
+    "all": "全部时间",
+    "week": "本周热门",
+    "month": "近 30 天",
+    "quarter": "近 90 天",
+    "fallback": "所选时间段内数据不足，已改为展示全部时间的结果。"
+  },
   "actions": {
     "notInterested": "不感兴趣"
   },

@@ -430,7 +430,7 @@ export function RepositoryList({ ownerId, refreshTrigger }: RepositoryListProps)
               <RepositoryExplorerView
                 repositories={repositories}
                 emptyMessage={t("home.repository.noRepositories")}
-                contentClassName="lg:grid-cols-1 xl:grid-cols-2"
+                contentClassName="md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3"
                   labels={{
                     treeTitle: t("home.repository.tree.title"),
                     allRepositories: t("home.repository.tree.all"),

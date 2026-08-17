@@ -1,16 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { RepositoryItemResponse } from "@/types/repository";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ChevronDown,
   ChevronRight,
   FolderOpen,
   GitBranch,
+  ListTree,
   Search,
 } from "lucide-react";
 
@@ -234,15 +241,17 @@ function TreeRow({
             type="button"
             className="flex h-7 w-5 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 opacity-70 transition-opacity hover:bg-background/60 hover:opacity-100 group-hover:opacity-100"
             onClick={() => onToggle(node.path)}
+            aria-expanded={isExpanded}
             aria-label={
               isExpanded ? labels.collapseFolder : labels.expandFolder
             }
           >
-            {isExpanded ? (
-              <ChevronDown className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronRight className="h-3.5 w-3.5" />
-            )}
+            <ChevronRight
+              className={cn(
+                "h-3.5 w-3.5 transition-transform duration-200 ease-out motion-reduce:transition-none",
+                isExpanded && "rotate-90"
+              )}
+            />
           </button>
         ) : (
           <span className="h-7 w-5 shrink-0" />
@@ -279,21 +288,34 @@ function TreeRow({
         </button>
       </div>
 
-      {hasChildren && isExpanded && (
-        <div className="mt-0.5 space-y-0.5">
-          {childNodes.map((child) => (
-            <TreeRow
-              key={child.path}
-              node={child}
-              depth={depth + 1}
-              selectedPath={selectedPath}
-              expandedPaths={expandedPaths}
-              labels={labels}
-              forceExpand={forceExpand}
-              onSelect={onSelect}
-              onToggle={onToggle}
-            />
-          ))}
+      {hasChildren && (
+        <div
+          aria-hidden={!isExpanded}
+          inert={isExpanded ? undefined : true}
+          className={cn(
+            "grid transition-[grid-template-rows,opacity,transform] duration-200 ease-out motion-reduce:transition-none",
+            isExpanded
+              ? "grid-rows-[1fr] translate-y-0 opacity-100"
+              : "grid-rows-[0fr] -translate-y-1 opacity-0"
+          )}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div className="mt-0.5 space-y-0.5">
+              {childNodes.map((child) => (
+                <TreeRow
+                  key={child.path}
+                  node={child}
+                  depth={depth + 1}
+                  selectedPath={selectedPath}
+                  expandedPaths={expandedPaths}
+                  labels={labels}
+                  forceExpand={forceExpand}
+                  onSelect={onSelect}
+                  onToggle={onToggle}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -317,6 +339,8 @@ export function RepositoryExplorerView({
     () => new Set()
   );
   const [filter, setFilter] = useState("");
+  const [isTreeOpen, setIsTreeOpen] = useState(false);
+  const filterInputRef = useRef<HTMLInputElement>(null);
   const query = filter.trim().toLowerCase();
 
   const effectiveSelectedPath =
@@ -379,6 +403,18 @@ export function RepositoryExplorerView({
     });
   };
 
+  const handleSelect = (path: string) => {
+    setSelectedPath(path);
+    setIsTreeOpen(false);
+  };
+
+  const handleTreeOpenChange = (open: boolean) => {
+    setIsTreeOpen(open);
+    if (!open) {
+      setFilter("");
+    }
+  };
+
   if (repositories.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -389,164 +425,182 @@ export function RepositoryExplorerView({
   }
 
   return (
-    <div
-      className={cn(
-        "grid overflow-hidden rounded-xl border border-border/70 bg-background md:grid-cols-[300px_minmax(0,1fr)]",
-        className
-      )}
-    >
-      <aside className="flex min-h-0 flex-col border-b border-border/70 bg-muted/20 md:border-b-0 md:border-r">
-        <div className="shrink-0 space-y-3 border-b border-border/60 px-3.5 py-3.5">
-          <div className="flex items-end justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                {labels.treeTitle}
-              </p>
-              <p className="mt-1 text-sm font-medium text-foreground">
-                {labels.repositoryCount(repositories.length)}
-              </p>
-            </div>
-          </div>
+    <div className={cn("flex min-w-0 flex-col gap-4", className)}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Popover open={isTreeOpen} onOpenChange={handleTreeOpenChange}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0 gap-1.5 rounded-lg"
+              >
+                <ListTree className="h-4 w-4" />
+                <span className="truncate">{labels.treeTitle}</span>
+                <ChevronDown
+                  className={cn(
+                    "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ease-out motion-reduce:transition-none",
+                    isTreeOpen && "rotate-180"
+                  )}
+                />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              className="w-[min(20rem,calc(100vw-2rem))] overflow-hidden p-0"
+              onOpenAutoFocus={(event) => {
+                event.preventDefault();
+                filterInputRef.current?.focus();
+              }}
+            >
+              <div className="space-y-2.5 border-b border-border/60 px-3 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    {labels.treeTitle}
+                  </p>
+                  <span className="text-[11px] text-muted-foreground">
+                    {labels.repositoryCount(repositories.length)}
+                  </span>
+                </div>
 
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={filter}
-              onChange={(event) => setFilter(event.target.value)}
-              placeholder={labels.filterPlaceholder}
-              className="h-8 rounded-lg border-border/60 bg-background/80 pl-8 text-xs shadow-none focus-visible:border-teal-500/40 focus-visible:ring-teal-500/15"
-            />
-          </div>
-        </div>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    ref={filterInputRef}
+                    value={filter}
+                    onChange={(event) => setFilter(event.target.value)}
+                    placeholder={labels.filterPlaceholder}
+                    className="h-8 rounded-lg border-border/60 bg-background/80 pl-8 text-xs shadow-none focus-visible:border-teal-500/40 focus-visible:ring-teal-500/15"
+                  />
+                </div>
+              </div>
 
-        <ScrollArea className="h-72 md:h-[640px]">
-          <div className="space-y-0.5 p-2 pr-3">
+              <ScrollArea className="h-[min(60vh,420px)]">
+                <div className="space-y-0.5 p-2 pr-3">
+                  <button
+                    type="button"
+                    className={cn(
+                      "relative mb-1 flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] transition-colors",
+                      effectiveSelectedPath === ROOT_PATH
+                        ? "bg-teal-500/10 text-foreground"
+                        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                    )}
+                    onClick={() => handleSelect(ROOT_PATH)}
+                  >
+                    {effectiveSelectedPath === ROOT_PATH && (
+                      <span
+                        aria-hidden
+                        className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-teal-500"
+                      />
+                    )}
+                    <span
+                      className={cn(
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
+                        effectiveSelectedPath === ROOT_PATH
+                          ? "bg-teal-500/20 text-teal-700 dark:text-teal-300"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      <GitBranch className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-medium">
+                      {labels.allRepositories}
+                    </span>
+                    <CountBadge
+                      count={repositories.length}
+                      active={effectiveSelectedPath === ROOT_PATH}
+                    />
+                  </button>
+
+                  {rootChildren.length === 0 ? (
+                    <div className="px-2 py-8 text-center text-xs text-muted-foreground">
+                      {labels.noMatch}
+                    </div>
+                  ) : (
+                    letterGroups.map(([letter, nodes]) => (
+                      <div key={letter} className="pt-1">
+                        <div className="sticky top-0 z-[1] bg-popover px-2 py-1 backdrop-blur-sm">
+                          <span className="text-[10px] font-semibold tracking-[0.16em] text-muted-foreground/80">
+                            {letter}
+                          </span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {nodes.map((node) => (
+                            <TreeRow
+                              key={node.path}
+                              node={node}
+                              depth={0}
+                              selectedPath={effectiveSelectedPath}
+                              expandedPaths={expandedPaths}
+                              labels={labels}
+                              forceExpand={Boolean(query)}
+                              onSelect={handleSelect}
+                              onToggle={handleToggle}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
             <button
               type="button"
-              className={cn(
-                "relative mb-1 flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-2 text-left text-[13px] transition-colors",
-                effectiveSelectedPath === ROOT_PATH
-                  ? "bg-teal-500/10 text-foreground"
-                  : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-              )}
+              className="hover:text-foreground"
               onClick={() => setSelectedPath(ROOT_PATH)}
             >
-              {effectiveSelectedPath === ROOT_PATH && (
-                <span
-                  aria-hidden
-                  className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-teal-500"
-                />
-              )}
-              <span
-                className={cn(
-                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-                  effectiveSelectedPath === ROOT_PATH
-                    ? "bg-teal-500/20 text-teal-700 dark:text-teal-300"
-                    : "bg-muted text-muted-foreground"
-                )}
-              >
-                <GitBranch className="h-3.5 w-3.5" />
-              </span>
-              <span className="min-w-0 flex-1 truncate font-medium">
-                {labels.allRepositories}
-              </span>
-              <CountBadge
-                count={repositories.length}
-                active={effectiveSelectedPath === ROOT_PATH}
-              />
+              {labels.allRepositories}
             </button>
-
-            {rootChildren.length === 0 ? (
-              <div className="px-2 py-8 text-center text-xs text-muted-foreground">
-                {labels.noMatch}
-              </div>
-            ) : (
-              letterGroups.map(([letter, nodes]) => (
-                <div key={letter} className="pt-1">
-                  <div className="sticky top-0 z-[1] bg-muted/20 px-2 py-1 backdrop-blur-sm">
-                    <span className="text-[10px] font-semibold tracking-[0.16em] text-muted-foreground/80">
-                      {letter}
-                    </span>
-                  </div>
-                  <div className="space-y-0.5">
-                    {nodes.map((node) => (
-                      <TreeRow
-                        key={node.path}
-                        node={node}
-                        depth={0}
-                        selectedPath={effectiveSelectedPath}
-                        expandedPaths={expandedPaths}
-                        labels={labels}
-                        forceExpand={Boolean(query)}
-                        onSelect={setSelectedPath}
-                        onToggle={handleToggle}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </ScrollArea>
-      </aside>
-
-      <section className="min-w-0 bg-background p-4 md:p-5">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
-              <button
-                type="button"
-                className="hover:text-foreground"
-                onClick={() => setSelectedPath(ROOT_PATH)}
-              >
-                {labels.allRepositories}
-              </button>
-              {breadcrumbSegments.map((segment, index) => {
-                const path = breadcrumbSegments.slice(0, index + 1).join("/");
-                return (
-                  <span key={path} className="flex min-w-0 items-center gap-1.5">
-                    <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-                    <button
-                      type="button"
-                      className={cn(
-                        "max-w-[160px] truncate hover:text-foreground",
-                        index === breadcrumbSegments.length - 1 &&
-                          "font-medium text-foreground"
-                      )}
-                      onClick={() => setSelectedPath(path)}
-                    >
-                      {segment}
-                    </button>
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-          <div className="text-sm text-muted-foreground">
-            {labels.repositoryCount(selectedRepositories.length)}
+            {breadcrumbSegments.map((segment, index) => {
+              const path = breadcrumbSegments.slice(0, index + 1).join("/");
+              return (
+                <span key={path} className="flex min-w-0 items-center gap-1.5">
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                  <button
+                    type="button"
+                    className={cn(
+                      "max-w-[160px] truncate hover:text-foreground",
+                      index === breadcrumbSegments.length - 1 &&
+                        "font-medium text-foreground"
+                    )}
+                    onClick={() => setSelectedPath(path)}
+                  >
+                    {segment}
+                  </button>
+                </span>
+              );
+            })}
           </div>
         </div>
 
-        {selectedRepositories.length === 0 ? (
-          <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 p-8 text-center">
-            <FolderOpen className="mb-3 h-10 w-10 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">{labels.emptyFolder}</p>
-          </div>
-        ) : (
-          <div
-            className={cn(
-              "grid auto-rows-fr grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3",
-              contentClassName
-            )}
-          >
-            {selectedRepositories.map((repository) => (
-              <div key={repository.id} className="h-full min-w-0">
-                {renderRepository(repository)}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+        <div className="shrink-0 text-sm text-muted-foreground">
+          {labels.repositoryCount(selectedRepositories.length)}
+        </div>
+      </div>
+
+      {selectedRepositories.length === 0 ? (
+        <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border border-dashed bg-muted/20 p-8 text-center">
+          <FolderOpen className="mb-3 h-10 w-10 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">{labels.emptyFolder}</p>
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4",
+            contentClassName
+          )}
+        >
+          {selectedRepositories.map((repository) => (
+            <div key={repository.id} className="h-full min-w-0">
+              {renderRepository(repository)}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

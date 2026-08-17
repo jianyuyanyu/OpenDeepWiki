@@ -34,6 +34,11 @@ public class RecommendationConfig
     /// 协同过滤权重
     /// </summary>
     public double CollaborativeWeight { get; set; } = 0.15;
+
+    /// <summary>
+    /// 时间窗口内的趋势热度权重，仅在指定时间窗口时生效
+    /// </summary>
+    public double TrendingWeight { get; set; } = 0.00;
 }
 
 /// <summary>
@@ -60,6 +65,11 @@ public class RecommendationRequest
     /// 语言过滤（可选）
     /// </summary>
     public string? LanguageFilter { get; set; }
+
+    /// <summary>
+    /// 时间窗口天数（可选），例如 7 表示只看最近一周活跃或新增的仓库
+    /// </summary>
+    public int? TimeWindowDays { get; set; }
 }
 
 /// <summary>
@@ -81,6 +91,16 @@ public class RecommendationResponse
     /// 总候选数量
     /// </summary>
     public int TotalCandidates { get; set; }
+
+    /// <summary>
+    /// 实际生效的时间窗口天数，未启用时为 null
+    /// </summary>
+    public int? TimeWindowDays { get; set; }
+
+    /// <summary>
+    /// 时间窗口内没有任何数据，已回退到全量排序
+    /// </summary>
+    public bool TimeWindowFallback { get; set; }
 }
 
 /// <summary>
@@ -127,6 +147,7 @@ public class ScoreBreakdown
     public double UserPreference { get; set; }
     public double PrivateRepoLanguage { get; set; }
     public double Collaborative { get; set; }
+    public double Trending { get; set; }
 }
 
 /// <summary>

@@ -19,6 +19,13 @@
     "similarUsers": "Recommandé par des utilisateurs similaires",
     "comprehensive": "Recommandé"
   },
+  "timeWindow": {
+    "all": "Toute la période",
+    "week": "Cette semaine",
+    "month": "30 derniers jours",
+    "quarter": "90 derniers jours",
+    "fallback": "Pas assez d'activité sur la période sélectionnée, affichage des résultats sur toute la période."
+  },
   "actions": {
     "notInterested": "Pas intéressé"
   },

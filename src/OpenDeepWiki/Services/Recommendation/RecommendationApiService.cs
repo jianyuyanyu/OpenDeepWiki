@@ -19,6 +19,7 @@ public class RecommendationApiService(RecommendationService recommendationServic
         [FromQuery] string? strategy,
         [FromQuery] string? language,
         [FromQuery] int limit = 20,
+        [FromQuery] int? windowDays = null,
         CancellationToken cancellationToken = default)
     {
         if (limit < 1) limit = 20;
@@ -29,7 +30,8 @@ public class RecommendationApiService(RecommendationService recommendationServic
             UserId = userId,
             Limit = limit,
             Strategy = strategy ?? "default",
-            LanguageFilter = language
+            LanguageFilter = language,
+            TimeWindowDays = windowDays
         };
 
         return await recommendationService.GetRecommendationsAsync(request, cancellationToken);
@@ -42,6 +44,7 @@ public class RecommendationApiService(RecommendationService recommendationServic
     public async Task<RecommendationResponse> GetPopularReposAsync(
         [FromQuery] string? language,
         [FromQuery] int limit = 20,
+        [FromQuery] int? windowDays = null,
         CancellationToken cancellationToken = default)
     {
         if (limit < 1) limit = 20;
@@ -52,7 +55,8 @@ public class RecommendationApiService(RecommendationService recommendationServic
             UserId = null,
             Limit = limit,
             Strategy = "popular",
-            LanguageFilter = language
+            LanguageFilter = language,
+            TimeWindowDays = windowDays
         };
 
         return await recommendationService.GetRecommendationsAsync(request, cancellationToken);

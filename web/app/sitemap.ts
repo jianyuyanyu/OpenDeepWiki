@@ -1,6 +1,6 @@
 ﻿import type { MetadataRoute } from "next";
-import { fetchRepoBranches, fetchRepoTree, fetchRepositoryList } from "@/lib/repository-api";
-import type { RepoTreeNode } from "@/types/repository";
+import { fetchRepoTree, fetchRepositoryList } from "@/lib/repository-api";
+import type { RepoTreeNode, RepositoryItemResponse } from "@/types/repository";
 import { buildRepoBasePath, buildRepoDocPath } from "@/lib/repo-route";
 import { absoluteUrl } from "@/lib/repo-seo";
 
@@ -9,11 +9,19 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 100;
 const MAX_REPOSITORIES = 1000;
 const MAX_URLS = 50000;
+const TREE_CONCURRENCY = 8;
 const DEFAULT_SITEMAP_REVALIDATE_SECONDS = 3600;
 
 type SitemapCacheEntry = {
   urls: MetadataRoute.Sitemap;
   expiresAt: number;
+};
+
+type RepoSitemapSource = {
+  owner: string;
+  repo: string;
+  lastModified: Date;
+  nodes: RepoTreeNode[];
 };
 
 let sitemapCache: SitemapCacheEntry | null = null;
@@ -23,6 +31,26 @@ function getSitemapRevalidateMs(): number {
   const parsed = Number.parseInt(process.env.SITEMAP_REVALIDATE_SECONDS ?? "", 10);
   const seconds = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_SITEMAP_REVALIDATE_SECONDS;
   return seconds * 1000;
+}
+
+async function mapPool<T, R>(items: T[], concurrency: number, mapper: (item: T) => Promise<R>): Promise<R[]> {
+  if (items.length === 0) {
+    return [];
+  }
+
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const current = nextIndex;
+      nextIndex += 1;
+      results[current] = await mapper(items[current]);
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => worker()));
+  return results;
 }
 
 function collectLeafSlugs(nodes: RepoTreeNode[]): string[] {
@@ -41,13 +69,6 @@ function collectLeafSlugs(nodes: RepoTreeNode[]): string[] {
 
   walk(nodes);
   return slugs;
-}
-
-function buildVariantQuery(branch: string, lang: string): string {
-  const params = new URLSearchParams();
-  params.set("branch", branch);
-  params.set("lang", lang);
-  return `?${params.toString()}`;
 }
 
 function escapeXml(value: string): string {
@@ -91,18 +112,35 @@ function addTreeUrls(
   repo: string,
   nodes: RepoTreeNode[],
   lastModified: Date,
-  query = "",
 ) {
   for (const slug of collectLeafSlugs(nodes)) {
     if (urls.length >= MAX_URLS) {
       return;
     }
 
-    addSitemapUrl(urls, knownUrls, `${buildRepoDocPath(owner, repo, slug)}${query}`, {
+    addSitemapUrl(urls, knownUrls, buildRepoDocPath(owner, repo, slug), {
       lastModified,
       changeFrequency: "weekly",
       priority: 0.6,
     });
+  }
+}
+
+async function loadRepoSitemapSource(repo: RepositoryItemResponse): Promise<RepoSitemapSource | null> {
+  try {
+    const tree = await fetchRepoTree(repo.orgName, repo.repoName);
+    if (!tree.exists || tree.statusName !== "Completed" || tree.nodes.length === 0) {
+      return null;
+    }
+
+    return {
+      owner: repo.orgName,
+      repo: repo.repoName,
+      lastModified: new Date(repo.updatedAt ?? repo.createdAt),
+      nodes: tree.nodes,
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -134,72 +172,23 @@ async function buildSitemapUrls(): Promise<{ urls: MetadataRoute.Sitemap; comple
         break;
       }
 
-      for (const repo of response.items) {
-        if (urls.length >= MAX_URLS) {
-          break;
-        }
+      const remaining = Math.min(total, MAX_REPOSITORIES) - processedRepositories;
+      const pageItems = response.items.slice(0, Math.max(remaining, 0));
+      processedRepositories += pageItems.length;
 
-        processedRepositories += 1;
-        const lastModified = new Date(repo.updatedAt ?? repo.createdAt);
+      const sources = await mapPool(pageItems, TREE_CONCURRENCY, loadRepoSitemapSource);
 
-        try {
-          const tree = await fetchRepoTree(repo.orgName, repo.repoName);
-          if (!tree.exists || tree.statusName !== "Completed" || tree.nodes.length === 0) {
-            continue;
-          }
-
-          addSitemapUrl(urls, knownUrls, buildRepoBasePath(repo.orgName, repo.repoName), {
-            lastModified,
-            changeFrequency: "weekly",
-            priority: 0.7,
-          });
-          addTreeUrls(urls, knownUrls, repo.orgName, repo.repoName, tree.nodes, lastModified);
-
-          if (urls.length >= MAX_URLS) {
-            break;
-          }
-
-          const branches = await fetchRepoBranches(repo.orgName, repo.repoName);
-          const defaultBranch = tree.currentBranch || branches.defaultBranch;
-          const defaultLanguage = tree.currentLanguage || branches.defaultLanguage;
-
-          for (const branch of branches.branches) {
-            for (const lang of branch.languages) {
-              if (urls.length >= MAX_URLS) {
-                break;
-              }
-
-              if (branch.name === defaultBranch && lang === defaultLanguage) {
-                continue;
-              }
-
-              try {
-                const variantTree = await fetchRepoTree(repo.orgName, repo.repoName, branch.name, lang);
-                if (!variantTree.exists || variantTree.statusName !== "Completed" || variantTree.nodes.length === 0) {
-                  continue;
-                }
-
-                addTreeUrls(
-                  urls,
-                  knownUrls,
-                  repo.orgName,
-                  repo.repoName,
-                  variantTree.nodes,
-                  lastModified,
-                  buildVariantQuery(branch.name, lang),
-                );
-              } catch {
-                continue;
-              }
-            }
-
-            if (urls.length >= MAX_URLS) {
-              break;
-            }
-          }
-        } catch {
+      for (const source of sources) {
+        if (!source || urls.length >= MAX_URLS) {
           continue;
         }
+
+        addSitemapUrl(urls, knownUrls, buildRepoBasePath(source.owner, source.repo), {
+          lastModified: source.lastModified,
+          changeFrequency: "weekly",
+          priority: 0.7,
+        });
+        addTreeUrls(urls, knownUrls, source.owner, source.repo, source.nodes, source.lastModified);
       }
 
       page += 1;

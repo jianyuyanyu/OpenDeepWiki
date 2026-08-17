@@ -19,6 +19,13 @@
     "similarUsers": "유사 사용자 추천",
     "comprehensive": "추천"
   },
+  "timeWindow": {
+    "all": "전체 기간",
+    "week": "이번 주",
+    "month": "최근 30일",
+    "quarter": "최근 90일",
+    "fallback": "선택한 기간의 데이터가 부족하여 전체 기간 결과를 표시합니다."
+  },
   "actions": {
     "notInterested": "관심 없음"
   },

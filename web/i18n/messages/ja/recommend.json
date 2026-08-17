@@ -19,6 +19,13 @@
     "similarUsers": "類似ユーザーが推奨",
     "comprehensive": "推奨"
   },
+  "timeWindow": {
+    "all": "全期間",
+    "week": "今週",
+    "month": "過去30日",
+    "quarter": "過去90日",
+    "fallback": "選択した期間のデータが不足しているため、全期間の結果を表示しています。"
+  },
   "actions": {
     "notInterested": "興味がない"
   },
