@@ -225,6 +225,26 @@ public class AdminRepositoryService : IAdminRepositoryService
 
         var repositoryIdArray = repositoryIds.Distinct().ToArray();
 
+        var branchLanguageIds = await (
+            from branch in _context.RepositoryBranches
+            where repositoryIdArray.Contains(branch.RepositoryId)
+            join language in _context.BranchLanguages on branch.Id equals language.RepositoryBranchId
+            select language.Id)
+            .Distinct()
+            .ToListAsync();
+
+        if (branchLanguageIds.Count > 0)
+        {
+            var catalogs = await _context.DocCatalogs
+                .Where(catalog => catalog.ParentId != null && branchLanguageIds.Contains(catalog.BranchLanguageId))
+                .ToListAsync();
+
+            foreach (var catalog in catalogs)
+            {
+                catalog.ParentId = null;
+            }
+        }
+
         var tokenUsages = await _context.TokenUsages
             .Where(usage => usage.RepositoryId != null && repositoryIdArray.Contains(usage.RepositoryId))
             .ToListAsync();
