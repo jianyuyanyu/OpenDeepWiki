@@ -31,6 +31,7 @@ const repoMarkdownText = {
     loading: "加载图表中...",
     enlarge: "点击放大查看",
     copyCode: "复制代码",
+    renderError: "Mermaid 图表渲染失败",
   },
   en: {
     zoomOut: "Zoom out",
@@ -41,6 +42,7 @@ const repoMarkdownText = {
     loading: "Loading diagram...",
     enlarge: "Click to enlarge",
     copyCode: "Copy code",
+    renderError: "Mermaid diagram could not be rendered",
   },
   ja: {
     zoomOut: "縮小",
@@ -51,6 +53,7 @@ const repoMarkdownText = {
     loading: "図を読み込み中...",
     enlarge: "クリックで拡大",
     copyCode: "コードをコピー",
+    renderError: "Mermaid 図をレンダリングできませんでした",
   },
   ko: {
     zoomOut: "축소",
@@ -61,6 +64,7 @@ const repoMarkdownText = {
     loading: "다이어그램 불러오는 중...",
     enlarge: "클릭하여 확대",
     copyCode: "코드 복사",
+    renderError: "Mermaid 다이어그램을 렌더링할 수 없습니다",
   },
 } as const;
 
@@ -297,8 +301,16 @@ function MermaidDiagram({ code, isDark, locale }: { code: string; isDark: boolea
   }, [code, isDark, id]);
 
   if (error) {
-    // 渲染失败时显示为普通代码块
-    return <CodeBlock code={code} language="mermaid" isDark={isDark} locale={locale} />;
+    const summary = error.split(/\r?\n/)[0] || error;
+    return (
+      <div className="my-4 not-prose">
+        <div className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          <div className="font-medium">{copy.renderError}</div>
+          <div className="mt-1 font-mono text-xs">{summary}</div>
+        </div>
+        <CodeBlock code={code} language="mermaid" isDark={isDark} locale={locale} />
+      </div>
+    );
   }
 
   if (!svg) {
