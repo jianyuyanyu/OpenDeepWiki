@@ -34,6 +34,19 @@ public class MindMapWorker : BackgroundService
         _logger.LogInformation("MindMap worker started. Polling interval: {PollingInterval}s",
             PollingInterval.TotalSeconds);
 
+        try
+        {
+            await RecoverOrphanedProcessingAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to recover orphaned Processing mindmap records");
+        }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -56,6 +69,43 @@ public class MindMapWorker : BackgroundService
         _logger.LogInformation("MindMap worker stopped");
     }
 
+    /// <summary>
+    /// Resets BranchLanguage rows stuck in <see cref="MindMapStatus.Processing"/>
+    /// back to <see cref="MindMapStatus.Pending"/>. This runs once at startup so
+    /// records that were mid-processing when the previous worker instance crashed
+    /// or shut down get picked up again instead of being stranded.
+    /// </summary>
+    private async Task RecoverOrphanedProcessingAsync(CancellationToken stoppingToken)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetService<IContext>();
+
+        if (context == null)
+        {
+            return;
+        }
+
+        var orphans = await context.BranchLanguages
+            .Where(bl => !bl.IsDeleted && bl.MindMapStatus == MindMapStatus.Processing)
+            .ToListAsync(stoppingToken);
+
+        if (orphans.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var orphan in orphans)
+        {
+            orphan.MindMapStatus = MindMapStatus.Pending;
+        }
+
+        await context.SaveChangesAsync(stoppingToken);
+
+        _logger.LogInformation(
+            "Reset {Count} orphaned mindmap record(s) from Processing to Pending",
+            orphans.Count);
+    }
+
     private async Task ProcessPendingMindMapsAsync(CancellationToken stoppingToken)
     {
         using var scope = _scopeFactory.CreateScope();
@@ -72,7 +122,10 @@ public class MindMapWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            // 查询已完成处理但思维导图状态为 Pending 或 Failed 的分支语言
+            // Only pick up Pending records. Retrying Failed on every iteration
+            // caused a busy-loop against persistently failing sources. There is
+            // no retry-count field, so failed mindmaps stay Failed until an
+            // operator resets them.
             var branchLanguage = await context.BranchLanguages
                 .Include(bl => bl.RepositoryBranch)
                 .ThenInclude(rb => rb!.Repository)
@@ -82,7 +135,7 @@ public class MindMapWorker : BackgroundService
                              bl.RepositoryBranch.Repository != null &&
                              !bl.RepositoryBranch.Repository.IsDeleted &&
                              bl.RepositoryBranch.Repository.Status == RepositoryStatus.Completed &&
-                             (bl.MindMapStatus == MindMapStatus.Pending || bl.MindMapStatus == MindMapStatus.Failed))
+                             bl.MindMapStatus == MindMapStatus.Pending)
                 .OrderBy(bl => bl.CreatedAt)
                 .FirstOrDefaultAsync(stoppingToken);
 
