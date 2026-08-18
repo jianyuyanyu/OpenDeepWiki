@@ -857,18 +857,47 @@ Please start executing the task.";
      * `stateDiagram-v2` for state machines
    - Mermaid syntax rules:
      * Node IDs must not contain special characters (use letters, numbers, underscores only)
-     * Use quotes for labels with special characters: `A[""Label with (parentheses)""]`
+     * Node IDs and subgraph IDs share one namespace within each Mermaid block
+     * Subgraph IDs must not match any node ID; use `sg_` prefix for subgraphs (e.g., `sg_SetupManager`)
+     * Reusing the same node ID in multiple edges is allowed and is not a duplicate declaration
+     * Edges must reference node IDs, not subgraph IDs
+     * For `erDiagram`, entity identifiers, relationship endpoints, attribute types, and field names must use only letters, numbers, and underscores; never use dots, hyphens, or spaces
+     * If the source type is namespaced or dotted, use a safe alias such as `ci_TaskletContext`, not `ci.TaskletContext`
+     * `erDiagram` attributes must have a single-token type followed by a field name: `string id`, `datetime created_at`
+     * For protobuf/repeated fields, collapse the type to one token and keep the original in the comment: `repeated_TypeName field_name ""original: repeated TypeName""`
+     * For enum values in `erDiagram`, always provide both type and field tokens: `ENUM_VALUE value_ENUM_VALUE ""Description""`
+     * For `classDiagram`, class blocks must close with `}}`, not `end`: `class Foo {{ ... }}`
+     * Do not write `classDiagram` class blocks as `class Foo {{ ... end`; `end` is only for flowchart subgraphs
+     * Always wrap flowchart node, decision/diamond, and subgraph labels in double quotes: `A[""Label with (parentheses)""]`, `Q{{""condition() == true?""}}`
+     * Always wrap flowchart edge labels in double quotes when using pipe syntax: `A -->|""Yes (Claude)""| B`
+     * Labels containing `()`, `/`, `.`, `<br/>`, spaces, non-English text, or punctuation MUST be quoted
      * Escape special characters in labels properly
      * Keep diagrams focused and readable (max 15-20 nodes per diagram)
      * Use subgraph for grouping related components
+   - Example — BAD (subgraph ID collides with node ID; causes render cycle error):
+     ```mermaid
+     flowchart TD
+         subgraph SetupManager[""Setup Manager""]
+             SetupManager[""SetupManager""]
+         end
+         Other --> SetupManager
+     ```
+   - Example — GOOD (subgraph uses `sg_` prefix; edges reference the node):
+     ```mermaid
+     flowchart TD
+         subgraph sg_SetupManager[""Setup Manager""]
+             SetupManager[""SetupManager""]
+         end
+         Other --> SetupManager
+     ```
    - Example valid Mermaid syntax:
      ```mermaid
      flowchart TD
-         subgraph Core[""Core Components""]
-             A[Service Layer] --> B[Repository]
+         subgraph sg_Core[""Core Components""]
+             A[""Service Layer""] --> B[""Repository""]
              B --> C[(Database)]
          end
-         D[API Controller] --> A
+         D[""API Controller""] -->|""calls (HTTP)""| A
      ```
 
 5. **Content Quality Requirements**
@@ -1867,6 +1896,7 @@ Source grounding:
 
                     // 清理 <think> 标签
                     translatedContent = RemoveThinkTags(translatedContent);
+                    translatedContent = MermaidMarkdownNormalizer.Normalize(translatedContent);
 
                     var newDocFile = new DocFile
                     {

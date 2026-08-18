@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.Wiki;
 
 namespace OpenDeepWiki.Agents.Tools;
 
@@ -72,6 +73,8 @@ content: '# Overview\n\nThis is the overview section...'")]
         {
             return "ERROR: Content cannot be empty. Please provide valid Markdown content for the document.";
         }
+
+        content = MermaidMarkdownNormalizer.Normalize(content);
 
         var catalogPath = ResolveCatalogPath(path);
         if (catalogPath == null)
@@ -182,6 +185,8 @@ content: '\n## Failure Modes\n\nThe service handles ... '")]
         {
             return "ERROR: Content cannot be empty. Please provide valid Markdown content to append.";
         }
+
+        content = MermaidMarkdownNormalizer.Normalize(content);
 
         var catalogPath = ResolveCatalogPath(path);
         if (catalogPath == null)
@@ -344,8 +349,10 @@ newContent: '## New Section\n\nUpdated content here'")]
                 return $"ERROR: The specified content to replace was not found in the document. Please use ReadAsync to see the current content and ensure the text matches exactly.";
             }
 
-            // Replace content
-            docFile.Content = docFile.Content.Replace(oldContent, newContent);
+            // Replace content, then normalize the full document so Mermaid
+            // repairs still apply after a partial edit.
+            docFile.Content = MermaidMarkdownNormalizer.Normalize(
+                docFile.Content.Replace(oldContent, newContent));
             docFile.UpdateTimestamp();
 
             await SaveChangesWithRetryAsync(cancellationToken);

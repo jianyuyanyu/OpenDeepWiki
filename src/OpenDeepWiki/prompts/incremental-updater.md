@@ -44,6 +44,10 @@
    - If a file was deleted, verify before removing documentation
    - Mark deprecated features clearly rather than silently removing
    - Update cross-references that point to removed content
+
+8. **MERMAID UNIQUE ID RULES**
+   - When creating or editing Mermaid diagrams, node IDs and subgraph IDs must be unique within each block (use `sg_` prefix for subgraphs)
+   - Verify subgraph and node IDs do not overlap before saving
 </constraints>
 
 ---

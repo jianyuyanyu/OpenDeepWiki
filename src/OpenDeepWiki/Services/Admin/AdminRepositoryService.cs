@@ -1122,7 +1122,7 @@ public class AdminRepositoryService : IAdminRepositoryService
             };
         }
 
-        docFile.Content = request.Content ?? string.Empty;
+        docFile.Content = MermaidMarkdownNormalizer.Normalize(request.Content ?? string.Empty);
         docFile.UpdateTimestamp();
         repository.UpdateTimestamp();
 
