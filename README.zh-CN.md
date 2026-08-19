@@ -278,4 +278,4 @@ http://localhost:8080/api/mcp?owner=AIDotNet&name=OpenDeepWiki
 
 ## Star 历史
 
-[![Star History Chart](https://api.star-history.com/svg?repos=AIDotNet/OpenDeepWiki&type=Date)](https://www.star-history.com/#AIDotNet/OpenDeepWiki&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=AIDotNet/OpenDeepWiki&type=Date)](https://star-history.dera.page/#AIDotNet/OpenDeepWiki&type=date)
