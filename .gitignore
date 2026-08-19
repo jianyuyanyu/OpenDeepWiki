@@ -500,3 +500,9 @@ src/OpenDeepWiki/opendeepwiki.db-shm
 src/OpenDeepWiki/opendeepwiki.db-wal
 src/OpenDeepWiki/opendeepwiki.db
 src/OpenDeepWiki/Properties/launchSettings.json
+
+# Local Docker Compose data volume (sqlite db, cloned repos, secrets)
+/data/
+
+# Local MCP client configuration (machine-specific endpoints)
+.mcp.json
