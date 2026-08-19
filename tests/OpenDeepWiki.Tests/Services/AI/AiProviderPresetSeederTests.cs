@@ -16,12 +16,16 @@ public class AiProviderPresetSeederTests
     {
         var catalog = new AiProviderPresetCatalog();
 
-        Assert.Equal(26, catalog.Presets.Count);
-        Assert.Equal(428, catalog.Presets.Sum(p => p.DefaultModels.Count));
+        Assert.Equal(27, catalog.Presets.Count);
+        Assert.Equal(436, catalog.Presets.Sum(p => p.DefaultModels.Count));
         Assert.Contains(catalog.Presets, p => p.BuiltinId == "routin-ai" && p.DefaultEnabled == true);
         Assert.Contains(catalog.Presets, p => p.BuiltinId == "codex-oauth" && p.AuthMode == "oauth");
         Assert.Contains(catalog.Presets.Single(p => p.BuiltinId == "openai").DefaultModels,
             model => model.Id == "gpt-5.2");
+        Assert.Contains(catalog.Presets,
+            p => p.BuiltinId == "orcarouter" &&
+                 p.DefaultBaseUrl == "https://api.orcarouter.ai/v1" &&
+                 p.DefaultModels.Any(m => m.Id == "orcarouter/auto"));
     }
 
     [Fact]
@@ -33,8 +37,8 @@ public class AiProviderPresetSeederTests
         await seeder.EnsureBuiltInProvidersAsync();
         await seeder.EnsureBuiltInProvidersAsync();
 
-        Assert.Equal(26, await context.AiProviderConfigs.CountAsync(p => !p.IsDeleted));
-        Assert.Equal(428, await context.AiModelConfigs.CountAsync(m => !m.IsDeleted));
+        Assert.Equal(27, await context.AiProviderConfigs.CountAsync(p => !p.IsDeleted));
+        Assert.Equal(436, await context.AiModelConfigs.CountAsync(m => !m.IsDeleted));
 
         var codex = await context.AiProviderConfigs.SingleAsync(p => p.Name == "codex-oauth");
         Assert.True(codex.IsBuiltIn);

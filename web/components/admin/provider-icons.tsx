@@ -11,6 +11,7 @@ const iconUrlMap: Record<string, string> = {
   "routin-ai": "https://routin.ai/icons/favicon.ico",
   "routin-ai-plan": "https://routin.ai/icons/favicon.ico",
   "copilot-oauth": "https://github.githubassets.com/favicons/favicon.png",
+  orcarouter: "https://www.orcarouter.ai/favicon.ico",
 };
 
 const providerIconSlugMap: Record<string, string> = {
