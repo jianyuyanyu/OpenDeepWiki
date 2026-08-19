@@ -1,4 +1,7 @@
 using System.Net;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Serilog;
 
 namespace OpenDeepWiki.Agents;
@@ -25,6 +28,8 @@ public class LoggingHttpHandler(HttpMessageHandler innerHandler) : DelegatingHan
         var requestId = Guid.NewGuid().ToString("N")[..8];
         var startTime = DateTime.UtcNow;
         var aiContext = AiExecutionScope.Current?.ToSummary() ?? "tag=unlabeled | desc=未标记AI请求";
+
+        await NormalizeToolCallArgumentsAsync(requestId, request, cancellationToken);
 
         Logger.Information(
             "[{RequestId}] [{AiContext}] >>> Request: {Method} {RequestUri}",
@@ -117,6 +122,135 @@ public class LoggingHttpHandler(HttpMessageHandler innerHandler) : DelegatingHan
         }
 
         return response!;
+    }
+
+    /// <summary>
+    /// Rewrites <c>messages[].tool_calls[].function.arguments</c> values that are
+    /// null / JSON null / empty into <c>"{}"</c>.
+    /// <para>
+    /// Zero-parameter tools (e.g. <c>ReadCatalog</c>) are often called with no
+    /// arguments. The OpenAI .NET serializer then re-emits that history entry as
+    /// <c>"arguments":"null"</c>. Strict JSON chat backends (for example MiniMax)
+    /// reject that payload. Normalizing to an empty JSON object keeps the request
+    /// valid for every provider.
+    /// </para>
+    /// <para>
+    /// The JSON DOM is mutated field-by-field rather than via string replace, so
+    /// document or catalog content that happens to contain the literal text
+    /// <c>"arguments":"null"</c> is never corrupted. Best-effort: any failure
+    /// leaves the request untouched.
+    /// </para>
+    /// </summary>
+    private static async Task NormalizeToolCallArgumentsAsync(
+        string requestId,
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (request.Content == null)
+            {
+                return;
+            }
+
+            var mediaType = request.Content.Headers.ContentType?.MediaType;
+            if (mediaType != null && !mediaType.Contains("json", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var body = await request.Content.ReadAsStringAsync(cancellationToken);
+            if (body.Length == 0 || !body.Contains("\"tool_calls\"", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            JsonNode? root;
+            try
+            {
+                root = JsonNode.Parse(body);
+            }
+            catch (JsonException)
+            {
+                return;
+            }
+
+            if (root is not JsonObject rootObject || rootObject["messages"] is not JsonArray messages)
+            {
+                return;
+            }
+
+            var fixedCount = 0;
+            foreach (var message in messages)
+            {
+                if (message is not JsonObject messageObject ||
+                    messageObject["tool_calls"] is not JsonArray toolCalls)
+                {
+                    continue;
+                }
+
+                foreach (var toolCall in toolCalls)
+                {
+                    if (toolCall is not JsonObject toolCallObject ||
+                        toolCallObject["function"] is not JsonObject functionObject)
+                    {
+                        continue;
+                    }
+
+                    if (NeedsEmptyArguments(functionObject["arguments"]))
+                    {
+                        functionObject["arguments"] = "{}";
+                        fixedCount++;
+                    }
+                }
+            }
+
+            if (fixedCount == 0)
+            {
+                return;
+            }
+
+            var rewritten = root.ToJsonString();
+            request.Content = new StringContent(rewritten, Encoding.UTF8, mediaType ?? "application/json");
+
+            Logger.Information(
+                "[{RequestId}] Normalized {FixedCount} tool-call argument(s) from null/empty to '{{}}'",
+                requestId,
+                fixedCount);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(
+                ex,
+                "[{RequestId}] Tool-call argument normalization skipped",
+                requestId);
+        }
+    }
+
+    /// <summary>
+    /// True when a tool-call <c>arguments</c> node is null, JSON null, or a
+    /// string that is empty/whitespace or the literal <c>"null"</c>.
+    /// </summary>
+    public static bool NeedsEmptyArguments(JsonNode? argumentsNode)
+    {
+        if (argumentsNode is null)
+        {
+            return true;
+        }
+
+        if (argumentsNode.GetValueKind() == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (argumentsNode.GetValueKind() == JsonValueKind.String)
+        {
+            var value = argumentsNode.GetValue<string>();
+            return string.IsNullOrWhiteSpace(value) ||
+                   string.Equals(value.Trim(), "null", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
     }
 
     private static bool ShouldRetry(HttpStatusCode statusCode)
