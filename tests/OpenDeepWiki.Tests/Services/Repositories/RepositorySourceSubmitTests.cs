@@ -355,6 +355,97 @@ public class RepositorySourceSubmitTests
     }
 
     [Fact]
+    public async Task DeleteRepositoryAsync_ShouldSoftDeleteRepositoryAndRemoveNestedCatalogsUsingSqliteForeignKeys()
+    {
+        await using var context = await CreateSqliteContextAsync();
+        const string userId = "user-1";
+        var repositoryId = Guid.NewGuid().ToString();
+        var branchId = Guid.NewGuid().ToString();
+        var languageId = Guid.NewGuid().ToString();
+        var docFileId = Guid.NewGuid().ToString();
+        var parentCatalogId = Guid.NewGuid().ToString();
+
+        context.Users.Add(new User
+        {
+            Id = userId,
+            Name = "Test User",
+            Email = "test@example.com"
+        });
+        context.Repositories.Add(new Repository
+        {
+            Id = repositoryId,
+            OwnerUserId = userId,
+            GitUrl = "https://github.com/demo/repo.git",
+            OrgName = "demo",
+            RepoName = "repo"
+        });
+        context.RepositoryBranches.Add(new RepositoryBranch
+        {
+            Id = branchId,
+            RepositoryId = repositoryId,
+            BranchName = "main"
+        });
+        context.BranchLanguages.Add(new BranchLanguage
+        {
+            Id = languageId,
+            RepositoryBranchId = branchId,
+            LanguageCode = "en",
+            IsDefault = true
+        });
+        context.DocFiles.Add(new DocFile
+        {
+            Id = docFileId,
+            BranchLanguageId = languageId,
+            Content = "Leaf content"
+        });
+        context.DocCatalogs.AddRange(
+            new DocCatalog
+            {
+                Id = parentCatalogId,
+                BranchLanguageId = languageId,
+                Path = "1-overview",
+                Title = "Overview"
+            },
+            new DocCatalog
+            {
+                Id = Guid.NewGuid().ToString(),
+                BranchLanguageId = languageId,
+                ParentId = parentCatalogId,
+                Path = "1-overview.1-intro",
+                Title = "Intro",
+                DocFileId = docFileId
+            });
+        context.TokenUsages.Add(new TokenUsage
+        {
+            Id = Guid.NewGuid().ToString(),
+            RepositoryId = repositoryId,
+            RecordedAt = DateTime.UtcNow
+        });
+        context.UserActivities.Add(new UserActivity
+        {
+            Id = Guid.NewGuid().ToString(),
+            UserId = userId,
+            RepositoryId = repositoryId,
+            ActivityType = UserActivityType.View,
+            Weight = 1
+        });
+        await context.SaveChangesAsync();
+
+        var adminService = CreateAdminService(context);
+
+        var deleted = await adminService.DeleteRepositoryAsync(repositoryId);
+
+        Assert.True(deleted);
+        Assert.True((await context.Repositories.SingleAsync(r => r.Id == repositoryId)).IsDeleted);
+        Assert.False(await context.RepositoryBranches.AnyAsync(b => b.RepositoryId == repositoryId));
+        Assert.False(await context.BranchLanguages.AnyAsync(l => l.RepositoryBranchId == branchId));
+        Assert.False(await context.DocCatalogs.AnyAsync(c => c.BranchLanguageId == languageId));
+        Assert.False(await context.DocFiles.AnyAsync(f => f.BranchLanguageId == languageId));
+        Assert.Null((await context.TokenUsages.SingleAsync()).RepositoryId);
+        Assert.Null((await context.UserActivities.SingleAsync()).RepositoryId);
+    }
+
+    [Fact]
     public async Task SubmitAsync_ShouldRemoveSoftDeletedDuplicateBeforeRecreate()
     {
         using var context = CreateContext();
@@ -823,6 +914,18 @@ public class RepositorySourceSubmitTests
             .Options;
 
         return new TestDbContext(options);
+    }
+
+    private static async Task<TestDbContext> CreateSqliteContextAsync()
+    {
+        var options = new DbContextOptionsBuilder<TestDbContext>()
+            .UseSqlite("Data Source=:memory:")
+            .Options;
+
+        var context = new TestDbContext(options);
+        await context.Database.OpenConnectionAsync();
+        await context.Database.EnsureCreatedAsync();
+        return context;
     }
 
     private static string CreateTempDirectory()
