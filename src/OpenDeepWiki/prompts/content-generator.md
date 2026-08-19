@@ -679,17 +679,74 @@ flowchart TD
 ```
 ✅ CORRECT Mermaid Syntax:
 - Node IDs: Use only letters, numbers, underscores (A1, ServiceLayer, auth_handler)
-- Labels with special chars: A["Label with (parentheses)"]
-- Subgraph labels: subgraph Name["Display Label"]
-- Arrow types: --> (solid), -.-> (dotted), ==> (thick), --text--> (labeled)
+- Unique IDs: Node IDs and subgraph IDs share one namespace within each Mermaid block
+- Subgraph IDs: Must not match any node ID; use `sg_` prefix (e.g., `sg_SetupManager`)
+- Edge targets: Reference node IDs only; reusing the same node ID in multiple edges is allowed and is not a duplicate declaration
+- Flowchart node labels: Always use quotes, e.g. A["Label with (parentheses)"]
+- Flowchart decision/diamond labels: Always use quotes, e.g. Q{"condition() && value > 0?"}
+- Edge labels with pipe syntax: A -->|"Yes (Claude)"| B
+- Subgraph labels: subgraph sg_Name["Display Label"]
+- Class diagram blocks: class Foo { ... } (close with `}`, never `end`)
+- Arrow types: --> (solid), -.-> (dotted), ==> (thick), -->|"label"| (labeled)
 - Direction: TD (top-down), LR (left-right), BT (bottom-top), RL (right-left)
+- ER identifiers: Use safe aliases with letters, numbers, underscores only (ci_TaskletContext, not ci.TaskletContext)
+- ER attributes: Use exactly one type token followed by one field token (string id, repeated_Tag tags)
+- ER repeated/protobuf fields: Use repeated_TypeName field_name "original: repeated TypeName"
+- ER enum values: Use ENUM_VALUE value_ENUM_VALUE "Description"
 
 ❌ INVALID Mermaid Syntax (will break rendering):
+- Subgraph ID equals a node ID in the same block (causes render cycle errors)
+- Edges targeting subgraph IDs instead of node IDs
 - Node IDs with spaces: My Node --> Other Node
 - Node IDs with special chars: Auth-Service --> DB.Connection
 - Unquoted labels with special chars: A[Label (broken)]
+- Unquoted labels that look simple but later break when edited: A[Process Request]
+- Unquoted decision labels with expressions: Q{items.filter(x).length > 0?}
+- Unquoted edge labels with special chars: A -->|Yes (Claude)| B
+- classDiagram class block closed with `end`: class Foo { ... end
+- ER identifiers with dots/hyphens/spaces: ci.TaskletContext ||--o{ api-key Config
+- ER multi-token attribute types: repeated string tags
+- ER enum values without field names: NONE "No value"
 - Missing end for subgraph
 - Nested quotes without escaping
+```
+
+**SetupManager ID collision — BAD vs GOOD:**
+
+```mermaid
+flowchart TD
+    subgraph SetupManager["Setup Manager"]
+        SetupManager["SetupManager"]
+    end
+    Other --> SetupManager
+```
+
+❌ BAD — `SetupManager` is both subgraph ID and node ID; Mermaid fails with a parent/child cycle.
+
+```mermaid
+flowchart TD
+    subgraph sg_SetupManager["Setup Manager"]
+        SetupManager["SetupManager"]
+    end
+    Other --> SetupManager
+```
+
+✅ GOOD — subgraph uses `sg_SetupManager`; edges reference the node `SetupManager`.
+
+For `classDiagram`, copy this block shape exactly. Each class block closes
+with `}` on its own line; reserve `end` only for flowchart subgraphs:
+
+```mermaid
+classDiagram
+    class Client {
+        +dependency: Api
+    }
+
+    class Api {
+        +execute() Result
+    }
+
+    Client --> Api
 ```
 
 ### 7.4 Architecture Diagram Template
