@@ -474,7 +474,7 @@ public abstract class MasterDbContext : DbContext, IContext
 
         // GitHubAppInstallation optional FK to Department
         modelBuilder.Entity<GitHubAppInstallation>()
-            .HasOne<Department>()
+            .HasOne(g => g.Department)
             .WithMany()
             .HasForeignKey(g => g.DepartmentId)
             .OnDelete(DeleteBehavior.SetNull);
