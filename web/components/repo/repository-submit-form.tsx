@@ -41,7 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api-client";
-import { wikiLanguageCodes } from "@/i18n/config";
+import { defaultWikiLanguage, wikiLanguageCodes } from "@/i18n/config";
 
 interface RepositorySubmitFormProps {
   onSuccess?: () => void;
@@ -49,10 +49,7 @@ interface RepositorySubmitFormProps {
 
 const GIT_URL_REGEX = /^(https?:\/\/|git@)[\w.-]+[/:].+?(\.git)?$/i;
 
-const SUPPORTED_LANGUAGES = wikiLanguageCodes.map((code) => ({
-  code,
-  label: `languages.${code}` as const,
-}));
+const SUPPORTED_LANGUAGES = wikiLanguageCodes;
 
 const SOURCE_OPTIONS: Array<{
   value: RepositorySourceType;
@@ -104,7 +101,7 @@ export function RepositorySubmitForm({ onSuccess }: RepositorySubmitFormProps) {
   const [localPath, setLocalPath] = useState("");
   const [archiveFile, setArchiveFile] = useState<File | null>(null);
   const [branchName, setBranchName] = useState("main");
-  const [languageCode, setLanguageCode] = useState("en");
+  const [languageCode, setLanguageCode] = useState(defaultWikiLanguage);
   const [isPublic, setIsPublic] = useState(true);
   const [generateSkill, setGenerateSkill] = useState(true);
   const [authAccount, setAuthAccount] = useState("");
@@ -580,8 +577,8 @@ export function RepositorySubmitForm({ onSuccess }: RepositorySubmitFormProps) {
           </SelectTrigger>
           <SelectContent>
             {SUPPORTED_LANGUAGES.map((lang) => (
-              <SelectItem key={lang.code} value={lang.code}>
-                {t(`home.repository.${lang.label}`)}
+              <SelectItem key={lang} value={lang}>
+                {t(`common.languageNames.${lang}`)}
               </SelectItem>
             ))}
           </SelectContent>

@@ -198,10 +198,17 @@
     "createdAt": "Créé le",
     "languages": {
       "en": "Anglais",
-      "pl": "Polonais",
       "zh": "Chinois",
+      "zh-tw": "Chinois traditionnel",
       "ja": "Japonais",
-      "ko": "Coréen"
+      "ko": "Coréen",
+      "es": "Espagnol",
+      "fr": "Français",
+      "de": "Allemand",
+      "pt-br": "Portugais (Brésil)",
+      "pl": "Polonais",
+      "ru": "Russe",
+      "ar": "Arabe"
     }
   },
   "mcpIntegrationShort": "MCP"

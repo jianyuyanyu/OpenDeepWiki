@@ -46,14 +46,27 @@ export const uiLocaleNames: Record<UiLocale, string> = {
 export const wikiLanguageCodes = [
   "en",
   "zh",
+  "zh-tw",
   "ja",
   "ko",
+  "es",
+  "fr",
+  "de",
+  "pt-br",
   "pl",
+  "ru",
+  "ar",
 ] as const;
 
 export type WikiLanguageCode = (typeof wikiLanguageCodes)[number];
 
 export const defaultWikiLanguage: WikiLanguageCode = "en";
+
+/**
+ * Default auto-translation target list. Keep in sync with
+ * `WikiGeneratorOptions.DefaultLanguages` on the backend.
+ */
+export const defaultWikiLanguages = wikiLanguageCodes.join(",");
 
 /**
  * Map a UI locale to a supported wiki language code.
@@ -62,12 +75,40 @@ export const defaultWikiLanguage: WikiLanguageCode = "en";
  */
 export function resolveWikiLanguageFromUiLocale(locale: string): WikiLanguageCode {
   const lower = locale.toLowerCase();
-  // Direct matches (case-insensitive)
   if (wikiLanguageCodes.includes(lower as WikiLanguageCode)) {
     return lower as WikiLanguageCode;
   }
-  // pt-BR -> not in wiki set yet, fall back to English
+  if (lower === "zh-cn" || lower === "zh-hans") {
+    return "zh";
+  }
+  if (lower === "zh-hant") {
+    return "zh-tw";
+  }
+  if (lower === "pt" || lower === "pt-pt") {
+    return "pt-br";
+  }
   return defaultWikiLanguage;
+}
+
+/**
+ * Map a wiki language code to a UI locale when the interface has a matching pack.
+ * Returns `null` when the wiki language has no dedicated UI translation.
+ */
+export function resolveUiLocaleFromWikiLanguage(languageCode: string): UiLocale | null {
+  if (isUiLocale(languageCode)) {
+    return languageCode;
+  }
+
+  const lower = languageCode.toLowerCase();
+  if (lower === "pt-br" || lower === "pt" || lower === "pt-pt") {
+    return "pt-BR";
+  }
+  if (lower === "zh-cn" || lower === "zh-hans" || lower === "zh-tw" || lower === "zh-hant") {
+    return "zh";
+  }
+
+  const match = uiLocales.find((locale) => locale.toLowerCase() === lower);
+  return match ?? null;
 }
 
 /**

@@ -71,7 +71,7 @@ services:
       - WIKI_CONTENT_API_KEY=your-content-api-key
       - WIKI_CONTENT_REQUEST_TYPE=OpenAI
 
-      - WIKI_LANGUAGES=en,zh
+      - WIKI_LANGUAGES=en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar
       - WIKI_PARALLEL_COUNT=5
 ```
 

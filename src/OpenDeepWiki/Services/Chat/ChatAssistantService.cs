@@ -14,6 +14,7 @@ using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
 using OpenDeepWiki.Services.AI;
 using OpenDeepWiki.Services.Repositories;
+using OpenDeepWiki.Services.Wiki;
 using GitRepository = LibGit2Sharp.Repository;
 
 namespace OpenDeepWiki.Services.Chat;
@@ -961,17 +962,7 @@ public class ChatAssistantService : IChatAssistantService
     /// </summary>
     private static string BuildSystemPrompt(DocContextDto context, bool hasCodeAccess)
     {
-        var responseLanguage = context.UserLanguage switch
-        {
-            "zh-CN" or "zh" => "Chinese (Simplified)",
-            "zh-TW" => "Chinese (Traditional)",
-            "ja" => "Japanese",
-            "ko" => "Korean",
-            "es" => "Spanish",
-            "fr" => "French",
-            "de" => "German",
-            _ => "English"
-        };
+        var responseLanguage = WikiLanguageNames.GetEnglishName(context.UserLanguage);
 
         var sb = new StringBuilder();
 

@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { RepoBranchesResponse } from "@/types/repository";
+import { resolveUiLocaleFromWikiLanguage } from "@/i18n/config";
 import { BranchGenerationStatus } from "./branch-generation-status";
 import { Loader2, XCircle } from "lucide-react";
 
@@ -64,7 +65,10 @@ export function BranchLanguageSelector({
     if (currentBranch) {
       params.set("branch", currentBranch);
     }
-    document.cookie = `NEXT_LOCALE=${newLanguage}; path=/; samesite=lax`;
+    const uiLocale = resolveUiLocaleFromWikiLanguage(newLanguage);
+    if (uiLocale) {
+      document.cookie = `NEXT_LOCALE=${uiLocale}; path=/; samesite=lax`;
+    }
     // 使用 window.location 强制刷新页面，确保 middleware 重新执行以更新 i18n locale
     window.location.href = `${pathname}?${params.toString()}`;
   };

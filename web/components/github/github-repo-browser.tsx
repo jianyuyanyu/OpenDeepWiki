@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { wikiLanguageCodes } from "@/i18n/config";
+import { defaultWikiLanguage, wikiLanguageCodes } from "@/i18n/config";
 import {
   ExternalLink,
   GitBranch,
@@ -105,7 +105,7 @@ export function GitHubRepoBrowser({
 
   // Import
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>(PERSONAL_ONLY_VALUE);
-  const [languageCode, setLanguageCode] = useState("en");
+  const [languageCode, setLanguageCode] = useState(defaultWikiLanguage);
   const [generateSkill, setGenerateSkill] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<BatchImportResult | null>(null);
@@ -373,7 +373,7 @@ export function GitHubRepoBrowser({
             {t("admin.githubImport.language")}:
           </label>
             <Select value={languageCode} onValueChange={setLanguageCode}>
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="w-[220px]">
                 <SelectValue />
               </SelectTrigger>
             <SelectContent>

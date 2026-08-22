@@ -58,6 +58,7 @@ public static class SystemSettingDefaults
         var existingByKey = existingSettings.ToDictionary(s => s.Key);
         var wikiOptionDefaults = new WikiGeneratorOptions();
         configuration.GetSection(WikiGeneratorOptions.SectionName).Bind(wikiOptionDefaults);
+        WikiGeneratorOptionsConfigurator.Apply(wikiOptionDefaults, configuration);
 
         var settingsToAdd = new List<SystemSetting>();
         var hasChanges = false;

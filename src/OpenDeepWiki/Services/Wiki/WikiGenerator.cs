@@ -2092,7 +2092,9 @@ Source grounding:
             return title;
         }
 
-        var prompt = $@"Translate the following title from {sourceLanguage} to {targetLanguage}. Return ONLY the translated text, nothing else.
+        var sourceName = WikiLanguageNames.GetEnglishName(sourceLanguage);
+        var targetName = WikiLanguageNames.GetEnglishName(targetLanguage);
+        var prompt = $@"Translate the following title from {sourceName} to {targetName}. Return ONLY the translated text, nothing else.
 
 Title: {title}
 
@@ -2171,15 +2173,17 @@ Translation:";
         string targetLanguage,
         CancellationToken cancellationToken)
     {
-        var prompt = $@"You are a professional technical documentation translator. Translate the following Markdown document from {sourceLanguage} to {targetLanguage}.
+        var sourceName = WikiLanguageNames.GetEnglishName(sourceLanguage);
+        var targetName = WikiLanguageNames.GetEnglishName(targetLanguage);
+        var prompt = $@"You are a professional technical documentation translator. Translate the following Markdown document from {sourceName} to {targetName}.
 
 IMPORTANT RULES:
-1. Translate all text content to {targetLanguage}
+1. Translate all text content to {targetName}
 2. Keep all code blocks, code snippets, and technical identifiers unchanged
 3. Keep all URLs, file paths, and variable names unchanged
 4. Maintain the exact Markdown formatting (headers, lists, tables, etc.)
 5. Keep inline code (`code`) unchanged
-6. Translate comments inside code blocks if they are in {sourceLanguage}
+6. Translate comments inside code blocks if they are in {sourceName}
 7. Return only the translated Markdown, no explanations
 
 Source document:
@@ -2283,7 +2287,9 @@ Translated document:";
         string targetLanguage,
         CancellationToken cancellationToken)
     {
-        var prompt = $@"You are a professional technical documentation translator. Translate the following mind map content from {sourceLanguage} to {targetLanguage}.
+        var sourceName = WikiLanguageNames.GetEnglishName(sourceLanguage);
+        var targetName = WikiLanguageNames.GetEnglishName(targetLanguage);
+        var prompt = $@"You are a professional technical documentation translator. Translate the following mind map content from {sourceName} to {targetName}.
 
 IMPORTANT RULES:
 1. Translate only the title text (before the colon if present)

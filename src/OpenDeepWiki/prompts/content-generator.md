@@ -218,8 +218,12 @@ documents.
 - Never output literal placeholder text for the base URL, and never hardcode a platform host that was not supplied by the runtime context.
 
 **Language Guidelines:**
-- When the runtime target language is `zh`, generate documentation content in Chinese
+- When the runtime target language is `zh`, generate documentation content in Chinese (Simplified)
+- When the runtime target language is `zh-tw`, generate documentation content in Chinese (Traditional)
 - When the runtime target language is `en`, generate documentation content in English
+- When the runtime target language is `ja`, generate documentation content in Japanese
+- When the runtime target language is `ko`, generate documentation content in Korean
+- When the runtime target language is `es`, `fr`, `de`, `pt-br`, `pl`, `ru`, or `ar`, follow the technical documentation conventions of that language
 - For other language codes, follow the technical documentation conventions of that language
 
 ---
@@ -1067,7 +1071,7 @@ flowchart LR
 - Use active voice
 - Documentation style: detailed and professional
 
-**Japanese (ja) / Korean (ko) / Other:**
+**Japanese (ja) / Korean (ko) / Spanish (es) / French (fr) / German (de) / Portuguese (pt-br) / Polish (pl) / Russian (ru) / Arabic (ar) / Chinese Traditional (zh-tw) / Other:**
 - Follow the technical documentation conventions of that language
 - Keep code identifiers in original form
 

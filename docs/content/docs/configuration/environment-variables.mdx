@@ -98,7 +98,7 @@ JWT 发行者、受众和过期时间通过 `appsettings.json` 的 `Jwt` 部分�
 | 变量 | 必需 | 默认值 | 描述 |
 |---|---|---|---|
 | `WIKI_PARALLEL_COUNT` | 否 | `5` | 并行文档生成任务数。更高的值加快生成但使用更多资源 |
-| `WIKI_LANGUAGES` | 否 | `en,zh` | 多语言 wiki 生成的目标语言逗号分隔列表（例如 `en,zh,ja,ko`） |
+| `WIKI_LANGUAGES` | 否 | `en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar` | 多语言 wiki 生成的目标语言逗号分隔列表 |
 | `REPOSITORIES_DIRECTORY` | 否 | `/data` | 用于存储克隆仓库文件的目录 |
 | `WIKI_MAX_OUTPUT_TOKENS` | 否 | `32000` | 单次 AI 生成的最大输出 Token 数，防止回复过长 |
 | `WIKI_DOCUMENT_GENERATION_TIMEOUT_MINUTES` | 否 | `60` | 单篇文档生成任务的超时时间（分钟） |
@@ -171,7 +171,7 @@ WIKI_CONTENT_ENDPOINT=https://api.openai.com/v1
 WIKI_CONTENT_API_KEY=sk-your-api-key
 
 # 多语言
-WIKI_LANGUAGES=en,zh
+WIKI_LANGUAGES=en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar
 ```
 
 <Callout type="info">

@@ -38,8 +38,11 @@ public static class WikiGeneratorOptionsConfigurator
 
         options.Languages = ResolveStringValue(
             configuration,
-            $"{WikiGeneratorOptions.SectionName}:Languages",
-            options.Languages);
+            "WIKI_LANGUAGES",
+            ResolveStringValue(
+                configuration,
+                $"{WikiGeneratorOptions.SectionName}:Languages",
+                options.Languages));
     }
 
     private static string? ResolveStringValue(

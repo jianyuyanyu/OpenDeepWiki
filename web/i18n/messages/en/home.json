@@ -198,10 +198,17 @@
     "createdAt": "Created",
     "languages": {
       "en": "English",
-      "pl": "Polish",
       "zh": "Chinese",
+      "zh-tw": "Chinese (Traditional)",
       "ja": "Japanese",
-      "ko": "Korean"
+      "ko": "Korean",
+      "es": "Spanish",
+      "fr": "French",
+      "de": "German",
+      "pt-br": "Portuguese (Brazil)",
+      "pl": "Polish",
+      "ru": "Russian",
+      "ar": "Arabic"
     }
   },
   "mcpIntegrationShort": "MCP setup"

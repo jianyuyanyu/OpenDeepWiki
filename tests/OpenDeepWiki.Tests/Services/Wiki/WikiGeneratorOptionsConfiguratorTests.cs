@@ -57,6 +57,37 @@ public class WikiGeneratorOptionsConfiguratorTests
         Assert.Null(options.TranslationModel);
     }
 
+    [Fact]
+    public void Apply_ShouldBindLanguages_FromWikiLanguagesEnvironmentVariable()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["WIKI_LANGUAGES"] = "en,zh,ja,ko,es,fr"
+        });
+
+        var options = new WikiGeneratorOptions();
+
+        WikiGeneratorOptionsConfigurator.Apply(options, configuration);
+
+        Assert.Equal("en,zh,ja,ko,es,fr", options.Languages);
+    }
+
+    [Fact]
+    public void Apply_ShouldPreferWikiLanguagesEnv_OverSectionValue()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["WIKI_LANGUAGES"] = "en,zh,pt-br",
+            ["WikiGenerator:Languages"] = "en,zh"
+        });
+
+        var options = new WikiGeneratorOptions();
+
+        WikiGeneratorOptionsConfigurator.Apply(options, configuration);
+
+        Assert.Equal("en,zh,pt-br", options.Languages);
+    }
+
     private static IConfiguration BuildConfiguration(IEnumerable<KeyValuePair<string, string?>> settings)
     {
         return new ConfigurationBuilder()

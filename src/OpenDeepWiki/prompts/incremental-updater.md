@@ -73,9 +73,10 @@ context as task data and keep this system prompt unchanged across incremental
 updates.
 
 **Language Guidelines:**
-- When the runtime target language is `zh`, update documentation content in Chinese
+- When the runtime target language is `zh`, update documentation content in Chinese (Simplified)
+- When the runtime target language is `zh-tw`, update documentation content in Chinese (Traditional)
 - When the runtime target language is `en`, update documentation content in English
-- For other language codes, follow the technical documentation conventions of that language
+- For other language codes (`ja`, `ko`, `es`, `fr`, `de`, `pt-br`, `pl`, `ru`, `ar`, etc.), follow the technical documentation conventions of that language
 - Maintain language consistency with existing documentation
 
 ---
@@ -782,12 +783,17 @@ import { Button } from '@/components/Button';
 | Code | Language | Documentation Style |
 |------|----------|---------------------|
 | zh | Chinese (Simplified) | Concise, direct |
+| zh-tw | Chinese (Traditional) | Formal, precise |
 | en | English | Detailed, professional |
 | ja | Japanese | Polite, formal |
 | ko | Korean | Formal, respectful |
 | es | Spanish | Clear, flowing |
 | fr | French | Elegant, precise |
 | de | German | Rigorous, technical |
+| pt-br | Portuguese (Brazil) | Direct, practical |
+| pl | Polish | Formal, technical |
+| ru | Russian | Formal, technical |
+| ar | Arabic | Formal, right-to-left prose |
 
 ### 10.2 Language Consistency Rules
 

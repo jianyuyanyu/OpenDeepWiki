@@ -141,7 +141,7 @@ environment:
   - WIKI_TRANSLATION_REQUEST_TYPE=OpenAI
 
   # 目标语言（逗号分隔）
-  - WIKI_LANGUAGES=en,zh,ja,ko
+  - WIKI_LANGUAGES=en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar
 ```
 
 ## Wiki 生成选项
@@ -151,7 +151,7 @@ environment:
 | 变量 | 默认值 | 描述 |
 |---|---|---|
 | `WIKI_PARALLEL_COUNT` | `5` | 并行文档生成任务数 |
-| `WIKI_LANGUAGES` | `en,zh,ja,ko` | 目标语言的逗号分隔列表 |
+| `WIKI_LANGUAGES` | `en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar` | 目标语言的逗号分隔列表 |
 
 这些也可以在 `appsettings.json` 的 `WikiGenerator` 部分设置：
 
@@ -163,7 +163,7 @@ environment:
     "ParallelCount": 5,
     "MaxOutputTokens": 32000,
     "MaxRetryAttempts": 3,
-    "Languages": "en,zh,ja,ko"
+    "Languages": "en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar"
   }
 }
 ```

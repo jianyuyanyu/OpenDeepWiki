@@ -210,6 +210,12 @@
     "de": "German",
     "pt": "Portuguese",
     "pt-BR": "Portuguese (Brazil)",
+    "pt-br": "Portuguese (Brazil)",
+    "zh-tw": "Chinese (Traditional)",
+    "it": "Italian",
+    "nl": "Dutch",
+    "tr": "Turkish",
+    "vi": "Vietnamese",
     "ru": "Russian",
     "ar": "Arabic"
   },

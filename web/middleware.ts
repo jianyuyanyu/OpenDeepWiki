@@ -1,8 +1,18 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
-import { uiLocales, defaultUiLocale } from './i18n/config';
+import { uiLocales, defaultUiLocale, resolveUiLocaleFromWikiLanguage } from './i18n/config';
 
 const supportedLocales = uiLocales as readonly string[];
 const defaultLocale = defaultUiLocale;
+
+function resolveRequestLocale(lang: string | null | undefined): string | null {
+  if (!lang) {
+    return null;
+  }
+  if (supportedLocales.includes(lang)) {
+    return lang;
+  }
+  return resolveUiLocaleFromWikiLanguage(lang);
+}
 
 export function middleware(request: NextRequest) {
   // 优先从 URL 查询参数获取语言设置（用于仓库文档页面）
@@ -13,10 +23,12 @@ export function middleware(request: NextRequest) {
   
   // Priority: URL `lang` > cookie > default `en`
   let locale: string = defaultLocale;
-  if (urlLang && supportedLocales.includes(urlLang)) {
-    locale = urlLang;
-  } else if (cookieLocale && supportedLocales.includes(cookieLocale)) {
-    locale = cookieLocale;
+  const urlLocale = resolveRequestLocale(urlLang);
+  const cookieResolved = resolveRequestLocale(cookieLocale);
+  if (urlLocale) {
+    locale = urlLocale;
+  } else if (cookieResolved) {
+    locale = cookieResolved;
   }
   
   // 将 locale 添加到请求头中，供 i18n 配置使用
@@ -29,7 +41,7 @@ export function middleware(request: NextRequest) {
     },
   });
 
-  if (urlLang && supportedLocales.includes(urlLang)) {
+  if (urlLocale) {
     response.cookies.set('NEXT_LOCALE', locale, {
       path: '/',
       sameSite: 'lax',

@@ -92,8 +92,8 @@ echo.
 echo # Wiki 生成并行数 ^(默认: 5^)
 echo WIKI_PARALLEL_COUNT=5
 echo.
-echo # 多语言支持 ^(逗号分隔，如: en,zh,ja,ko^)
-echo WIKI_LANGUAGES=en,zh
+echo # 多语言支持 ^(逗号分隔，如: en,zh,ja,ko,es,fr,de,pt-br^)
+echo WIKI_LANGUAGES=en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar
 echo.
 echo # JWT 配置（生产环境请修改）
 echo JWT_SECRET_KEY=OpenDeepWiki-Default-Secret-Key-Please-Change-In-Production-Environment-2024

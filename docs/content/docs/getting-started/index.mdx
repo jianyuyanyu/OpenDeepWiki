@@ -59,7 +59,7 @@ services:
       - WIKI_CONTENT_REQUEST_TYPE=OpenAI
 
       # 多语言输出（逗号分隔）
-      - WIKI_LANGUAGES=en,zh
+      - WIKI_LANGUAGES=en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar
 ```
 
 <Callout type="info">
@@ -101,7 +101,7 @@ make up
 | `WIKI_CATALOG_MODEL` | 用于生成 wiki 目录结构的模型 | `gpt-4o` |
 | `WIKI_CONTENT_MODEL` | 用于生成 wiki 内容的模型 | `gpt-4o` |
 | `WIKI_PARALLEL_COUNT` | 并行 wiki 生成任务数 | `5` |
-| `WIKI_LANGUAGES` | 输出的语言代码（逗号分隔） | `en,zh` |
+| `WIKI_LANGUAGES` | 输出的语言代码（逗号分隔） | `en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar` |
 | `JWT_SECRET_KEY` | JWT 签名密钥（生产环境需更改） | 默认密钥 |
 
 <Callout type="warn">

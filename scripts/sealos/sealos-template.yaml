@@ -131,9 +131,9 @@ spec:
       default: '5'
       required: true
     wiki_languages:
-      description: '支持的语言（逗号分隔，如: en,zh,ja,ko）'
+      description: '支持的语言（逗号分隔，如: en,zh,ja,ko,es,fr,de,pt-br）'
       type: string
-      default: 'en,zh'
+      default: 'en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar'
       required: true
     
     # 存储配置

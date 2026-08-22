@@ -74,7 +74,7 @@
 
 #### Wiki 生成配置
 - **wiki_parallel_count**: 并行生成数量（默认：`5`）
-- **wiki_languages**: 支持的语言（默认：`en,zh`）
+- **wiki_languages**: 支持的语言（默认：`en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar`）
 
 #### 存储配置
 - **volume_size_data**: 数据存储容量（默认：`5Gi`）

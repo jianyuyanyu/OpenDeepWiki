@@ -152,10 +152,10 @@ public class WikiGeneratorOptions
 
     /// <summary>
     /// Comma-separated list of language codes for multi-language wiki generation.
-    /// Example: "en,zh,ja,ko". Can be configured via WIKI_LANGUAGES environment variable.
+    /// Example: "en,zh,ja,ko,es,fr,de,pt-br". Can be configured via WIKI_LANGUAGES environment variable.
     /// The primary language selected by user will be generated first, then translated to other languages.
     /// </summary>
-    public string? Languages { get; set; } = "en,zh,ja,ko";
+    public string? Languages { get; set; } = WikiLanguageNames.DefaultLanguages;
 
     /// <summary>
     /// The AI model to use for translation.
