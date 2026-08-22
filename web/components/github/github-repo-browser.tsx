@@ -105,7 +105,7 @@ export function GitHubRepoBrowser({
 
   // Import
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>(PERSONAL_ONLY_VALUE);
-  const [languageCode, setLanguageCode] = useState(defaultWikiLanguage);
+  const [languageCode, setLanguageCode] = useState<string>(defaultWikiLanguage);
   const [generateSkill, setGenerateSkill] = useState(true);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<BatchImportResult | null>(null);

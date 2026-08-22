@@ -101,7 +101,7 @@ export function RepositorySubmitForm({ onSuccess }: RepositorySubmitFormProps) {
   const [localPath, setLocalPath] = useState("");
   const [archiveFile, setArchiveFile] = useState<File | null>(null);
   const [branchName, setBranchName] = useState("main");
-  const [languageCode, setLanguageCode] = useState(defaultWikiLanguage);
+  const [languageCode, setLanguageCode] = useState<string>(defaultWikiLanguage);
   const [isPublic, setIsPublic] = useState(true);
   const [generateSkill, setGenerateSkill] = useState(true);
   const [authAccount, setAuthAccount] = useState("");
