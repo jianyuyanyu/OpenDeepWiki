@@ -1,4 +1,4 @@
----
+﻿---
 title: 介绍
 description: OpenDeepWiki — AI 驱动的代码知识库，可在几分钟内将任何代码仓库转换为全面的 wiki。
 ---
@@ -10,7 +10,9 @@ import { Zap, Globe, GitBranch, Puzzle, Brain, Plug } from "lucide-react";
 
 OpenDeepWiki 是一个开源的、AI 驱动的代码知识库。它分析来自 GitHub、GitLab、Gitee、Gitea 等平台的代码仓库，然后自动生成结构化文档、架构图和知识图谱 — 一切只需几分钟。
 
-基于 **.NET 9** 和 **Semantic Kernel**，配合 **Next.js** 前端，OpenDeepWiki 架起了原始代码和人类可读文档之间的桥梁。
+基于 **.NET 10** 和 **Microsoft.Agents.AI**（多提供商 AI 代理框架），配合 **Next.js** 前端，OpenDeepWiki 架起了原始代码和人类可读文档之间的桥梁。
+
+除 Git 仓库外，OpenDeepWiki 还支持上传 ZIP 压缩包和受允许根目录约束的本地目录导入，并通过后台 Worker 处理翻译、思维导图和 Graphify 图谱等衍生产物。
 
 ## 核心功能
 
