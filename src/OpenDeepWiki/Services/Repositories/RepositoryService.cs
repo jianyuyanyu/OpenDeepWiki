@@ -482,28 +482,10 @@ public class RepositoryService(
             return Results.NotFound(Error("仓库不存在"));
         }
 
-        // 验证所有权
-        if (repository.OwnerUserId != currentUserId)
+        var isAdmin = userContext.User?.IsInRole("Admin") == true;
+        if (repository.OwnerUserId != currentUserId && !isAdmin)
         {
-            // Allow admin to manage department-owned repos in their departments
-            var allowed = false;
-            if (repository.IsDepartmentOwned)
-            {
-                var isAdmin = userContext.User?.IsInRole("Admin") == true;
-                if (isAdmin)
-                {
-                    var deptRepos = await organizationService.GetDepartmentRepositoriesAsync(currentUserId);
-                    if (deptRepos.Any(r => r.RepositoryId == repository.Id))
-                    {
-                        allowed = true;
-                    }
-                }
-            }
-
-            if (!allowed)
-            {
-                return Results.Forbid();
-            }
+            return Results.Forbid();
         }
 
         // 只有失败或完成状态才能重新生成

@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -516,6 +517,46 @@ public class RepositorySourceSubmitTests
     }
 
     [Fact]
+    public async Task RegenerateAsync_WhenAdminIsNotOwner_AllowsRegeneration()
+    {
+        using var context = CreateContext();
+        await SeedRepositoryWithDocumentAsync(context, RepositoryStatus.Failed);
+        var service = CreateService(
+            context,
+            new RepositoryAnalyzerOptions(),
+            userId: "admin-1",
+            isAdmin: true);
+
+        var result = await RegenerateAsync(service, new RegenerateRequest
+        {
+            Owner = "AIDotNet",
+            Repo = "OpenCowork"
+        });
+
+        Assert.True(result.Success);
+        Assert.Equal(RepositoryStatus.Pending, (await context.Repositories.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task RegenerateAsync_WhenNonOwnerNonAdmin_ReturnsForbid()
+    {
+        using var context = CreateContext();
+        await SeedRepositoryWithDocumentAsync(context, RepositoryStatus.Failed);
+        var service = CreateService(
+            context,
+            new RepositoryAnalyzerOptions(),
+            userId: "other-user");
+
+        var result = await service.RegenerateAsync(new RegenerateRequest
+        {
+            Owner = "AIDotNet",
+            Repo = "OpenCowork"
+        });
+
+        Assert.IsType<Microsoft.AspNetCore.Http.HttpResults.ForbidHttpResult>(result);
+    }
+
+    [Fact]
     public async Task RegenerateAsync_WhenRepositoryFailed_ClearsDocumentsForFreshRun()
     {
         using var context = CreateContext();
@@ -811,12 +852,13 @@ public class RepositorySourceSubmitTests
         TestDbContext context,
         RepositoryAnalyzerOptions analyzerOptions,
         string userId = "user-1",
-        IGitPlatformService? gitPlatformService = null)
+        IGitPlatformService? gitPlatformService = null,
+        bool isAdmin = false)
     {
         return new RepositoryService(
             context,
             gitPlatformService ?? Mock.Of<IGitPlatformService>(),
-            new TestUserContext(userId),
+            new TestUserContext(userId, isAdmin),
             Mock.Of<IGitHubAppService>(),
             Mock.Of<IOrganizationService>(),
             new RepositoryFullRegenerationCleaner(),
@@ -952,13 +994,32 @@ public class RepositorySourceSubmitTests
         return stream;
     }
 
-    private sealed class TestUserContext(string? userId) : IUserContext
+    private sealed class TestUserContext(string? userId, bool isAdmin = false) : IUserContext
     {
         public string? UserId { get; } = userId;
         public string? UserName => "token帅比";
         public string? Email => "token@example.com";
         public bool IsAuthenticated => !string.IsNullOrWhiteSpace(UserId);
-        public System.Security.Claims.ClaimsPrincipal? User => null;
+        public ClaimsPrincipal? User { get; } = CreatePrincipal(userId, isAdmin);
+
+        private static ClaimsPrincipal? CreatePrincipal(string? userId, bool isAdmin)
+        {
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return null;
+            }
+
+            var claims = new List<Claim>
+            {
+                new(ClaimTypes.NameIdentifier, userId)
+            };
+            if (isAdmin)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+            }
+
+            return new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"));
+        }
     }
 
     private sealed class TestDbContext(DbContextOptions<TestDbContext> options) : MasterDbContext(options)
