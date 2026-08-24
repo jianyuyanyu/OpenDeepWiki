@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useTranslations } from "@/hooks/use-translations";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { getAvailableLanguages, type LanguageInfo } from "@/lib/recommendation-api";
+import type { LanguageInfo } from "@/lib/recommendation-api";
 import { cn } from "@/lib/utils";
 import { Code2 } from "lucide-react";
 
 interface LanguageTagsProps {
+  languages: LanguageInfo[];
   selectedLanguage: string | null;
   onLanguageChange: (language: string | null) => void;
   className?: string;
@@ -36,34 +35,13 @@ const languageColors: Record<string, string> = {
 
 const defaultColor = "bg-muted hover:bg-muted/80 text-muted-foreground border-border";
 
-export function LanguageTags({ selectedLanguage, onLanguageChange, className }: LanguageTagsProps) {
+export function LanguageTags({
+  languages,
+  selectedLanguage,
+  onLanguageChange,
+  className,
+}: LanguageTagsProps) {
   const t = useTranslations();
-  const [languages, setLanguages] = useState<LanguageInfo[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const loadLanguages = async () => {
-      try {
-        const response = await getAvailableLanguages();
-        setLanguages(response.languages);
-      } catch (error) {
-        console.error("Failed to load languages:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadLanguages();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className={cn("flex flex-wrap gap-2", className)}>
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <Skeleton key={i} className="h-7 w-20 rounded-full" />
-        ))}
-      </div>
-    );
-  }
 
   if (languages.length === 0) {
     return null;

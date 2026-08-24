@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "@/hooks/use-translations";
-import { fetchAllRepositoryList, fetchRepositoryList } from "@/lib/repository-api";
 import { PublicRepositoryCard } from "./public-repository-card";
 import { RepositoryExplorerView } from "./repository-explorer-view";
 import { LanguageTags } from "./language-tags";
+import type { LanguageInfo } from "@/lib/recommendation-api";
 import type { RepositoryItemResponse } from "@/types/repository";
 import {
   GitBranch,
@@ -23,10 +23,27 @@ import { cn } from "@/lib/utils";
 
 interface PublicRepositoryListProps {
   keyword: string;
+  repositories: RepositoryItemResponse[];
+  languages: LanguageInfo[];
+  loadError?: boolean;
+  refreshing?: boolean;
+  onRefresh?: () => void;
   className?: string;
 }
 
 const PAGE_SIZE = 12;
+
+function matchesKeyword(repository: RepositoryItemResponse, keyword: string) {
+  const query = keyword.trim().toLowerCase();
+  if (!query) {
+    return true;
+  }
+
+  return (
+    repository.orgName.toLowerCase().includes(query) ||
+    repository.repoName.toLowerCase().includes(query)
+  );
+}
 
 function RepositoryGridSkeleton() {
   return (
@@ -46,55 +63,51 @@ function RepositoryGridSkeleton() {
   );
 }
 
-export function PublicRepositoryList({ keyword, className }: PublicRepositoryListProps) {
+export function PublicRepositoryList({
+  keyword,
+  repositories,
+  languages,
+  loadError = false,
+  refreshing = false,
+  onRefresh,
+  className,
+}: PublicRepositoryListProps) {
   const t = useTranslations();
-  const [repositories, setRepositories] = useState<RepositoryItemResponse[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"tree" | "grid">("tree");
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
 
   const isTreeView = viewMode === "tree";
-  const totalPages = isTreeView ? 1 : Math.ceil(total / PAGE_SIZE);
 
-  const loadRepositories = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  const filteredRepositories = useMemo(() => {
+    return repositories.filter((repository) => {
+      if (!matchesKeyword(repository, keyword)) {
+        return false;
+      }
 
-      const params = {
-        isPublic: true,
-        sortBy: "status",
-        keyword: keyword || undefined,
-        language: selectedLanguage || undefined,
-      } as const;
-      const response = isTreeView
-        ? await fetchAllRepositoryList(params)
-        : await fetchRepositoryList({
-            ...params,
-            page,
-            pageSize: PAGE_SIZE,
-          });
+      if (selectedLanguage && repository.primaryLanguage !== selectedLanguage) {
+        return false;
+      }
 
-      setRepositories(response.items);
-      setTotal(response.total);
-    } catch (err) {
-      setError(t("home.publicRepository.loadError"));
-      console.error("Failed to fetch public repositories:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isTreeView, keyword, page, selectedLanguage, t]);
+      return true;
+    });
+  }, [keyword, repositories, selectedLanguage]);
 
-  useEffect(() => {
-    loadRepositories();
-  }, [loadRepositories]);
+  const total = filteredRepositories.length;
+  const totalPages = isTreeView ? 1 : Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pagedRepositories = isTreeView
+    ? filteredRepositories
+    : filteredRepositories.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   useEffect(() => {
     setPage(1);
   }, [keyword, selectedLanguage, viewMode]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const handleLanguageChange = (language: string | null) => {
     setSelectedLanguage(language);
@@ -113,13 +126,13 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
   };
 
   const pagination =
-    totalPages > 1 ? (
+    !isTreeView && totalPages > 1 ? (
       <div className="flex items-center justify-center gap-4 mt-8">
         <Button
           variant="outline"
           size="sm"
           onClick={handlePrevPage}
-          disabled={page === 1 || isLoading}
+          disabled={page === 1 || refreshing}
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
           {t("home.bookmarks.previous")}
@@ -133,7 +146,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
           variant="outline"
           size="sm"
           onClick={handleNextPage}
-          disabled={page === totalPages || isLoading}
+          disabled={page === totalPages || refreshing}
         >
           {t("home.bookmarks.next")}
           <ChevronRight className="h-4 w-4 ml-1" />
@@ -141,25 +154,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
       </div>
     ) : null;
 
-  if (isLoading && repositories.length === 0) {
-    return (
-      <div className={cn("w-full", className)}>
-        <h2 className="mb-4 text-lg font-semibold tracking-tight">
-          {t("home.publicRepository.title")}
-        </h2>
-        <div className="mb-6">
-          <div className="flex flex-wrap gap-2">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Skeleton key={i} className="h-7 w-20 rounded-full" />
-            ))}
-          </div>
-        </div>
-        <RepositoryGridSkeleton />
-      </div>
-    );
-  }
-
-  if (error) {
+  if (loadError && repositories.length === 0) {
     return (
       <div className={cn("w-full", className)}>
         <h2 className="mb-4 text-lg font-semibold tracking-tight">
@@ -167,9 +162,11 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
         </h2>
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <XCircle className="h-12 w-12 text-destructive mb-4" />
-          <p className="text-muted-foreground mb-4">{error}</p>
-          <Button variant="outline" onClick={loadRepositories}>
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <p className="text-muted-foreground mb-4">
+            {t("home.publicRepository.loadError")}
+          </p>
+          <Button variant="outline" onClick={onRefresh} disabled={refreshing}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", refreshing && "animate-spin")} />
             {t("home.repository.retry")}
           </Button>
         </div>
@@ -215,28 +212,31 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
             variant="ghost"
             size="icon"
             className="h-8 w-8 shrink-0 rounded-lg"
-            onClick={loadRepositories}
-            disabled={isLoading}
+            onClick={onRefresh}
+            disabled={refreshing}
           >
-            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+            <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
           </Button>
         </div>
       </div>
 
       <LanguageTags
+        languages={languages}
         selectedLanguage={selectedLanguage}
         onLanguageChange={handleLanguageChange}
         className="mb-6"
       />
 
-      {repositories.length === 0 && !keyword && !selectedLanguage ? (
+      {refreshing && repositories.length === 0 ? (
+        <RepositoryGridSkeleton />
+      ) : repositories.length === 0 && !keyword && !selectedLanguage ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <GitBranch className="h-12 w-12 text-muted-foreground mb-4" />
           <p className="text-muted-foreground">
             {t("home.publicRepository.empty")}
           </p>
         </div>
-      ) : repositories.length === 0 ? (
+      ) : pagedRepositories.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Search className="h-12 w-12 text-muted-foreground mb-4" />
           <p className="text-muted-foreground">
@@ -247,7 +247,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
         <>
           {viewMode === "tree" ? (
             <RepositoryExplorerView
-              repositories={repositories}
+              repositories={pagedRepositories}
               emptyMessage={t("home.publicRepository.empty")}
               labels={{
                 treeTitle: t("home.repository.tree.title"),
@@ -266,7 +266,7 @@ export function PublicRepositoryList({ keyword, className }: PublicRepositoryLis
             />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {repositories.map((repo) => (
+              {pagedRepositories.map((repo) => (
                 <PublicRepositoryCard key={repo.id} repository={repo} />
               ))}
             </div>
