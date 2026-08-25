@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
+using OpenDeepWiki.Services.Wiki;
 
 namespace OpenDeepWiki.Services.Repositories;
 
@@ -68,9 +70,15 @@ public class IncrementalUpdateWorker : BackgroundService
     {
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<IContext>();
-        var updateService = scope.ServiceProvider.GetRequiredService<IIncrementalUpdateService>();
         var gitPlatformService = scope.ServiceProvider.GetRequiredService<IGitPlatformService>();
         var repositoryAnalyzer = scope.ServiceProvider.GetRequiredService<IRepositoryAnalyzer>();
+        var coordinator = scope.ServiceProvider.GetService<IWikiGenerationCoordinator>();
+        var wikiOptions = scope.ServiceProvider.GetService<IOptionsMonitor<WikiGeneratorOptions>>();
+
+        if (coordinator is not null)
+        {
+            await coordinator.RecoverStaleWorkAsync(context, stoppingToken);
+        }
 
         var pendingTasks = await GetPendingTasksAsync(context, stoppingToken);
 
@@ -82,7 +90,15 @@ public class IncrementalUpdateWorker : BackgroundService
                 break;
             }
 
-            await ProcessSingleTaskAsync(context, updateService, task, stoppingToken);
+            var shouldStop = await ProcessSingleTaskAsync(
+                coordinator,
+                wikiOptions?.CurrentValue,
+                task,
+                stoppingToken);
+            if (shouldStop)
+            {
+                break;
+            }
         }
 
         await CheckScheduledUpdatesAsync(context, gitPlatformService, repositoryAnalyzer, stoppingToken);
@@ -93,27 +109,77 @@ public class IncrementalUpdateWorker : BackgroundService
         CancellationToken stoppingToken)
     {
         return await context.IncrementalUpdateTasks
+            .AsNoTracking()
             .Where(t => !t.IsDeleted && t.Status == IncrementalUpdateStatus.Pending)
             .OrderByDescending(t => t.Priority)
             .ThenBy(t => t.CreatedAt)
+            .Take(20)
             .ToListAsync(stoppingToken);
     }
 
-    private async Task ProcessSingleTaskAsync(
-        IContext context,
-        IIncrementalUpdateService updateService,
-        IncrementalUpdateTask task,
+    private async Task<bool> ProcessSingleTaskAsync(
+        IWikiGenerationCoordinator? coordinator,
+        WikiGeneratorOptions? wikiOptions,
+        IncrementalUpdateTask pendingTask,
         CancellationToken stoppingToken)
     {
+        using var scope = _scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<IContext>();
+        var updateService = scope.ServiceProvider.GetRequiredService<IIncrementalUpdateService>();
+        var jobCoordinator = coordinator ?? scope.ServiceProvider.GetService<IWikiGenerationCoordinator>();
+
+        WikiGenerationWorkLease? lease = null;
+        if (jobCoordinator is not null)
+        {
+            var (status, acquiredLease) = await jobCoordinator.TryBeginAsync(
+                context,
+                pendingTask.RepositoryId,
+                RepositoryGenerationLockOwnerType.IncrementalTask,
+                pendingTask.Id,
+                RepositoryGenerationLockScope.Branch,
+                WikiGenerationWorkType.IncrementalTask,
+                stoppingToken);
+
+            if (status == WikiGenerationAcquireStatus.ClusterFull)
+            {
+                _logger.LogInformation(
+                    "Wiki generation cluster is full, deferring incremental updates. TaskId: {TaskId}",
+                    pendingTask.Id);
+                return true;
+            }
+
+            if (status != WikiGenerationAcquireStatus.Acquired || acquiredLease is null)
+            {
+                _logger.LogDebug(
+                    "Skipping incremental task because the repository is busy. TaskId: {TaskId}, RepositoryId: {RepositoryId}",
+                    pendingTask.Id, pendingTask.RepositoryId);
+                return false;
+            }
+
+            lease = acquiredLease;
+        }
+
+        var task = await TryClaimIncrementalTaskAsync(context, pendingTask.Id, stoppingToken);
+        if (task is null)
+        {
+            if (lease is not null && jobCoordinator is not null)
+            {
+                await jobCoordinator.ReleaseAsync(context, lease, CancellationToken.None);
+            }
+
+            return false;
+        }
+
+        IAsyncDisposable? heartbeat = lease is not null && wikiOptions is not null
+            ? WikiGenerationHeartbeat.Start(_scopeFactory, lease, wikiOptions, _logger, stoppingToken)
+            : null;
+
         _logger.LogInformation(
             "Processing task. TaskId: {TaskId}, RepositoryId: {RepositoryId}, BranchId: {BranchId}, Priority: {Priority}",
             task.Id, task.RepositoryId, task.BranchId, task.Priority);
 
         try
         {
-            await UpdateTaskStatusAsync(
-                context, task, IncrementalUpdateStatus.Processing, null, stoppingToken);
-
             var result = await updateService.ProcessIncrementalUpdateAsync(
                 task.RepositoryId, task.BranchId, stoppingToken);
 
@@ -140,6 +206,8 @@ public class IncrementalUpdateWorker : BackgroundService
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             _logger.LogInformation("Task processing cancelled. TaskId: {TaskId}", task.Id);
+            await UpdateTaskStatusAsync(
+                context, task, IncrementalUpdateStatus.Pending, null, CancellationToken.None);
             throw;
         }
         catch (Exception ex)
@@ -151,6 +219,69 @@ public class IncrementalUpdateWorker : BackgroundService
                 "Task processing failed with exception. TaskId: {TaskId}",
                 task.Id);
         }
+        finally
+        {
+            if (heartbeat is not null)
+            {
+                await heartbeat.DisposeAsync();
+            }
+
+            if (lease is not null && jobCoordinator is not null)
+            {
+                await jobCoordinator.ReleaseAsync(context, lease, CancellationToken.None);
+            }
+        }
+
+        return false;
+    }
+
+    private static async Task<IncrementalUpdateTask?> TryClaimIncrementalTaskAsync(
+        IContext context,
+        string taskId,
+        CancellationToken stoppingToken)
+    {
+        var now = DateTime.UtcNow;
+
+        if (EfContextCapabilities.SupportsExecuteUpdate(context))
+        {
+            var updatedRows = await context.IncrementalUpdateTasks
+                .Where(item => item.Id == taskId &&
+                               !item.IsDeleted &&
+                               item.Status == IncrementalUpdateStatus.Pending)
+                .ExecuteUpdateAsync(
+                    setters => setters
+                        .SetProperty(item => item.Status, IncrementalUpdateStatus.Processing)
+                        .SetProperty(item => item.StartedAt, now)
+                        .SetProperty(item => item.CompletedAt, (DateTime?)null)
+                        .SetProperty(item => item.ErrorMessage, (string?)null)
+                        .SetProperty(item => item.UpdatedAt, now),
+                    stoppingToken);
+
+            if (updatedRows != 1)
+            {
+                return null;
+            }
+
+            return await context.IncrementalUpdateTasks.FirstAsync(item => item.Id == taskId, stoppingToken);
+        }
+
+        var task = await context.IncrementalUpdateTasks
+            .FirstOrDefaultAsync(item => item.Id == taskId &&
+                                         !item.IsDeleted &&
+                                         item.Status == IncrementalUpdateStatus.Pending,
+                stoppingToken);
+        if (task is null)
+        {
+            return null;
+        }
+
+        task.Status = IncrementalUpdateStatus.Processing;
+        task.StartedAt = now;
+        task.CompletedAt = null;
+        task.ErrorMessage = null;
+        task.UpdatedAt = now;
+        await context.SaveChangesAsync(stoppingToken);
+        return task;
     }
 
     private async Task UpdateTaskStatusAsync(

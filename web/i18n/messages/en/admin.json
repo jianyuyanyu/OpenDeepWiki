@@ -493,6 +493,10 @@
         "label": "Parallel generation tasks",
         "description": "Maximum number of document generation jobs that can run at the same time."
       },
+      "WIKI_MAX_CONCURRENT_GENERATIONS": {
+        "label": "Concurrent repository wiki generations",
+        "description": "Maximum number of repository wiki generations that may run at the same time across the cluster. Instances share this quota. Default is 1."
+      },
       "WIKI_MAX_OUTPUT_TOKENS": {
         "label": "Max output tokens",
         "description": "Upper limit for tokens returned by a single wiki content generation request."

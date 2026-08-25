@@ -59,6 +59,9 @@ services:
       # Wiki 生成并行数 (默认: 5)
       - WIKI_PARALLEL_COUNT=5
 
+      # 集群同时生成的仓库 Wiki 数量 (默认: 1，多实例共享这个上限)
+      - WIKI_MAX_CONCURRENT_GENERATIONS=1
+
       # 多语言支持 (逗号分隔，如: en,zh,ja,ko,es,fr,de,pt-br)
       - WIKI_LANGUAGES=en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar
     volumes:

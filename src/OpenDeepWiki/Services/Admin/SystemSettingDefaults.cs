@@ -29,6 +29,7 @@ public static class SystemSettingDefaults
         (GraphifyModelId, "ai", "AI model used for Graphify community labels"),
         ("WIKI_LANGUAGES", "ai", "Supported languages (comma-separated)"),
         ("WIKI_PARALLEL_COUNT", "ai", "Number of parallel document generation tasks"),
+        ("WIKI_MAX_CONCURRENT_GENERATIONS", "ai", "Maximum number of repository wiki generations running at the same time across the cluster"),
         ("WIKI_MAX_OUTPUT_TOKENS", "ai", "Maximum output token count"),
         ("WIKI_MAX_DOCUMENT_APPEND_OPERATIONS", "ai", "Maximum AppendDoc calls per generated document"),
         ("WIKI_MAX_DOCUMENT_SOURCE_TOOL_CALLS", "ai", "Maximum ReadFile/ListFiles/Grep calls per generated document"),
@@ -126,6 +127,7 @@ public static class SystemSettingDefaults
             WikiTranslationModelId => options.TranslationModel,
             "WIKI_LANGUAGES" => options.Languages,
             "WIKI_PARALLEL_COUNT" => options.ParallelCount.ToString(),
+            "WIKI_MAX_CONCURRENT_GENERATIONS" => options.GetMaxConcurrentGenerations().ToString(),
             "WIKI_MAX_OUTPUT_TOKENS" => options.MaxOutputTokens.ToString(),
             "WIKI_MAX_DOCUMENT_APPEND_OPERATIONS" => options.MaxDocumentAppendOperations.ToString(),
             "WIKI_MAX_DOCUMENT_SOURCE_TOOL_CALLS" => options.MaxDocumentSourceToolCalls.ToString(),
@@ -175,6 +177,9 @@ public static class SystemSettingDefaults
                 break;
             case "WIKI_PARALLEL_COUNT" when int.TryParse(value, out var parallelCount):
                 options.ParallelCount = parallelCount;
+                break;
+            case "WIKI_MAX_CONCURRENT_GENERATIONS" when int.TryParse(value, out var maxConcurrentGenerations):
+                options.MaxConcurrentGenerations = maxConcurrentGenerations;
                 break;
             case "WIKI_MAX_OUTPUT_TOKENS" when int.TryParse(value, out var maxTokens):
                 options.MaxOutputTokens = maxTokens;

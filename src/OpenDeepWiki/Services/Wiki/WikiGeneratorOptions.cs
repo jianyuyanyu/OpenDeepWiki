@@ -59,6 +59,42 @@ public class WikiGeneratorOptions
     /// </summary>
     public int ParallelCount { get; set; } = 5;
 
+    public const int DefaultMaxConcurrentGenerations = 1;
+    public const int MaxConcurrentGenerationsLimit = 32;
+    public const int DefaultGenerationLeaseTimeoutSeconds = 180;
+    public const int DefaultGenerationHeartbeatIntervalSeconds = 30;
+
+    /// <summary>
+    /// Maximum number of repository wiki generations that may run at the same
+    /// time across the entire cluster. Default: 1.
+    /// </summary>
+    public int MaxConcurrentGenerations { get; set; } = DefaultMaxConcurrentGenerations;
+
+    /// <summary>
+    /// Seconds without a heartbeat before a bound lock or slot is treated as stale.
+    /// </summary>
+    public int GenerationLeaseTimeoutSeconds { get; set; } = DefaultGenerationLeaseTimeoutSeconds;
+
+    /// <summary>
+    /// Interval for refreshing lock and slot heartbeats while generation is running.
+    /// </summary>
+    public int GenerationHeartbeatIntervalSeconds { get; set; } = DefaultGenerationHeartbeatIntervalSeconds;
+
+    public int GetMaxConcurrentGenerations()
+    {
+        return Math.Clamp(MaxConcurrentGenerations, 1, MaxConcurrentGenerationsLimit);
+    }
+
+    public int GetGenerationLeaseTimeoutSeconds()
+    {
+        return Math.Max(60, GenerationLeaseTimeoutSeconds);
+    }
+
+    public int GetGenerationHeartbeatIntervalSeconds()
+    {
+        return Math.Clamp(GenerationHeartbeatIntervalSeconds, 5, 60);
+    }
+
     /// <summary>
     /// Maximum output tokens per AI response.
     /// This bounds a SINGLE model response, not the whole document. The content

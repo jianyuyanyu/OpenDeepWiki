@@ -493,6 +493,10 @@
         "label": "并行生成任务数",
         "description": "允许同时运行的文档生成任务上限。"
       },
+      "WIKI_MAX_CONCURRENT_GENERATIONS": {
+        "label": "同时生成的仓库数",
+        "description": "整个集群同时进行仓库 Wiki 生成的上限。多实例会共享这个配额，默认 1。"
+      },
       "WIKI_MAX_OUTPUT_TOKENS": {
         "label": "单次输出 Token 上限",
         "description": "单次 Wiki 内容生成请求允许返回的最大 Token 数。"

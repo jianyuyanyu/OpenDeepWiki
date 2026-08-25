@@ -453,6 +453,10 @@
         "label": "並列生成タスク数",
         "description": "同時に実行できるドキュメント生成タスクの上限です。"
       },
+      "WIKI_MAX_CONCURRENT_GENERATIONS": {
+        "label": "同時リポジトリ Wiki 生成数",
+        "description": "クラスタ全体で同時に実行できるリポジトリ Wiki 生成数の上限です。インスタンスはこの枠を共有します。デフォルトは 1 です。"
+      },
       "WIKI_MAX_OUTPUT_TOKENS": {
         "label": "最大出力トークン数",
         "description": "1 回の Wiki コンテンツ生成リクエストで返せる最大トークン数です。"

@@ -493,6 +493,10 @@
         "label": "Tâches de génération en parallèle",
         "description": "Nombre maximum de tâches de génération de documents pouvant s'exécuter simultanément."
       },
+      "WIKI_MAX_CONCURRENT_GENERATIONS": {
+        "label": "Générations wiki de dépôts simultanées",
+        "description": "Nombre maximum de générations wiki de dépôts pouvant s'exécuter en même temps dans le cluster. Les instances partagent ce quota. La valeur par défaut est 1."
+      },
       "WIKI_MAX_OUTPUT_TOKENS": {
         "label": "Tokens de sortie max",
         "description": "Limite supérieure de tokens renvoyés par une seule requête de génération de contenu Wiki."

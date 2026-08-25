@@ -493,6 +493,10 @@
         "label": "Parallele Generierungsaufgaben",
         "description": "Maximale Anzahl von Dokumentgenerierungsaufgaben, die gleichzeitig ausgeführt werden können."
       },
+      "WIKI_MAX_CONCURRENT_GENERATIONS": {
+        "label": "Gleichzeitige Repository-Wiki-Generierungen",
+        "description": "Maximale Anzahl gleichzeitiger Repository-Wiki-Generierungen im gesamten Cluster. Instanzen teilen sich dieses Kontingent. Standard ist 1."
+      },
       "WIKI_MAX_OUTPUT_TOKENS": {
         "label": "Max. Ausgabe-Tokens",
         "description": "Obergrenze für Tokens, die von einer einzelnen Wiki-Inhaltsgenerierungsanfrage zurückgegeben werden."

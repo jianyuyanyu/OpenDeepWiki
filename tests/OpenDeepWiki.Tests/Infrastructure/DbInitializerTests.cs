@@ -87,6 +87,7 @@ public class DbInitializerTests
                 await setupContext.Database.EnsureCreatedAsync();
                 await setupContext.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys=OFF");
                 await setupContext.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS RepositoryGenerationLocks");
+                await setupContext.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS WikiGenerationSlots");
                 await setupContext.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS BranchGenerationTasks");
                 await setupContext.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS RepositoryProcessingLogs");
                 await setupContext.Database.ExecuteSqlRawAsync(@"
@@ -127,6 +128,9 @@ public class DbInitializerTests
             await using var verificationContext = CreateContext(dbPath);
             Assert.True(await TableExistsAsync(verificationContext, "BranchGenerationTasks"));
             Assert.True(await TableExistsAsync(verificationContext, "RepositoryGenerationLocks"));
+            Assert.True(await TableExistsAsync(verificationContext, "WikiGenerationSlots"));
+            Assert.True(await ColumnExistsAsync(verificationContext, "RepositoryGenerationLocks", "InstanceId"));
+            Assert.True(await ColumnExistsAsync(verificationContext, "RepositoryGenerationLocks", "HeartbeatAt"));
             Assert.True(await ColumnExistsAsync(verificationContext, "RepositoryBranches", "GenerationStatus"));
             Assert.True(await ColumnExistsAsync(verificationContext, "RepositoryBranches", "LastGenerationTaskId"));
             Assert.True(await ColumnExistsAsync(verificationContext, "RepositoryBranches", "LastGenerationError"));

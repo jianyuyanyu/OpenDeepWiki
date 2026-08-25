@@ -171,7 +171,9 @@ try
     builder.Services.AddScoped<IRepositoryAnalyzer, RepositoryAnalyzer>();
     builder.Services.AddScoped<IRepositoryFullRegenerationCleaner, RepositoryFullRegenerationCleaner>();
     builder.Services.AddScoped<IBranchFullGenerationCleaner, BranchFullGenerationCleaner>();
+    builder.Services.AddSingleton<WikiGenerationInstanceIdentity>();
     builder.Services.AddScoped<IRepositoryGenerationLockService, RepositoryGenerationLockService>();
+    builder.Services.AddScoped<IWikiGenerationCoordinator, WikiGenerationCoordinator>();
     builder.Services.AddScoped<IRepositoryBranchProcessor, RepositoryBranchProcessor>();
     builder.Services.AddScoped<IBranchGenerationTaskService, BranchGenerationTaskService>();
     builder.Services.AddScoped<IRepositoryScanPlanResolver, RepositoryScanPlanResolver>();

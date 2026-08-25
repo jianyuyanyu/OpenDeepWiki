@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -5,9 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenDeepWiki.EFCore;
 using OpenDeepWiki.Entities;
-using OpenDeepWiki.Services.Translation;
 using OpenDeepWiki.Services.Wiki;
-using System.Diagnostics;
 
 namespace OpenDeepWiki.Services.Repositories;
 
@@ -18,49 +18,54 @@ namespace OpenDeepWiki.Services.Repositories;
 public class RepositoryProcessingWorker(
     IServiceScopeFactory scopeFactory,
     ILogger<RepositoryProcessingWorker> logger,
-    IOptions<WikiGeneratorOptions> wikiOptions) : BackgroundService
+    IOptionsMonitor<WikiGeneratorOptions> wikiOptions) : BackgroundService
 {
     private static readonly TimeSpan PollingInterval = TimeSpan.FromSeconds(30);
-    private readonly WikiGeneratorOptions _wikiOptions = wikiOptions.Value;
+    private readonly ConcurrentDictionary<string, Task> _inFlight = new();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Repository processing worker started. Polling interval: {PollingInterval}s", 
-            PollingInterval.TotalSeconds);
+        logger.LogInformation(
+            "Repository processing worker started. Polling interval: {PollingInterval}s, MaxConcurrentGenerations: {MaxConcurrent}",
+            PollingInterval.TotalSeconds,
+            wikiOptions.CurrentValue.GetMaxConcurrentGenerations());
 
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                await ProcessPendingAsync(stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                logger.LogInformation("Repository processing worker is shutting down");
-                break;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Repository processing loop failed unexpectedly");
-            }
+                try
+                {
+                    await DispatchPendingAsync(stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    logger.LogInformation("Repository processing worker is shutting down");
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Repository processing loop failed unexpectedly");
+                }
 
-            await Task.Delay(PollingInterval, stoppingToken);
+                await Task.Delay(PollingInterval, stoppingToken);
+            }
+        }
+        finally
+        {
+            await WaitForInFlightAsync();
         }
 
         logger.LogInformation("Repository processing worker stopped");
     }
 
-    private async Task ProcessPendingAsync(CancellationToken stoppingToken)
+    private async Task DispatchPendingAsync(CancellationToken stoppingToken)
     {
+        PruneCompletedJobs();
+
         using var scope = scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetService<IContext>();
-        var repositoryAnalyzer = scope.ServiceProvider.GetService<IRepositoryAnalyzer>();
-        var wikiGenerator = scope.ServiceProvider.GetService<IWikiGenerator>();
-        var processingLogService = scope.ServiceProvider.GetService<IProcessingLogService>();
-        var skillMarkdownBuilder = scope.ServiceProvider.GetService<IRepositorySkillMarkdownBuilder>();
-        var scanPlanResolver = scope.ServiceProvider.GetService<IRepositoryScanPlanResolver>();
-        var branchProcessor = scope.ServiceProvider.GetService<IRepositoryBranchProcessor>();
-        var generationLockService = scope.ServiceProvider.GetService<IRepositoryGenerationLockService>();
+        var coordinator = scope.ServiceProvider.GetService<IWikiGenerationCoordinator>();
 
         if (context is null)
         {
@@ -68,97 +73,141 @@ public class RepositoryProcessingWorker(
             return;
         }
 
-        if (repositoryAnalyzer is null)
+        if (coordinator is null)
         {
-            logger.LogWarning("IRepositoryAnalyzer is not registered, skip repository processing");
+            logger.LogWarning("IWikiGenerationCoordinator is not registered, skip repository processing");
             return;
         }
 
-        if (wikiGenerator is null)
+        await coordinator.RecoverStaleWorkAsync(context, stoppingToken);
+
+        var inFlightIds = _inFlight.Keys.ToHashSet();
+        var candidates = await context.Repositories
+            .AsNoTracking()
+            .Where(item =>
+                !item.IsDeleted &&
+                (item.Status == RepositoryStatus.Pending || item.Status == RepositoryStatus.Processing) &&
+                !inFlightIds.Contains(item.Id))
+            .OrderBy(item => item.CreatedAt)
+            .Take(50)
+            .Select(item => item.Id)
+            .ToListAsync(stoppingToken);
+
+        if (candidates.Count == 0)
         {
-            logger.LogWarning("IWikiGenerator is not registered, skip repository processing");
+            logger.LogDebug("No pending repositories found");
             return;
         }
 
-        if (branchProcessor is null)
+        foreach (var repositoryId in candidates)
         {
-            logger.LogWarning("IRepositoryBranchProcessor is not registered, skip repository processing");
-            return;
-        }
+            stoppingToken.ThrowIfCancellationRequested();
 
-        if (generationLockService is null)
-        {
-            logger.LogWarning("IRepositoryGenerationLockService is not registered, skip repository processing");
-            return;
-        }
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            // Get the oldest pending repository (ordered by creation time)
-            var repository = await context.Repositories
-                .OrderBy(item => item.CreatedAt)
-                .FirstOrDefaultAsync(item => item.Status == RepositoryStatus.Pending || item.Status == RepositoryStatus.Processing, stoppingToken);
-
-            if (repository is null)
-            {
-                logger.LogDebug("No pending repositories found");
-                break;
-            }
-
-            var lockAcquired = await generationLockService.TryAcquireAsync(
+            var (status, lease) = await coordinator.TryBeginAsync(
                 context,
-                repository.Id,
+                repositoryId,
                 RepositoryGenerationLockOwnerType.Repository,
-                repository.Id,
+                repositoryId,
                 RepositoryGenerationLockScope.Repository,
+                WikiGenerationWorkType.Repository,
                 stoppingToken);
 
-            if (!lockAcquired)
+            if (status == WikiGenerationAcquireStatus.ClusterFull)
             {
                 logger.LogInformation(
-                    "Repository processing is blocked by an active generation lock. RepositoryId: {RepositoryId}",
-                    repository.Id);
+                    "Wiki generation cluster is full. MaxConcurrentGenerations: {MaxConcurrent}",
+                    wikiOptions.CurrentValue.GetMaxConcurrentGenerations());
                 break;
             }
 
-            try
+            if (status != WikiGenerationAcquireStatus.Acquired || lease is null)
             {
-                // 清除旧的处理日志
-                if (processingLogService != null)
-                {
-                    await processingLogService.ClearLogsAsync(repository.Id, stoppingToken);
-                }
+                logger.LogDebug(
+                    "Skipping repository because another worker holds it. RepositoryId: {RepositoryId}",
+                    repositoryId);
+                continue;
+            }
 
-            // 设置当前仓库ID到WikiGenerator
+            var job = ProcessRepositoryJobAsync(repositoryId, lease, stoppingToken);
+            if (!_inFlight.TryAdd(repositoryId, job))
+            {
+                await ReleaseLeaseAsync(lease);
+                continue;
+            }
+
+            _ = job.ContinueWith(
+                _ => _inFlight.TryRemove(repositoryId, out var _),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
+    }
+
+    private async Task ProcessRepositoryJobAsync(
+        string repositoryId,
+        WikiGenerationWorkLease lease,
+        CancellationToken stoppingToken)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<IContext>();
+        var coordinator = scope.ServiceProvider.GetRequiredService<IWikiGenerationCoordinator>();
+        var repositoryAnalyzer = scope.ServiceProvider.GetRequiredService<IRepositoryAnalyzer>();
+        var wikiGenerator = scope.ServiceProvider.GetRequiredService<IWikiGenerator>();
+        var branchProcessor = scope.ServiceProvider.GetRequiredService<IRepositoryBranchProcessor>();
+        var processingLogService = scope.ServiceProvider.GetService<IProcessingLogService>();
+        var skillMarkdownBuilder = scope.ServiceProvider.GetService<IRepositorySkillMarkdownBuilder>();
+        var scanPlanResolver = scope.ServiceProvider.GetService<IRepositoryScanPlanResolver>();
+
+        var repository = await context.Repositories
+            .FirstOrDefaultAsync(item => item.Id == repositoryId && !item.IsDeleted, stoppingToken);
+
+        if (repository is null)
+        {
+            await coordinator.ReleaseAsync(context, lease, CancellationToken.None);
+            return;
+        }
+
+        await using var heartbeat = WikiGenerationHeartbeat.Start(
+            scopeFactory,
+            lease,
+            wikiOptions.CurrentValue,
+            logger,
+            stoppingToken);
+
+        try
+        {
+            if (processingLogService != null)
+            {
+                await processingLogService.ClearLogsAsync(repository.Id, stoppingToken);
+            }
+
             if (wikiGenerator is WikiGenerator generator)
             {
                 generator.SetCurrentRepository(repository.Id, $"{repository.OrgName}/{repository.RepoName}");
             }
 
-            // Transition to Processing status
             repository.Status = RepositoryStatus.Processing;
             repository.UpdateTimestamp();
             context.Repositories.Update(repository);
             await context.SaveChangesAsync(stoppingToken);
 
-            // 记录开始处理
             if (processingLogService != null)
             {
-                await processingLogService.LogAsync(repository.Id, ProcessingStep.Workspace, 
+                await processingLogService.LogAsync(repository.Id, ProcessingStep.Workspace,
                     $"Starting repository processing: {repository.OrgName}/{repository.RepoName}", cancellationToken: stoppingToken);
             }
 
             var stopwatch = Stopwatch.StartNew();
             logger.LogInformation(
-                "Starting repository processing. RepositoryId: {RepositoryId}, Repository: {Org}/{Repo}, GitUrl: {GitUrl}",
-                repository.Id, repository.OrgName, repository.RepoName, repository.GitUrl);
+                "Starting repository processing. RepositoryId: {RepositoryId}, Repository: {Org}/{Repo}, GitUrl: {GitUrl}, Slot: {SlotIndex}",
+                repository.Id, repository.OrgName, repository.RepoName, repository.GitUrl, lease.SlotIndex);
 
             try
             {
                 await ProcessRepositoryAsync(
-                    repository, 
-                    context, 
-                    repositoryAnalyzer, 
+                    repository,
+                    context,
+                    repositoryAnalyzer,
                     wikiGenerator,
                     branchProcessor,
                     skillMarkdownBuilder,
@@ -167,23 +216,21 @@ public class RepositoryProcessingWorker(
                     stoppingToken);
 
                 stopwatch.Stop();
-                // Transition to Completed status
                 repository.Status = RepositoryStatus.Completed;
                 logger.LogInformation(
                     "Repository processing completed successfully. RepositoryId: {RepositoryId}, Repository: {Org}/{Repo}, Duration: {Duration}ms",
                     repository.Id, repository.OrgName, repository.RepoName, stopwatch.ElapsedMilliseconds);
 
-                // 记录完成
                 if (processingLogService != null)
                 {
-                    await processingLogService.LogAsync(repository.Id, ProcessingStep.Complete, 
+                    await processingLogService.LogAsync(repository.Id, ProcessingStep.Complete,
                         $"Repository processing complete, total time: {stopwatch.ElapsedMilliseconds}ms", cancellationToken: stoppingToken);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 stopwatch.Stop();
-                repository.Status = RepositoryStatus.Pending; // Reset to pending for retry
+                repository.Status = RepositoryStatus.Pending;
                 logger.LogWarning(
                     "Repository processing cancelled. RepositoryId: {RepositoryId}, Repository: {Org}/{Repo}, Duration: {Duration}ms",
                     repository.Id, repository.OrgName, repository.RepoName, stopwatch.ElapsedMilliseconds);
@@ -192,33 +239,69 @@ public class RepositoryProcessingWorker(
             catch (Exception ex)
             {
                 stopwatch.Stop();
-                // Transition to Failed status
                 repository.Status = RepositoryStatus.Failed;
-                logger.LogError(ex, 
+                logger.LogError(ex,
                     "Repository processing failed. RepositoryId: {RepositoryId}, Repository: {Org}/{Repo}, Duration: {Duration}ms, ErrorType: {ErrorType}",
                     repository.Id, repository.OrgName, repository.RepoName, stopwatch.ElapsedMilliseconds, ex.GetType().Name);
 
-                // 记录失败
                 if (processingLogService != null)
                 {
-                    await processingLogService.LogAsync(repository.Id, ProcessingStep.Content, 
+                    await processingLogService.LogAsync(repository.Id, ProcessingStep.Content,
                         $"Processing failed: {ex.Message}", cancellationToken: stoppingToken);
                 }
             }
 
-                repository.UpdateTimestamp();
-                context.Repositories.Update(repository);
-                await context.SaveChangesAsync(stoppingToken);
-            }
-            finally
+            repository.UpdateTimestamp();
+            context.Repositories.Update(repository);
+            await context.SaveChangesAsync(stoppingToken);
+        }
+        finally
+        {
+            await coordinator.ReleaseAsync(context, lease, CancellationToken.None);
+        }
+    }
+
+    private async Task ReleaseLeaseAsync(WikiGenerationWorkLease lease)
+    {
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<IContext>();
+            var coordinator = scope.ServiceProvider.GetRequiredService<IWikiGenerationCoordinator>();
+            await coordinator.ReleaseAsync(context, lease, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to release wiki generation lease. RepositoryId: {RepositoryId}", lease.RepositoryId);
+        }
+    }
+
+    private void PruneCompletedJobs()
+    {
+        foreach (var (repositoryId, task) in _inFlight.ToArray())
+        {
+            if (task.IsCompleted)
             {
-                await generationLockService.ReleaseAsync(
-                    context,
-                    repository.Id,
-                    RepositoryGenerationLockOwnerType.Repository,
-                    repository.Id,
-                    CancellationToken.None);
+                _inFlight.TryRemove(repositoryId, out _);
             }
+        }
+    }
+
+    private async Task WaitForInFlightAsync()
+    {
+        var running = _inFlight.Values.ToArray();
+        if (running.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.WhenAll(running);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "One or more repository generation jobs ended with an error during shutdown");
         }
     }
 

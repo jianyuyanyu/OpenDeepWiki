@@ -147,6 +147,15 @@ public class IncrementalUpdateService : IIncrementalUpdateService
                     $"Repository or branch not found. RepositoryId: {repositoryId}, BranchId: {branchId}");
             }
 
+            if (repository.Status is RepositoryStatus.Pending or RepositoryStatus.Processing)
+            {
+                return new IncrementalUpdateResult
+                {
+                    Success = false,
+                    ErrorMessage = "Repository generation is active"
+                };
+            }
+
             var previousCommitId = branch.LastCommitId;
             var workspace = await PrepareWorkspaceWithRetryAsync(
                 repository, branch.BranchName, previousCommitId, cancellationToken);

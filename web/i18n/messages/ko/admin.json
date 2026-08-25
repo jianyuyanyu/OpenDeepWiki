@@ -453,6 +453,10 @@
         "label": "병렬 생성 작업 수",
         "description": "동시에 실행할 수 있는 문서 생성 작업의 최대 개수입니다."
       },
+      "WIKI_MAX_CONCURRENT_GENERATIONS": {
+        "label": "동시 저장소 Wiki 생성 수",
+        "description": "클러스터 전체에서 동시에 실행할 수 있는 저장소 Wiki 생성 수 상한입니다. 인스턴스가 이 할당량을 공유합니다. 기본값은 1입니다."
+      },
       "WIKI_MAX_OUTPUT_TOKENS": {
         "label": "최대 출력 토큰",
         "description": "한 번의 Wiki 콘텐츠 생성 요청에서 반환할 수 있는 최대 토큰 수입니다."

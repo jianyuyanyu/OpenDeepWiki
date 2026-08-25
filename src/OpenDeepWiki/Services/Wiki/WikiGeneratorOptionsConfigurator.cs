@@ -43,6 +43,24 @@ public static class WikiGeneratorOptionsConfigurator
                 configuration,
                 $"{WikiGeneratorOptions.SectionName}:Languages",
                 options.Languages));
+
+        options.MaxConcurrentGenerations = ResolveIntValue(
+            configuration,
+            "WIKI_MAX_CONCURRENT_GENERATIONS",
+            ResolveIntValue(
+                configuration,
+                $"{WikiGeneratorOptions.SectionName}:MaxConcurrentGenerations",
+                options.MaxConcurrentGenerations));
+    }
+
+    private static int ResolveIntValue(
+        IConfiguration configuration,
+        string sectionKey,
+        int fallbackValue)
+    {
+        return int.TryParse(configuration[sectionKey], out var parsed)
+            ? parsed
+            : fallbackValue;
     }
 
     private static string? ResolveStringValue(

@@ -88,6 +88,30 @@ public class WikiGeneratorOptionsConfiguratorTests
         Assert.Equal("en,zh,pt-br", options.Languages);
     }
 
+    [Fact]
+    public void Apply_ShouldBindMaxConcurrentGenerations_FromEnvironmentVariable()
+    {
+        var configuration = BuildConfiguration(new Dictionary<string, string?>
+        {
+            ["WIKI_MAX_CONCURRENT_GENERATIONS"] = "3"
+        });
+
+        var options = new WikiGeneratorOptions();
+
+        WikiGeneratorOptionsConfigurator.Apply(options, configuration);
+
+        Assert.Equal(3, options.MaxConcurrentGenerations);
+        Assert.Equal(3, options.GetMaxConcurrentGenerations());
+    }
+
+    [Fact]
+    public void GetMaxConcurrentGenerations_ShouldClampToAtLeastOne()
+    {
+        var options = new WikiGeneratorOptions { MaxConcurrentGenerations = 0 };
+
+        Assert.Equal(1, options.GetMaxConcurrentGenerations());
+    }
+
     private static IConfiguration BuildConfiguration(IEnumerable<KeyValuePair<string, string?>> settings)
     {
         return new ConfigurationBuilder()

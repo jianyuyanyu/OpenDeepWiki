@@ -468,6 +468,25 @@ public static class DbInitializer
         await ctx.Database.ExecuteSqlRawAsync(
             "CREATE UNIQUE INDEX IF NOT EXISTS IX_RepositoryGenerationLocks_RepositoryId ON RepositoryGenerationLocks (RepositoryId)");
 
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS WikiGenerationSlots (
+                Id TEXT NOT NULL PRIMARY KEY,
+                SlotIndex INTEGER NOT NULL,
+                WorkType INTEGER,
+                RepositoryId TEXT,
+                OwnerId TEXT,
+                InstanceId TEXT,
+                AcquiredAt TEXT,
+                HeartbeatAt TEXT,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT,
+                DeletedAt TEXT,
+                IsDeleted INTEGER NOT NULL DEFAULT 0,
+                Version BLOB
+            )");
+        await ctx.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS IX_WikiGenerationSlots_SlotIndex ON WikiGenerationSlots (SlotIndex)");
+
         // Add Description column if not exists
         var connection = ctx.Database.GetDbConnection();
         if (connection.State != System.Data.ConnectionState.Open)
@@ -512,6 +531,8 @@ public static class DbInitializer
         await AddSqliteColumnIfMissingAsync(connection, ctx, "RepositoryBranches", "LastGenerationCompletedAt", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "RepositoryProcessingLogs", "BranchId", "TEXT");
         await AddSqliteColumnIfMissingAsync(connection, ctx, "RepositoryProcessingLogs", "GenerationTaskId", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "RepositoryGenerationLocks", "InstanceId", "TEXT");
+        await AddSqliteColumnIfMissingAsync(connection, ctx, "RepositoryGenerationLocks", "HeartbeatAt", "TEXT");
         await ctx.Database.ExecuteSqlRawAsync(
             "CREATE INDEX IF NOT EXISTS IX_RepositoryProcessingLogs_RepositoryId_BranchId_GenerationTaskId_CreatedAt ON RepositoryProcessingLogs (RepositoryId, BranchId, GenerationTaskId, CreatedAt)");
         await ctx.Database.ExecuteSqlRawAsync(
@@ -718,6 +739,25 @@ public static class DbInitializer
         await ctx.Database.ExecuteSqlRawAsync(@"
             CREATE UNIQUE INDEX IF NOT EXISTS ""IX_RepositoryGenerationLocks_RepositoryId"" ON ""RepositoryGenerationLocks"" (""RepositoryId"")");
 
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ""WikiGenerationSlots"" (
+                ""Id"" TEXT NOT NULL PRIMARY KEY,
+                ""SlotIndex"" INTEGER NOT NULL,
+                ""WorkType"" INTEGER,
+                ""RepositoryId"" TEXT,
+                ""OwnerId"" TEXT,
+                ""InstanceId"" TEXT,
+                ""AcquiredAt"" TIMESTAMP WITH TIME ZONE,
+                ""HeartbeatAt"" TIMESTAMP WITH TIME ZONE,
+                ""CreatedAt"" TIMESTAMP WITH TIME ZONE NOT NULL,
+                ""UpdatedAt"" TIMESTAMP WITH TIME ZONE,
+                ""DeletedAt"" TIMESTAMP WITH TIME ZONE,
+                ""IsDeleted"" BOOLEAN NOT NULL DEFAULT FALSE,
+                ""Version"" BYTEA
+            )");
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE UNIQUE INDEX IF NOT EXISTS ""IX_WikiGenerationSlots_SlotIndex"" ON ""WikiGenerationSlots"" (""SlotIndex"")");
+
         // Add Description column if not exists
         await ctx.Database.ExecuteSqlRawAsync(@"
             ALTER TABLE ""Repositories"" ADD COLUMN IF NOT EXISTS ""Description"" TEXT;
@@ -759,7 +799,9 @@ public static class DbInitializer
             ALTER TABLE ""RepositoryBranches"" ADD COLUMN IF NOT EXISTS ""LastGenerationStartedAt"" TIMESTAMP WITH TIME ZONE;
             ALTER TABLE ""RepositoryBranches"" ADD COLUMN IF NOT EXISTS ""LastGenerationCompletedAt"" TIMESTAMP WITH TIME ZONE;
             ALTER TABLE ""RepositoryProcessingLogs"" ADD COLUMN IF NOT EXISTS ""BranchId"" TEXT;
-            ALTER TABLE ""RepositoryProcessingLogs"" ADD COLUMN IF NOT EXISTS ""GenerationTaskId"" TEXT;");
+            ALTER TABLE ""RepositoryProcessingLogs"" ADD COLUMN IF NOT EXISTS ""GenerationTaskId"" TEXT;
+            ALTER TABLE ""RepositoryGenerationLocks"" ADD COLUMN IF NOT EXISTS ""InstanceId"" TEXT;
+            ALTER TABLE ""RepositoryGenerationLocks"" ADD COLUMN IF NOT EXISTS ""HeartbeatAt"" TIMESTAMP WITH TIME ZONE;");
         await ctx.Database.ExecuteSqlRawAsync(@"
             CREATE INDEX IF NOT EXISTS ""IX_RepositoryProcessingLogs_RepositoryId_BranchId_GenerationTaskId_CreatedAt"" ON ""RepositoryProcessingLogs"" (""RepositoryId"", ""BranchId"", ""GenerationTaskId"", ""CreatedAt"")");
         await ctx.Database.ExecuteSqlRawAsync(@"
