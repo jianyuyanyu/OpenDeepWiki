@@ -97,6 +97,28 @@ public class BatchSyncItemResult
 }
 
 /// <summary>
+/// 批量触发仓库全量重生成结果
+/// </summary>
+public class BatchRegenerateResult
+{
+    public int TotalCount { get; set; }
+    public int SuccessCount { get; set; }
+    public int FailedCount { get; set; }
+    public List<BatchRegenerateItemResult> Results { get; set; } = new();
+}
+
+/// <summary>
+/// 批量触发仓库全量重生成单项结果
+/// </summary>
+public class BatchRegenerateItemResult
+{
+    public string Id { get; set; } = string.Empty;
+    public string RepoName { get; set; } = string.Empty;
+    public bool Success { get; set; }
+    public string? Message { get; set; }
+}
+
+/// <summary>
 /// 批量删除结果
 /// </summary>
 public class BatchDeleteResult

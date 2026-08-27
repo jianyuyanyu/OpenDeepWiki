@@ -22,6 +22,11 @@ public interface IAdminRepositoryService
     /// 批量同步仓库统计信息
     /// </summary>
     Task<BatchSyncStatsResult> BatchSyncRepositoryStatsAsync(string[] ids);
+
+    /// <summary>
+    /// 批量触发仓库全量重生成
+    /// </summary>
+    Task<BatchRegenerateResult> BatchRegenerateRepositoriesAsync(string[] ids);
     
     /// <summary>
     /// 批量删除仓库

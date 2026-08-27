@@ -206,6 +206,17 @@ public static class AdminRepositoryEndpoints
         .WithName("AdminRegenerateRepositoryDocument")
         .WithSummary("触发指定文档重生成");
 
+        // 批量触发仓库全量重生成
+        repoGroup.MapPost("/batch/regenerate", async (
+            [FromBody] BatchOperationRequest request,
+            [FromServices] IAdminRepositoryService repositoryService) =>
+        {
+            var result = await repositoryService.BatchRegenerateRepositoriesAsync(request.Ids);
+            return Results.Ok(new { success = true, data = result });
+        })
+        .WithName("AdminBatchRegenerateRepositories")
+        .WithSummary("批量触发仓库全量重生成");
+
         // 手动更新指定文档内容
         repoGroup.MapPut("/{id}/documents/content", async (
             string id,

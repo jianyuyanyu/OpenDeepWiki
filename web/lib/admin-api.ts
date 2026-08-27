@@ -344,6 +344,30 @@ export async function batchSyncRepositoryStats(ids: string[]): Promise<BatchSync
   return result.data;
 }
 
+// Batch regenerate repositories
+export interface BatchRegenerateItemResult {
+  id: string;
+  repoName: string;
+  success: boolean;
+  message?: string;
+}
+
+export interface BatchRegenerateResult {
+  totalCount: number;
+  successCount: number;
+  failedCount: number;
+  results: BatchRegenerateItemResult[];
+}
+
+export async function batchRegenerateRepositories(ids: string[]): Promise<BatchRegenerateResult> {
+  const url = buildApiUrl("/api/admin/repositories/batch/regenerate");
+  const result = await fetchWithAuth(url, {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+  return result.data;
+}
+
 // Batch delete repositories
 export interface BatchDeleteResult {
   totalCount: number;

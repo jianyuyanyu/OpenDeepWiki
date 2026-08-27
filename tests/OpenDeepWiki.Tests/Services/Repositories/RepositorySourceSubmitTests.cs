@@ -694,6 +694,123 @@ public class RepositorySourceSubmitTests
     }
 
     [Fact]
+    public async Task AdminBatchRegenerateRepositoriesAsync_QueuesEligibleRepositoriesAndReportsActiveOnes()
+    {
+        using var context = CreateContext();
+        var eligible = await SeedRepositoryWithDocumentAsync(context, RepositoryStatus.Completed);
+        var active = await SeedRepositoryWithDocumentAsync(context, RepositoryStatus.Pending);
+        var service = CreateAdminService(context);
+
+        var result = await service.BatchRegenerateRepositoriesAsync([
+            eligible.RepositoryId,
+            active.RepositoryId
+        ]);
+
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(1, result.SuccessCount);
+        Assert.Equal(1, result.FailedCount);
+
+        var queuedItem = Assert.Single(result.Results, item => item.Id == eligible.RepositoryId);
+        Assert.True(queuedItem.Success);
+        var rejectedItem = Assert.Single(result.Results, item => item.Id == active.RepositoryId);
+        Assert.False(rejectedItem.Success);
+        Assert.Contains("正在处理中", rejectedItem.Message);
+
+        Assert.Equal(
+            RepositoryStatus.Pending,
+            (await context.Repositories.SingleAsync(item => item.Id == eligible.RepositoryId)).Status);
+        Assert.True(await context.DocCatalogs.AnyAsync(item => item.Id == active.CatalogId));
+        Assert.False(await context.DocCatalogs.AnyAsync(item => item.Id == eligible.CatalogId));
+        Assert.False(await context.DocFiles.AnyAsync(item => item.Id == eligible.DocFileId));
+
+        var generationLock = await context.RepositoryGenerationLocks
+            .SingleAsync(item => item.RepositoryId == eligible.RepositoryId);
+        Assert.Equal(RepositoryGenerationLockOwnerType.Repository, generationLock.OwnerType);
+        Assert.Equal(eligible.RepositoryId, generationLock.OwnerId);
+    }
+
+    [Fact]
+    public async Task AdminBatchRegenerateRepositoriesAsync_WhenInputIsEmpty_ReturnsEmptyResult()
+    {
+        using var context = CreateContext();
+        var service = CreateAdminService(context);
+
+        var result = await service.BatchRegenerateRepositoriesAsync([" ", "\t"]);
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Equal(0, result.SuccessCount);
+        Assert.Equal(0, result.FailedCount);
+        Assert.Empty(result.Results);
+        Assert.Empty(await context.RepositoryGenerationLocks.ToListAsync());
+    }
+
+    [Fact]
+    public async Task AdminBatchRegenerateRepositoriesAsync_NormalizesDuplicateAndUnknownIds()
+    {
+        using var context = CreateContext();
+        var seeded = await SeedRepositoryWithDocumentAsync(context, RepositoryStatus.Completed);
+        const string unknownRepositoryId = "missing-repository";
+        var service = CreateAdminService(context);
+
+        var result = await service.BatchRegenerateRepositoriesAsync([
+            " ",
+            $" {seeded.RepositoryId} ",
+            seeded.RepositoryId,
+            unknownRepositoryId
+        ]);
+
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(1, result.SuccessCount);
+        Assert.Equal(1, result.FailedCount);
+        Assert.Equal(
+            new[] { seeded.RepositoryId, unknownRepositoryId },
+            result.Results.Select(item => item.Id));
+
+        var unknownItem = Assert.Single(result.Results, item => item.Id == unknownRepositoryId);
+        Assert.False(unknownItem.Success);
+        Assert.Equal(unknownRepositoryId, unknownItem.RepoName);
+        Assert.Contains("仓库不存在", unknownItem.Message);
+    }
+
+    [Fact]
+    public async Task AdminBatchRegenerateRepositoriesAsync_WhenOneItemThrows_ContinuesWithRemainingRepositories()
+    {
+        using var context = CreateContext();
+        var failing = await SeedRepositoryWithDocumentAsync(context, RepositoryStatus.Completed);
+        var succeeding = await SeedRepositoryWithDocumentAsync(context, RepositoryStatus.Completed);
+        var service = CreateAdminService(
+            context,
+            fullRegenerationCleaner: new ThrowingRepositoryCleaner(failing.RepositoryId));
+
+        var result = await service.BatchRegenerateRepositoriesAsync([
+            failing.RepositoryId,
+            succeeding.RepositoryId
+        ]);
+
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(1, result.SuccessCount);
+        Assert.Equal(1, result.FailedCount);
+
+        var failedItem = Assert.Single(result.Results, item => item.Id == failing.RepositoryId);
+        Assert.False(failedItem.Success);
+        Assert.Equal("触发全量重生成失败，请稍后重试", failedItem.Message);
+
+        var succeededItem = Assert.Single(result.Results, item => item.Id == succeeding.RepositoryId);
+        Assert.True(succeededItem.Success);
+
+        Assert.Equal(
+            RepositoryStatus.Completed,
+            (await context.Repositories.SingleAsync(item => item.Id == failing.RepositoryId)).Status);
+        Assert.Equal(
+            RepositoryStatus.Pending,
+            (await context.Repositories.SingleAsync(item => item.Id == succeeding.RepositoryId)).Status);
+        Assert.True(await context.DocCatalogs.AnyAsync(item => item.Id == failing.CatalogId));
+        Assert.False(await context.DocCatalogs.AnyAsync(item => item.Id == succeeding.CatalogId));
+        Assert.False(await context.RepositoryGenerationLocks.AnyAsync(item => item.RepositoryId == failing.RepositoryId));
+        Assert.True(await context.RepositoryGenerationLocks.AnyAsync(item => item.RepositoryId == succeeding.RepositoryId));
+    }
+
+    [Fact]
     public void RepositoryStatus_ProcessingMatchesAdminApiStatusValue()
     {
         Assert.Equal(0, (int)RepositoryStatus.Pending);
@@ -930,14 +1047,15 @@ public class RepositorySourceSubmitTests
 
     private static AdminRepositoryService CreateAdminService(
         TestDbContext context,
-        IRepositoryAnalyzer? repositoryAnalyzer = null)
+        IRepositoryAnalyzer? repositoryAnalyzer = null,
+        IRepositoryFullRegenerationCleaner? fullRegenerationCleaner = null)
     {
         return new AdminRepositoryService(
             context,
             Mock.Of<IGitPlatformService>(),
             repositoryAnalyzer ?? Mock.Of<IRepositoryAnalyzer>(),
             Mock.Of<IWikiGenerator>(),
-            new RepositoryFullRegenerationCleaner(),
+            fullRegenerationCleaner ?? new RepositoryFullRegenerationCleaner(),
             CreateScanPlanResolver(),
             new RepositoryGenerationLockService(context));
     }
@@ -947,6 +1065,21 @@ public class RepositorySourceSubmitTests
         var monitor = new Mock<IOptionsMonitor<WikiGeneratorOptions>>();
         monitor.SetupGet(item => item.CurrentValue).Returns(new WikiGeneratorOptions());
         return new RepositoryScanPlanResolver(monitor.Object);
+    }
+
+    private sealed class ThrowingRepositoryCleaner(string repositoryId) : IRepositoryFullRegenerationCleaner
+    {
+        private readonly RepositoryFullRegenerationCleaner _inner = new();
+
+        public Task CleanAsync(IContext context, Repository repository, CancellationToken cancellationToken = default)
+        {
+            if (repository.Id == repositoryId)
+            {
+                throw new InvalidOperationException("simulated cleaner failure");
+            }
+
+            return _inner.CleanAsync(context, repository, cancellationToken);
+        }
     }
 
     private static TestDbContext CreateContext()

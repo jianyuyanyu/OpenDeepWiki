@@ -523,6 +523,86 @@ public class AdminRepositoryService : IAdminRepositoryService
         return result;
     }
 
+    public async Task<BatchRegenerateResult> BatchRegenerateRepositoriesAsync(string[] ids)
+    {
+        var repositoryIds = (ids ?? Array.Empty<string>())
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        if (repositoryIds.Length == 0)
+        {
+            return new BatchRegenerateResult();
+        }
+
+        var repositories = await _context.Repositories
+            .AsNoTracking()
+            .Where(repository => repositoryIds.Contains(repository.Id) && !repository.IsDeleted)
+            .Select(repository => new
+            {
+                repository.Id,
+                repository.OrgName,
+                repository.RepoName
+            })
+            .ToListAsync();
+        var repositoryNames = repositories.ToDictionary(
+            repository => repository.Id,
+            repository => $"{repository.OrgName}/{repository.RepoName}");
+
+        var result = new BatchRegenerateResult
+        {
+            TotalCount = repositoryIds.Length
+        };
+
+        // Regeneration mutates the shared DbContext and holds a repository-level lock.
+        // Keep this sequential so each repository preserves the same transaction and lock
+        // semantics as the existing single-repository operation.
+        foreach (var repositoryId in repositoryIds)
+        {
+            var repoName = repositoryNames.TryGetValue(repositoryId, out var name)
+                ? name
+                : repositoryId;
+
+            try
+            {
+                var operation = await RegenerateRepositoryAsync(repositoryId);
+                result.Results.Add(new BatchRegenerateItemResult
+                {
+                    Id = repositoryId,
+                    RepoName = repoName,
+                    Success = operation.Success,
+                    Message = operation.Message
+                });
+
+                if (operation.Success)
+                {
+                    result.SuccessCount++;
+                }
+                else
+                {
+                    result.FailedCount++;
+                }
+            }
+            catch
+            {
+                // A failed per-repository transaction must not leave tracked changes that
+                // affect the remaining selected repositories.
+                EfContextTransaction.ClearPendingChanges(_context);
+                result.Results.Add(new BatchRegenerateItemResult
+                {
+                    Id = repositoryId,
+                    RepoName = repoName,
+                    Success = false,
+                    Message = "触发全量重生成失败，请稍后重试"
+                });
+                result.FailedCount++;
+            }
+        }
+
+        return result;
+    }
+
     public async Task<BatchDeleteResult> BatchDeleteRepositoriesAsync(string[] ids)
     {
         var result = new BatchDeleteResult

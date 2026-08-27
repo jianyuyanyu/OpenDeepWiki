@@ -88,6 +88,7 @@ import {
   updateRepositoryStatus,
   syncRepositoryStats,
   batchSyncRepositoryStats,
+  batchRegenerateRepositories,
   batchDeleteRepositories,
   AdminRepository,
   RepositoryListResponse,
@@ -118,7 +119,9 @@ export default function AdminRepositoriesPage() {
   const [syncing, setSyncing] = useState<string | null>(null);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [batchSyncing, setBatchSyncing] = useState(false);
+  const [batchRegenerating, setBatchRegenerating] = useState(false);
   const [batchDeleting, setBatchDeleting] = useState(false);
+  const [showBatchRegenerateConfirm, setShowBatchRegenerateConfirm] = useState(false);
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const t = useTranslations();
@@ -266,11 +269,40 @@ export default function AdminRepositoriesPage() {
           failed: result.failedCount,
         })
       );
-      fetchData();
+      await fetchData();
     } catch {
       toast.error(t("admin.toast.syncFailed"));
     } finally {
       setBatchSyncing(false);
+    }
+  };
+
+  const handleBatchRegenerate = async () => {
+    if (selectedIds.size === 0) return;
+
+    setBatchRegenerating(true);
+    try {
+      const result = await batchRegenerateRepositories(Array.from(selectedIds));
+      const failedItems = result.results.filter((item) => !item.success);
+      const resultMessage = t("admin.repositories.batchRegenerateResult", {
+        success: result.successCount,
+        failed: result.failedCount,
+      });
+
+      if (failedItems.length > 0) {
+        console.warn("Some repositories failed to regenerate:", failedItems);
+        toast.warning(resultMessage);
+      } else {
+        toast.success(resultMessage);
+      }
+
+      setShowBatchRegenerateConfirm(false);
+      await fetchData();
+    } catch (error) {
+      console.error("Failed to regenerate repositories:", error);
+      toast.error(t("admin.repositories.batchRegenerateFailed"));
+    } finally {
+      setBatchRegenerating(false);
     }
   };
 
@@ -315,6 +347,8 @@ export default function AdminRepositoriesPage() {
   const allSelected =
     data && data.items.length > 0 && selectedIds.size === data.items.length;
   const someSelected = selectedIds.size > 0 && !allSelected;
+  const batchOperationInProgress =
+    batchSyncing || batchRegenerating || batchDeleting;
   const isEmpty = !loading && (data?.items.length ?? 0) === 0;
 
   const toolbar = (
@@ -358,7 +392,7 @@ export default function AdminRepositoriesPage() {
             size="sm"
             className="h-7"
             onClick={handleBatchSync}
-            disabled={batchSyncing}
+            disabled={batchOperationInProgress}
           >
             {batchSyncing ? (
               <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -368,10 +402,25 @@ export default function AdminRepositoriesPage() {
             {t("admin.repositories.batchSync")}
           </Button>
           <Button
+            variant="outline"
+            size="sm"
+            className="h-7"
+            onClick={() => setShowBatchRegenerateConfirm(true)}
+            disabled={batchOperationInProgress}
+          >
+            {batchRegenerating ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-1 h-3.5 w-3.5" />
+            )}
+            {t("admin.repositories.batchRegenerate")}
+          </Button>
+          <Button
             variant="destructive"
             size="sm"
             className="h-7"
             onClick={() => setShowBatchDeleteConfirm(true)}
+            disabled={batchOperationInProgress}
           >
             <Trash2 className="mr-1 h-3.5 w-3.5" />
             {t("admin.repositories.batchDelete")}
@@ -381,6 +430,7 @@ export default function AdminRepositoriesPage() {
             size="sm"
             className="h-7"
             onClick={() => setSelectedIds(new Set())}
+            disabled={batchOperationInProgress}
           >
             {t("admin.repositories.cancelSelect")}
           </Button>
@@ -752,6 +802,51 @@ export default function AdminRepositoriesPage() {
               className="bg-red-600 hover:bg-red-700"
             >
               {t("admin.common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 批量重新生成确认对话框 */}
+      <AlertDialog
+        open={showBatchRegenerateConfirm}
+        onOpenChange={(open) => {
+          if (!batchRegenerating) {
+            setShowBatchRegenerateConfirm(open);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t("admin.repositories.confirmBatchRegenerate")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("admin.repositories.batchRegenerateWarning", {
+                count: selectedIds.size,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={batchRegenerating}>
+              {t("admin.common.cancel")}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleBatchRegenerate();
+              }}
+              className="bg-amber-600 hover:bg-amber-700"
+              disabled={batchRegenerating}
+            >
+              {batchRegenerating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t("admin.repositories.batchRegenerating")}
+                </>
+              ) : (
+                t("admin.repositories.batchRegenerate")
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
