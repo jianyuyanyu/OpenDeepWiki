@@ -31,7 +31,7 @@ cd OpenDeepWiki
 <Step>
 ### 配置环境变量
 
-编辑 `compose.yaml` 文件并设置你的 AI 提供商凭证。至少需要配置：
+编辑 `compose.yaml` 文件并设置你的 AI 提供商凭证。最少需要把 JWT 密钥和 AI 配置改成真实值：
 
 ```yaml title="compose.yaml"
 services:
@@ -40,6 +40,8 @@ services:
       # 数据库（sqlite 是默认值，无需额外设置）
       - DB_TYPE=sqlite
       - CONNECTION_STRING=Data Source=/data/opendeepwiki.db
+
+      - JWT_SECRET_KEY=replace-this-in-production
 
       # AI 服务 — 用于聊天功能
       - CHAT_API_KEY=your-api-key
@@ -71,7 +73,7 @@ services:
 ### 启动服务
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 或者如果你已安装 `make`：
@@ -81,13 +83,13 @@ make up
 ```
 
 这将启动两个容器：
-- **opendeepwiki**（后端 API）在端口 `8080`
-- **web**（Next.js 前端）在端口 `3000`
+- **opendeepwiki**（后端 API）容器内端口 `8080`（当前 `compose.yaml` 映射到宿主机 `8081`）
+- **web**（Next.js 前端）容器内端口 `3000`（当前 `compose.yaml` 映射到宿主机 `8090`）
 </Step>
 
 </Steps>
 
-两个服务都健康后，在浏览器中打开 [http://localhost:3000](http://localhost:3000)。
+两个服务都健康后，在浏览器中打开 [http://localhost:8090](http://localhost:8090)。
 
 ## 关键环境变量
 
@@ -95,14 +97,15 @@ make up
 |---|---|---|
 | `DB_TYPE` | 数据库类型：`sqlite` 或 `postgresql` | `sqlite` |
 | `CONNECTION_STRING` | 数据库连接字符串 | `Data Source=/data/opendeepwiki.db` |
+| `JWT_SECRET_KEY` | JWT 签名密钥（生产环境需更改） | 默认密钥 |
 | `CHAT_API_KEY` | 聊天 AI 提供商的 API 密钥 | — |
 | `ENDPOINT` | 聊天 AI 端点 URL | `https://api.openai.com/v1` |
-| `CHAT_REQUEST_TYPE` | 提供商类型：`OpenAI`、`AzureOpenAI`、`Anthropic` | `OpenAI` |
+| `CHAT_REQUEST_TYPE` | 提供商类型：`OpenAI`、`AzureOpenAI`、`OpenAIResponses`、`Anthropic`、`DeepSeekOpenAI` | `OpenAI` |
 | `WIKI_CATALOG_MODEL` | 用于生成 wiki 目录结构的模型 | `gpt-4o` |
 | `WIKI_CONTENT_MODEL` | 用于生成 wiki 内容的模型 | `gpt-4o` |
 | `WIKI_PARALLEL_COUNT` | 并行 wiki 生成任务数 | `5` |
 | `WIKI_LANGUAGES` | 输出的语言代码（逗号分隔） | `en,zh,zh-tw,ja,ko,es,fr,de,pt-br,pl,ru,ar` |
-| `JWT_SECRET_KEY` | JWT 签名密钥（生产环境需更改） | 默认密钥 |
+| `LOCAL_IMPORT_ROOT` | 允许导入的本地目录根路径（本地目录导入功能） | — |
 
 <Callout type="warn">
   在生产部署中始终更改 `JWT_SECRET_KEY`。默认密钥仅用于开发。

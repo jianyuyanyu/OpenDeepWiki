@@ -97,6 +97,10 @@ Streamable HTTP 是现代推荐的传输模式。如果你的 MCP 客户端支�
 }
 ```
 
+## MCP_ENABLED 环境变量
+
+设置 `MCP_ENABLED=false` 可完全关闭 MCP 端点注册（默认为 `true`）。适用于只把 OpenDeepWiki 当作文档站或聊天服务使用、不对外暴露 MCP 的部署。
+
 ## MCP_STREAMABLE 环境变量
 
 `MCP_STREAMABLE` 环境变量允许你在服务器级别为特定 AI 服务配置 MCP Streamable HTTP 支持。这在 OpenDeepWiki 充当 MCP **客户端**连接到外部 MCP 工具服务器时使用。

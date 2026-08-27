@@ -18,12 +18,12 @@ import { Callout } from "fumadocs-ui/components/callout";
 
 | 工具 | 版本 | 用途 |
 |---|---|---|
-| [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ (预览版) | 后端构建和运行 |
+| [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | 后端构建和运行 |
 | [Node.js](https://nodejs.org/) | 18+ | 前端构建和运行 |
 | [Git](https://git-scm.com/) | 最新版 | 仓库克隆（后端运行时使用） |
 
 <Callout type="info">
-  后端目标是 `net10.0`。确保已安装 .NET 10 预览版 SDK。使用 `dotnet --version` 检查。
+  后端目标是 `net10.0`。确保已安装 .NET 10 SDK。使用 `dotnet --version` 检查。
 </Callout>
 
 ## 设置
@@ -68,7 +68,7 @@ export WIKI_CATALOG_API_KEY=your-api-key
 export WIKI_CONTENT_API_KEY=your-api-key
 ```
 
-默认情况下，后端使用 SQLite，本地数据库文件为 `opendeepwiki.db`（项目目录中）。
+默认情况下，后端使用 SQLite，数据库路径来自 `ConnectionStrings:Default`（容器内默认 `/data/opendeepwiki.db`，本地运行建议改为项目目录下的相对路径）。
 </Step>
 
 <Step>
@@ -78,7 +78,7 @@ export WIKI_CONTENT_API_KEY=your-api-key
 dotnet run --project src/OpenDeepWiki/OpenDeepWiki.csproj
 ```
 
-API 默认在 `http://localhost:5000` 启动（检查 `Properties/launchSettings.json` 获取确切端口）。
+API 默认在 `http` launch profile 下监听 `http://localhost:5265`（检查 `Properties/launchSettings.json` 获取确切端口）。开发环境下可通过 `/v1/scalar` 查看 OpenAPI 文档。
 </Step>
 
 <Step>
@@ -94,7 +94,7 @@ npm install
 创建或编辑 `web/.env.local` 以指向你的本地后端：
 
 ```bash title="web/.env.local"
-API_PROXY_URL=http://localhost:5000
+API_PROXY_URL=http://localhost:5265
 ```
 
 然后启动开发服务器：
@@ -144,25 +144,26 @@ OpenDeepWiki/
 dotnet test tests/OpenDeepWiki.Tests/OpenDeepWiki.Tests.csproj
 ```
 
-### 前端 lint
+### 前端测试与 lint
 
 ```bash
 cd web
-npm run lint
+npm test        # Vitest 单元测试
+npm run lint    # ESLint 检查
 ```
 
 ## 常见问题
 
 ### 后端构建失败
 
-- 确保你有 .NET 10 预览版 SDK：`dotnet --list-sdks`
+- 确保你有 .NET 10 SDK：`dotnet --list-sdks`
 - 从仓库根目录运行 `dotnet restore` 以恢复 NuGet 包
 
 ### 前端无法连接到后端
 
-- 验证后端正在运行并检查 `Properties/launchSettings.json` 中的端口
+- 验证后端正在运行并检查 `Properties/launchSettings.json` 中的端口（默认 `5265`）
 - 确保 `web/.env.local` 中的 `API_PROXY_URL` 与后端 URL 匹配
 
 ### 数据库迁移错误
 
-后端在启动时自动应用迁移。如果遇到问题，可以删除本地 `opendeepwiki.db` 文件并重启 — 它会被重新创建。
+后端在启动时自动应用迁移。如果遇到问题，可以删除本地 SQLite 数据库文件并重启 — 它会被重新创建。

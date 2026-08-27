@@ -40,7 +40,17 @@ environment:
 
 对于生产工作负载，推荐使用 PostgreSQL。它提供更好的并发性、可扩展性和数据完整性。
 
-### 使用 PostgreSQL 的 Docker Compose
+### 使用仓库自带的 PostgreSQL 编排
+
+仓库根目录提供 `compose.pgsql.yaml`，包含 PostgreSQL 服务和已配置好的后端连接：
+
+```bash
+docker compose -f compose.pgsql.yaml up -d --build
+```
+
+该编排中后端在数据库健康检查通过后才启动，默认连接串为 `Host=postgres;Port=5432;Database=opendeepwiki;Username=postgres;Password=opendeepwiki123`（生产环境请修改）。
+
+### 自定义 Docker Compose
 
 将 PostgreSQL 服务添加到你的 `compose.yaml`：
 
@@ -131,8 +141,8 @@ OpenDeepWiki 在启动时自动运行数据库迁移。无需手动迁移步骤 
 
 | 变量 | 值 | 默认值 | 描述 |
 |---|---|---|---|
-| `DB_TYPE` | `sqlite`、`postgresql` | `sqlite` | 数据库后端类型 |
-| `CONNECTION_STRING` | 连接字符串 | `Data Source=/data/opendeepwiki.db` | 数据库连接字符串 |
+| `DB_TYPE` / `Database__Type` | `sqlite`、`postgresql` | `sqlite` | 数据库后端类型 |
+| `CONNECTION_STRING` / `ConnectionStrings__Default` | 连接字符串 | `Data Source=/data/opendeepwiki.db` | 数据库连接字符串 |
 
 数据库类型也可以通过 `appsettings.json` 设置：
 

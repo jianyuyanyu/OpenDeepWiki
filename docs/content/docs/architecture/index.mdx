@@ -30,17 +30,19 @@ graph TB
         API --> WikiGen["Wiki 生成器"]
         API --> ChatService["聊天助手"]
         API --> AdminService["管理服务"]
-        
-        WikiGen --> AgentFactory["AgentFactory (AI)"]
+
+        WikiGen --> AgentFactory["AgentFactory (Microsoft.Agents.AI)"]
         WikiGen --> PromptPlugin["提示模板"]
         ChatService --> AgentFactory
-        
-        RepoService --> RepoAnalyzer["仓库分析器\n(LibGit2Sharp)"]
-        
+
+        RepoService --> RepoAnalyzer["仓库分析器\n(LibGit2Sharp / ZIP / 本地目录)"]
+
         Workers["后台工作者"]
         Workers --> RepoWorker["RepositoryProcessingWorker"]
+        Workers --> BranchGenWorker["BranchGenerationWorker"]
         Workers --> TransWorker["TranslationWorker"]
         Workers --> MindMapWorker["MindMapWorker"]
+        Workers --> GraphifyWorker["GraphifyArtifactWorker"]
         Workers --> IncrWorker["IncrementalUpdateWorker"]
     end
 
@@ -68,16 +70,17 @@ graph TB
 | 模块 | 位置 | 描述 |
 |--------|----------|-------------|
 | API 端点 | `src/OpenDeepWiki/Endpoints/` | 最小 API 端点定义，按域组织 |
-| 管理端点 | `src/OpenDeepWiki/Endpoints/Admin/` | 管理员专用端点（仓库、用户、角色、工具等） |
-| 服务 | `src/OpenDeepWiki/Services/` | 业务逻辑层，涵盖仓库、wiki 生成、聊天、管理等 |
+| 管理端点 | `src/OpenDeepWiki/Endpoints/Admin/` | 管理员专用端点（仓库、用户、角色、部门、API Key、工具等） |
+| 服务 | `src/OpenDeepWiki/Services/` | 业务逻辑层，涵盖仓库、wiki 生成、聊天、Graphify、管理等 |
 | 代理 | `src/OpenDeepWiki/Agents/` | 通过 `AgentFactory` 的 AI 代理编排，支持多个 LLM 提供商 |
-| Chat 系统 | `src/OpenDeepWiki/Chat/` | 多平台聊天系统（飞书、QQ、微信等 Webhook 集成） |
+| Chat 系统 | `src/OpenDeepWiki/Chat/` | 多平台聊天系统（飞书、QQ、微信、Slack 等 Webhook 集成） |
 | 实体 | `src/OpenDeepWiki.Entities/` | 域实体定义（Repository、DocCatalog、User 等） |
 | EF Core | `src/OpenDeepWiki.EFCore/` | 共享 `MasterDbContext` 基类和 `IContext` 接口 |
 | 数据库提供商 | `src/EFCore/` | SQLite 和 PostgreSQL 特定的 DbContext 实现 |
 | 前端应用 | `web/app/` | Next.js App Router 页面和布局 |
 | 组件 | `web/components/` | 可复用的 React UI 组件 |
 | Hooks | `web/hooks/` | 自定义 React hooks（聊天历史、翻译、滚动等） |
+| 测试 | `tests/OpenDeepWiki.Tests/` | xUnit + FsCheck 后端测试；前端 Vitest 位于 `web/lib/__tests__/` |
 
 ## 请求流程
 
@@ -92,8 +95,9 @@ graph TB
 
 ## 关键设计决策
 
-- **最小 API** — 后端使用 ASP.NET Core 最小 API 而不是控制器，保持端点定义简洁并按域组织
-- **多提供商 AI** — `AgentFactory` 抽象了 LLM 提供商差异，通过统一接口支持 OpenAI、Azure OpenAI 和 Anthropic
+- **最小 API** — 后端使用 ASP.NET Core 最小 API（借助 `Making.MiniApis` 基础设施）而不是控制器，保持端点定义简洁并按域组织
+- **多提供商 AI** — `AgentFactory` 抽象了 LLM 提供商差异，通过统一接口支持 OpenAI、Azure OpenAI、Anthropic 和 DeepSeek（含 Responses API 与思考模式）
 - **分离的生成模型** — Wiki 生成支持为目录结构、内容生成和翻译使用不同的 AI 模型，允许成本/质量优化
-- **后台工作者** — 长时间运行的任务（仓库处理、翻译、思维导图生成、增量更新）作为 `IHostedService` 后台工作者运行
+- **后台工作者** — 长时间运行的任务（仓库准备、分支生成、翻译、思维导图、Graphify 产物、增量更新）作为 `BackgroundService` 后台工作者运行
+- **扫描计划解析** — 大型仓库按规模自动解析目录树深度与文件数预算（`RepositoryScanPlanResolver`），控制 AI 上下文成本
 - **数据库抽象** — `MasterDbContext` 提供共享基类，SQLite 和 PostgreSQL 实现可通过配置选择

@@ -93,7 +93,7 @@ describe('ImageUpload Property Tests', () => {
             
             expect(result.valid).toBe(false)
             expect(result.error).toBeDefined()
-            expect(result.error).toContain('不支持的图片格式')
+            expect(result.error).toContain('Unsupported image format')
             
             return true
           }
@@ -113,7 +113,7 @@ describe('ImageUpload Property Tests', () => {
             
             expect(result.valid).toBe(false)
             expect(result.error).toBeDefined()
-            expect(result.error).toContain('超过限制')
+            expect(result.error).toContain('exceeds the 10MB limit')
             
             return true
           }
@@ -148,7 +148,7 @@ describe('ImageUpload Property Tests', () => {
             
             expect(result.valid).toBe(false)
             expect(result.error).toBeDefined()
-            expect(result.error).toContain('不支持的图片格式')
+            expect(result.error).toContain('Unsupported image format')
             
             return true
           }

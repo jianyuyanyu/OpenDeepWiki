@@ -26,11 +26,11 @@ function readServerApiProxyUrlFromEnvFiles(): string {
     ];
 
     for (const envFile of envFiles) {
-      if (!fs.existsSync(envFile)) {
+      if (!fs.existsSync(/*turbopackIgnore: true*/ envFile)) {
         continue;
       }
 
-      const parsed = dotenv.parse(fs.readFileSync(envFile));
+      const parsed = dotenv.parse(fs.readFileSync(/*turbopackIgnore: true*/ envFile));
       const apiProxyUrl = parsed.API_PROXY_URL?.trim();
       if (apiProxyUrl) {
         cachedServerApiProxyUrl = apiProxyUrl;
